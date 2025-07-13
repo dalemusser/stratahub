@@ -1,0 +1,16 @@
+{{ define "content" }}
+<h1 class="text-3xl font-bold mb-4">About StrataHub</h1>
+
+<p class="mb-2">
+  StrataHub is the central portal for students, teachers, and researchers to
+  access educational WebGL games, dashboards, and logs—all powered by the Strata
+  suite and gowebcore.
+</p>
+
+<p class="text-sm text-gray-600">
+  © {{ now.Year }} StrataHub. All rights reserved.
+</p>
+{{ end }}
+
+{{/* If you use a shared base layout: */}}
+{{ template "base.html" . }}
