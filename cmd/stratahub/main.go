@@ -6,43 +6,37 @@ import (
 	"log"
 	"os"
 
-	"github.com/dalemusser/gowebcore/auth"
+	"github.com/go-chi/chi/v5"
+
 	"github.com/dalemusser/gowebcore/config"
 	"github.com/dalemusser/gowebcore/db"
 	"github.com/dalemusser/gowebcore/logger"
 	"github.com/dalemusser/gowebcore/server"
-	"github.com/go-chi/chi/v5"
 
 	"github.com/dalemusser/stratahub/internal/platform/handler"
+	"github.com/dalemusser/stratahub/internal/platform/session"
 	"github.com/dalemusser/stratahub/internal/routes"
 )
 
-/*
----------------------------------------------------------------------------
-Application-specific configuration additions
----------------------------------------------------------------------------
-config.Base already gives you:
+/*─────────────────────────────────────────────────────────────────────────────*
+| Extended application configuration                                         |
+*─────────────────────────────────────────────────────────────────────────────*/
 
-  - Addr        string   (":8080" etc.)
-  - EnableTLS   bool     (true → Let’s Encrypt or cert / key)
-  - LogLevel    string   ("info", "debug" …)
-
-We embed it and extend with the fields StrataHub needs.
-*/
 type AppCfg struct {
-	config.Base
-
-	MongoURI string `mapstructure:"mongo_uri"`
-	MongoDB  string `mapstructure:"mongo_db"`
-
-	// Two secrets for the secure-cookie session (required by gowebcore/auth)
-	SessionHashKey  string `mapstructure:"session_hash_key"`  // 32–64 chars
-	SessionBlockKey string `mapstructure:"session_block_key"` // 16, 24, 32 chars
+	config.Base            // addr, TLS flags, log-level, …
+	MongoURI        string `mapstructure:"mongo_uri"`
+	MongoDB         string `mapstructure:"mongo_db"`
+	SessionHashKey  string `mapstructure:"session_hash_key"`  // ≥32 rand chars
+	SessionBlockKey string `mapstructure:"session_block_key"` // 16/24/32 chars
 }
+
+/*─────────────────────────────────────────────────────────────────────────────*
+| Entry point                                                                 |
+*─────────────────────────────────────────────────────────────────────────────*/
 
 func main() {
 	//----------------------------------------------------------------------
-	// 1. Load configuration (flags → env → file → defaults).
+	// 1. Load configuration (flags → env → YAML → defaults)
 	//----------------------------------------------------------------------
 	var cfg AppCfg
 	if err := config.Load(&cfg, config.WithEnvPrefix("STRATA")); err != nil {
@@ -50,32 +44,31 @@ func main() {
 	}
 
 	//----------------------------------------------------------------------
-	// 2. Initialise structured slog logger at the configured level.
+	// 2. Initialise structured slog via gowebcore
 	//----------------------------------------------------------------------
 	logger.Init(cfg.LogLevel)
 
 	//----------------------------------------------------------------------
-	// 3. Build shared infrastructure: DB manager and auth session.
+	// 3. Shared infrastructure (DB, sessions, handler)
 	//----------------------------------------------------------------------
-	mgr := db.NewManager()
-	// Example: _ = mgr.Register("primary", cfg.MongoURI, cfg.MongoDB)
+	dbMgr := db.NewManager()
+	// Example: _ = dbMgr.Register("primary", cfg.MongoURI, cfg.MongoDB)
 
-	// auth.NewSession(hashKey, blockKey) – both are []byte
-	sess := auth.NewSession(
+	sessMgr := session.New(
 		[]byte(cfg.SessionHashKey),
 		[]byte(cfg.SessionBlockKey),
 	)
 
-	h := handler.New(&cfg.Base, mgr, sess)
+	h := handler.New(&cfg.Base, dbMgr, sessMgr)
 
 	//----------------------------------------------------------------------
-	// 4. Compose the router and mount every feature slice.
+	// 4. Compose router and mount all feature slices
 	//----------------------------------------------------------------------
 	r := chi.NewRouter()
 	routes.RegisterAll(r, h)
 
 	//----------------------------------------------------------------------
-	// 5. Start the HTTP(S) server.  For Let’s Encrypt pass empty cert / key.
+	// 5. Start HTTP(S) server   (Let’s Encrypt auto-handled when EnableTLS=true)
 	//----------------------------------------------------------------------
 	srv := server.New(cfg.Base, r)
 

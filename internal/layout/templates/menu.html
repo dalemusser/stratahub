@@ -1,0 +1,104 @@
+{{/* ─────────────────────────────────────────────────────────────────────────────
+   Dynamic menu dispatcher – choose a role-specific sub-template at runtime
+   (no custom template funcs are required)
+─────────────────────────────────────────────────────────────────────────────*/}}
+{{ define "menu" }}
+  {{ if eq .Role "admin" }}
+    {{ template "menu_admin" . }}
+  {{ else if eq .Role "leader" }}
+    {{ template "menu_leader" . }}
+  {{ else if eq .Role "player" }}
+    {{ template "menu_player" . }}
+  {{ else }}
+    {{ template "menu_visitor" . }}
+  {{ end }}
+{{ end }}
+
+{{/* ─────────────────────────────  Admin  ──────────────────────────────*/}}
+{{ define "menu_admin" }}
+<div class="mb-6">
+  <h1 class="text-xl font-bold text-indigo-600">Adroit Games</h1>
+  {{ if .IsLoggedIn }}
+    <div class="mt-2 text-gray-600 text-xs">
+      <div class="font-semibold">{{ .UserName }}</div>
+      <div>{{ .Role }}</div>
+    </div>
+  {{ end }}
+</div>
+
+<nav class="space-y-2 text-sm">
+  <a class="block hover:text-indigo-600" href="/admin/dashboard">📊 Dashboard</a>
+  <a class="block hover:text-indigo-600" href="/admin/organizations">🏢 Organizations</a>
+  <a class="block hover:text-indigo-600" href="/admin/leaders">👑 Leaders</a>
+  <a class="block hover:text-indigo-600" href="/admin/groups">👥 Groups</a>
+  <a class="block hover:text-indigo-600" href="/admin/players">⛹️‍♀️ Players</a>
+  <a class="block hover:text-indigo-600" href="/admin/games">🎮 Games</a>
+
+  {{ template "menu_common" . }}
+</nav>
+{{ end }}
+
+{{/* ─────────────────────────────  Leader  ─────────────────────────────*/}}
+{{ define "menu_leader" }}
+<div class="mb-6">
+  <h1 class="text-xl font-bold text-indigo-600">Adroit Games</h1>
+  {{ if .IsLoggedIn }}
+    <div class="mt-2 text-gray-600 text-xs">
+      <div class="font-semibold">{{ .UserName }}</div>
+      <div>{{ .Role }}</div>
+    </div>
+  {{ end }}
+</div>
+
+<nav class="space-y-2 text-sm">
+  <a class="block hover:text-indigo-600" href="/leader/dashboard">📊 Dashboard</a>
+  <a class="block hover:text-indigo-600" href="/leader/groups">👥 Groups</a>
+  <a class="block hover:text-indigo-600" href="/leader/players">🧩 Players</a>
+
+  {{ template "menu_common" . }}
+</nav>
+{{ end }}
+
+{{/* ─────────────────────────────  Player  ─────────────────────────────*/}}
+{{ define "menu_player" }}
+<div class="mb-6">
+  <h1 class="text-xl font-bold text-indigo-600">Adroit Games</h1>
+  {{ if .IsLoggedIn }}
+    <div class="mt-2 text-gray-600 text-xs">
+      <div class="font-semibold">{{ .UserName }}</div>
+      <div>{{ .Role }}</div>
+    </div>
+  {{ end }}
+</div>
+
+<nav class="space-y-2 text-sm">
+  <a class="block hover:text-indigo-600" href="/player/dashboard">📊 Dashboard</a>
+  <a class="block hover:text-indigo-600" href="/player/games">🎮 Games</a>
+
+  {{ template "menu_common" . }}
+</nav>
+{{ end }}
+
+{{/* ───────────────────────────── Visitor  ────────────────────────────*/}}
+{{ define "menu_visitor" }}
+<div class="mb-6">
+  <h1 class="text-xl font-bold text-indigo-600">Adroit Games</h1>
+</div>
+
+<nav class="space-y-2 text-sm">
+  {{ template "menu_common" . }}
+</nav>
+{{ end }}
+
+{{/* ───────────────────────────── Shared links  ───────────────────────*/}}
+{{ define "menu_common" }}
+  <a class="block hover:text-indigo-600" href="/about">ℹ️ About</a>
+  <a class="block hover:text-indigo-600" href="/contact">📧 Contact</a>
+  <a class="block hover:text-indigo-600" href="/terms">📜 Terms</a>
+
+  {{ if .IsLoggedIn }}
+    <a class="block text-red-500 hover:underline" href="/logout">🚪 Logout</a>
+  {{ else }}
+    <a class="block hover:text-indigo-600" href="/login">🔐 Login</a>
+  {{ end }}
+{{ end }}

@@ -5,6 +5,7 @@ go 1.24.1
 require (
 	github.com/dalemusser/gowebcore v0.8.0
 	github.com/go-chi/chi/v5 v5.0.10
+	github.com/gorilla/sessions v1.4.0
 )
 
 require (
@@ -20,7 +21,7 @@ require (
 	github.com/golang-jwt/jwt/v4 v4.5.2 // indirect
 	github.com/golang-jwt/jwt/v5 v5.2.0 // indirect
 	github.com/golang/snappy v0.0.1 // indirect
-	github.com/gorilla/securecookie v1.1.1 // indirect
+	github.com/gorilla/securecookie v1.1.2 // indirect
 	github.com/hashicorp/hcl v1.0.0 // indirect
 	github.com/jonboulle/clockwork v0.5.0 // indirect
 	github.com/justinas/nosurf v1.2.0 // indirect
