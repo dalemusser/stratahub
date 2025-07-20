@@ -1,0 +1,33 @@
+##############################################################################
+# StrataHub – example configuration (TOML)                                  #
+# Place alongside cmd/stratahub/ or pass with --config path/to/config.toml   #
+##############################################################################
+
+##############################################################################
+# Base server settings (embed config.Base)                                   #
+##############################################################################
+# Plain-HTTP listener; gowebcore falls back to 8080 if unset
+http_port  = 8080               
+
+# Optional TLS settings (leave empty for local dev)
+enable_tls = false               # Let’s Encrypt autocert if true + domain
+https_port = 8443
+domain     = ""                  # e.g. "example.com"
+cert_file  = ""                  # static cert (leave empty for autocert)
+key_file   = ""                  # static key
+
+# Logging
+log_level  = "debug"             # debug | info | warn | error
+
+##############################################################################
+# Mongo / DocumentDB                                                        #
+##############################################################################
+mongo_uri  = "mongodb://localhost:27017"
+mongo_db   = "stratahub"
+
+##############################################################################
+# Session keys (32-byte hash, 16/24/32-byte block)                          #
+# Generate with:  head -c32 /dev/urandom | base64                            #
+##############################################################################
+session_hash_key  = "P/68Rr2oIA14di2sP9GrVBxlqk803RUnJWxxQAyMxJ4="
+session_block_key = "Sg28fh67J0JCKO3Z"     # 16 bytes for AES-128

@@ -1,16 +1,17 @@
+// internal/features/login/routes.go
 package login
 
 import (
 	"context"
 	"embed"
 	"html/template"
-	"log/slog"
 	"net/http"
 	"regexp"
 	"strings"
 	"sync"
 	"time"
 
+	"github.com/dalemusser/gowebcore/logger"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -20,7 +21,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/platform/handler"
 )
 
-/*───────── embedded templates ─────────*/
+/*──────────────────── embedded templates ────────────────────*/
 
 //go:embed templates/*.html
 var views embed.FS
@@ -36,7 +37,7 @@ func parseTemplates() *template.Template {
 	return t
 }
 
-/*───────── form view-model ─────────*/
+/*──────────────────── view-model for form ─────────────────────*/
 
 type formData struct {
 	Title                 string
@@ -45,7 +46,7 @@ type formData struct {
 	Role, UserName, Email string
 }
 
-/*───────── handler struct & routes ─────────*/
+/*──────────────────────── route handler ──────────────────────*/
 
 type LoginHandler struct{ h *handler.Handler }
 
@@ -79,7 +80,7 @@ func (lh *LoginHandler) handlePost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	/*─ look-up user (case-insensitive) ─*/
+	/*────────── lookup user (case-insensitive) ──────────*/
 
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
@@ -106,17 +107,14 @@ func (lh *LoginHandler) handlePost(w http.ResponseWriter, r *http.Request) {
 		lh.renderErr(w, r, "No account found for that email address.", email)
 		return
 	case nil:
-		// continue
+		// found – continue
 	default:
-		slog.Error("db find user",
-			slog.String("email", email),
-			slog.Any("err", err),
-		)
+		logger.Error("db find user", "email", email, "err", err)
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return
 	}
 
-	/*─ create session & redirect ─*/
+	/*────────── create session & redirect ──────────*/
 
 	lh.h.Session.Login(
 		w, r,
@@ -129,12 +127,12 @@ func (lh *LoginHandler) handlePost(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/admin/dashboard", http.StatusSeeOther)
 	case "leader":
 		http.Redirect(w, r, "/leader/dashboard", http.StatusSeeOther)
-	default:
+	default: // player / visitor
 		http.Redirect(w, r, "/player/dashboard", http.StatusSeeOther)
 	}
 }
 
-/*────────── helpers ──────────*/
+/*──────────────────── helper renders ───────────────────────*/
 
 func (lh *LoginHandler) render(w http.ResponseWriter, r *http.Request, d formData) {
 	tplOnce.Do(func() { tpl = parseTemplates() })

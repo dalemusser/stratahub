@@ -7,14 +7,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dalemusser/gowebcore/logger"
 	"github.com/go-chi/chi/v5"
 
 	"github.com/dalemusser/stratahub/internal/layout" // shared base + menu
 	"github.com/dalemusser/stratahub/internal/platform/handler"
 )
 
-// ────────────────────────────── Embedded slice templates ──────────────────────
-//
+/*──────────────────────── embedded slice templates ──────────────*/
 
 //go:embed templates/*.html
 var views embed.FS
@@ -34,26 +34,27 @@ func parseTemplates() *template.Template {
 		Funcs(funcs).
 		ParseFS(layout.Views, "templates/*.html")
 	if err != nil {
-		panic("contact: layout parse failed: " + err.Error())
+		logger.Error("contact: layout parse failed", "err", err)
+		panic(err)
 	}
 
 	// 2) slice-specific templates
 	if _, err := t.ParseFS(views, "templates/*.html"); err != nil {
-		panic("contact: slice parse failed: " + err.Error())
+		logger.Error("contact: slice parse failed", "err", err)
+		panic(err)
 	}
 	return t
 }
 
-// ────────────────────────────── Route registration ────────────────────────────
+/*────────────────────────── route registration ───────────────────*/
 
 // MountRoutes attaches GET /contact.
 func MountRoutes(r chi.Router, h *handler.Handler) {
 	r.Get("/contact", func(w http.ResponseWriter, r *http.Request) {
-
 		// lazy, thread-safe template parse
 		tplOnce.Do(func() { tpl = parseTemplates() })
 
-		// minimal view-model; add Role / UserName if you need the menu logic
+		// minimal view-model; add role / user if menu logic needs it
 		data := struct {
 			Title      string
 			Role       string
@@ -67,8 +68,8 @@ func MountRoutes(r chi.Router, h *handler.Handler) {
 		}
 
 		if err := tpl.ExecuteTemplate(w, "base", data); err != nil {
-			http.Error(w, "template error: "+err.Error(),
-				http.StatusInternalServerError)
+			logger.Error("contact: render failed", "err", err)
+			http.Error(w, "template error", http.StatusInternalServerError)
 		}
 	})
 }

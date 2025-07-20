@@ -7,13 +7,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dalemusser/gowebcore/logger"
 	"github.com/go-chi/chi/v5"
 
-	"github.com/dalemusser/stratahub/internal/layout" // base + menu
+	"github.com/dalemusser/stratahub/internal/layout" // shared base + menu
 	"github.com/dalemusser/stratahub/internal/platform/handler"
 )
 
-/*─────────────────── embedded slice templates ───────────────────*/
+/*────────────────── embedded slice templates ──────────────────*/
 
 //go:embed templates/*.html
 var views embed.FS
@@ -30,17 +31,19 @@ func parseTemplates() *template.Template {
 	t, err := template.New("").Funcs(funcs).
 		ParseFS(layout.Views, "templates/*.html")
 	if err != nil {
-		panic("terms: layout parse failed: " + err.Error())
+		logger.Error("terms: layout parse failed", "err", err)
+		panic(err)
 	}
 
 	// 2) this slice’s templates
 	if _, err := t.ParseFS(views, "templates/*.html"); err != nil {
-		panic("terms: slice parse failed: " + err.Error())
+		logger.Error("terms: slice parse failed", "err", err)
+		panic(err)
 	}
 	return t
 }
 
-/*────────────────────── route registration ─────────────────────*/
+/*───────────────────── route registration ────────────────────*/
 
 func MountRoutes(r chi.Router, h *handler.Handler) {
 	r.Get("/terms", func(w http.ResponseWriter, r *http.Request) {
@@ -59,8 +62,8 @@ func MountRoutes(r chi.Router, h *handler.Handler) {
 		}
 
 		if err := tpl.ExecuteTemplate(w, "base", view); err != nil {
-			http.Error(w, "template error: "+err.Error(),
-				http.StatusInternalServerError)
+			logger.Error("terms: render failed", "err", err)
+			http.Error(w, "template error", http.StatusInternalServerError)
 		}
 	})
 }

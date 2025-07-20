@@ -1,3 +1,4 @@
+// internal/features/about/routes.go
 package about
 
 import (
@@ -7,21 +8,19 @@ import (
 	"sync"
 	"time"
 
+	"github.com/dalemusser/gowebcore/logger"
 	"github.com/go-chi/chi/v5"
 
-	// shared layout (base.html, footer partials, …)
+	// shared layout (base.html, menu, footer …)
 	"github.com/dalemusser/stratahub/internal/layout"
 	"github.com/dalemusser/stratahub/internal/platform/handler"
 )
 
-// --------------------------------------------------------------------
-// 1.  Slice-local templates
-// --------------------------------------------------------------------
+/*─────────────────────────── slice-local templates ──────────────────────────*/
 
 //go:embed templates/*.html
 var views embed.FS
 
-// lazy-parsed template set
 var (
 	tplOnce sync.Once
 	tpl     *template.Template
@@ -30,39 +29,38 @@ var (
 func parseTemplates() *template.Template {
 	funcs := template.FuncMap{"now": time.Now}
 
-	// 1) Parse the shared layout first.
-	t, err := template.New("").
-		Funcs(funcs).
+	// 1) shared layout / partials
+	t, err := template.New("").Funcs(funcs).
 		ParseFS(layout.Views, "templates/*.html")
 	if err != nil {
-		panic("about: layout parse failed: " + err.Error())
+		logger.Error("about: layout parse failed", "err", err)
+		panic(err)
 	}
 
-	// 2) Add this slice’s templates.
+	// 2) this slice’s templates
 	if _, err := t.ParseFS(views, "templates/*.html"); err != nil {
-		panic("about: slice parse failed: " + err.Error())
+		logger.Error("about: slice parse failed", "err", err)
+		panic(err)
 	}
 	return t
 }
 
-// --------------------------------------------------------------------
-// 2.  Route registration
-// --------------------------------------------------------------------
+/*──────────────────────────── route registration ───────────────────────────*/
 
-// MountRoutes attaches GET /about.
+// MountRoutes attaches GET /about to the router.
 func MountRoutes(r chi.Router, h *handler.Handler) {
 	r.Get("/about", func(w http.ResponseWriter, r *http.Request) {
-		// Parse & cache once.
+		// parse & cache once
 		tplOnce.Do(func() { tpl = parseTemplates() })
 
 		data := map[string]any{
 			"title": "About StrataHub",
-			// you can add h.Session or user data here later
+			// add user/session info when needed
 		}
-		// --- Render the shared layout ("base") ---
+
 		if err := tpl.ExecuteTemplate(w, "base", data); err != nil {
-			http.Error(w, "template error: "+err.Error(),
-				http.StatusInternalServerError)
+			logger.Error("about: render failed", "err", err)
+			http.Error(w, "template error", http.StatusInternalServerError)
 		}
 	})
 }
