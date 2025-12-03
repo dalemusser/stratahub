@@ -1,0 +1,25 @@
+{{ define "layout" }}
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-gray-100">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Adroit Games</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/htmx.org@1.9.5"></script>
+  </head>
+
+  <body class="h-full">
+    <div class="flex h-screen">
+      <!-- Sidebar -->
+      <aside class="w-40 bg-white shadow-md p-4 flex flex-col">
+        {{ template "menu" . }}
+      </aside>
+
+      <!-- Main Content -->
+      <main class="flex-1 p-6 overflow-auto" id="content">
+        {{ block "content" . }}{{ end }}
+      </main>
+    </div>
+  </body>
+</html>
+{{ end }}
