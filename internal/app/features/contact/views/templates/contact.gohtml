@@ -1,0 +1,46 @@
+{{ define "contact" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<!-- Heading outside white box -->
+<div class="mb-4">
+  <h1 class="text-2xl font-bold text-gray-900">📧 Contact</h1>
+</div>
+
+<!-- White box containing contact info, using text-sm for smaller font -->
+<div class="p-4 bg-white rounded shadow text-gray-700 leading-relaxed text-sm">
+  <div class="space-y-3">
+    <!-- Email -->
+    <p>
+      <span class="font-semibold">Email:</span>
+      <a
+        href="mailto:GriffinJG@missouri.edu"
+        class="text-indigo-600 hover:underline"
+      >
+        GriffinJG@missouri.edu
+      </a>
+    </p>
+
+    <!-- Phone -->
+    <p>
+      <span class="font-semibold">Phone:</span>
+      <a
+        href="tel:3147951979"
+        class="text-indigo-600 hover:underline"
+      >
+        (314) 795-1979
+      </a>
+    </p>
+
+    <!-- Address -->
+    <p>
+      <span class="font-semibold">Address:</span><br />
+      Adroit Studios<br />
+      104 Townsend Hall<br />
+      University of Missouri<br />
+      Columbia, MO 65211
+    </p>
+  </div>
+</div>
+{{ end }}
