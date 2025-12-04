@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"net/http"
 
+	dashboardfeature "github.com/dalemusser/stratahub/internal/app/features/dashboard"
+	_ "github.com/dalemusser/stratahub/internal/app/features/dashboard/views" // register dashboard templates
+
 	aboutfeature "github.com/dalemusser/stratahub/internal/app/features/about"
 	_ "github.com/dalemusser/stratahub/internal/app/features/about/views" // register about templates
 	contactfeature "github.com/dalemusser/stratahub/internal/app/features/contact"
@@ -20,7 +23,7 @@ import (
 	"github.com/dalemusser/waffle/app"
 	"github.com/dalemusser/waffle/config"
 	"github.com/dalemusser/waffle/templates"
-	wafflemongo "github.com/dalemusser/waffle/toolkit/mongo"
+	"github.com/dalemusser/waffle/toolkit/db/mongodb"
 	"github.com/go-chi/chi/v5"
 	"github.com/spf13/viper"
 	"go.uber.org/zap"
@@ -64,7 +67,7 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 }
 
 func ValidateConfig(coreCfg *config.CoreConfig, appCfg AppConfig, logger *zap.Logger) error {
-	if err := wafflemongo.ValidateURI(appCfg.StrataHubMongoURI); err != nil {
+	if err := mongodb.ValidateURI(appCfg.StrataHubMongoURI); err != nil {
 		logger.Error("invalid StrataHub Mongo URI", zap.Error(err))
 		return fmt.Errorf("invalid StrataHub Mongo URI: %w", err)
 	}
@@ -79,7 +82,7 @@ func ConnectDB(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig
 		zap.String("database", appCfg.StrataHubMongoDatabase),
 	)
 
-	client, err := wafflemongo.Connect(ctx, appCfg.StrataHubMongoURI, appCfg.StrataHubMongoDatabase)
+	client, err := mongodb.Connect(ctx, appCfg.StrataHubMongoURI, appCfg.StrataHubMongoDatabase)
 
 	if err != nil {
 		logger.Error("MongoDB connection failed", zap.Error(err))
@@ -137,6 +140,10 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	// Terms
 	termsHandler := termsfeature.NewHandler(logger)
 	r.Mount("/terms", termsfeature.Routes(termsHandler))
+
+	// Dashboard feature
+	dashboardHandler := dashboardfeature.NewHandler(deps.StrataHubMongoDatabase, logger)
+	r.Mount("/dashboard", dashboardfeature.Routes(dashboardHandler))
 
 	return r, nil
 }

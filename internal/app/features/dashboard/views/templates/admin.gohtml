@@ -1,0 +1,95 @@
+{{ define "admin_dashboard" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="mb-3">
+  <!-- Slightly smaller heading -->
+  <h1 class="text-2xl font-semibold text-gray-800">🎛️ Dashboard</h1>
+  <p class="text-gray-500 text-sm">Admin Panel</p>
+</div>
+
+<!-- Stats row with reduced gap, smaller padding -->
+<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 mb-4">
+
+  <!-- Organizations -->
+  <a
+    href="/admin/organizations?return={{ .CurrentPath | urlquery }}"
+    class="bg-white rounded-lg shadow p-2 text-center hover:bg-gray-50 transition block"
+  >
+    <div class="text-gray-500 text-xs">Organizations</div>
+    <div class="text-indigo-600 text-xl font-bold">{{ .OrganizationsCount }}</div>
+  </a>
+
+  <!-- Leaders -->
+  <a
+    href="/admin/leaders?return={{ .CurrentPath | urlquery }}"
+    class="bg-white rounded-lg shadow p-2 text-center hover:bg-gray-50 transition block"
+  >
+    <div class="text-gray-500 text-xs">Leaders</div>
+    <div class="text-indigo-600 text-xl font-bold">{{ .LeadersCount }}</div>
+  </a>
+
+  <!-- Groups -->
+  <a
+    href="/groups?return={{ .CurrentPath | urlquery }}"
+    class="bg-white rounded-lg shadow p-2 text-center hover:bg-gray-50 transition block"
+  >
+    <div class="text-gray-500 text-xs">Groups</div>
+    <div class="text-indigo-600 text-xl font-bold">{{ .GroupsCount }}</div>
+  </a>
+
+  <!-- Members -->
+  <a
+    href="/members?return={{ .CurrentPath | urlquery }}"
+    class="bg-white rounded-lg shadow p-2 text-center hover:bg-gray-50 transition block"
+  >
+    <div class="text-gray-500 text-xs">Members</div>
+    <div class="text-indigo-600 text-xl font-bold">{{ .MembersCount }}</div>
+  </a>
+
+  <!-- Resources -->
+  <a
+    href="/admin/resources?return={{ .CurrentPath | urlquery }}"
+    class="bg-white rounded-lg shadow p-2 text-center hover:bg-gray-50 transition block"
+  >
+    <div class="text-gray-500 text-xs">Resources</div>
+    <div class="text-indigo-600 text-xl font-bold">{{ .ResourcesCount }}</div>
+  </a>
+</div>
+
+<!-- Quick Actions area with smaller padding and buttons -->
+<div class="bg-white rounded-lg shadow p-2">
+  <!-- Slightly smaller subheading -->
+  <h2 class="text-base font-semibold text-gray-800 mb-2">Quick Actions</h2>
+
+  <!-- Quick action buttons are smaller -->
+  <div class="flex flex-wrap gap-2">
+    <!-- Link to Add Organization -->
+    <a
+      href="/admin/organizations/new?return={{ .CurrentPath | urlquery }}"
+      class="px-2 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 inline-block"
+    >
+      + Add Organization
+    </a>
+    <!-- Link to Add Leader -->
+    <a
+      href="/admin/leaders/new?return={{ .CurrentPath | urlquery }}"
+      class="px-2 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 inline-block"
+    >
+      + Add Leader
+    </a>
+    <!-- Link to Add Resource -->
+    <a
+      href="/admin/resources/new?return={{ .CurrentPath | urlquery }}"
+      class="px-2 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 inline-block"
+    >
+      + Add Resource
+    </a>
+    <!-- Link to Download Member Data -->
+    <a href="/reports/members?return={{ .CurrentPath | urlquery }}" class="px-2 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 inline-block">
+      Members Report (CSV)
+    </a>
+  </div>
+</div>
+{{ end }}

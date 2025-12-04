@@ -1,0 +1,51 @@
+{{ define "analyst_dashboard" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="mb-3">
+  <h1 class="text-2xl font-semibold text-gray-800">🎛️ Dashboard</h1>
+  <p class="text-gray-500 text-sm">Analyst Panel</p>
+</div>
+
+<!-- Stats row (same layout/scale as admin; no links) -->
+<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 mb-4">
+  <div class="bg-white rounded-lg shadow p-2 text-center">
+    <div class="text-gray-500 text-xs">Organizations</div>
+    <div class="text-indigo-600 text-xl font-bold">{{ .OrganizationsCount }}</div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-2 text-center">
+    <div class="text-gray-500 text-xs">Leaders</div>
+    <div class="text-indigo-600 text-xl font-bold">{{ .LeadersCount }}</div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-2 text-center">
+    <div class="text-gray-500 text-xs">Groups</div>
+    <div class="text-indigo-600 text-xl font-bold">{{ .GroupsCount }}</div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-2 text-center">
+    <div class="text-gray-500 text-xs">Members</div>
+    <div class="text-indigo-600 text-xl font-bold">{{ .MembersCount }}</div>
+  </div>
+
+  <div class="bg-white rounded-lg shadow p-2 text-center">
+    <div class="text-gray-500 text-xs">Resources</div>
+    <div class="text-indigo-600 text-xl font-bold">{{ .ResourcesCount }}</div>
+  </div>
+</div>
+
+<!-- Quick Actions (same container + sizing as admin) -->
+<div class="bg-white rounded-lg shadow p-2">
+  <h2 class="text-base font-semibold text-gray-800 mb-2">Quick Actions</h2>
+  <div class="space-x-2">
+    <a
+      href="/reports/Members?return={{ .CurrentPath | urlquery }}"
+      class="px-2 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 inline-block"
+    >
+      Members Report (CSV)
+    </a>
+  </div>
+</div>
+{{ end }}
