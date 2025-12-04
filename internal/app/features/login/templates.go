@@ -1,5 +1,5 @@
-// internal/app/features/contact/views/views.go
-package contact
+// internal/app/features/login/templates.go
+package login
 
 import (
 	"embed"
@@ -12,7 +12,7 @@ var FS embed.FS
 
 func init() {
 	templates.Register(templates.Set{
-		Name:     "contact",
+		Name:     "login",
 		FS:       FS,
 		Patterns: []string{"templates/*.gohtml"},
 	})

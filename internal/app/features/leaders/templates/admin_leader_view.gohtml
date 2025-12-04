@@ -1,0 +1,54 @@
+{{ define "admin_leader_view" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center mb-2">
+  <a href="{{ .BackURL }}"
+     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 mr-2"
+     title="Go back">
+    ← Back
+  </a>
+  <h1 class="text-2xl font-bold text-gray-900">👑 View Leader</h1>
+</div>
+
+<div class="bg-white rounded shadow p-4">
+  <div class="mb-4">
+    <label class="block text-sm font-semibold mb-1">Full Name</label>
+    <input type="text" class="w-full border rounded px-3 py-2 bg-gray-50" value="{{ .FullName }}" disabled>
+  </div>
+
+  <div class="mb-4">
+    <label class="block text-sm font-semibold mb-1">Email</label>
+    <input type="text" class="w-full border rounded px-3 py-2 bg-gray-50" value="{{ .Email }}" disabled>
+  </div>
+
+  <div class="mb-4">
+    <label class="block text-sm font-semibold mb-1">Organization</label>
+    <input type="text" class="w-full border rounded px-3 py-2 bg-gray-50" value="{{ .OrgName }}" disabled>
+  </div>
+
+  <div class="mb-4">
+    <label class="block text-sm font-semibold mb-1">Auth Method</label>
+    <input type="text" class="w-full border rounded px-3 py-2 bg-gray-50" value="{{ .Auth }}" disabled>
+  </div>
+
+  {{ if .Status }}
+  <div class="mb-2">
+    <label class="block text-sm font-semibold mb-1">Status</label>
+    <input type="text" class="w-full border rounded px-3 py-2 bg-gray-50" value="{{ .Status }}" disabled>
+  </div>
+  {{ end }}
+</div>
+
+<!-- Actions -->
+<div class="mt-4">
+  <a
+    href="/leaders/{{ .ID }}/edit?return={{ .BackURL | urlquery }}"
+    class="inline-block bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+  >
+    Edit Leader
+  </a>
+</div>
+
+{{ end }}

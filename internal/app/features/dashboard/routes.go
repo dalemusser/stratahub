@@ -6,34 +6,19 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-const (
-	AdminDashboard   = "/admin/dashboard"
-	AnalystDashboard = "/analyst/dashboard"
-	LeaderDashboard  = "/leader/dashboard"
-	MemberDashboard  = "/member/dashboard"
-)
-
+// Routes wires the dashboard feature under whatever mount point
+// the top-level router chooses (e.g., "/dashboard").
+//
+// The handler will dispatch to the appropriate role-specific view
+// based on the current user's role (admin, analyst, leader, member).
 func Routes(h *Handler) chi.Router {
 	r := chi.NewRouter()
 
+	// All dashboards require the user to be signed in.
 	r.Group(func(pr chi.Router) {
-		pr.Use(auth.RequireRole("admin"))
-		pr.Get(AdminDashboard, h.ServeAdmin)
-	})
-
-	r.Group(func(pr chi.Router) {
-		pr.Use(auth.RequireRole("analyst"))
-		pr.Get(AnalystDashboard, h.ServeAnalyst)
-	})
-
-	r.Group(func(pr chi.Router) {
-		pr.Use(auth.RequireRole("leader"))
-		pr.Get(LeaderDashboard, h.ServeLeader)
-	})
-
-	r.Group(func(pr chi.Router) {
-		pr.Use(auth.RequireRole("member"))
-		pr.Get(MemberDashboard, h.ServeMember)
+		pr.Use(auth.RequireSignedIn)
+		// Final path will be /dashboard when mounted at "/dashboard".
+		pr.Get("/", h.ServeDashboard)
 	})
 
 	return r

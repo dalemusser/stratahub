@@ -1,5 +1,5 @@
-// internal/app/features/about/views/views.go
-package about
+// internal/app/features/about/templates.go
+package dashboard
 
 import (
 	"embed"
@@ -12,7 +12,7 @@ var FS embed.FS
 
 func init() {
 	templates.Register(templates.Set{
-		Name:     "about",
+		Name:     "dashboard",
 		FS:       FS,
 		Patterns: []string{"templates/*.gohtml"},
 	})

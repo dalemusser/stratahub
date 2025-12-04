@@ -2,11 +2,13 @@ package auth
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 
 	"github.com/gorilla/sessions"
+	"go.uber.org/zap"
 )
 
 /*─────────────────────────────────────────────────────────────────────────────*
@@ -164,6 +166,48 @@ func RequireRole(allowed ...string) func(http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 		})
 	}
+}
+
+// InitSessionStore initializes the global session Store using the provided
+// session key and domain. The `secure` flag controls whether cookies are
+// marked Secure and which SameSite mode is used.
+//
+// In production (secure=true), cookies should be Secure + SameSite=None
+// (for cross-site use with HTTPS).
+// In local dev over http://localhost, use secure=false so cookies are accepted.
+func InitSessionStore(sessionKey, domain string, secure bool, logger *zap.Logger) error {
+	if sessionKey == "" {
+		return fmt.Errorf("session key is empty; provide ≥32 random chars")
+	}
+	if len(sessionKey) < 32 {
+		logger.Warn("session key is short; 32+ chars recommended",
+			zap.Int("length", len(sessionKey)))
+	}
+
+	store := sessions.NewCookieStore([]byte(sessionKey))
+	opts := &sessions.Options{
+		Domain:   domain,
+		Path:     "/",
+		Secure:   secure,
+		HttpOnly: true,
+	}
+
+	// SameSite handling: in prod with Secure cookies, we use None
+	// so cookies can be sent in cross-site contexts. In dev, Lax is fine.
+	if secure {
+		opts.SameSite = http.SameSiteNoneMode
+	} else {
+		opts.SameSite = http.SameSiteLaxMode
+	}
+
+	store.Options = opts
+	Store = store
+
+	logger.Info("session store initialized",
+		zap.Bool("secure", secure),
+		zap.String("domain", domain))
+
+	return nil
 }
 
 // helpers
