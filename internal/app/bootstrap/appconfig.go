@@ -8,4 +8,7 @@ type AppConfig struct {
 
 	StrataHubMongoURI      string
 	StrataHubMongoDatabase string
+
+	SessionKey    string
+	SessionDomain string
 }

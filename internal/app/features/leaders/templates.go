@@ -1,5 +1,5 @@
-// internal/app/features/terms/views/views.go
-package terms
+// internal/app/features/leaders/templates.go
+package leaders
 
 import (
 	"embed"
@@ -12,7 +12,7 @@ var FS embed.FS
 
 func init() {
 	templates.Register(templates.Set{
-		Name:     "terms",
+		Name:     "admin_leaders",
 		FS:       FS,
 		Patterns: []string{"templates/*.gohtml"},
 	})

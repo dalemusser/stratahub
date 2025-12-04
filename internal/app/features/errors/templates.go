@@ -1,5 +1,5 @@
-// internal/app/features/home/views/views.go
-package home
+// internal/app/features/errors/templates.go
+package errors
 
 import (
 	"embed"
@@ -12,7 +12,7 @@ var FS embed.FS
 
 func init() {
 	templates.Register(templates.Set{
-		Name:     "home",
+		Name:     "errors",
 		FS:       FS,
 		Patterns: []string{"templates/*.gohtml"},
 	})
