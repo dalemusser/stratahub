@@ -1,0 +1,82 @@
+{{ define "group_upload_csv" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center mb-2">
+  <a href="{{ .BackURL }}"
+     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 mr-2"
+     title="Go back">
+    ← Back
+  </a>
+  <h1 class="text-2xl font-bold text-gray-900">👥 Upload CSV to Group</h1>
+</div>
+
+<!-- Selected context -->
+<div class="text-sm text-gray-700 mb-3">
+  <span class="font-semibold">Group:</span> <span>{{ .GroupName }}</span>
+  <span class="mx-2 text-gray-400">•</span>
+  <span class="font-semibold">Organization:</span> <span>{{ .OrgName }}</span>
+</div>
+
+{{ if .Error }}
+  <div class="mb-3 text-sm text-red-800 bg-red-100 px-3 py-2 rounded">{{ .Error }}</div>
+{{ end }}
+{{ if .Success }}
+  <div class="mb-3 text-sm text-green-800 bg-green-100 px-3 py-2 rounded">{{ .Success }}</div>
+{{ end }}
+
+<div class="bg-white rounded shadow p-4 max-w-2xl">
+  <form method="post" action="/groups/{{ .GroupID }}/upload_csv" enctype="multipart/form-data" class="space-y-3">
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">CSV file</label>
+      <input type="file" name="csv" accept=".csv" required
+             class="block w-full text-sm text-gray-900 border border-gray-300 rounded cursor-pointer focus:outline-none focus:ring-2 focus:ring-indigo-400">
+    <!-- Format + allowed auth methods, same visual style -->
+    <p class="text-xs text-gray-500 mt-1">
+      Format (header row optional): <em>Full Name, Email, Auth Method</em>
+    </p>
+    <p class="text-xs text-gray-500 mt-1">
+      Allowed Auth Methods (case-insensitive): internal, google, classlink, clever, microsoft
+    </p>
+    </div>
+
+    <button type="submit" class="px-3 py-2 bg-purple-600 text-white rounded hover:bg-purple-700">Upload</button>
+  </form>
+
+  {{ if or .Created .Previously .SkippedCount }}
+  <hr class="my-4">
+  <div>
+    <h2 class="text-sm font-semibold text-gray-800 mb-2">Summary</h2>
+    <ul class="text-sm text-gray-700 space-y-1">
+      <li>New members created in org and added to the group: <span class="font-semibold">{{ .Created }}</span></li>
+      <li>Existing members in the org: <span class="font-semibold">{{ .Previously }}</span>
+        <ul class="ml-5 list-disc">
+          <li>Added to group now: <span class="font-semibold">{{ .AddedToGroup }}</span></li>
+          <li>Already in this group: <span class="font-semibold">{{ .AlreadyInGroup }}</span></li>
+        </ul>
+      </li>
+      <li>Skipped (already belong to a different organization): <span class="font-semibold">{{ .SkippedCount }}</span></li>
+    </ul>
+
+    {{ if .SkippedEmails }}
+      <div class="mt-3">
+        <h3 class="text-sm font-semibold text-gray-800 mb-1">Skipped emails (in other orgs)</h3>
+        <ul class="text-sm text-gray-700 list-disc ml-5">
+          {{ range .SkippedEmails }}
+            <li>{{ . }}</li>
+          {{ end }}
+        </ul>
+      </div>
+    {{ end }}
+
+    <div class="mt-4">
+      <a href="/groups/{{ .GroupID }}/upload_csv?return={{ urlquery .BackURL }}"
+         class="inline-flex items-center px-3 py-2 border rounded hover:bg-gray-50">
+        Upload another CSV
+      </a>
+    </div>
+  </div>
+  {{ end }}
+</div>
+{{ end }}

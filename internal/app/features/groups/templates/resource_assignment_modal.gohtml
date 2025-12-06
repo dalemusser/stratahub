@@ -1,0 +1,73 @@
+{{ define "group_manage_assignment_modal" }}
+<div class="fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/40"></div>
+  <div class="relative bg-white rounded-xl shadow max-w-lg w-full p-4 space-y-4">
+    <h2 class="text-lg font-semibold text-gray-900">Manage Assignment in {{ .GroupName }}</h2>
+    <p class="text-sm text-gray-600">
+      {{ .ResourceTitle }}{{ if .ResourceType }} ({{ .ResourceType }}){{ end }}
+    </p>
+
+    <div class="text-sm text-gray-700 space-y-1">
+      <p>Use the actions below to view, edit, or remove this resource assignment.</p>
+    </div>
+
+    <div class="flex flex-col gap-3 pt-2">
+      <!-- Centered action buttons -->
+      <div class="flex justify-center gap-2">
+        <!-- View Assignment -->
+        <a
+          href="/groups/{{ .GroupID }}/assign_resources/{{ .AssignmentID }}/view?return={{ .BackURL | urlquery }}"
+          class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+        >
+          View
+        </a>
+
+        <!-- Edit Assignment -->
+        <a
+          href="/groups/{{ .GroupID }}/assign_resources/{{ .AssignmentID }}/edit?return={{ .BackURL | urlquery }}"
+          class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+        >
+          Edit
+        </a>
+
+        <!-- Delete Assignment -->
+        <form
+          method="post"
+          action="/groups/{{ .GroupID }}/assign_resources/remove"
+          hx-post="/groups/{{ .GroupID }}/assign_resources/remove"
+          hx-target="#content"
+          hx-swap="innerHTML"
+          hx-replace-url="true"
+          hx-disable-element
+          hx-confirm="Are you sure you want to delete this resource assignment?"
+          hx-on:htmx:before-request="(function(btn){ btn.disabled = true; btn.setAttribute('aria-disabled','true'); })(this.querySelector('button'))"
+          hx-on:htmx:after-request="(function(btn){
+            var s=(event.detail&&event.detail.xhr)?event.detail.xhr.status:0;
+            if(s<200||s>=300){ btn.disabled=false; btn.removeAttribute('aria-disabled'); }
+          })(this.querySelector('button'))"
+        >
+          <input type="hidden" name="assignmentID" value="{{ .AssignmentID }}">
+          <input type="hidden" name="return" value="{{ .BackURL }}">
+          <button
+            type="submit"
+            class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+          >
+            Delete
+          </button>
+        </form>
+      </div>
+
+      <!-- Close bottom-left -->
+      <div class="flex justify-start">
+        <button
+          type="button"
+          class="px-3 py-1 border rounded text-sm text-gray-700 hover:bg-gray-50"
+          onclick="document.getElementById('modal-root').innerHTML=''"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{{ end }}

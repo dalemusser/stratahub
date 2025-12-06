@@ -1,0 +1,72 @@
+{{ define "member_new" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center mb-2">
+  <a href="{{ .BackURL }}"
+     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 mr-2"
+     title="Go back">
+    ← Back
+  </a>
+  <h1 class="text-2xl font-bold text-gray-900">⛹️ Add Member</h1>
+</div>
+
+{{ if .Error }}
+  <div class="mb-3 p-2 border border-red-300 bg-red-50 text-red-700 rounded">
+    {{ .Error }}
+  </div>
+{{ end }}
+
+<form method="post" action="/members" class="space-y-3 max-w-xl bg-white p-4 rounded border">
+
+  <input type="hidden" name="return" value="{{ .BackURL }}">
+
+  <!-- Full name -->
+  <div>
+    <label class="block text-sm font-medium mb-1">Full Name</label>
+    <input name="full_name" type="text" value="{{ .FullName }}" class="w-full border p-2 rounded" required />
+  </div>
+
+  <!-- Email -->
+  <div>
+    <label class="block text-sm font-medium mb-1">Email</label>
+    <input name="email" type="email" value="{{ .Email }}" class="w-full border p-2 rounded" required />
+  </div>
+
+  {{ if .OrgLocked }}
+    <input type="hidden" name="orgID" value="{{ .OrgHex }}">
+    <div class="text-sm text-gray-600">
+      Organization:
+      <span class="font-semibold">{{ .OrgName }}</span>
+      <span class="ml-1">(locked for your role)</span>
+    </div>
+  {{ else }}
+    <div>
+      <label class="block text-sm font-medium mb-1" for="orgID">Organization</label>
+      <select id="orgID" name="orgID" class="w-full border p-2 rounded" required>
+        <option value="">-- Select organization --</option>
+        {{ range .Orgs }}
+          <option value="{{ .ID.Hex }}" {{ if eq $.OrgHex (.ID.Hex) }}selected{{ end }}>
+            {{ .Name }}
+          </option>
+        {{ end }}
+      </select>
+    </div>
+  {{ end }}
+
+  <!-- Auth Method -->
+  <div>
+    <label class="block text-sm font-medium mb-1">Auth Method</label>
+    <select name="auth_method" class="w-full border p-2 rounded">
+      <option value="internal"  {{ if eq .Auth "internal" }}selected{{ end }}>internal</option>
+      <option value="google"    {{ if eq .Auth "google" }}selected{{ end }}>google</option>
+      <option value="classlink" {{ if eq .Auth "classlink" }}selected{{ end }}>classlink</option>
+      <option value="clever"    {{ if eq .Auth "clever" }}selected{{ end }}>clever</option>
+      <option value="microsoft" {{ if eq .Auth "microsoft" }}selected{{ end }}>microsoft</option>
+    </select>
+  </div>
+
+  <div class="pt-2"><button class="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Create Member</button></div>
+</form>
+{{ end }}

@@ -1,0 +1,85 @@
+{{ define "member_upload_csv" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center mb-2">
+  <a href="{{ .BackURL }}"
+     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 mr-2"
+     title="Go back">
+    ← Back
+  </a>
+  <h1 class="text-2xl font-bold text-gray-900">⛹️ Upload CSV</h1>
+</div>
+
+<!-- Selected organization -->
+<div class="text-sm text-gray-700 mb-3">
+  <span class="font-semibold">Organization:</span>
+  <span>{{ .OrgName }}</span>
+</div>
+
+
+{{ if .Error }}
+  <div class="mb-3 text-sm text-red-800 bg-red-100 px-3 py-2 rounded">{{ .Error }}</div>
+{{ else }}
+  {{ if and (eq .Created 0) (eq .Previously 0) (eq .SkippedCount 0) }}
+    <p class="mb-3 text-xs text-gray-500">
+      No CSV has been processed yet. Choose a file and click <strong>Upload</strong> to add or update members.
+    </p>
+  {{ end }}
+{{ end }}
+
+<form method="post" action="/members/upload_csv" enctype="multipart/form-data"
+      class="space-y-3 max-w-xl bg-white p-4 rounded border">
+  <input type="hidden" name="orgID" value="{{ .OrgHex }}" />
+
+  <div>
+    <label class="block text-sm font-medium mb-1">CSV File</label>
+    <input type="file" name="csv" accept=".csv" class="w-full border rounded px-3 py-1" required />
+
+    <!-- Format + allowed auth methods, same visual style -->
+    <p class="text-xs text-gray-500 mt-1">
+      Format (header row optional): <em>Full Name, Email, Auth Method</em>
+    </p>
+    <p class="text-xs text-gray-500 mt-1">
+      Allowed Auth Methods (case-insensitive): internal, google, classlink, clever, microsoft
+    </p>
+  </div>
+
+  <!-- round-trip the stable list URL so Back always returns to Members -->
+  <input type="hidden" name="return" value="{{ .BackURL }}">
+  <div>
+    <button class="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700">Upload</button>
+  </div>
+</form>
+
+<!-- Status summary BELOW the form -->
+{{ if or (gt .Created 0) (gt .Previously 0) (gt .SkippedCount 0) }}
+  <div class="mt-3 max-w-xl bg-white border rounded p-3 text-sm">
+    <div>
+      Created: <strong>{{ .Created }}</strong>
+      &nbsp; Previously Added: <strong>{{ .Previously }}</strong>
+      &nbsp; Skipped (different org): <strong>{{ .SkippedCount }}</strong>
+    </div>
+
+    {{ if gt .SkippedCount 0 }}
+      <div class="mt-2">
+        <div class="font-semibold">Skipped (already in another organization):</div>
+        <ul class="list-disc list-inside text-gray-700">
+          {{ range .SkippedEmails }}
+            <li>{{ . }}</li>
+          {{ end }}
+        </ul>
+      </div>
+    {{ end }}
+
+    <!-- Allow repeated uploads without losing org/return -->
+    <div class="mt-3">
+      <a href="/members/upload_csv?org={{ .OrgHex }}&return={{ urlquery .BackURL }}"
+         class="inline-flex items-center px-3 py-2 border rounded hover:bg-gray-50">
+        Upload another CSV
+      </a>
+    </div>
+  </div>
+{{ end }}
+{{ end }}

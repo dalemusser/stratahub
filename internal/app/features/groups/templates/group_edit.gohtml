@@ -1,0 +1,62 @@
+{{ define "group_edit" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center mb-2">
+  <a href="{{ .BackURL }}"
+     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 mr-2"
+     title="Go back">
+    ← Back
+  </a>
+  <h1 class="text-2xl font-bold text-gray-900">👥 Edit Group</h1>
+</div>
+
+{{ if .Error }}
+  <div class="mb-3 p-2 border border-red-300 bg-red-50 text-red-700 rounded">
+    {{ .Error }}
+  </div>
+{{ end }}
+
+<form method="post" action="/groups/{{ .GroupID }}/edit" class="space-y-3 max-w-xl bg-white p-4 rounded border">
+  <!-- Name -->
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+    <input name="name" type="text" value="{{ .Name }}" class="w-full border p-2 rounded" required />
+  </div>
+
+  <!-- Organization (read-only) -->
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Organization</label>
+    <input type="text" value="{{ .OrganizationName }}" class="w-full border p-2 rounded bg-gray-50" readonly />
+    <input type="hidden" name="orgID" value="{{ .OrganizationID }}" />
+  </div>
+
+  <!-- Description -->
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+    <textarea name="description" rows="4" class="w-full border p-2 rounded">{{ .Description }}</textarea>
+  </div>
+
+  <!-- Propagate return so HandleEditGroup can send user back -->
+  <input type="hidden" name="return" value="{{ .BackURL }}">
+
+  <div class="pt-2">
+    <button class="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Update Group</button>
+  </div>
+</form>
+
+{{ if eq .Role "admin" }}
+<!-- Danger zone: Delete Group -->
+<form method="post" action="/groups/{{ .GroupID }}/delete" class="max-w-xl mt-4">
+  <input type="hidden" name="return" value="{{ .BackURL }}">
+  <button
+    type="submit"
+    class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+    onclick="return confirm('Delete this group? This removes assignments and detaches the group from all users.');"
+  >
+    Delete Group
+  </button>
+</form>
+{{ end }}
+{{ end }}

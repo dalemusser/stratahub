@@ -1,0 +1,60 @@
+{{ define "member_resource_view" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center mb-2">
+  <a href="{{ .BackURL }}"
+     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 mr-2"
+     title="Go back">
+    ← Back
+  </a>
+  <h1 class="text-2xl font-bold text-gray-900">📚 {{ .TypeDisplay }}</h1>
+</div>
+
+<div class="mb-4">
+  <h1 class="text-2xl font-bold text-gray-900">{{ .ResourceTitle }}</h1>
+  <p class="text-gray-500 text-sm">{{ .Subject }}</p>
+</div>
+
+<div class="bg-white shadow rounded p-4 text-gray-700 text-sm max-w-xl space-y-3">
+  {{ if .AvailableUntil }}
+  <div>
+    <label class="block font-semibold mb-1">Availability</label>
+    <p class="text-gray-800">{{ .AvailableUntil }}</p>
+    {{ if .TimeZone }}
+      <p class="text-xs text-gray-500">Times shown in {{ .TimeZone }} (group timezone)</p>
+    {{ end }}
+  </div>
+  {{ end }}
+
+  <!-- Description -->
+  <div>
+    <label class="block font-semibold mb-1">Description</label>
+    <p class="text-gray-800">{{ .Description }}</p>
+  </div>
+
+  <!-- Instructions -->
+  {{ if .DefaultInstructions }}
+  <div>
+    <label class="block font-semibold mb-1">Instructions</label>
+    <p class="text-gray-800 whitespace-pre-line">{{ .DefaultInstructions }}</p>
+  </div>
+  {{ end }}
+
+  <!-- Actions -->
+  <div class="flex items-center gap-2">
+    {{ if and .CanOpen .LaunchURL }}
+      <a
+        href="{{ .LaunchURL }}"
+        target="_blank" rel="noopener"
+        class="bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700"
+      >
+        Open
+      </a>
+    {{ else }}
+      <span class="text-gray-500 font-semibold">Not currently available.</span>
+    {{ end }}
+  </div>
+</div>
+{{ end }}

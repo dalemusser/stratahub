@@ -1,5 +1,5 @@
 // internal/app/system/search/search.go
-package webutil
+package search
 
 import "strings"
 
@@ -14,7 +14,7 @@ import "strings"
 //
 // Typical usage in org-scoped lists (Members/Leaders):
 //
-//	pivot := webutil.EmailPivotOK(query, status, scopeOrg != nil)
+//	pivot := search.EmailPivotOK(query, status, scopeOrg != nil)
 //	sortField := "full_name_ci"
 //	if pivot {
 //	    sortField = "email"
@@ -22,7 +22,7 @@ import "strings"
 //
 // For unscoped lists (e.g., System Users across all orgs), use EmailPivotNoOrgOK.
 //
-//	pivot := webutil.EmailPivotNoOrgOK(query, status)
+//	pivot := search.EmailPivotNoOrgOK(query, status)
 func EmailPivotOK(search, status string, hasOrg bool) bool {
 	qHasAt := strings.Contains(search, "@")
 	statusFixed := equalsAnyFold(status, "active", "disabled")
