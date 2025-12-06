@@ -8,11 +8,17 @@ import (
 	contactfeature "github.com/dalemusser/stratahub/internal/app/features/contact"
 	dashboardfeature "github.com/dalemusser/stratahub/internal/app/features/dashboard"
 	errorsfeature "github.com/dalemusser/stratahub/internal/app/features/errors"
+	groupsfeature "github.com/dalemusser/stratahub/internal/app/features/groups"
 	healthfeature "github.com/dalemusser/stratahub/internal/app/features/health"
 	homefeature "github.com/dalemusser/stratahub/internal/app/features/home"
 	leadersfeature "github.com/dalemusser/stratahub/internal/app/features/leaders"
 	loginfeature "github.com/dalemusser/stratahub/internal/app/features/login"
 	logoutfeature "github.com/dalemusser/stratahub/internal/app/features/logout"
+	membersfeature "github.com/dalemusser/stratahub/internal/app/features/members"
+	organizationsfeature "github.com/dalemusser/stratahub/internal/app/features/organizations"
+	reportsfeature "github.com/dalemusser/stratahub/internal/app/features/reports"
+	resourcesfeature "github.com/dalemusser/stratahub/internal/app/features/resources"
+	systemusersfeature "github.com/dalemusser/stratahub/internal/app/features/systemusers"
 	termsfeature "github.com/dalemusser/stratahub/internal/app/features/terms"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/waffle/config"
@@ -75,6 +81,33 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	errorsHandler := errorsfeature.NewHandler()
 	r.Get("/forbidden", errorsHandler.Forbidden)
 	r.Get("/unauthorized", errorsHandler.Unauthorized)
+
+	// Groups feature
+	groupsHandler := groupsfeature.NewHandler(deps.StrataHubMongoDatabase, logger)
+	r.Mount("/groups", groupsfeature.Routes(groupsHandler))
+
+	// Members feature
+	membersHandler := membersfeature.NewHandler(deps.StrataHubMongoDatabase, logger)
+	r.Mount("/members", membersfeature.Routes(membersHandler))
+
+	// System Users feature
+	sysUsersHandler := systemusersfeature.NewHandler(deps.StrataHubMongoDatabase, logger)
+	r.Mount("/system-users", systemusersfeature.Routes(sysUsersHandler))
+
+	// Organizations feature
+	orgHandler := organizationsfeature.NewHandler(deps.StrataHubMongoDatabase, logger)
+	r.Mount("/organizations", organizationsfeature.Routes(orgHandler))
+
+	// Resource Admin feature
+	adminResHandler := resourcesfeature.NewAdminHandler(deps.StrataHubMongoDatabase, logger)
+	r.Mount("/resources", resourcesfeature.AdminRoutes(adminResHandler))
+
+	// Member Resources feature
+	memberResHandler := resourcesfeature.NewMemberHandler(deps.StrataHubMongoDatabase, logger)
+	r.Mount("/member/resources", resourcesfeature.MemberRoutes(memberResHandler))
+
+	reportsHandler := reportsfeature.NewHandler(deps.StrataHubMongoDatabase, logger)
+	r.Mount("/reports", reportsfeature.Routes(reportsHandler))
 
 	return r, nil
 }

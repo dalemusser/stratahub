@@ -1,0 +1,235 @@
+<style>
+.sr-only{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0;}
+</style>
+{{ define "group_manage_resources" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center mb-2">
+  <a href="{{ .BackURL }}"
+     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 mr-2"
+     title="Go back">
+    ← Back
+  </a>
+  <h1 class="text-2xl font-bold text-gray-900" aria-live="polite">👥 Assign Resources in {{ .GroupName }}</h1>
+</div>
+
+{{ if .Flash }}
+  <div class="mb-3 text-xs text-green-800 bg-green-100 px-2 py-1 rounded">{{ .Flash }}</div>
+{{ end }}
+
+<!-- ASSIGNED -->
+<h2 class="font-semibold mb-1">Assigned Resources ({{ len .Assigned }})</h2>
+<div class="relative max-h-80 overflow-y-auto mb-6 text-sm" style="scrollbar-gutter: stable;">
+  <table class="min-w-full border bg-white table-fixed border-separate border-spacing-0">
+    <caption class="sr-only">List of resources already assigned to this group</caption>
+    <colgroup>
+      <col class="w-2/6" />
+      <col class="w-1/6" />
+      <col class="w-1/6" />
+      <col class="w-1/6" />
+      <col class="w-1/6" />
+      <col class="w-1/6" />
+    </colgroup>
+    <thead class="bg-white sticky top-0 z-10">
+      <tr>
+        <th class="px-2 py-1 text-left border-b border-gray-300">Title</th>
+        <th class="px-2 py-1 text-left border-b border-gray-300">Availability</th>
+        <th class="px-2 py-1 text-left border-b border-gray-300">Subject</th>
+        <th class="px-2 py-1 text-left border-b border-gray-300">Type</th>
+        <th class="px-2 py-1 text-left border-b border-gray-300">Status</th>
+        <th class="px-2 py-1 text-left border-b border-gray-300">Action</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ if .Assigned }}
+        {{ range .Assigned }}
+        <tr class="border-b">
+          <td class="px-2 py-1">{{ .Title }}</td>
+          <td class="px-2 py-1" title="{{ .AvailabilityTitle }}">
+            {{ if .Availability }}{{ .Availability }}{{ else }}<span class="text-gray-400">—</span>{{ end }}
+          </td>
+          <td class="px-2 py-1">{{ if .Subject }}{{ .Subject }}{{ else }}<span class="text-gray-400">—</span>{{ end }}</td>
+          <td class="px-2 py-1">{{ if .Type }}{{ .Type }}{{ else }}<span class="text-gray-400">—</span>{{ end }}</td>
+          <td class="px-2 py-1">
+            {{ if eq .Status "active" }}
+              <span class="text-green-600 font-semibold">Active</span>
+            {{ else if .Status }}
+              <span class="text-gray-700">{{ .Status }}</span>
+            {{ else }}
+              <span class="text-gray-400">—</span>
+            {{ end }}
+          </td>
+          <td class="px-2 py-1">
+          <form method="get" action="/groups/{{ $.GroupID }}/assign_resources/new"
+                hx-get="/groups/{{ $.GroupID }}/assign_resources/new"
+                hx-target="#modal-root"
+                hx-swap="innerHTML"
+                aria-label="Manage assignment">
+            <input type="hidden" name="assignmentID" value="{{ .AssignmentID }}">
+            <input type="hidden" name="resourceID" value="{{ .ResourceID }}">
+            <input type="hidden" name="return" value="{{ $.BackURL }}">
+            <input type="hidden" name="mode" value="manage">
+            <button type="submit" class="bg-indigo-600 text-white px-2 py-1 text-xs rounded hover:bg-indigo-700" title="Manage {{ .Title }}">Manage</button>
+          </form>
+          </td>
+        </tr>
+        {{ end }}
+      {{ else }}
+        <tr><td class="px-2 py-2 text-gray-500" colspan="6">No resources assigned.</td></tr>
+      {{ end }}
+    </tbody>
+  </table>
+</div>
+
+<!-- AVAILABLE -->
+<h2 class="font-semibold mb-1">Available Resources</h2>
+{{ template "group_available_resources_block" . }}
+<div id="modal-root"></div>
+{{ end }}
+
+{{/* ──────────────── Available Resources reusable block (for HTMX) ──────────────── */}}
+{{ define "group_available_resources_block" }}
+<div id="available-resources-block">
+  <div class="flex items-baseline gap-2">
+    <h3 class="font-semibold">Library</h3>
+    <span class="text-xs text-gray-600">({{ .AvailableShown }} shown of {{ .AvailableTotal }} total)</span>
+  </div>
+
+  <!-- Controls row: search left, pager right -->
+  <div class="flex items-center justify-between mt-2 mb-2 gap-3 text-sm">
+    <form
+      id="resource-search-form"
+      hx-get="/groups/{{ .GroupID }}/assign_resources/search-resources"
+      hx-target="#available-resources-block"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+      hx-trigger="submit, keyup changed delay:300ms from:#resourceSearch, change from:#resourceType"
+      class="flex items-center gap-2"
+    >
+      <label for="resourceSearch">Search Resources:</label>
+      <input
+        id="resourceSearch"
+        name="q"
+        type="text"
+        value="{{ .Query }}"
+        class="border p-1 text-sm"
+        hx-on="input: (function(){
+          const f=document.getElementById('resource-search-form');
+          f.querySelector('input[name=after]').value='';
+          f.querySelector('input[name=before]').value='';
+        })()"
+      >
+      <label for="resourceType">Type:</label>
+      <select id="resourceType" name="type" class="border p-1 text-sm"
+        hx-on="change: (function(){
+          const f=document.getElementById('resource-search-form');
+          if (!f) return;
+          var a=f.querySelector('input[name=after]');
+          var b=f.querySelector('input[name=before]');
+          if (a) a.value='';
+          if (b) b.value='';
+        })()"
+      >
+      <option value="" {{ if not .TypeFilter }}selected{{ end }}>all types</option>
+      {{ range .TypeOptions }}
+        <option value="{{ . }}" {{ if eq $.TypeFilter . }}selected{{ end }}>{{ . }}</option>
+      {{ end }}
+      </select>
+      <input type="hidden" name="after" value="{{ .CurrentAfter }}">
+      <input type="hidden" name="before" value="{{ .CurrentBefore }}">
+      <input type="hidden" name="return" value="{{ .BackURL }}">
+      <button
+        type="button"
+        class="bg-gray-200 text-gray-800 px-2 py-1 text-xs rounded hover:bg-gray-300"
+        hx-get="/groups/{{ .GroupID }}/assign_resources/search-resources?q=&type=&return={{ .BackURL | urlquery }}"
+        hx-target="#available-resources-block"
+        hx-swap="outerHTML"
+        hx-push-url="true"
+      >Clear</button>
+    </form>
+
+    <div class="flex items-center gap-2">
+      {{ if .HasPrev }}
+        <a
+          href="/groups/{{ .GroupID }}/assign_resources/search-resources?before={{ .PrevCursor }}&q={{ .Query }}&type={{ .TypeFilter }}&return={{ .BackURL | urlquery }}"
+          hx-get="/groups/{{ .GroupID }}/assign_resources/search-resources?before={{ .PrevCursor }}&q={{ .Query }}&type={{ .TypeFilter }}&return={{ .BackURL | urlquery }}"
+          hx-target="#available-resources-block" hx-swap="outerHTML" hx-push-url="true"
+          class="px-2 py-1 text-xs border rounded hover:bg-gray-50"
+        >Prev</a>
+      {{ else }}
+        <span class="px-2 py-1 text-xs text-gray-400 border rounded cursor-not-allowed">Prev</span>
+      {{ end }}
+      {{ if .HasNext }}
+        <a
+          href="/groups/{{ .GroupID }}/assign_resources/search-resources?after={{ .NextCursor }}&q={{ .Query }}&type={{ .TypeFilter }}&return={{ .BackURL | urlquery }}"
+          hx-get="/groups/{{ .GroupID }}/assign_resources/search-resources?after={{ .NextCursor }}&q={{ .Query }}&type={{ .TypeFilter }}&return={{ .BackURL | urlquery }}"
+          hx-target="#available-resources-block" hx-swap="outerHTML" hx-push-url="true"
+          class="px-2 py-1 text-xs border rounded hover:bg-gray-50"
+        >Next</a>
+      {{ else }}
+        <span class="px-2 py-1 text-xs text-gray-400 border rounded cursor-not-allowed">Next</span>
+      {{ end }}
+    </div>
+  </div>
+
+  <div class="relative max-h-80 overflow-y-auto text-sm" style="scrollbar-gutter: stable;">
+    <table class="min-w-full border bg-white table-fixed border-separate border-spacing-0">
+      <caption class="sr-only">List of resources available to assign to this group</caption>
+      <colgroup>
+        <col class="w-2/6" />
+        <col class="w-1/6" />
+        <col class="w-1/6" />
+        <col class="w-1/6" />
+        <col class="w-1/6" />
+        <col class="w-1/6" />
+      </colgroup>
+      <thead class="bg-white sticky top-0 z-10">
+        <tr>
+          <th class="px-2 py-1 text-left border-b border-gray-300">Title</th>
+          <th class="px-2 py-1 text-left border-b border-gray-300"></th>
+          <th class="px-2 py-1 text-left border-b border-gray-300">Subject</th>
+          <th class="px-2 py-1 text-left border-b border-gray-300">Type</th>
+          <th class="px-2 py-1 text-left border-b border-gray-300">Status</th>
+          <th class="px-2 py-1 text-left border-b border-gray-300">Action</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ if .Available }}
+          {{ range .Available }}
+          <tr class="border-b">
+            <td class="px-2 py-1">{{ .Title }}</td>
+            <td class="px-2 py-1"></td>
+            <td class="px-2 py-1">
+              {{ if .Subject }}{{ .Subject }}{{ else }}<span class="text-gray-400">—</span>{{ end }}
+            </td>
+            <td class="px-2 py-1">{{ if .Type }}{{ .Type }}{{ else }}<span class="text-gray-400">—</span>{{ end }}</td>
+            <td class="px-2 py-1">
+              {{ if eq .Status "active" }}
+                <span class="text-green-600 font-semibold">Active</span>
+              {{ else if .Status }}
+                <span class="text-gray-700">{{ .Status }}</span>
+              {{ else }}
+                <span class="text-gray-400">—</span>
+              {{ end }}
+            </td>
+            <td class="px-2 py-1">
+              <a
+                href="/groups/{{ $.GroupID }}/assign_resources/create?resourceID={{ .ResourceID }}&return={{ $.BackURL | urlquery }}"
+                class="bg-green-600 text-white px-2 py-1 text-xs rounded hover:bg-green-700"
+                title="Assign {{ .Title }}"
+              >
+                Assign
+              </a>
+            </td>
+          </tr>
+          {{ end }}
+        {{ else }}
+          <tr><td colspan="6" class="px-2 py-2 text-gray-500">No resources available to add.</td></tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{ end }}

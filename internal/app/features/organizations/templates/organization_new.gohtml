@@ -1,0 +1,66 @@
+{{ define "organization_new" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex mb-2">
+  <a href="{{ .BackURL }}"
+     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 mr-2"
+     title="Go back">
+    ← Back
+  </a>
+  <h1 class="text-2xl font-bold text-gray-900">🏢 Add Organization</h1>
+</div>
+
+{{ if .Error }}
+  <div class="mb-3 p-3 rounded border border-red-300 bg-red-50 text-red-700 text-sm">
+    {{ .Error }}
+  </div>
+{{ end }}
+
+<form method="post" action="/organizations" class="space-y-3 max-w-2xl bg-white p-4 rounded border">
+
+  <input type="hidden" name="return" value="{{ .BackURL }}">
+
+  <div>
+    <label class="block text-sm font-medium mb-1">Organization Name</label>
+    <input name="name" type="text" required class="w-full border p-2 rounded" value="{{ .Name }}" />
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium mb-1">City</label>
+    <input name="city" type="text" class="w-full border p-2 rounded" value="{{ .City }}" />
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium mb-1">State</label>
+    <input name="state" type="text" class="w-full border p-2 rounded" value="{{ .State }}" />
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium mb-1">Contact Information</label>
+    <textarea name="contact" rows="4" class="w-full border p-2 rounded">{{ .Contact }}</textarea>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium mb-1">Time Zone</label>
+    <select name="timezone" class="w-full border p-2 rounded">
+    <option value="" {{ if eq .TimeZone "" }}selected{{ end }}>Select a time zone</option>
+    {{ range .TimeZoneGroups }}
+      <optgroup label="{{ .Region }}">
+        {{ range .Zones }}
+          <option value="{{ .ID }}" {{ if eq $.TimeZone .ID }}selected{{ end }}>
+            {{ .Label }}
+          </option>
+        {{ end }}
+      </optgroup>
+    {{ end }}
+  </select>
+  </div>
+
+
+  <div class="pt-2">
+    <button type="submit" class="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Create Organization</button>
+  </div>
+</form>
+{{ end }}

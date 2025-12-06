@@ -1,0 +1,386 @@
+{{ define "members_list" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<!-- Title + hide/show toggle (admins only) -->
+<div class="flex items-center justify-between mb-2">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900">⛹️ Members</h1>
+  </div>
+  {{ if .ShowOrgPane }}
+  <button id="toggle-orgs"
+          class="text-xs px-2 py-1 border rounded hover:bg-gray-50"
+          type="button">
+    Hide Orgs
+  </button>
+  {{ end }}
+</div>
+
+<!-- Always horizontal: capped sidebar + flexible table; allow horizontal scroll when narrow -->
+<div id="members-grid"
+     class="flex items-start gap-2 md:gap-4 overflow-x-auto scroll-smooth [overscroll-behavior-x:contain] [-webkit-overflow-scrolling:touch]">
+  {{ if .ShowOrgPane }}
+  <aside id="orgs-sidebar"
+         class="org-col flex-none"
+         style="flex-basis: clamp(220px, 22vw, 280px);">
+    <div class="bg-white rounded shadow p-3">
+      <label class="block text-sm font-semibold mb-2">Organizations</label>
+
+      <!-- Org search (live; debounced) kept on one line -->
+      <form
+        hx-get="/members"
+        hx-target="#content"
+        hx-swap="innerHTML"
+        hx-push-url="true"
+        hx-trigger="submit, keyup changed delay:300ms from:#orgs-q"
+        class="w-full flex items-center gap-2 mb-2 flex-nowrap"
+      >
+        <input type="hidden" name="org" value="{{ .SelectedOrg }}">
+        <input type="hidden" name="status" value="{{ .Status }}">
+        <input type="hidden" name="search" value="{{ .SearchQuery }}">
+
+        <input
+          id="orgs-q" name="org_q" type="text" placeholder="Search orgs..."
+          value="{{ .OrgQuery }}"
+          class="flex-auto min-w-0 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+
+        <a
+          href="/members?org={{ .SelectedOrg }}{{ if .Status }}&status={{ .Status | urlquery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery | urlquery }}{{ end }}&org_q="
+          hx-get="/members"
+          hx-vals='{"org":"{{ .SelectedOrg }}","status":"{{ .Status }}","search":"{{ .SearchQuery }}","org_q":"","start":"1"}'
+          hx-target="#content"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+          class="shrink-0 px-3 py-2 border rounded text-gray-700 hover:bg-gray-50"
+        >
+          Clear
+        </a>
+      </form>
+
+      <!-- “All” row -->
+      <a
+        href="/members?org=all{{ if .Status }}&status={{ .Status }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}"
+        hx-get="/members?org=all{{ if .Status }}&status={{ .Status }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}"
+        hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
+        class="flex justify-between items-center px-3 py-2 rounded hover:bg-gray-50 {{ if or (eq .SelectedOrg "all") (eq .SelectedOrg "") }}bg-indigo-50{{ end }}"
+      >
+        <span class="font-medium">All</span>
+        <span class="ml-2 inline-flex items-center justify-center text-xs bg-gray-200 rounded-full px-2 py-0.5">{{ .AllCount }}</span>
+      </a>
+
+      <!-- Pager BELOW “All” (stable height buttons) -->
+      <div class="px-2 py-2 text-sm text-gray-600 flex justify-between">
+        <span>
+          {{ if .OrgTotal }}
+            {{ .OrgRangeStart }}–{{ .OrgRangeEnd }} of {{ .OrgTotal }} shown
+          {{ else }}
+            0 of 0 shown
+          {{ end }}
+        </span>
+        <span class="flex gap-2">
+          {{ if .OrgHasPrev }}
+            <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded hover:bg-gray-50 whitespace-nowrap"
+               href="/members?org={{ .SelectedOrg }}&org_before={{ .OrgPrevCur }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}"
+               hx-get="/members?org={{ .SelectedOrg }}&org_before={{ .OrgPrevCur }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}"
+               hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Prev</a>
+          {{ else }}
+            <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 whitespace-nowrap">Prev</span>
+          {{ end }}
+          {{ if .OrgHasNext }}
+            <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded hover:bg-gray-50 whitespace-nowrap"
+               href="/members?org={{ .SelectedOrg }}&org_after={{ .OrgNextCur }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}"
+               hx-get="/members?org={{ .SelectedOrg }}&org_after={{ .OrgNextCur }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}"
+               hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Next</a>
+          {{ else }}
+            <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 whitespace-nowrap">Next</span>
+          {{ end }}
+        </span>
+      </div>
+
+      <!-- Org list -->
+      <ul class="max-h-96 overflow-y-auto divide-y divide-gray-200">
+       {{ range .OrgRows }}
+          <li>
+            <a
+              class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 {{ if eq $.SelectedOrg (.ID.Hex) }}bg-indigo-50{{ end }}"
+              href="/members?org={{ .ID.Hex }}{{ if $.OrgQuery }}&org_q={{ $.OrgQuery }}{{ end }}{{ if $.SearchQuery }}&search={{ $.SearchQuery }}{{ end }}{{ if $.Status }}&status={{ $.Status }}{{ end }}"
+              hx-get="/members?org={{ .ID.Hex }}{{ if $.OrgQuery }}&org_q={{ $.OrgQuery }}{{ end }}{{ if $.SearchQuery }}&search={{ $.SearchQuery }}{{ end }}{{ if $.Status }}&status={{ $.Status }}{{ end }}"
+              hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
+            >
+              <span class="flex-1 min-w-0 truncate">{{ .Name }}</span>
+              <span class="shrink-0 ml-2 inline-flex items-center justify-center text-xs bg-gray-200 rounded-full px-2 py-0.5">{{ .Count }}</span>
+            </a>
+          </li>
+        {{ else }}
+          <li class="px-3 py-2 text-sm text-gray-500">No organizations.</li>
+        {{ end }}
+      </ul>
+    </div>
+  </aside>
+  {{ end }}
+
+  <!-- RIGHT: Members table; keep a sane minimum width so it stays on the right -->
+  <section class="table-col flex-1 min-w-[560px]">
+    <!-- Controls -->
+    <form
+      hx-get="/members"
+      hx-target="#content"
+      hx-swap="innerHTML"
+      hx-push-url="true"
+      hx-trigger="submit, keyup changed delay:300ms from:#member-q, change from:#member-status"
+      class="bg-white rounded shadow p-3 mb-2 flex flex-wrap items-center gap-2"
+    >
+      <input type="hidden" name="org" value="{{ .SelectedOrg }}">
+      <input type="hidden" name="org_q" value="{{ .OrgQuery }}">
+      <!-- NEW: reset to first page on new search -->
+      <input type="hidden" name="start" value="1">
+
+      <input
+        id="member-q" name="search" type="text"
+        value="{{ .SearchQuery }}"
+        placeholder="Search by name or email"
+        class="flex-1 px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+
+      <select id="member-status" name="status" class="px-3 py-2 border rounded">
+        <option value="" {{ if not .Status }}selected{{ end }}>All Statuses</option>
+        <option value="active"   {{ if eq .Status "active" }}selected{{ end }}>Active</option>
+        <option value="disabled" {{ if eq .Status "disabled" }}selected{{ end }}>Disabled</option>
+      </select>
+
+      <!-- Clear search AND reset status to "All Statuses" (preserve org & org_q) -->
+      <a
+        href="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}"
+        hx-get="/members"
+        hx-vals='{
+          "org":"{{ .SelectedOrg }}",
+          "org_q":"{{ .OrgQuery }}",
+          "search":"",
+          "status":"",
+          "start":"1"
+        }'
+        hx-target="#content"
+        hx-swap="innerHTML"
+        hx-push-url="true"
+        hx-on="click: (() => {
+          const q = document.getElementById('member-q');
+          if (q) q.value = '';
+          const s = document.getElementById('member-status');
+          if (s) s.value = '';
+        })()"
+        class="px-4 py-2 border rounded hover:bg-gray-50 mr-6"
+      >
+        Clear
+      </a>
+
+      {{ if .ShowOrgPane }}
+        {{ if and (ne .SelectedOrg "") (ne .SelectedOrg "all") }}
+          <a href="/members/upload_csv?org={{ .SelectedOrg }}&return={{ .CurrentPath | urlquery }}"
+            class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 ">Upload CSV</a>
+        {{ end }}
+      {{ else }}
+        <a href="/members/upload_csv?return={{ .CurrentPath | urlquery }}"
+          class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">Upload CSV</a>
+      {{ end }}
+
+      <a href="/members/new?return={{ .CurrentPath | urlquery }}"
+         class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">+ Add Member</a>
+    </form>
+
+    <!-- Top pager (shows range) -->
+    <div class="flex items-center justify-between mb-2">
+      <div class="text-gray-600 text-sm">
+        {{ if .Total }}{{ .RangeStart }}–{{ .RangeEnd }} of {{ .Total }} shown{{ else }}0 of 0 shown{{ end }}
+      </div>
+      <div class="flex items-center gap-2">
+        {{ if .HasPrev }}
+          <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded hover:bg-gray-50 whitespace-nowrap"
+             href="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&before={{ .PrevCursor }}&start={{ .PrevStart }}"
+             hx-get="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&before={{ .PrevCursor }}&start={{ .PrevStart }}"
+             hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Prev</a>
+        {{ else }}
+          <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 whitespace-nowrap">Prev</span>
+        {{ end }}
+        {{ if .HasNext }}
+          <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded hover:bg-gray-50 whitespace-nowrap"
+             href="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&after={{ .NextCursor }}&start={{ .NextStart }}"
+             hx-get="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&after={{ .NextCursor }}&start={{ .NextStart }}"
+             hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Next</a>
+        {{ else }}
+          <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 whitespace-nowrap">Next</span>
+        {{ end }}
+      </div>
+    </div>
+
+    <!-- Table -->
+    <div class="bg-white rounded shadow overflow-x-auto">
+      <table class="min-w-full text-sm text-left text-gray-700">
+        <colgroup>
+          <col style="width: 24%;" />
+          <col style="width: 30%;" />
+          <col style="width: 26%;" />
+          <col style="width: 6rem;" />
+          <col style="width: 12rem;" />
+        </colgroup>
+        <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
+          <tr>
+            <th class="px-2 py-2">Name</th>
+            <th class="px-2 py-2">Email</th>
+            <th class="px-2 py-2">Organization</th>
+            <th class="px-2 py-2 text-center">Status</th>
+            <th class="px-2 py-2 text-right md:whitespace-nowrap">Actions</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200">
+          {{ range .MemberRows }}
+          <tr>
+            <td class="px-2 py-2"><div class="truncate" title="{{ .FullName }}">{{ .FullName }}</div></td>
+            <td class="px-2 py-2"><div class="truncate" title="{{ .Email }}">{{ .Email }}</div></td>
+            <td class="px-2 py-2"><div class="truncate" title="{{ .OrgName }}">{{ .OrgName }}</div></td>
+            <td class="px-2 py-2 text-center">
+              {{ if eq .Status "active" }}
+                <span class="px-2 py-1 text-xs bg-green-100 text-green-700 rounded">Active</span>
+              {{ else if eq .Status "disabled" }}
+                <span class="px-2 py-1 text-xs bg-gray-200 text-gray-700 rounded">Disabled</span>
+              {{ else }}
+                <span class="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 rounded">{{ .Status }}</span>
+              {{ end }}
+            </td>
+            <td class="px-2 py-2 text-right">
+              <div class="inline-flex gap-2 whitespace-nowrap">
+                <form
+                  method="get"
+                  action="/members/{{ .ID.Hex }}/manage_modal"
+                  hx-get="/members/{{ .ID.Hex }}/manage_modal?return={{ $.CurrentPath | urlquery }}"
+                  hx-target="#modal-root"
+                  hx-swap="innerHTML"
+                  aria-label="Manage member"
+                >
+                  <button
+                    type="submit"
+                    class="bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 text-xs md:text-sm"
+                    title="Manage {{ .FullName }}"
+                  >
+                    Manage
+                  </button>
+                </form>
+              </div>
+            </td>
+          </tr>
+          {{ else }}
+          <tr><td colspan="5" class="px-2 py-6 text-center text-gray-500">No members found.</td></tr>
+          {{ end }}
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Bottom pager -->
+    <div class="flex items-center justify-between mt-2">
+      <div class="text-xs text-gray-600">
+        {{ if .Total }}{{ .RangeStart }}–{{ .RangeEnd }} of {{ .Total }} shown{{ else }}0 of 0 shown{{ end }}
+      </div>
+      <div class="flex gap-2 items-center">
+        {{ if .HasPrev }}
+        <a
+          href="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&before={{ .PrevCursor }}&start={{ .PrevStart }}"
+          hx-get="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&before={{ .PrevCursor }}&start={{ .PrevStart }}"
+          hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
+          class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded hover:bg-gray-50 whitespace-nowrap">Prev</a>
+        {{ else }}
+        <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 whitespace-nowrap">Prev</span>
+        {{ end }}
+        {{ if .HasNext }}
+        <a
+          href="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&after={{ .NextCursor }}&start={{ .NextStart }}"
+          hx-get="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&after={{ .NextCursor }}&start={{ .NextStart }}"
+          hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
+          class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded hover:bg-gray-50 whitespace-nowrap">Next</a>
+        {{ else }}
+        <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 whitespace-nowrap">Next</span>
+        {{ end }}
+      </div>
+    </div>
+    <div id="modal-root"></div>
+  </section>
+</div>
+
+<!-- Hide Orgs / Show Orgs (persist like Groups) -->
+<script>
+  (function(){
+    var btn = document.getElementById('toggle-orgs');
+    var aside = document.getElementById('orgs-sidebar');
+    if (!btn || !aside) return;
+
+    var key = 'members_hide_orgs';
+    function apply(hidden) {
+      aside.classList.toggle('hidden', hidden);
+      btn.textContent = hidden ? 'Show Orgs' : 'Hide Orgs';
+    }
+    var initial = localStorage.getItem(key) === '1';
+    apply(initial);
+
+    btn.addEventListener('click', function(){
+      var hidden = aside.classList.contains('hidden');
+      var next = !hidden;
+      localStorage.setItem(key, next ? '1' : '0');
+      apply(next);
+    });
+  })();
+</script>
+{{ end }}
+
+{{ define "members_manage_member_modal" }}
+<div class="fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/40" onclick="document.getElementById('modal-root').innerHTML=''"></div>
+  <div class="relative bg-white rounded-xl shadow max-w-lg w-full p-4 space-y-4">
+    <h2 class="text-lg font-semibold text-gray-900">Manage Member</h2>
+    <p class="text-sm text-gray-700">
+      {{ .FullName }}
+      {{ if .OrgName }}<span class="text-gray-500"> ({{ .OrgName }})</span>{{ end }}
+    </p>
+    <p class="text-xs text-gray-500">{{ .Email }}</p>
+
+    <div class="text-sm text-gray-700">
+      <p>Use the actions below to view, edit, or remove this member.</p>
+    </div>
+
+    <div class="flex flex-col gap-3 pt-2">
+      <!-- Row of actions centered -->
+      <div class="flex justify-center gap-2">
+        <a
+          href="/members/{{ .MemberID }}/view?return={{ .BackURL | urlquery }}"
+          class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+        >View</a>
+
+        <a
+          href="/members/{{ .MemberID }}/edit?return={{ .BackURL | urlquery }}"
+          class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+        >Edit</a>
+
+        <form
+          method="post"
+          action="/members/{{ .MemberID }}/delete"
+          onsubmit="return confirm('Are you sure you want to delete this member?');"
+        >
+          <input type="hidden" name="return" value="{{ .BackURL }}">
+          <button
+            type="submit"
+            class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+          >Delete</button>
+        </form>
+      </div>
+
+      <!-- Close button bottom-left -->
+      <div class="flex justify-start">
+        <button
+          type="button"
+          class="px-3 py-1 border rounded text-sm text-gray-700 hover:bg-gray-50"
+          onclick="document.getElementById('modal-root').innerHTML=''"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{{ end }}

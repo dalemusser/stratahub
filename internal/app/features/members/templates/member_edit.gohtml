@@ -1,0 +1,84 @@
+{{ define "member_edit" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center mb-2">
+  <a href="{{ .BackURL }}"
+     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 mr-2"
+     title="Go back">
+    ← Back
+  </a>
+  <h1 class="text-2xl font-bold text-gray-900">⛹️ Edit Member</h1>
+</div>
+
+{{ if .Error }}
+  <div class="mb-3 p-2 border border-red-300 bg-red-50 text-red-700 rounded">
+    {{ .Error }}
+  </div>
+{{ end }}
+
+<form action="/members/{{ .ID }}/edit" method="POST" class="bg-white rounded shadow p-4 mb-6 max-w-xl">
+  <input type="hidden" name="return" value="{{ .BackURL }}">
+
+  <div class="space-y-4">
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+      <input name="full_name" type="text" value="{{ .FullName }}"
+             class="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400" required />
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+      <input name="email" type="text" value="{{ .Email }}"
+             class="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400" required />
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Organization</label>
+      <!-- Read-only display + hidden field to post orgID -->
+      <div class="w-full border rounded px-3 py-2 bg-gray-50 text-gray-800">{{ .OrgName }}</div>
+      <input type="hidden" name="orgID" value="{{ .OrgID }}">
+      <small class="text-gray-500">Organization is assigned and cannot be changed.</small>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Auth Method</label>
+      <select name="auth_method"
+              class="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        <option value="internal"  {{ if eq .Auth "internal" }}selected{{ end }}>internal</option>
+        <option value="google"    {{ if eq .Auth "google" }}selected{{ end }}>google</option>
+        <option value="classlink" {{ if eq .Auth "classlink" }}selected{{ end }}>classlink</option>
+        <option value="clever"    {{ if eq .Auth "clever" }}selected{{ end }}>clever</option>
+        <option value="microsoft" {{ if eq .Auth "microsoft" }}selected{{ end }}>microsoft</option>
+      </select>
+    </div>
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+      <select name="status"
+              class="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        <option value="active"   {{ if eq .Status "active" }}selected{{ end }}>Active</option>
+        <option value="disabled" {{ if eq .Status "disabled" }}selected{{ end }}>Disabled</option>
+      </select>
+    </div>
+
+    <div class="pt-2">
+      <button type="submit"
+              class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+        Update Member
+      </button>
+    </div>
+  </div>
+</form>
+
+<form action="/members/{{ .ID }}/delete" method="POST" class="max-w-xl">
+  <input type="hidden" name="return" value="{{ .BackURL }}">
+  <button type="submit"
+          class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"
+          onclick="return confirm('Delete this member?');">
+    Delete Member
+  </button>
+</form>
+{{ end }}

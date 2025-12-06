@@ -1,0 +1,62 @@
+{{ define "member_resources_list" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="mb-4">
+  <h1 class="text-2xl font-bold text-gray-800 mb-1">📚 My Assigned Resources</h1>
+</div>
+
+{{ if .Resources }}
+  <div class="bg-white shadow rounded overflow-x-auto">
+    <table class="min-w-full text-sm text-left text-gray-700">
+      <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
+        <tr>
+          <th class="px-2 py-2">Title</th>
+          <th class="px-2 py-2">Subject</th>
+          <th class="px-2 py-2">Type</th>
+          <th class="px-2 py-2">Available Until</th>
+          <th class="px-2 py-2 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200">
+        {{ range .Resources }}
+        <tr>
+          <td class="px-2 py-1">{{ .Title }}</td>
+          <td class="px-2 py-1">{{ .Subject }}</td>
+          <td class="px-2 py-1">{{ .Type }}</td>
+          <td class="px-2 py-1">{{ .AvailableUntil }}</td>
+          <td class="px-2 py-1 text-right">
+            <!-- View -->
+            <a
+              href="/member/resources/{{ .ID }}"
+              class="bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700"
+            >
+              View
+            </a>
+
+            <!-- Open (LaunchURL already has id, group, org) -->
+            {{ if .LaunchURL }}
+              <a
+                href="{{ .LaunchURL }}"
+                target="_blank" rel="noopener"
+                class="ml-2 bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
+              >
+                Open
+              </a>
+            {{ end }}
+          </td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+  {{ if .TimeZone }}
+    <p class="mt-2 text-xs text-gray-500">
+      Times shown in {{ .TimeZone }} (group timezone)
+    </p>
+  {{ end }}
+{{ else }}
+  <p class="text-gray-500">No resources assigned.</p>
+{{ end }}
+{{ end }}

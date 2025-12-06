@@ -1,0 +1,228 @@
+{{ define "resources_list" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="mb-4">
+  <h1 class="text-2xl font-bold text-gray-800 mb-1">📚 Resources</h1>
+</div>
+
+<form
+  id="resources-search-form"
+  action="/resources"
+  method="GET"
+  class="bg-white rounded shadow p-4 mb-4 flex flex-col md:flex-row gap-3 md:items-center"
+  hx-get="/resources"
+  hx-target="#resources-table-wrap"
+  hx-select="#resources-table-wrap"
+  hx-swap="outerHTML"
+  hx-push-url="true"
+  hx-trigger="keyup changed delay:300ms from:#q"
+>
+  <input
+    id="q"
+    name="q"
+    type="text"
+    placeholder="Search by title or subject…"
+    value="{{ .Q }}"
+    class="flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-400"
+  />
+
+  <div class="ml-auto flex gap-2">
+    <a
+      href="/resources?q="
+      hx-get="/resources"
+      hx-vals='{"q":""}'
+      hx-target="#resources-table-wrap"
+      hx-select="#resources-table-wrap"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+      class="px-4 py-2 border rounded hover:bg-gray-50 mr-6"
+    >
+      Clear
+    </a>
+
+    <a href="/resources/new"
+       class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+      + Add Resource
+    </a>
+  </div>
+</form>
+
+{{ template "resources_table" . }}
+{{ end }}
+
+{{ define "resources_table" }}
+<div id="resources-table-wrap" class="bg-white rounded shadow overflow-x-auto">
+  <table class="min-w-full text-sm text-left text-gray-700">
+    <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
+      <tr>
+        <th class="px-2 py-2">Title</th>
+        <th class="px-2 py-2">Subject</th>
+        <th class="px-2 py-2">Type</th>
+        <th class="px-2 py-2">Status</th>
+        <th class="px-2 py-2">Show</th>
+        <th class="px-2 py-2">Description</th>
+        <th class="px-2 py-2 text-right">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-200">
+      {{ range .Items }}
+      <tr>
+        <td class="px-2 py-2 align-top">{{ .Title }}</td>
+        <td class="px-2 py-2 align-top">{{ .Subject }}</td>
+        <td class="px-2 py-2 align-top">{{ .Type }}</td>
+        <td class="px-2 py-2 align-top">{{ .Status }}</td>
+        <td class="px-2 py-2 align-top">{{ if .ShowInLibrary }}Yes{{ else }}No{{ end }}</td>
+        <td class="px-2 py-2 align-top">{{ .Description }}</td>
+        <td class="px-2 py-1 text-right">
+          <form
+            method="get"
+            action="/resources/{{ .ID.Hex }}/manage_modal"
+            hx-get="/resources/{{ .ID.Hex }}/manage_modal?return=/resources"
+            hx-target="#modal-root"
+            hx-swap="innerHTML"
+            aria-label="Manage resource"
+          >
+            <button
+              type="submit"
+              class="bg-indigo-600 text-white px-2 py-1 rounded text-xs md:text-sm hover:bg-indigo-700"
+              title="Manage {{ .Title }}"
+            >
+              Manage
+            </button>
+          </form>
+        </td>
+      </tr>
+      {{ else }}
+      <tr>
+        <td colspan="7" class="px-2 py-6 text-center text-gray-500">
+          No resources found.
+        </td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+</div>
+<div id="modal-root"></div>
+{{ end }}
+
+{{ define "resources_form_oob" }}
+<form
+  id="resources-search-form"
+  hx-swap-oob="outerHTML"
+  action="/resources"
+  method="GET"
+  class="bg-white rounded shadow p-4 mb-4 flex flex-col md:flex-row gap-3 md:items-center"
+  hx-get="/resources"
+  hx-target="#resources-table-wrap"
+  hx-select="#resources-table-wrap"
+  hx-swap="outerHTML"
+  hx-push-url="true"
+  hx-trigger="keyup changed delay:300ms from:#q"
+>
+  <input
+    id="q"
+    name="q"
+    type="text"
+    placeholder="Search by title or subject…"
+    value="{{ .Q }}"
+    class="flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-400"
+  />
+
+  <div class="ml-auto flex gap-2">
+    <a
+      href="/resources?q="
+      hx-get="/resources"
+      hx-vals='{"q":""}'
+      hx-target="#resources-table-wrap"
+      hx-select="#resources-table-wrap"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+      class="px-4 py-2 border rounded hover:bg-gray-50 mr-6"
+    >
+      Clear
+    </a>
+
+    <a href="/resources/new"
+       class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+      + Add Resource
+    </a>
+  </div>
+</form>
+{{ end }}
+
+{{ define "resources_table_oob_form" }}
+  {{ template "resources_table" . }}
+  {{ template "resources_form_oob" . }}
+{{ end }}
+
+{{ define "resource_manage_modal" }}
+<div class="fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/40"
+       onclick="document.getElementById('modal-root').innerHTML=''"></div>
+
+  <div class="relative bg-white rounded-xl shadow max-w-md w-full p-4 space-y-4">
+    <h2 class="text-lg font-semibold text-gray-900">Manage Resource</h2>
+
+    <p class="text-sm text-gray-700">
+      {{ .Title }}
+      {{ if .Type }}<span class="text-gray-500"> ({{ .Type }})</span>{{ end }}
+    </p>
+
+    <div class="text-xs text-gray-500 space-y-1">
+      {{ if .Subject }}
+        <p><span class="font-semibold">Subject:</span> {{ .Subject }}</p>
+      {{ end }}
+      <p>
+        <span class="font-semibold">Status:</span> {{ .Status | printf "%s" }}
+        · <span class="font-semibold">Show in Library:</span>
+        {{ if .ShowInLibrary }}Yes{{ else }}No{{ end }}
+      </p>
+      {{ if .Description }}
+        <p class="mt-1"><span class="font-semibold">Description:</span> {{ .Description }}</p>
+      {{ end }}
+    </div>
+
+    <div class="flex flex-col gap-3 pt-2">
+      <!-- Centered action buttons -->
+      <div class="flex justify-center gap-2">
+        <a
+          href="/resources/{{ .ID }}/view?return=/resources"
+          class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+        >View</a>
+
+        <a
+          href="/resources/{{ .ID }}/edit?return=/resources"
+          class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+        >Edit</a>
+
+        <form
+          method="post"
+          action="/resources/{{ .ID }}/delete"
+          onsubmit="return confirm('Are you sure you want to delete this resource?');"
+        >
+          <input type="hidden" name="return" value="/resources">
+          <button
+            type="submit"
+            class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+          >
+            Delete
+          </button>
+        </form>
+      </div>
+
+      <!-- Close button bottom-left -->
+      <div class="flex justify-start">
+        <button
+          type="button"
+          class="px-3 py-1 border rounded text-sm text-gray-700 hover:bg-gray-50"
+          onclick="document.getElementById('modal-root').innerHTML=''"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{{ end }}

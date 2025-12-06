@@ -1,0 +1,104 @@
+{{ define "group_new" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center mb-2">
+  <a href="{{ .BackURL }}"
+     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 mr-2"
+     title="Go back">
+    ← Back
+  </a>
+  <h1 class="text-2xl font-bold text-gray-900">👥 Add Group</h1>
+</div>
+
+{{ if .Error }}
+  <div class="mb-3 p-2 border border-red-300 bg-red-50 text-red-700 rounded">
+    {{ .Error }}
+  </div>
+{{ end }}
+
+<form method="post" action="/groups" class="space-y-3 max-w-xl bg-white p-4 rounded border" id="new-group-form">
+  <!-- Name -->
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+    <input name="name" type="text" value="{{ .Name }}" class="w-full border p-2 rounded" required />
+  </div>
+
+  {{ if eq .Role "admin" }}
+    <!-- Organization -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Organization</label>
+      <select name="orgID" id="orgSelect" class="w-full border p-2 rounded" required>
+        <option value="">-- Select organization --</option>
+        {{ $cur := .OrgHex }}
+        {{ range .Organizations }}
+          {{ $id := .ID.Hex }}
+          <option value="{{ $id }}" {{ if eq $cur $id }}selected{{ end }}>{{ .Name }}</option>
+        {{ end }}
+      </select>
+    </div>
+
+    <!-- Leaders (optional; filtered by org) -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Leader(s)</label>
+      <select name="leaderIDs" id="leaderSelect" multiple size="6" class="w-full border p-2 rounded">
+        {{ $sel := .SelectedLeader }}
+        {{ range .Leaders }}
+          {{ $lid := .ID.Hex }}
+          <option value="{{ $lid }}" data-org="{{ .OrgHex }}"
+            {{ if $sel }}{{ if (index $sel $lid) }}selected{{ end }}{{ end }}>
+            {{ .FullName }}
+          </option>
+        {{ end }}
+      </select>
+      <p class="text-xs text-gray-500 mt-1">
+        Selecting leaders is optional; you can assign leaders later.
+      </p>
+    </div>
+  {{ else }}
+    <!-- Leader path: org is fixed; creator auto-assigned as leader -->
+    <div>
+      <label class="block text-sm font-medium text-gray-700 mb-1">Organization</label>
+      <input type="text" value="{{ .LeaderOrgName }}" class="w-full border p-2 rounded bg-gray-50" readonly />
+      <input type="hidden" name="orgID" value="{{ .LeaderOrgID }}" />
+      <p class="text-xs text-gray-500 mt-1">You will be assigned as a leader of this group.</p>
+    </div>
+  {{ end }}
+
+  <!-- Description -->
+  <div>
+    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
+    <textarea name="description" rows="4" class="w-full border p-2 rounded">{{ .Description }}</textarea>
+  </div>
+
+  <!-- Propagate return so the handler can send user back -->
+  <input type="hidden" name="return" value="{{ .BackURL }}">
+
+  <div class="pt-2">
+    <button class="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Create Group</button>
+  </div>
+</form>
+
+{{ if eq .Role "admin" }}
+<script>
+  (function(){
+    var orgSel = document.getElementById('orgSelect');
+    var leaderSel = document.getElementById('leaderSelect');
+    function filterLeaders(){
+      var org = orgSel.value || '';
+      for (var i=0; i<leaderSel.options.length; i++){
+        var opt = leaderSel.options[i];
+        var match = (opt.getAttribute('data-org') === org);
+        opt.hidden   = !match;
+        opt.disabled = !match;
+        if (!match) { opt.selected = false; }
+      }
+    }
+    orgSel && orgSel.addEventListener('change', filterLeaders);
+    filterLeaders(); // initial pass
+    // No "must select leader" guard — leaders are optional now
+  })();
+</script>
+{{ end }}
+{{ end }}

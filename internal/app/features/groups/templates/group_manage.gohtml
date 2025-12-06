@@ -1,0 +1,400 @@
+{{ define "group_manage" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center mb-2">
+  <a href="{{ .BackURL }}"
+     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 mr-2"
+     title="Go back">
+    ← Back
+  </a>
+  <h1 class="text-2xl font-bold text-gray-900">👥 Manage Users in {{ .GroupName }}</h1>
+</div>
+
+<div class="mb-4 text-sm text-gray-700">
+  <p>Organization: {{ .OrganizationName }}</p>
+  <p>Description: {{ .GroupDescription }}</p>
+</div>
+
+<!-- LEADERS SECTION -->
+<div id="leaders-section" class="mb-6">
+  <h2 class="text-lg font-semibold mb-2">Leaders</h2>
+  {{ template "group_leaders_contents" . }}
+</div>
+
+<hr class="my-4" />
+
+<!-- MEMBERS SECTION -->
+<div id="members-section" class="text-sm">
+  <h2 class="text-lg font-semibold mb-2">Members</h2>
+  {{ template "group_members_contents" . }}
+</div>
+{{ end }}
+
+{{ define "group_leaders_contents" }}
+<div id="leaders-contents" class="text-sm">
+  <!-- Fixed header table -->
+  <table class="min-w-full border bg-white table-fixed border-separate border-spacing-0">
+    <colgroup><col class="w-1/3" /><col class="w-1/3" /><col class="w-1/3" /></colgroup>
+    <thead class="bg-white">
+      <tr class="border-b">
+        <th class="px-2 py-1 text-left">Name</th>
+        <th class="px-2 py-1 text-left">Email</th>
+        <th class="px-2 py-1 text-left">Action</th>
+      </tr>
+    </thead>
+  </table>
+
+  <!-- Body in scroll container -->
+  <div class="relative max-h-96 overflow-y-auto mb-4" style="scrollbar-gutter: stable;">
+    <table class="min-w-full border bg-white table-fixed border-separate border-spacing-0">
+      <colgroup><col class="w-1/3" /><col class="w-1/3" /><col class="w-1/3" /></colgroup>
+      <tbody>
+        {{ if .CurrentLeaders }}
+          {{ range .CurrentLeaders }}
+          <tr class="border-b">
+            <td class="px-2 py-1">{{ .FullName }}</td>
+            <td class="px-2 py-1">{{ .Email }}</td>
+            <td class="px-2 py-1">
+              <form
+                hx-post="/groups/{{ $.GroupID }}/manage/remove-leader"
+                hx-target="#leaders-contents"
+                hx-swap="outerHTML"
+                hx-disable-element
+              >
+                <input type="hidden" name="userID" value="{{ .ID }}" />
+                <input type="hidden" name="return" value="{{ $.BackURL }}">
+                <button class="bg-red-600 text-white px-1 py-1 text-xs rounded hover:bg-red-700">Remove</button>
+              </form>
+            </td>
+          </tr>
+          {{ end }}
+        {{ else }}
+          <tr><td colspan="3" class="px-2 py-1">No leaders yet.</td></tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+
+  <form
+    hx-post="/groups/{{ .GroupID }}/manage/add-leader"
+    hx-target="#leaders-contents"
+    hx-swap="outerHTML"
+    hx-disable-element
+    class="flex items-center space-x-2 mb-4"
+  >
+    <label for="leaderSelect" class="mr-2">Add Leader:</label>
+    <select id="leaderSelect" name="userID" class="border p-1 text-sm">
+      <option value="">-- Select Leader --</option>
+      {{ range .PossibleLeaders }}
+        <option value="{{ .ID }}">{{ .FullName }} ({{ .Email }})</option>
+      {{ end }}
+    </select>
+    <input type="hidden" name="return" value="{{ .BackURL }}">
+    <button class="bg-blue-600 text-white px-2 py-1 text-xs rounded hover:bg-blue-700">Add</button>
+  </form>
+</div>
+{{ end }}
+
+{{/* ─────────── Members in Group: header + body-only snippet for swaps ─────────── */}}
+{{ define "group_members_header" }}
+<div id="members-header-block">
+  <div class="flex items-baseline gap-2 mb-1">
+    <h3 class="font-semibold">In Group</h3>
+    <span class="text-xs text-gray-600">({{ len .CurrentMembers }} total)</span>
+  </div>
+
+  <!-- Fixed header table -->
+  <table class="min-w-full border bg-white table-fixed border-separate border-spacing-0">
+    <colgroup><col class="w-1/3" /><col class="w-1/3" /><col class="w-1/3" /></colgroup>
+    <thead class="bg-white">
+      <tr class="border-b">
+        <th class="px-2 py-1 text-left">Name</th>
+        <th class="px-2 py-1 text-left">Email</th>
+        <th class="px-2 py-1 text-left">Action</th>
+      </tr>
+    </thead>
+  </table>
+</div>
+{{ end }}
+
+{{ define "group_members_header_oob" }}
+<div id="members-header-block" hx-swap-oob="outerHTML">
+  {{ template "group_members_header" . }}
+</div>
+{{ end }}
+
+{{ define "group_members_list_inner" }}
+<!-- Only the scrollable BODY gets swapped -->
+<div id="members-list-body" class="relative max-h-96 overflow-y-auto mb-6" style="scrollbar-gutter: stable;">
+  <table class="min-w-full border bg-white table-fixed border-separate border-spacing-0">
+    <colgroup><col class="w-1/3" /><col class="w-1/3" /><col class="w-1/3" /></colgroup>
+    <tbody>
+      {{ if .CurrentMembers }}
+        {{ range .CurrentMembers }}
+        <tr class="border-b">
+          <td class="px-2 py-1">{{ .FullName }}</td>
+          <td class="px-2 py-1">{{ .Email }}</td>
+          <td class="px-2 py-1">
+            <form
+              hx-post="/groups/{{ $.GroupID }}/manage/remove-member"
+              hx-target="#members-list-body"
+              hx-swap="outerHTML"
+              hx-disable-element
+              hx-include="#member-search-form"
+            >
+              <input type="hidden" name="userID" value="{{ .ID }}" />
+              <input type="hidden" name="return" value="{{ $.BackURL }}">
+              <button class="bg-red-600 text-white px-1 py-1 text-xs rounded hover:bg-red-700">Remove</button>
+            </form>
+          </td>
+        </tr>
+        {{ end }}
+      {{ else }}
+        <tr><td colspan="3" class="px-2 py-1">No members yet.</td></tr>
+      {{ end }}
+    </tbody>
+  </table>
+</div>
+{{ end }}
+
+{{/* ───────────── Available members – full block (page render) ───────────── */}}
+{{ define "group_available_members_block" }}
+<div id="available-block">
+  <!-- Heading with counts, one line -->
+  <div class="flex items-baseline gap-2">
+    <h3 class="font-semibold">Available to Add</h3>
+    <span class="text-xs text-gray-600">({{ .AvailableShown }} shown of {{ .AvailableTotal }} total)</span>
+  </div>
+
+  <!-- Controls row: search left, pager right -->
+  <div class="flex items-center justify-between mt-2 mb-2 gap-3">
+    <form
+      id="member-search-form"
+      hx-get="/groups/{{ .GroupID }}/manage/search-members"
+      hx-target="#available-block"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+      hx-trigger="submit, keyup changed delay:300ms from:#memberSearch"
+      class="flex items-center gap-2"
+    >
+      <label for="memberSearch">Search Members to Add:</label>
+      <input
+        id="memberSearch" name="q" type="text" value="{{ .Query }}" class="border p-1 text-sm"
+        hx-on="input: (function(){
+          const f=document.getElementById('member-search-form');
+          f.querySelector('input[name=after]').value='';
+          f.querySelector('input[name=before]').value='';
+        })()"
+      >
+      <input type="hidden" name="after"  value="{{ .CurrentAfter }}">
+      <input type="hidden" name="before" value="{{ .CurrentBefore }}">
+      <input type="hidden" name="return" value="{{ .BackURL }}">
+      <button
+        type="button"
+        class="bg-gray-200 text-gray-800 px-2 py-1 text-xs rounded hover:bg-gray-300"
+        hx-get="/groups/{{ .GroupID }}/manage/search-members?q=&return={{ .BackURL | urlquery }}"
+        hx-target="#available-block"
+        hx-swap="outerHTML"
+        hx-push-url="true"
+      >Clear</button>
+    </form>
+
+    <div class="flex items-center gap-2">
+      {{ if .HasPrev }}
+        <a href="/groups/{{ .GroupID }}/manage/search-members?before={{ .PrevCursor }}&q={{ .Query }}&return={{ .BackURL | urlquery }}"
+           hx-get="/groups/{{ .GroupID }}/manage/search-members?before={{ .PrevCursor }}&q={{ .Query }}&return={{ .BackURL | urlquery }}"
+           hx-target="#available-block" hx-swap="outerHTML" hx-push-url="true"
+           class="px-2 py-1 text-xs border rounded hover:bg-gray-50">Prev</a>
+      {{ else }}
+        <span class="px-2 py-1 text-xs text-gray-400 border rounded cursor-not-allowed">Prev</span>
+      {{ end }}
+      {{ if .HasNext }}
+        <a href="/groups/{{ .GroupID }}/manage/search-members?after={{ .NextCursor }}&q={{ .Query }}&return={{ .BackURL | urlquery }}"
+           hx-get="/groups/{{ .GroupID }}/manage/search-members?after={{ .NextCursor }}&q={{ .Query }}&return={{ .BackURL | urlquery }}"
+           hx-target="#available-block" hx-swap="outerHTML" hx-push-url="true"
+           class="px-2 py-1 text-xs border rounded hover:bg-gray-50">Next</a>
+      {{ else }}
+        <span class="px-2 py-1 text-xs text-gray-400 border rounded cursor-not-allowed">Next</span>
+      {{ end }}
+    </div>
+  </div>
+
+  <!-- Fixed header table -->
+  <table class="min-w-full border bg-white table-fixed border-separate border-spacing-0">
+    <colgroup><col class="w-1/3" /><col class="w-1/3" /><col class="w-1/3" /></colgroup>
+    <thead class="bg-white">
+      <tr class="border-b">
+        <th class="px-2 py-1 text-left">Name</th>
+        <th class="px-2 py-1 text-left">Email</th>
+        <th class="px-2 py-1 text-left">Action</th>
+      </tr>
+    </thead>
+  </table>
+
+  <!-- Body in scroll container -->
+  <div id="member-search-results" class="relative max-h-96 overflow-y-auto" style="scrollbar-gutter: stable;">
+    <table class="min-w-full border bg-white table-fixed border-separate border-spacing-0">
+      <colgroup><col class="w-1/3" /><col class="w-1/3" /><col class="w-1/3" /></colgroup>
+      <tbody id="member-search-results-body">
+        {{ if .AvailableMembers }}
+          {{ range .AvailableMembers }}
+          <tr class="border-b">
+            <td class="px-2 py-1">{{ .FullName }}</td>
+            <td class="px-2 py-1">{{ .Email }}</td>
+            <td class="px-2 py-1">
+              <form
+                hx-post="/groups/{{ $.GroupID }}/manage/add-member"
+                hx-target="#members-list-body"
+                hx-swap="outerHTML"
+                hx-disable-element
+                hx-include="#member-search-form"
+              >
+                <input type="hidden" name="userID" value="{{ .ID }}" />
+                <input type="hidden" name="return" value="{{ $.BackURL }}">
+                <button class="bg-green-600 text-white px-2 py-1 text-xs rounded hover:bg-green-700">Add</button>
+              </form>
+            </td>
+          </tr>
+          {{ end }}
+        {{ else }}
+          <tr id="no-candidates-row">
+            <td colspan="3" class="px-2 py-2 text-gray-500">No members match the current search.</td>
+          </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Bottom pager -->
+  <div class="flex items-center justify-end gap-2 mt-2">
+    {{ if .HasPrev }}
+      <a href="/groups/{{ .GroupID }}/manage/search-members?before={{ .PrevCursor }}&q={{ .Query }}&return={{ .BackURL | urlquery }}"
+         hx-get="/groups/{{ .GroupID }}/manage/search-members?before={{ .PrevCursor }}&q={{ .Query }}&return={{ .BackURL | urlquery }}"
+         hx-target="#available-block" hx-swap="outerHTML" hx-push-url="true"
+         class="px-2 py-1 text-xs border rounded hover:bg-gray-50">Prev</a>
+    {{ else }}
+      <span class="px-2 py-1 text-xs text-gray-400 border rounded cursor-not-allowed">Prev</span>
+    {{ end }}
+    {{ if .HasNext }}
+      <a href="/groups/{{ .GroupID }}/manage/search-members?after={{ .NextCursor }}&q={{ .Query }}&return={{ .BackURL | urlquery }}"
+         hx-get="/groups/{{ .GroupID }}/manage/search-members?after={{ .NextCursor }}&q={{ .Query }}&return={{ .BackURL | urlquery }}"
+         hx-target="#available-block" hx-swap="outerHTML" hx-push-url="true"
+         class="px-2 py-1 text-xs border rounded hover:bg-gray-50">Next</a>
+    {{ else }}
+      <span class="px-2 py-1 text-xs text-gray-400 border rounded cursor-not-allowed">Next</span>
+    {{ end }}
+  </div>
+</div>
+{{ end }}
+
+{{ define "group_available_members_block_oob" }}
+<div id="available-block" hx-swap-oob="outerHTML">
+  {{ template "group_available_members_block" . }}
+</div>
+{{ end }}
+
+{{ define "group_members_contents" }}
+  {{ template "group_members_list_block" . }}
+
+  <!-- Chip stack lives OUTSIDE the replaceable available block -->
+  <div id="recent-chips" class="flex flex-wrap gap-2 mb-2"></div>
+
+  {{ template "group_available_members_block" . }}
+{{ end }}
+
+{{ define "group_members_list_block" }}
+  {{ template "group_members_header" . }}
+  {{ template "group_members_list_inner" . }}
+{{ end }}
+
+{{ define "group_recent_chip_oob" }}
+<div id="recent-chips" hx-swap-oob="beforeend">
+  <div
+    id="chip-{{ .UserID }}"
+    role="status"
+    aria-live="polite"
+    class="inline-flex items-center gap-2 bg-amber-100 text-amber-900 px-3 py-1 rounded text-xs shadow-sm transition-opacity"
+    hx-on::load="(function(el){
+      // initialize countdown state
+      el._remain = 10;
+      const label = el.querySelector('[data-countdown]');
+      function tick(){
+        el._remain--;
+        if (label) { label.textContent = el._remain; }
+        if (el._remain <= 0) {
+          clearInterval(el._int); el._int = null;
+          if (el._t) { clearTimeout(el._t); el._t = null; }
+          el.remove();
+        }
+      }
+      el._int = setInterval(tick, 1000);
+      el._t = setTimeout(function(){
+        if (el) {
+          if (el._int) { clearInterval(el._int); el._int = null; }
+          el.remove();
+        }
+      }, 10000);
+    })(this)"
+    hx-on:mouseenter="(function(el){
+      if (el._t) { clearTimeout(el._t); el._t = null; }
+      if (el._int) { clearInterval(el._int); el._int = null; }
+    })(this)"
+    hx-on:mouseleave="(function(el){
+      // resume countdown with remaining seconds (at least 1s)
+      const ms = Math.max(1000, (el._remain || 10) * 1000);
+      if (!el._t) {
+        el._t = setTimeout(function(){
+          if (el) {
+            if (el._int) { clearInterval(el._int); el._int = null; }
+            el.remove();
+          }
+        }, ms);
+      }
+      if (!el._int) {
+        const label = el.querySelector('[data-countdown]');
+        el._int = setInterval(function(){
+          el._remain = (typeof el._remain === 'number') ? el._remain - 1 : 9;
+          if (label) { label.textContent = el._remain; }
+          if (el._remain <= 0) {
+            clearInterval(el._int); el._int = null;
+            if (el._t) { clearTimeout(el._t); el._t = null; }
+            el.remove();
+          }
+        }, 1000);
+      }
+    })(this)"
+  >
+    <span>Removed: {{ .FullName }}</span>
+    <span class="opacity-70">•</span>
+    <span class="opacity-80">Undo in <span data-countdown>10</span>s</span>
+    <form
+      hx-post="/groups/{{ .GroupID }}/manage/add-member"
+      hx-target="#members-list-body"
+      hx-swap="outerHTML"
+      hx-include="#member-search-form"
+      hx-disable-element
+      hx-on:click="(function(){
+        var el=document.getElementById('chip-{{ .UserID }}');
+        if (el) { el.classList.add('opacity-60'); el.classList.add('pointer-events-none'); }
+      })()"
+      hx-on:htmx:after-request="(function(){
+        var el=document.getElementById('chip-{{ .UserID }}');
+        var s=(event.detail && event.detail.xhr)?event.detail.xhr.status:0;
+        if (!el) { return; }
+        if (s>=200 && s<300) {
+          if (el._int) { clearInterval(el._int); el._int=null; }
+          if (el._t) { clearTimeout(el._t); el._t=null; }
+          el.remove();
+        } else {
+          el.classList.remove('opacity-60'); el.classList.remove('pointer-events-none');
+        }
+      })()"
+    >
+      <input type="hidden" name="userID" value="{{ .UserID }}">
+      <button class="bg-green-600 text-white px-2 py-0.5 rounded" aria-label="Add back {{ .FullName }}">Add back</button>
+    </form>
+  </div>
+</div>
+{{ end }}
