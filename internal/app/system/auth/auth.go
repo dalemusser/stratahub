@@ -2,85 +2,277 @@ package auth
 
 import (
 	"context"
-	"fmt"
 	"net/http"
 	"net/url"
 	"strings"
 
+	"github.com/dalemusser/stratahub/internal/app/system/normalize"
+	"github.com/gorilla/securecookie"
 	"github.com/gorilla/sessions"
 	"go.uber.org/zap"
 )
 
+// Session error classification for logging and monitoring.
+type sessionErrorType int
+
+const (
+	sessionErrUnknown sessionErrorType = iota
+	sessionErrExpired                  // timestamp expired - normal
+	sessionErrTampered                 // MAC invalid - potential attack
+	sessionErrCorrupted                // decode/decrypt failed - corruption or key rotation
+	sessionErrBackend                  // store/backend failure
+)
+
 /*─────────────────────────────────────────────────────────────────────────────*
-| Session constants & globals                                                |
+| Session constants                                                           |
 *─────────────────────────────────────────────────────────────────────────────*/
 
 const (
-	SessionName = "adroit-session"
-
 	isAuthKey = "is_authenticated"
 	userIDKey = "user_id"
 	userName  = "user_name"
 	userEmail = "user_email"
 	userRole  = "user_role"
+	userOrgID = "organization_id"
 )
 
-// Store is initialised once via InitSessionStore.
-var Store *sessions.CookieStore
+/*─────────────────────────────────────────────────────────────────────────────*
+| SessionManager - injectable session management                              |
+*─────────────────────────────────────────────────────────────────────────────*/
+
+// SessionManager encapsulates session store and configuration.
+// It provides middleware and utilities for session-based authentication.
+// Use NewSessionManager to create an instance.
+type SessionManager struct {
+	store       *sessions.CookieStore
+	logger      *zap.Logger
+	name        string
+	userFetcher UserFetcher
+}
+
+// NewSessionManager creates a new SessionManager with the provided configuration.
+//
+// Parameters:
+//   - sessionKey: signing key for cookies (must be ≥32 chars in production)
+//   - name: session cookie name (defaults to "stratahub-session" if empty)
+//   - domain: cookie domain (empty means current host)
+//   - secure: if true, cookies are Secure + SameSite=None (for HTTPS production)
+//   - logger: zap logger for session error logging
+//
+// Returns an error if sessionKey is empty or too weak for production mode.
+func NewSessionManager(sessionKey, name, domain string, secure bool, logger *zap.Logger) (*SessionManager, error) {
+	if sessionKey == "" {
+		return nil, &SessionConfigError{Message: "session key is empty; provide ≥32 random chars"}
+	}
+
+	// Check for weak/default keys
+	isWeak := len(sessionKey) < 32 || isDefaultKey(sessionKey)
+
+	if secure {
+		// In production mode, require a strong key - fail startup if weak
+		if isWeak {
+			return nil, &SessionConfigError{
+				Message: "session key is too weak for production; provide ≥32 random chars (not the default dev key)",
+			}
+		}
+	} else if isWeak {
+		// In dev mode, warn but allow weak keys
+		logger.Warn("session key is weak; 32+ random chars required in production",
+			zap.Int("length", len(sessionKey)),
+			zap.Bool("is_default", isDefaultKey(sessionKey)))
+	}
+
+	// Set session name (use default if empty)
+	if name == "" {
+		name = "stratahub-session"
+	}
+
+	store := sessions.NewCookieStore([]byte(sessionKey))
+	opts := &sessions.Options{
+		Domain:   domain,
+		Path:     "/",
+		Secure:   secure,
+		HttpOnly: true,
+	}
+
+	// SameSite handling: in prod with Secure cookies, we use None
+	// so cookies can be sent in cross-site contexts. In dev, Lax is fine.
+	if secure {
+		opts.SameSite = http.SameSiteNoneMode
+	} else {
+		opts.SameSite = http.SameSiteLaxMode
+	}
+
+	store.Options = opts
+
+	logger.Info("session manager initialized",
+		zap.Bool("secure", secure),
+		zap.String("name", name),
+		zap.String("domain", domain))
+
+	return &SessionManager{
+		store:  store,
+		logger: logger,
+		name:   name,
+	}, nil
+}
+
+// SessionConfigError is returned when session configuration is invalid.
+type SessionConfigError struct {
+	Message string
+}
+
+func (e *SessionConfigError) Error() string {
+	return e.Message
+}
+
+// SessionName returns the configured session cookie name.
+func (sm *SessionManager) SessionName() string {
+	return sm.name
+}
+
+// Store returns the underlying session store.
+// Use this when you need direct access to store options.
+func (sm *SessionManager) Store() *sessions.CookieStore {
+	return sm.store
+}
+
+// GetSession retrieves the session for the request.
+// If the session doesn't exist or is invalid, a new empty session is returned.
+func (sm *SessionManager) GetSession(r *http.Request) (*sessions.Session, error) {
+	return sm.store.Get(r, sm.name)
+}
+
+// SetUserFetcher sets the UserFetcher used by LoadSessionUser to fetch fresh
+// user data on each request. This must be called after database initialization.
+func (sm *SessionManager) SetUserFetcher(uf UserFetcher) {
+	sm.userFetcher = uf
+}
+
+/*─────────────────────────────────────────────────────────────────────────────*
+| UserFetcher interface                                                       |
+*─────────────────────────────────────────────────────────────────────────────*/
+
+// UserFetcher fetches fresh user data from the database.
+// Implementations should return nil if the user is not found or is disabled.
+type UserFetcher interface {
+	// FetchUser retrieves a user by ID. Returns nil if user not found,
+	// disabled, or any other condition that should invalidate the session.
+	FetchUser(ctx context.Context, userID string) *SessionUser
+}
 
 /*─────────────────────────────────────────────────────────────────────────────*
 | Current-User helper                                                        |
 *─────────────────────────────────────────────────────────────────────────────*/
 
-// SessionUser is what we cache in the session & inject into r.Context().
+// SessionUser represents the authenticated user in the request context.
+// This data is fetched fresh from the database on each request to ensure
+// role changes, disabled accounts, and profile updates take effect immediately.
 type SessionUser struct {
-	ID    string
-	Name  string
-	Email string
-	Role  string
+	ID               string
+	Name             string
+	Email            string
+	Role             string
+	OrganizationID   string
+	OrganizationName string
 }
 
 type ctxKey string
 
 const currentUserKey ctxKey = "currentUser"
 
-// CurrentUser returns the user & “found?” flag.
+// CurrentUser returns the user & "found?" flag from the request context.
 func CurrentUser(r *http.Request) (*SessionUser, bool) {
 	u, ok := r.Context().Value(currentUserKey).(*SessionUser)
 	return u, ok
 }
 
-// LoadSessionUser injects the user into context if they are logged in.
-// If the session store has not been initialized yet, it is a no-op.
-func LoadSessionUser(next http.Handler) http.Handler {
+/*─────────────────────────────────────────────────────────────────────────────*
+| Middleware                                                                  |
+*─────────────────────────────────────────────────────────────────────────────*/
+
+// LoadSessionUser returns middleware that injects the user into context if logged in.
+// If a UserFetcher is configured, fresh user data is fetched from the database
+// on each request to ensure role changes, disabled accounts, and profile updates
+// take effect immediately.
+func (sm *SessionManager) LoadSessionUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// If the session store isn't configured yet, just continue.
-		if Store == nil {
-			next.ServeHTTP(w, r)
-			return
+		sess, err := sm.store.Get(r, sm.name)
+		if err != nil {
+			// Classify the session error for appropriate logging.
+			errType, errCategory := classifySessionError(err)
+			switch errType {
+			case sessionErrExpired:
+				// Normal expiration - debug level, not a concern
+				sm.logger.Debug("session expired, starting fresh session",
+					zap.String("category", errCategory),
+					zap.String("path", r.URL.Path))
+			case sessionErrTampered:
+				// MAC invalid - potential tampering attempt, log at Warn with client info
+				sm.logger.Warn("session MAC validation failed (possible tampering)",
+					zap.String("category", errCategory),
+					zap.String("path", r.URL.Path),
+					zap.String("remote_addr", r.RemoteAddr),
+					zap.String("user_agent", r.UserAgent()))
+			case sessionErrCorrupted:
+				// Decode/decrypt failed - could be key rotation or corruption
+				sm.logger.Info("session decode failed, starting fresh session",
+					zap.String("category", errCategory),
+					zap.String("path", r.URL.Path))
+			case sessionErrBackend:
+				// Store backend failure - this is concerning
+				sm.logger.Error("session store error, starting fresh session",
+					zap.Error(err),
+					zap.String("path", r.URL.Path))
+			default:
+				// Unknown error type
+				sm.logger.Warn("session error, starting fresh session",
+					zap.Error(err),
+					zap.String("category", errCategory),
+					zap.String("path", r.URL.Path))
+			}
 		}
 
-		sess, _ := Store.Get(r, SessionName)
-
 		if isAuth, _ := sess.Values[isAuthKey].(bool); isAuth {
-			u := &SessionUser{
-				ID:    getString(sess, userIDKey),
-				Name:  getString(sess, userName),
-				Email: getString(sess, userEmail),
-				Role:  getString(sess, userRole),
+			userID := getString(sess, userIDKey)
+
+			// If we have a UserFetcher, get fresh data from DB
+			if sm.userFetcher != nil && userID != "" {
+				u := sm.userFetcher.FetchUser(r.Context(), userID)
+				if u != nil {
+					// User exists and is active - inject into context
+					r = withUser(r, u)
+				} else {
+					// User not found, disabled, or deleted - clear session
+					sm.logger.Info("session invalidated: user not found or disabled",
+						zap.String("user_id", userID),
+						zap.String("path", r.URL.Path))
+					sess.Values[isAuthKey] = false
+					delete(sess.Values, userIDKey)
+					_ = sess.Save(r, w) // Best effort to clear
+				}
+			} else if userID != "" {
+				// Fallback: no UserFetcher configured, use session data (legacy behavior)
+				u := &SessionUser{
+					ID:             userID,
+					Name:           getString(sess, userName),
+					Email:          getString(sess, userEmail),
+					Role:           getString(sess, userRole),
+					OrganizationID: getString(sess, userOrgID),
+				}
+				r = withUser(r, u)
 			}
-			r = withUser(r, u)
 		}
 		next.ServeHTTP(w, r)
 	})
 }
 
-// RequireSignedIn ensures there is a user in context (set by LoadSessionUser).
+// RequireSignedIn returns middleware that ensures there is a user in context.
 // If not signed in:
 //   - HTMX: sends HX-Redirect to /login?return=...
 //   - HTML: 303 redirect to /login?return=...
 //   - API:  401 Unauthorized with a plain error body.
-func RequireSignedIn(next http.Handler) http.Handler {
+func (sm *SessionManager) RequireSignedIn(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if _, ok := CurrentUser(r); ok {
 			next.ServeHTTP(w, r)
@@ -107,12 +299,12 @@ func RequireSignedIn(next http.Handler) http.Handler {
 	})
 }
 
-// RequireRole ensures there is a user with the required role in context (set by LoadSessionUser).
+// RequireRole returns middleware that ensures there is a user with the required role.
 // If not authorized, it redirects to HTML pages (or sets HX-Redirect) instead of writing a blank error.
-func RequireRole(allowed ...string) func(http.Handler) http.Handler {
+func (sm *SessionManager) RequireRole(allowed ...string) func(http.Handler) http.Handler {
 	set := make(map[string]struct{}, len(allowed))
 	for _, role := range allowed {
-		set[strings.ToLower(strings.TrimSpace(role))] = struct{}{}
+		set[normalize.Role(role)] = struct{}{}
 	}
 
 	return func(next http.Handler) http.Handler {
@@ -142,7 +334,7 @@ func RequireRole(allowed ...string) func(http.Handler) http.Handler {
 			}
 
 			// 2) Signed in but wrong role → 403 semantics
-			if _, has := set[strings.ToLower(u.Role)]; !has {
+			if _, has := set[normalize.Role(u.Role)]; !has {
 				// HTMX: redirect (so the full page swaps)
 				if r.Header.Get("HX-Request") == "true" {
 					dest := "/forbidden"
@@ -168,49 +360,9 @@ func RequireRole(allowed ...string) func(http.Handler) http.Handler {
 	}
 }
 
-// InitSessionStore initializes the global session Store using the provided
-// session key and domain. The `secure` flag controls whether cookies are
-// marked Secure and which SameSite mode is used.
-//
-// In production (secure=true), cookies should be Secure + SameSite=None
-// (for cross-site use with HTTPS).
-// In local dev over http://localhost, use secure=false so cookies are accepted.
-func InitSessionStore(sessionKey, domain string, secure bool, logger *zap.Logger) error {
-	if sessionKey == "" {
-		return fmt.Errorf("session key is empty; provide ≥32 random chars")
-	}
-	if len(sessionKey) < 32 {
-		logger.Warn("session key is short; 32+ chars recommended",
-			zap.Int("length", len(sessionKey)))
-	}
-
-	store := sessions.NewCookieStore([]byte(sessionKey))
-	opts := &sessions.Options{
-		Domain:   domain,
-		Path:     "/",
-		Secure:   secure,
-		HttpOnly: true,
-	}
-
-	// SameSite handling: in prod with Secure cookies, we use None
-	// so cookies can be sent in cross-site contexts. In dev, Lax is fine.
-	if secure {
-		opts.SameSite = http.SameSiteNoneMode
-	} else {
-		opts.SameSite = http.SameSiteLaxMode
-	}
-
-	store.Options = opts
-	Store = store
-
-	logger.Info("session store initialized",
-		zap.Bool("secure", secure),
-		zap.String("domain", domain))
-
-	return nil
-}
-
-// helpers
+/*─────────────────────────────────────────────────────────────────────────────*
+| Helpers                                                                     |
+*─────────────────────────────────────────────────────────────────────────────*/
 
 func withUser(r *http.Request, u *SessionUser) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), currentUserKey, u))
@@ -237,4 +389,67 @@ func currentURI(r *http.Request) string {
 	// Preserve path + query as a return param.
 	u := *r.URL
 	return u.RequestURI()
+}
+
+// isDefaultKey checks if the session key appears to be a default/placeholder value.
+// This catches common patterns like "dev-only", "change-me", "placeholder", etc.
+func isDefaultKey(key string) bool {
+	lower := strings.ToLower(key)
+	patterns := []string{
+		"dev-only",
+		"change-me",
+		"placeholder",
+		"default",
+		"example",
+		"insecure",
+		"test-key",
+		"secret123",
+		"password",
+	}
+	for _, p := range patterns {
+		if strings.Contains(lower, p) {
+			return true
+		}
+	}
+	return false
+}
+
+// classifySessionError categorizes a session/cookie error for appropriate logging.
+// Returns the error type and a human-readable category string.
+func classifySessionError(err error) (sessionErrorType, string) {
+	if err == nil {
+		return sessionErrUnknown, "none"
+	}
+
+	errStr := strings.ToLower(err.Error())
+
+	// Check for securecookie.Error interface first
+	if scErr, ok := err.(securecookie.Error); ok {
+		if !scErr.IsDecode() {
+			// Not a decode error - likely a backend/usage issue
+			return sessionErrBackend, "backend"
+		}
+
+		// Decode errors - classify by error message patterns
+		// securecookie uses specific error messages we can match
+		switch {
+		case strings.Contains(errStr, "expired timestamp"):
+			return sessionErrExpired, "expired"
+		case strings.Contains(errStr, "mac") || strings.Contains(errStr, "hash"):
+			// MAC/HMAC validation failed - tampering
+			return sessionErrTampered, "mac_invalid"
+		case strings.Contains(errStr, "decrypt"):
+			// Decryption failed - wrong key or corruption
+			return sessionErrCorrupted, "decrypt_failed"
+		case strings.Contains(errStr, "base64") || strings.Contains(errStr, "decode"):
+			// Base64/decode issues - corruption
+			return sessionErrCorrupted, "decode_failed"
+		default:
+			// Other decode error
+			return sessionErrCorrupted, "decode_other"
+		}
+	}
+
+	// Not a securecookie.Error - treat as backend error
+	return sessionErrBackend, "unknown"
 }

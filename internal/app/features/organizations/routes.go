@@ -8,13 +8,13 @@ import (
 
 // Routes mounts all Organization routes under the base path
 // (typically "/organizations" from bootstrap).
-func Routes(h *Handler) chi.Router {
+func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 	r := chi.NewRouter()
 
 	r.Group(func(pr chi.Router) {
 		// Only signed-in admins can access Organizations.
-		pr.Use(auth.RequireSignedIn)
-		pr.Use(auth.RequireRole("admin"))
+		pr.Use(sm.RequireSignedIn)
+		pr.Use(sm.RequireRole("admin"))
 
 		// LIST (live search + HTMX swap)
 		pr.Get("/", h.ServeList)

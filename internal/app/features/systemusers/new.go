@@ -5,21 +5,29 @@ import (
 	"context"
 	"html/template"
 	"net/http"
-	"strings"
 	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
-	"github.com/dalemusser/waffle/templates"
-	textfold "github.com/dalemusser/waffle/toolkit/text/textfold"
-	nav "github.com/dalemusser/waffle/toolkit/ui/nav"
-	validate "github.com/dalemusser/waffle/toolkit/validate"
-
-	mongodb "github.com/dalemusser/waffle/toolkit/db/mongodb"
-
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/inputval"
+	"github.com/dalemusser/stratahub/internal/app/system/navigation"
+	"github.com/dalemusser/stratahub/internal/app/system/normalize"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/waffle/pantry/httpnav"
+	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
+	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/dalemusser/waffle/pantry/text"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+// createSystemUserInput defines validation rules for creating a system user.
+type createSystemUserInput struct {
+	FullName   string `validate:"required,max=200" label:"Full name"`
+	Email      string `validate:"required,email,max=254" label:"Email"`
+	Role       string `validate:"required,oneof=admin analyst" label:"Role"`
+	AuthMethod string `validate:"required,authmethod" label:"Auth method"`
+}
 
 // ServeNew renders the "Add System User" form.
 //
@@ -38,8 +46,8 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 		IsLoggedIn:  true,
 		Role:        role,
 		UserName:    uname,
-		BackURL:     nav.ResolveBackURL(r, "/system-users"),
-		CurrentPath: nav.CurrentPath(r),
+		BackURL:     httpnav.ResolveBackURL(r, "/system-users"),
+		CurrentPath: httpnav.CurrentPath(r),
 		// Field values start empty; template will show sensible defaults.
 	}
 
@@ -54,45 +62,14 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		h.ErrLog.LogBadRequest(w, r, "parse form failed", err, "Invalid form data.", "/system-users")
 		return
 	}
 
-	full := strings.TrimSpace(r.FormValue("full_name"))
-	email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
-	userRole := strings.ToLower(strings.TrimSpace(r.FormValue("role")))
-	authm := strings.ToLower(strings.TrimSpace(r.FormValue("auth_method")))
-
-	// Validation (presence + whitelist)
-	var errs []string
-	if full == "" {
-		errs = append(errs, "Full Name is required.")
-	}
-	if email == "" {
-		errs = append(errs, "Email is required.")
-	} else if !validate.SimpleEmailValid(email) {
-		errs = append(errs, "Email format is invalid.")
-	}
-
-	switch userRole {
-	case "admin", "analyst":
-	default:
-		if userRole == "" {
-			errs = append(errs, "Role is required.")
-		} else {
-			errs = append(errs, "Role must be admin or analyst.")
-		}
-	}
-
-	switch authm {
-	case "internal", "google", "classlink", "clever", "microsoft":
-	default:
-		if authm == "" {
-			errs = append(errs, "Auth Method is required.")
-		} else {
-			errs = append(errs, "Auth Method must be internal, google, classlink, clever, or microsoft.")
-		}
-	}
+	full := normalize.Name(r.FormValue("full_name"))
+	email := normalize.Email(r.FormValue("email"))
+	userRole := normalize.Role(r.FormValue("role"))
+	authm := normalize.AuthMethod(r.FormValue("auth_method"))
 
 	reRender := func(msg string) {
 		templates.Render(w, r, "system_user_new", formData{
@@ -107,32 +84,34 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 			Auth:        authm,
 			Status:      "active",
 			Error:       template.HTML(msg),
-			BackURL:     nav.ResolveBackURL(r, "/system-users"),
-			CurrentPath: nav.CurrentPath(r),
+			BackURL:     httpnav.ResolveBackURL(r, "/system-users"),
+			CurrentPath: httpnav.CurrentPath(r),
 		})
 	}
 
-	if len(errs) > 0 {
-		reRender(strings.Join(errs, " "))
+	// Validate using struct tags (required, email, oneof)
+	input := createSystemUserInput{
+		FullName:   full,
+		Email:      email,
+		Role:       userRole,
+		AuthMethod: authm,
+	}
+	if result := inputval.Validate(input); result.HasErrors() {
+		reRender(result.First())
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), sysUsersMedTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 	db := h.DB
 
-	// Duplicate email check
-	if err := db.Collection("users").FindOne(ctx, bson.M{"email": email}).Err(); err == nil {
-		reRender("A user with that email already exists.")
-		return
-	}
-
+	// Insert (duplicate email is caught by unique index)
 	now := time.Now()
 
 	doc := bson.M{
 		"_id":          primitive.NewObjectID(),
 		"full_name":    full,
-		"full_name_ci": textfold.Fold(full),
+		"full_name_ci": text.Fold(full),
 		"email":        email,
 		"auth_method":  authm,
 		"role":         userRole,
@@ -142,7 +121,7 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if _, err := db.Collection("users").InsertOne(ctx, doc); err != nil {
-		if mongodb.IsDup(err) {
+		if wafflemongo.IsDup(err) {
 			reRender("A user with that email already exists.")
 			return
 		}
@@ -150,9 +129,6 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if ret := r.FormValue("return"); ret != "" && strings.HasPrefix(ret, "/") {
-		http.Redirect(w, r, ret, http.StatusSeeOther)
-		return
-	}
-	http.Redirect(w, r, "/system-users", http.StatusSeeOther)
+	ret := navigation.SafeBackURL(r, navigation.SystemUsersBackURL)
+	http.Redirect(w, r, ret, http.StatusSeeOther)
 }

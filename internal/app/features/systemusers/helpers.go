@@ -5,54 +5,27 @@ import (
 	"context"
 	"html/template"
 	"net/http"
-	"strings"
 
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
-	"github.com/dalemusser/waffle/templates"
-	nav "github.com/dalemusser/waffle/toolkit/ui/nav"
+	"github.com/dalemusser/stratahub/internal/app/system/navigation"
+	"github.com/dalemusser/waffle/pantry/httpnav"
+	"github.com/dalemusser/waffle/pantry/templates"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
-/*
-backToSystemUsersURL computes a “safe” return URL for System Users pages.
-
-It honors ?return=... / form return only if it points to /system-users and
-is not one of the sub-actions (new, edit, delete). Otherwise it falls back
-to the canonical list page (/system-users).
-*/
+// backToSystemUsersURL returns a safe return URL for System Users pages.
 func backToSystemUsersURL(r *http.Request) string {
-	ret := strings.TrimSpace(r.URL.Query().Get("return"))
-	if ret == "" {
-		ret = strings.TrimSpace(r.FormValue("return"))
-	}
-	if strings.HasPrefix(ret, "/system-users") &&
-		!strings.Contains(ret, "/edit") &&
-		!strings.Contains(ret, "/delete") &&
-		!strings.Contains(ret, "/new") {
-		return ret
-	}
-	return "/system-users"
+	return navigation.SafeBackURL(r, navigation.SystemUsersBackURL)
 }
 
-/*
-requireAdmin gates an endpoint to admins only.
-
-It returns (role, userName, userID, ok). If ok is false, it has already
-written an HTTP error (401/403) to the response.
-*/
-func requireAdmin(w http.ResponseWriter, r *http.Request) (string, string, primitive.ObjectID, bool) {
-	role, uname, uid, ok := authz.UserCtx(r)
-	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return "", "", primitive.NilObjectID, false
-	}
-	if !authz.IsAdmin(r) {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return "", "", primitive.NilObjectID, false
-	}
-	return role, uname, uid, true
+// userContext returns the current user's context (role, name, userID, ok).
+// Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach handlers calling this.
+// This function only retrieves context; it does not perform authorization checks.
+func userContext(r *http.Request) (string, string, primitive.ObjectID, bool) {
+	role, name, userID, ok := authz.UserCtx(r)
+	return role, name, userID, ok
 }
 
 /*
@@ -78,6 +51,7 @@ func renderEditForm(
 	w http.ResponseWriter,
 	r *http.Request,
 	role, uname, idHex, full, email, uRole, authm, status string,
+	isSelf bool,
 	errMsg template.HTML,
 ) {
 	templates.Render(w, r, "system_user_edit", formData{
@@ -92,8 +66,9 @@ func renderEditForm(
 		UserRole:    uRole,
 		Auth:        authm,
 		Status:      status,
+		IsSelf:      isSelf,
 		Error:       errMsg,
 		BackURL:     backToSystemUsersURL(r),
-		CurrentPath: nav.CurrentPath(r),
+		CurrentPath: httpnav.CurrentPath(r),
 	})
 }

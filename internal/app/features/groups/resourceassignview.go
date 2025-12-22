@@ -11,9 +11,10 @@ import (
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
 	resourceassignstore "github.com/dalemusser/stratahub/internal/app/store/resourceassign"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/templates"
-	nav "github.com/dalemusser/waffle/toolkit/ui/nav"
+	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -66,51 +67,56 @@ func (h *Handler) ServeViewResourceAssignmentPage(w http.ResponseWriter, r *http
 	gid := chi.URLParam(r, "id")
 	groupOID, err := primitive.ObjectIDFromHex(gid)
 	if err != nil {
-		uierrors.RenderForbidden(w, r, "Bad group id.", nav.ResolveBackURL(r, "/groups"))
+		uierrors.RenderForbidden(w, r, "Bad group id.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
 
 	assignHex := chi.URLParam(r, "assignmentID")
 	assignID, err := primitive.ObjectIDFromHex(assignHex)
 	if err != nil {
-		uierrors.RenderForbidden(w, r, "Bad assignment id.", nav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
+		uierrors.RenderForbidden(w, r, "Bad assignment id.", httpnav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), metaShortTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
 
 	// Load group
 	group, err := groupstore.New(db).GetByID(ctx, groupOID)
 	if err == mongo.ErrNoDocuments {
-		uierrors.RenderForbidden(w, r, "Group not found.", nav.ResolveBackURL(r, "/groups"))
+		uierrors.RenderForbidden(w, r, "Group not found.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
 	if err != nil {
 		h.Log.Warn("group GetByID(view assignment)", zap.Error(err))
-		uierrors.RenderForbidden(w, r, "A database error occurred.", nav.ResolveBackURL(r, "/groups"))
+		uierrors.RenderForbidden(w, r, "A database error occurred.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
 
-	if !grouppolicy.CanManageGroup(ctx, db, r, group.ID) {
-		uierrors.RenderForbidden(w, r, "You do not have access to this group.", nav.ResolveBackURL(r, "/groups"))
+	canManage, policyErr := grouppolicy.CanManageGroup(ctx, db, r, group.ID, group.OrganizationID)
+	if policyErr != nil {
+		h.ErrLog.LogServerError(w, r, "database error checking group access", policyErr, "A database error occurred.", "/groups")
+		return
+	}
+	if !canManage {
+		uierrors.RenderForbidden(w, r, "You do not have access to this group.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
 
 	// Load assignment
 	asn, err := resourceassignstore.New(db).GetByID(ctx, assignID)
 	if err == mongo.ErrNoDocuments {
-		uierrors.RenderForbidden(w, r, "Assignment not found.", nav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
+		uierrors.RenderForbidden(w, r, "Assignment not found.", httpnav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
 		return
 	}
 	if err != nil {
 		h.Log.Warn("assignment GetByID(view)", zap.Error(err))
-		uierrors.RenderForbidden(w, r, "A database error occurred.", nav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
+		uierrors.RenderForbidden(w, r, "A database error occurred.", httpnav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
 		return
 	}
 	if asn.GroupID != group.ID {
-		uierrors.RenderForbidden(w, r, "Assignment does not belong to this group.", nav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
+		uierrors.RenderForbidden(w, r, "Assignment does not belong to this group.", httpnav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
 		return
 	}
 
@@ -121,11 +127,11 @@ func (h *Handler) ServeViewResourceAssignmentPage(w http.ResponseWriter, r *http
 	var res models.Resource
 	if err := db.Collection("resources").FindOne(ctx, bson.M{"_id": asn.ResourceID}).Decode(&res); err != nil {
 		if err == mongo.ErrNoDocuments {
-			uierrors.RenderForbidden(w, r, "Resource not found.", nav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
+			uierrors.RenderForbidden(w, r, "Resource not found.", httpnav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
 			return
 		}
 		h.Log.Warn("resource FindOne(view assignment)", zap.Error(err))
-		uierrors.RenderForbidden(w, r, "A database error occurred.", nav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
+		uierrors.RenderForbidden(w, r, "A database error occurred.", httpnav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
 		return
 	}
 
@@ -150,7 +156,7 @@ func (h *Handler) ServeViewResourceAssignmentPage(w http.ResponseWriter, r *http
 
 	back := r.URL.Query().Get("return")
 	if back == "" {
-		back = nav.ResolveBackURL(r, "/groups/"+group.ID.Hex()+"/assign_resources")
+		back = httpnav.ResolveBackURL(r, "/groups/"+group.ID.Hex()+"/assign_resources")
 	}
 
 	vm := viewResourceAssignmentPageVM{
@@ -158,7 +164,7 @@ func (h *Handler) ServeViewResourceAssignmentPage(w http.ResponseWriter, r *http
 		IsLoggedIn:  true,
 		Role:        role,
 		UserName:    uname,
-		CurrentPath: nav.CurrentPath(r),
+		CurrentPath: httpnav.CurrentPath(r),
 
 		GroupID:       group.ID.Hex(),
 		GroupName:     group.Name,

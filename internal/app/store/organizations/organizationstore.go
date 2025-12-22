@@ -6,9 +6,10 @@ import (
 	"errors"
 	"time"
 
+	"github.com/dalemusser/stratahub/internal/app/system/status"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/toolkit/db/mongodb"
-	"github.com/dalemusser/waffle/toolkit/text/textfold"
+	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
+	"github.com/dalemusser/waffle/pantry/text"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -26,18 +27,18 @@ func New(db *mongo.Database) *Store {
 
 func (s *Store) Create(ctx context.Context, org models.Organization) (models.Organization, error) {
 	now := time.Now().UTC()
-	org.ID = primitive.NilObjectID
-	org.NameCI = textfold.Fold(org.Name)
-	org.CityCI = textfold.Fold(org.City)
-	org.StateCI = textfold.Fold(org.State)
+	org.ID = primitive.NewObjectID()
+	org.NameCI = text.Fold(org.Name)
+	org.CityCI = text.Fold(org.City)
+	org.StateCI = text.Fold(org.State)
 	if org.Status == "" {
-		org.Status = "active"
+		org.Status = status.Active
 	}
 	org.CreatedAt = now
 	org.UpdatedAt = now
 	_, err := s.c.InsertOne(ctx, org)
 	if err != nil {
-		if mongodb.IsDup(err) {
+		if wafflemongo.IsDup(err) {
 			return models.Organization{}, ErrDuplicateOrganization
 		}
 		return models.Organization{}, err

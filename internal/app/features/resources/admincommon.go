@@ -7,8 +7,8 @@ import (
 
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/templates"
-	nav "github.com/dalemusser/waffle/toolkit/ui/nav"
+	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/dalemusser/waffle/pantry/httpnav"
 )
 
 // renderNewForm populates the common chrome for the New Resource page and
@@ -25,10 +25,10 @@ func (h *AdminHandler) renderNewForm(w http.ResponseWriter, r *http.Request, vm 
 
 	// Back link returns to the admin resources list (with safe fallback).
 	// For stratahub we’re mounting admin resources at /resources.
-	vm.BackURL = nav.ResolveBackURL(r, "/resources")
+	vm.BackURL = httpnav.ResolveBackURL(r, "/resources")
 
 	// CurrentPath is useful for building return= links in templates.
-	vm.CurrentPath = nav.CurrentPath(r)
+	vm.CurrentPath = httpnav.CurrentPath(r)
 
 	// Populate resource type options for the select menu.
 	vm.TypeOptions = resourceTypeOptions()
@@ -65,7 +65,7 @@ func (h *AdminHandler) renderEditForm(w http.ResponseWriter, r *http.Request, vm
 
 	// BackURL is where the simple "Back" link should go.
 	if vm.BackURL == "" {
-		vm.BackURL = nav.ResolveBackURL(r, "/resources")
+		vm.BackURL = httpnav.ResolveBackURL(r, "/resources")
 	}
 
 	// SubmitReturn is the post-edit redirect target; DeleteReturn is used
@@ -78,7 +78,7 @@ func (h *AdminHandler) renderEditForm(w http.ResponseWriter, r *http.Request, vm
 		vm.DeleteReturn = "/resources"
 	}
 
-	vm.CurrentPath = nav.CurrentPath(r)
+	vm.CurrentPath = httpnav.CurrentPath(r)
 
 	// Populate resource type options for the select menu.
 	vm.TypeOptions = resourceTypeOptions()

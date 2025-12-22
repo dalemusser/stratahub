@@ -9,29 +9,28 @@ import (
 )
 
 type Handler struct {
-	Log *zap.Logger
+	Log        *zap.Logger
+	SessionMgr *auth.SessionManager
 }
 
-func NewHandler(logger *zap.Logger) *Handler {
+func NewHandler(sessionMgr *auth.SessionManager, logger *zap.Logger) *Handler {
 	return &Handler{
-		Log: logger,
+		Log:        logger,
+		SessionMgr: sessionMgr,
 	}
 }
 
 // ServeLogout handles GET /logout.
 func (h *Handler) ServeLogout(w http.ResponseWriter, r *http.Request) {
-	// If the session store isn't initialized, just redirect home.
-	if auth.Store == nil {
-		h.Log.Warn("logout called but session store is not initialized")
-		http.Redirect(w, r, "/", http.StatusSeeOther)
-		return
+	// Get current session.
+	session, err := h.SessionMgr.GetSession(r)
+	if err != nil {
+		// Session decode failed. Log and continue - we'll still try to clear the cookie.
+		h.Log.Warn("session decode failed during logout", zap.Error(err))
 	}
 
-	// Get current session.
-	session, _ := auth.Store.Get(r, auth.SessionName)
-
 	// Ensure the deletion-cookie matches the original store settings.
-	opts := auth.Store.Options
+	opts := h.SessionMgr.Store().Options
 	if opts != nil {
 		session.Options.Domain = opts.Domain
 		session.Options.Path = opts.Path

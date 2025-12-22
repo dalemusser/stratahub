@@ -3,91 +3,26 @@ package groups
 
 import (
 	"context"
+	"errors"
 	"net/http"
-	"strconv"
-	"strings"
-	"time"
 
+	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/normalize"
+	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/templates"
-	mongodb "github.com/dalemusser/waffle/toolkit/db/mongodb"
-	textfold "github.com/dalemusser/waffle/toolkit/text/textfold"
-	nav "github.com/dalemusser/waffle/toolkit/ui/nav"
+	"github.com/dalemusser/waffle/pantry/httpnav"
+	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
+	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/dalemusser/waffle/pantry/text"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.mongodb.org/mongo-driver/mongo/options"
 	"go.uber.org/zap"
 )
-
-const (
-	listTimeout      = 10 * time.Second
-	listShortTimeout = 5 * time.Second
-)
-
-// View model for the group manage modal snippet.
-type groupManageModalData struct {
-	GroupID          string
-	GroupName        string
-	OrganizationName string
-	BackURL          string
-}
-
-type orgRow struct {
-	ID    primitive.ObjectID
-	Name  string
-	Count int64
-}
-
-type groupListItem struct {
-	ID                     primitive.ObjectID
-	Name                   string
-	OrganizationName       string
-	LeadersCount           int
-	MembersCount           int
-	AssignedResourcesCount int
-}
-
-type groupListData struct {
-	Title, SearchQuery string
-	IsLoggedIn         bool
-	Role, UserName     string
-
-	// Left org pane (admins only)
-	ShowOrgPane   bool
-	OrgQuery      string
-	OrgShown      int
-	OrgTotal      int64
-	OrgHasPrev    bool
-	OrgHasNext    bool
-	OrgPrevCur    string
-	OrgNextCur    string
-	OrgRangeStart int
-	OrgRangeEnd   int
-	SelectedOrg   string // "all" or hex
-	OrgRows       []orgRow
-	AllCount      int64
-
-	// Right table
-	Shown      int
-	Total      int64
-	HasPrev    bool
-	HasNext    bool
-	PrevCursor string
-	NextCursor string
-	Groups     []groupListItem
-
-	// groups range + page-index starts
-	RangeStart int
-	RangeEnd   int
-	PrevStart  int
-	NextStart  int
-
-	CurrentPath string
-}
 
 // andify composes clauses into a single bson.M with optional $and.
 func andify(clauses []bson.M) bson.M {
@@ -120,50 +55,44 @@ func dedupObjectIDs(in []primitive.ObjectID) []primitive.ObjectID {
 func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
 	role, uname, uid, ok := authz.UserCtx(r)
 	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
 
 	// Only admins and leaders may view Groups
 	if !(authz.IsAdmin(r) || authz.IsLeader(r)) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		uierrors.RenderForbidden(w, r, "You don't have permission to view this page.", httpnav.ResolveBackURL(r, "/"))
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), listTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 	db := h.DB
 
 	// --- read query params ---
-	selectedOrg := strings.TrimSpace(r.URL.Query().Get("org")) // "all" or org hex
-	orgQ := strings.TrimSpace(r.URL.Query().Get("org_q"))
-	orgAfter := strings.TrimSpace(r.URL.Query().Get("org_after"))
-	orgBefore := strings.TrimSpace(r.URL.Query().Get("org_before"))
+	selectedOrg := normalize.QueryParam(r.URL.Query().Get("org")) // "all" or org hex
+	orgQ := normalize.QueryParam(r.URL.Query().Get("org_q"))
+	orgAfter := normalize.QueryParam(r.URL.Query().Get("org_after"))
+	orgBefore := normalize.QueryParam(r.URL.Query().Get("org_before"))
 
-	search := strings.TrimSpace(r.URL.Query().Get("search"))
-	after := strings.TrimSpace(r.URL.Query().Get("after"))
-	before := strings.TrimSpace(r.URL.Query().Get("before"))
-
-	// human-friendly start index for the RIGHT table range
-	startParam := strings.TrimSpace(r.URL.Query().Get("start"))
-	start := 1
-	if startParam != "" {
-		if n, err := strconv.Atoi(startParam); err == nil && n > 0 {
-			start = n
-		}
-	}
+	search := normalize.QueryParam(r.URL.Query().Get("search"))
+	after := normalize.QueryParam(r.URL.Query().Get("after"))
+	before := normalize.QueryParam(r.URL.Query().Get("before"))
+	start := paging.ParseStart(r)
 
 	// Leaders are forced to their own org; no org pane.
 	showOrgPane := authz.IsAdmin(r)
 	if authz.IsLeader(r) {
-		var u struct {
-			OrganizationID *primitive.ObjectID `bson:"organization_id"`
-		}
-		if err := db.Collection("users").FindOne(ctx, bson.M{"_id": uid}).Decode(&u); err != nil || u.OrganizationID == nil {
-			http.Error(w, "your account is not linked to an organization", http.StatusForbidden)
+		oid, _, err := orgutil.ResolveLeaderOrg(ctx, db, uid)
+		if errors.Is(err, orgutil.ErrUserNotFound) || errors.Is(err, orgutil.ErrNoOrganization) {
+			uierrors.RenderForbidden(w, r, "Your account is not linked to an organization.", httpnav.ResolveBackURL(r, "/"))
 			return
 		}
-		selectedOrg = u.OrganizationID.Hex()
+		if err != nil {
+			h.ErrLog.LogServerError(w, r, "database error resolving leader org", err, "A database error occurred.", "/groups")
+			return
+		}
+		selectedOrg = oid.Hex()
 		showOrgPane = false
 	} else {
 		// For admins, default to "all" when empty.
@@ -173,307 +102,24 @@ func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// --- build org pane (admins only) ---
-	var orgRows []orgRow
-	var orgTotal int64
-	var orgHasPrev, orgHasNext bool
-	var orgPrevCur, orgNextCur string
-	var allCount int64
-	orgRangeStart := 1
-	orgRangeEnd := 0
-
+	var orgPane orgPaneData
 	if showOrgPane {
-		orgBase := bson.M{}
-		if orgQ != "" {
-			q := textfold.Fold(orgQ)
-			hi := q + "\uffff"
-			orgBase["name_ci"] = bson.M{"$gte": q, "$lt": hi}
-		}
-
 		var err error
-		orgTotal, err = db.Collection("organizations").CountDocuments(ctx, orgBase)
+		orgPane, err = h.fetchOrgPane(ctx, db, orgQ, orgAfter, orgBefore)
 		if err != nil {
-			h.Log.Warn("count orgs failed", zap.Error(err))
-			http.Error(w, "db error", http.StatusInternalServerError)
+			h.ErrLog.LogServerError(w, r, "database error fetching org pane", err, "A database error occurred.", "/groups")
 			return
-		}
-
-		orgFilter := bson.M{}
-		for k, v := range orgBase {
-			orgFilter[k] = v
-		}
-
-		find := options.Find()
-		limit := paging.LimitPlusOne()
-		if orgBefore != "" {
-			if c, ok := mongodb.DecodeCursor(orgBefore); ok {
-				orgFilter["$or"] = []bson.M{
-					{"name_ci": bson.M{"$lt": c.CI}},
-					{"name_ci": c.CI, "_id": bson.M{"$lt": c.ID}},
-				}
-			}
-			find.SetSort(bson.D{{Key: "name_ci", Value: -1}, {Key: "_id", Value: -1}}).SetLimit(limit)
-		} else {
-			if orgAfter != "" {
-				if c, ok := mongodb.DecodeCursor(orgAfter); ok {
-					orgFilter["$or"] = []bson.M{
-						{"name_ci": bson.M{"$gt": c.CI}},
-						{"name_ci": c.CI, "_id": bson.M{"$gt": c.ID}},
-					}
-				}
-			}
-			find.SetSort(bson.D{{Key: "name_ci", Value: 1}, {Key: "_id", Value: 1}}).SetLimit(limit)
-		}
-
-		cur, err := db.Collection("organizations").Find(ctx, orgFilter, find)
-		if err != nil {
-			h.Log.Warn("find orgs failed", zap.Error(err))
-			http.Error(w, "db error", http.StatusInternalServerError)
-			return
-		}
-		defer cur.Close(ctx)
-
-		var oraw []struct {
-			ID     primitive.ObjectID `bson:"_id"`
-			Name   string             `bson:"name"`
-			NameCI string             `bson:"name_ci"`
-		}
-		if err := cur.All(ctx, &oraw); err != nil {
-			h.Log.Warn("decode orgs failed", zap.Error(err))
-			http.Error(w, "db error", http.StatusInternalServerError)
-			return
-		}
-
-		shown := len(oraw)
-		if orgBefore != "" {
-			if shown > paging.PageSize {
-				oraw = oraw[1:]
-				shown = len(oraw)
-				orgHasPrev = true
-			}
-			orgHasNext = true
-		} else {
-			if shown > paging.PageSize {
-				oraw = oraw[:paging.PageSize]
-				shown = paging.PageSize
-				orgHasNext = true
-			}
-			orgHasPrev = orgAfter != ""
-		}
-
-		orgRows = make([]orgRow, 0, shown)
-		for _, o := range oraw {
-			orgRows = append(orgRows, orgRow{ID: o.ID, Name: o.Name})
-		}
-
-		if shown > 0 {
-			orgRangeEnd = orgRangeStart + shown - 1
-			first := oraw[0]
-			last := oraw[shown-1]
-			orgPrevCur = mongodb.EncodeCursor(first.NameCI, first.ID)
-			orgNextCur = mongodb.EncodeCursor(last.NameCI, last.ID)
-		} else {
-			orgRangeStart, orgRangeEnd = 0, 0
-		}
-
-		allCount, _ = db.Collection("groups").CountDocuments(ctx, bson.M{})
-
-		orgIDs := make([]primitive.ObjectID, 0, len(orgRows))
-		for _, o := range orgRows {
-			orgIDs = append(orgIDs, o.ID)
-		}
-		orgIDs = dedupObjectIDs(orgIDs)
-
-		byOrg := map[primitive.ObjectID]int64{}
-		if len(orgIDs) > 0 {
-			pipeline := []bson.M{
-				{"$match": bson.M{"organization_id": bson.M{"$in": orgIDs}}},
-				{"$group": bson.M{"_id": "$organization_id", "count": bson.M{"$sum": 1}}},
-			}
-			cc, _ := db.Collection("groups").Aggregate(ctx, pipeline)
-			if cc != nil {
-				defer cc.Close(ctx)
-				for cc.Next(ctx) {
-					var row struct {
-						ID    primitive.ObjectID `bson:"_id"`
-						Count int64              `bson:"count"`
-					}
-					_ = cc.Decode(&row)
-					byOrg[row.ID] = row.Count
-				}
-			}
-		}
-		for i := range orgRows {
-			orgRows[i].Count = byOrg[orgRows[i].ID]
 		}
 	}
 
 	// --- build right-side groups table ---
-
-	var clauses []bson.M
-
-	if selectedOrg != "" && selectedOrg != "all" {
-		if oid, err := primitive.ObjectIDFromHex(selectedOrg); err == nil {
-			clauses = append(clauses, bson.M{"organization_id": oid})
-		}
-	}
-
-	if search != "" {
-		q := textfold.Fold(search)
-		hi := q + "\uffff"
-		clauses = append(clauses, bson.M{"name_ci": bson.M{"$gte": q, "$lt": hi}})
-	}
-
-	find := options.Find()
-	limit := paging.LimitPlusOne()
-
-	if before != "" {
-		if c, ok := mongodb.DecodeCursor(before); ok {
-			clauses = append(clauses, mongodb.KeysetWindow("name_ci", "lt", c.CI, c.ID))
-		}
-		find.SetSort(bson.D{{Key: "name_ci", Value: -1}, {Key: "_id", Value: -1}}).SetLimit(limit)
-	} else {
-		if after != "" {
-			if c, ok := mongodb.DecodeCursor(after); ok {
-				clauses = append(clauses, mongodb.KeysetWindow("name_ci", "gt", c.CI, c.ID))
-			}
-		}
-		find.SetSort(bson.D{{Key: "name_ci", Value: 1}, {Key: "_id", Value: 1}}).SetLimit(limit)
-	}
-
-	filter := andify(clauses)
-
-	curG, err := db.Collection("groups").Find(ctx, filter, find)
+	groups, shown, total, prevCur, nextCur, hasPrev, hasNext, err := h.fetchGroupsList(ctx, db, selectedOrg, search, after, before)
 	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
-		return
-	}
-	defer curG.Close(ctx)
-
-	var graw []struct {
-		ID             primitive.ObjectID `bson:"_id"`
-		Name           string             `bson:"name"`
-		NameCI         string             `bson:"name_ci"`
-		OrganizationID primitive.ObjectID `bson:"organization_id"`
-	}
-	if err := curG.All(ctx, &graw); err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		h.ErrLog.LogServerError(w, r, "database error fetching groups list", err, "A database error occurred.", "/groups")
 		return
 	}
 
-	orig := len(graw)
-	hasPrev, hasNext := false, false
-	if before != "" {
-		if orig > paging.PageSize {
-			graw = graw[1:]
-			hasPrev = true
-		}
-		hasNext = true
-	} else {
-		if orig > paging.PageSize {
-			graw = graw[:paging.PageSize]
-			hasNext = true
-		}
-		hasPrev = after != ""
-	}
-	shown := len(graw)
-
-	rangeStart := 0
-	rangeEnd := 0
-	if shown > 0 {
-		rangeStart = start
-		rangeEnd = start + shown - 1
-	}
-	prevStart := start - paging.PageSize
-	if prevStart < 1 {
-		prevStart = 1
-	}
-	nextStart := start + shown
-
-	// org id -> name map
-	orgIDs := make([]primitive.ObjectID, 0, shown)
-	for _, g := range graw {
-		orgIDs = append(orgIDs, g.OrganizationID)
-	}
-	orgNames := map[primitive.ObjectID]string{}
-	if len(orgIDs) > 0 {
-		oc2, _ := db.Collection("organizations").Find(ctx, bson.M{"_id": bson.M{"$in": orgIDs}})
-		defer oc2.Close(ctx)
-		for oc2.Next(ctx) {
-			var o models.Organization
-			_ = oc2.Decode(&o)
-			orgNames[o.ID] = o.Name
-		}
-	}
-
-	// leaders/members counts via group_memberships
-	groupIDs := make([]primitive.ObjectID, 0, shown)
-	for _, g := range graw {
-		groupIDs = append(groupIDs, g.ID)
-	}
-
-	leaderByGroup := map[primitive.ObjectID]int{}
-	memberByGroup := map[primitive.ObjectID]int{}
-	if len(groupIDs) > 0 {
-		curLM, _ := db.Collection("group_memberships").Aggregate(ctx, []bson.M{
-			{"$match": bson.M{"group_id": bson.M{"$in": groupIDs}}},
-			{"$group": bson.M{"_id": bson.M{"g": "$group_id", "r": "$role"}, "n": bson.M{"$sum": 1}}},
-		})
-		defer curLM.Close(ctx)
-		for curLM.Next(ctx) {
-			var row struct {
-				ID struct {
-					G primitive.ObjectID `bson:"g"`
-					R string             `bson:"r"`
-				} `bson:"_id"`
-				N int `bson:"n"`
-			}
-			if err := curLM.Decode(&row); err == nil {
-				if row.ID.R == "leader" {
-					leaderByGroup[row.ID.G] = row.N
-				} else if row.ID.R == "member" {
-					memberByGroup[row.ID.G] = row.N
-				}
-			}
-		}
-	}
-
-	assignByGroup := map[primitive.ObjectID]int{}
-	if len(groupIDs) > 0 {
-		curA, _ := db.Collection("group_resource_assignments").Aggregate(ctx, []bson.M{
-			{"$match": bson.M{"group_id": bson.M{"$in": groupIDs}}},
-			{"$group": bson.M{"_id": "$group_id", "n": bson.M{"$sum": 1}}},
-		})
-		defer curA.Close(ctx)
-		for curA.Next(ctx) {
-			var row struct {
-				ID primitive.ObjectID `bson:"_id"`
-				N  int                `bson:"n"`
-			}
-			if err := curA.Decode(&row); err == nil {
-				assignByGroup[row.ID] = row.N
-			}
-		}
-	}
-
-	rows := make([]groupListItem, 0, shown)
-	for _, g := range graw {
-		rows = append(rows, groupListItem{
-			ID:                     g.ID,
-			Name:                   g.Name,
-			OrganizationName:       orgNames[g.OrganizationID],
-			LeadersCount:           leaderByGroup[g.ID],
-			MembersCount:           memberByGroup[g.ID],
-			AssignedResourcesCount: assignByGroup[g.ID],
-		})
-	}
-
-	prevCur, nextCur := "", ""
-	if shown > 0 {
-		firstKey := graw[0].NameCI
-		lastKey := graw[shown-1].NameCI
-		prevCur = mongodb.EncodeCursor(firstKey, graw[0].ID)
-		nextCur = mongodb.EncodeCursor(lastKey, graw[shown-1].ID)
-	}
+	rng := paging.ComputeRange(start, shown)
 
 	data := groupListData{
 		Title:      "Groups",
@@ -483,46 +129,255 @@ func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
 
 		ShowOrgPane:   showOrgPane,
 		OrgQuery:      orgQ,
-		OrgShown:      len(orgRows),
-		OrgTotal:      orgTotal,
-		OrgHasPrev:    orgHasPrev,
-		OrgHasNext:    orgHasNext,
-		OrgPrevCur:    orgPrevCur,
-		OrgNextCur:    orgNextCur,
-		OrgRangeStart: orgRangeStart,
-		OrgRangeEnd:   orgRangeEnd,
+		OrgShown:      len(orgPane.Rows),
+		OrgTotal:      orgPane.Total,
+		OrgHasPrev:    orgPane.HasPrev,
+		OrgHasNext:    orgPane.HasNext,
+		OrgPrevCur:    orgPane.PrevCursor,
+		OrgNextCur:    orgPane.NextCursor,
+		OrgRangeStart: orgPane.RangeStart,
+		OrgRangeEnd:   orgPane.RangeEnd,
 		SelectedOrg:   selectedOrg,
-		OrgRows:       orgRows,
-		AllCount:      allCount,
+		OrgRows:       orgPane.Rows,
+		AllCount:      orgPane.AllCount,
 
 		SearchQuery: search,
 		Shown:       shown,
-		Total:       countGroups(ctx, db, filter),
+		Total:       total,
 		HasPrev:     hasPrev,
 		HasNext:     hasNext,
 		PrevCursor:  prevCur,
 		NextCursor:  nextCur,
-		Groups:      rows,
+		Groups:      groups,
 
-		RangeStart: rangeStart,
-		RangeEnd:   rangeEnd,
-		PrevStart:  prevStart,
-		NextStart:  nextStart,
+		RangeStart: rng.Start,
+		RangeEnd:   rng.End,
+		PrevStart:  rng.PrevStart,
+		NextStart:  rng.NextStart,
 
-		CurrentPath: nav.CurrentPath(r),
+		CurrentPath: httpnav.CurrentPath(r),
 	}
 
 	templates.RenderAutoMap(w, r, "groups_list", nil, data)
 }
 
-// countGroups counts documents matching filter, logging errors.
-func countGroups(ctx context.Context, db *mongo.Database, filter bson.M) int64 {
-	n, err := db.Collection("groups").CountDocuments(ctx, filter)
-	if err != nil {
-		// best-effort; log via global zap if needed
-		return 0
+// fetchGroupsList fetches the paginated groups list with counts using a single
+// aggregation pipeline for optimal performance. Combines org name lookup,
+// membership counts, and assignment counts into one database round-trip.
+func (h *Handler) fetchGroupsList(
+	ctx context.Context,
+	db *mongo.Database,
+	selectedOrg, search, after, before string,
+) ([]groupListItem, int, int64, string, string, bool, bool, error) {
+	// Build base filter (without keyset window for total count)
+	var baseClauses []bson.M
+	if selectedOrg != "" && selectedOrg != "all" {
+		if oid, err := primitive.ObjectIDFromHex(selectedOrg); err == nil {
+			baseClauses = append(baseClauses, bson.M{"organization_id": oid})
+		}
 	}
-	return n
+	if search != "" {
+		q := text.Fold(search)
+		hi := q + "\uffff"
+		baseClauses = append(baseClauses, bson.M{"name_ci": bson.M{"$gte": q, "$lt": hi}})
+	}
+	baseFilter := andify(baseClauses)
+
+	// Configure keyset pagination
+	cfg := paging.ConfigureKeyset(before, after)
+
+	// Build full filter including keyset window
+	fullClauses := append([]bson.M{}, baseClauses...)
+	if ks := cfg.KeysetWindow("name_ci"); ks != nil {
+		fullClauses = append(fullClauses, ks)
+	}
+	fullFilter := andify(fullClauses)
+
+	// Build aggregation pipeline with $facet to get data and count in one query
+	pipe := mongo.Pipeline{
+		// Match base filter first (for accurate total count)
+		bson.D{{Key: "$match", Value: baseFilter}},
+		// Use $facet to run count and data queries in parallel
+		bson.D{{Key: "$facet", Value: bson.M{
+			"totalCount": []bson.M{
+				{"$count": "count"},
+			},
+			"data": h.buildGroupsDataPipeline(fullFilter, baseFilter, cfg),
+		}}},
+	}
+
+	cur, err := db.Collection("groups").Aggregate(ctx, pipe)
+	if err != nil {
+		return nil, 0, 0, "", "", false, false, err
+	}
+	defer cur.Close(ctx)
+
+	// Parse aggregation result
+	var result struct {
+		TotalCount []struct {
+			Count int64 `bson:"count"`
+		} `bson:"totalCount"`
+		Data []groupAggRow `bson:"data"`
+	}
+	if cur.Next(ctx) {
+		if err := cur.Decode(&result); err != nil {
+			return nil, 0, 0, "", "", false, false, err
+		}
+	}
+
+	total := int64(0)
+	if len(result.TotalCount) > 0 {
+		total = result.TotalCount[0].Count
+	}
+
+	graw := result.Data
+
+	// Reverse if paging backwards
+	if cfg.Direction == paging.Backward {
+		paging.Reverse(graw)
+	}
+
+	page := paging.TrimPage(&graw, before, after)
+	hasPrev, hasNext := page.HasPrev, page.HasNext
+	shown := len(graw)
+
+	// Build result rows from aggregation data
+	rows := make([]groupListItem, 0, shown)
+	for _, g := range graw {
+		rows = append(rows, groupListItem{
+			ID:                     g.ID,
+			Name:                   g.Name,
+			OrganizationName:       g.OrgName,
+			LeadersCount:           g.LeadersCount,
+			MembersCount:           g.MembersCount,
+			AssignedResourcesCount: g.AssignmentCount,
+		})
+	}
+
+	// Build cursors
+	prevCur, nextCur := "", ""
+	if shown > 0 {
+		prevCur = wafflemongo.EncodeCursor(graw[0].NameCI, graw[0].ID)
+		nextCur = wafflemongo.EncodeCursor(graw[shown-1].NameCI, graw[shown-1].ID)
+	}
+
+	return rows, shown, total, prevCur, nextCur, hasPrev, hasNext, nil
+}
+
+// groupAggRow holds the result of the combined aggregation query.
+type groupAggRow struct {
+	ID              primitive.ObjectID `bson:"_id"`
+	Name            string             `bson:"name"`
+	NameCI          string             `bson:"name_ci"`
+	OrgName         string             `bson:"org_name"`
+	LeadersCount    int                `bson:"leaders_count"`
+	MembersCount    int                `bson:"members_count"`
+	AssignmentCount int                `bson:"assignment_count"`
+}
+
+// buildGroupsDataPipeline constructs the data portion of the $facet pipeline.
+// It applies keyset pagination, joins org names, and computes membership/assignment counts.
+func (h *Handler) buildGroupsDataPipeline(fullFilter, baseFilter bson.M, cfg paging.KeysetConfig) []bson.M {
+	pipeline := []bson.M{}
+
+	// Apply keyset window filter if present (re-match after facet's base match)
+	if ks := cfg.KeysetWindow("name_ci"); ks != nil {
+		pipeline = append(pipeline, bson.M{"$match": ks})
+	}
+
+	// Sort and limit for pagination
+	pipeline = append(pipeline,
+		bson.M{"$sort": bson.D{
+			{Key: "name_ci", Value: cfg.SortOrder},
+			{Key: "_id", Value: cfg.SortOrder},
+		}},
+		bson.M{"$limit": paging.LimitPlusOne()},
+	)
+
+	// Lookup organization name
+	pipeline = append(pipeline,
+		bson.M{"$lookup": bson.M{
+			"from":         "organizations",
+			"localField":   "organization_id",
+			"foreignField": "_id",
+			"as":           "org",
+		}},
+	)
+
+	// Lookup and aggregate membership counts (leaders and members)
+	pipeline = append(pipeline,
+		bson.M{"$lookup": bson.M{
+			"from": "group_memberships",
+			"let":  bson.M{"gid": "$_id"},
+			"pipeline": []bson.M{
+				{"$match": bson.M{"$expr": bson.M{"$eq": []string{"$group_id", "$$gid"}}}},
+				{"$group": bson.M{"_id": "$role", "count": bson.M{"$sum": 1}}},
+			},
+			"as": "memberships",
+		}},
+	)
+
+	// Lookup and count resource assignments
+	pipeline = append(pipeline,
+		bson.M{"$lookup": bson.M{
+			"from": "group_resource_assignments",
+			"let":  bson.M{"gid": "$_id"},
+			"pipeline": []bson.M{
+				{"$match": bson.M{"$expr": bson.M{"$eq": []string{"$group_id", "$$gid"}}}},
+				{"$count": "count"},
+			},
+			"as": "assignments",
+		}},
+	)
+
+	// Project final fields with computed counts
+	pipeline = append(pipeline,
+		bson.M{"$project": bson.M{
+			"_id":     1,
+			"name":    1,
+			"name_ci": 1,
+			"org_name": bson.M{"$ifNull": []interface{}{
+				bson.M{"$arrayElemAt": []interface{}{"$org.name", 0}},
+				"",
+			}},
+			"leaders_count": bson.M{"$ifNull": []interface{}{
+				bson.M{"$arrayElemAt": []interface{}{
+					bson.M{"$map": bson.M{
+						"input": bson.M{"$filter": bson.M{
+							"input": "$memberships",
+							"as":    "m",
+							"cond":  bson.M{"$eq": []interface{}{"$$m._id", "leader"}},
+						}},
+						"as": "m",
+						"in": "$$m.count",
+					}},
+					0,
+				}},
+				0,
+			}},
+			"members_count": bson.M{"$ifNull": []interface{}{
+				bson.M{"$arrayElemAt": []interface{}{
+					bson.M{"$map": bson.M{
+						"input": bson.M{"$filter": bson.M{
+							"input": "$memberships",
+							"as":    "m",
+							"cond":  bson.M{"$eq": []interface{}{"$$m._id", "member"}},
+						}},
+						"as": "m",
+						"in": "$$m.count",
+					}},
+					0,
+				}},
+				0,
+			}},
+			"assignment_count": bson.M{"$ifNull": []interface{}{
+				bson.M{"$arrayElemAt": []interface{}{"$assignments.count", 0}},
+				0,
+			}},
+		}},
+	)
+
+	return pipeline
 }
 
 // ServeGroupManageModal handles GET /groups/{id}/manage_modal and returns
@@ -530,26 +385,26 @@ func countGroups(ctx context.Context, db *mongo.Database, filter bson.M) int64 {
 func (h *Handler) ServeGroupManageModal(w http.ResponseWriter, r *http.Request) {
 	_, _, _, ok := authz.UserCtx(r)
 	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
 	if !(authz.IsAdmin(r) || authz.IsLeader(r)) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		uierrors.RenderForbidden(w, r, "You don't have permission to view this page.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
 
 	gid := chi.URLParam(r, "id")
 	if gid == "" {
-		http.Error(w, "bad group id", http.StatusBadRequest)
+		uierrors.HTMXBadRequest(w, r, "Invalid group ID.", "/groups")
 		return
 	}
 	groupOID, err := primitive.ObjectIDFromHex(gid)
 	if err != nil {
-		http.Error(w, "bad group id", http.StatusBadRequest)
+		uierrors.HTMXBadRequest(w, r, "Invalid group ID.", "/groups")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), listShortTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
 
@@ -560,9 +415,11 @@ func (h *Handler) ServeGroupManageModal(w http.ResponseWriter, r *http.Request) 
 	}
 	if err := db.Collection("groups").FindOne(ctx, bson.M{"_id": groupOID}).Decode(&g); err != nil {
 		if err == mongo.ErrNoDocuments {
-			http.NotFound(w, r)
+			uierrors.HTMXError(w, r, http.StatusNotFound, "Group not found.", func() {
+				uierrors.RenderNotFound(w, r, "Group not found.", "/groups")
+			})
 		} else {
-			http.Error(w, "db error", http.StatusInternalServerError)
+			h.ErrLog.HTMXLogServerError(w, r, "database error loading group for modal", err, "A database error occurred.", "/groups")
 		}
 		return
 	}
@@ -570,14 +427,24 @@ func (h *Handler) ServeGroupManageModal(w http.ResponseWriter, r *http.Request) 
 	orgName := ""
 	if !g.OrganizationID.IsZero() {
 		var o models.Organization
-		if err := db.Collection("organizations").FindOne(ctx, bson.M{"_id": g.OrganizationID}).Decode(&o); err == nil {
+		if err := db.Collection("organizations").FindOne(ctx, bson.M{"_id": g.OrganizationID}).Decode(&o); err != nil {
+			if err == mongo.ErrNoDocuments {
+				h.Log.Warn("organization not found for group (may have been deleted)",
+					zap.String("group_id", gid),
+					zap.String("org_id", g.OrganizationID.Hex()))
+				orgName = "(Deleted)"
+			} else {
+				h.ErrLog.HTMXLogServerError(w, r, "database error loading organization for group", err, "A database error occurred.", "/groups")
+				return
+			}
+		} else {
 			orgName = o.Name
 		}
 	}
 
 	back := r.URL.Query().Get("return")
 	if back == "" {
-		back = nav.ResolveBackURL(r, "/groups")
+		back = httpnav.ResolveBackURL(r, "/groups")
 	}
 
 	data := groupManageModalData{

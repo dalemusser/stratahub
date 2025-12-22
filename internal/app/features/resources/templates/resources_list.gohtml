@@ -53,7 +53,33 @@
 {{ end }}
 
 {{ define "resources_table" }}
-<div id="resources-table-wrap" class="bg-white rounded shadow overflow-x-auto">
+<!-- Top pager -->
+<div id="resources-table-wrap">
+<div class="flex items-center justify-between mb-2">
+  <div class="text-gray-600 text-sm">
+    {{ if .Total }}{{ .RangeStart }}–{{ .RangeEnd }} of {{ .Total }} shown{{ else }}0 of 0 shown{{ end }}
+  </div>
+  <div class="flex items-center gap-2">
+    {{ if .HasPrev }}
+      <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded hover:bg-gray-50 whitespace-nowrap"
+         href="/resources?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}before={{ .PrevCursor }}&start={{ .PrevStart }}"
+         hx-get="/resources?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}before={{ .PrevCursor }}&start={{ .PrevStart }}"
+         hx-target="#resources-table-wrap" hx-swap="outerHTML" hx-push-url="true">Prev</a>
+    {{ else }}
+      <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 whitespace-nowrap">Prev</span>
+    {{ end }}
+    {{ if .HasNext }}
+      <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded hover:bg-gray-50 whitespace-nowrap"
+         href="/resources?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}after={{ .NextCursor }}&start={{ .NextStart }}"
+         hx-get="/resources?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}after={{ .NextCursor }}&start={{ .NextStart }}"
+         hx-target="#resources-table-wrap" hx-swap="outerHTML" hx-push-url="true">Next</a>
+    {{ else }}
+      <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 whitespace-nowrap">Next</span>
+    {{ end }}
+  </div>
+</div>
+
+<div class="bg-white rounded shadow overflow-x-auto">
   <table class="min-w-full text-sm text-left text-gray-700">
     <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
       <tr>
@@ -103,6 +129,32 @@
       {{ end }}
     </tbody>
   </table>
+</div>
+
+<!-- Bottom pager -->
+<div class="flex items-center justify-between mt-2">
+  <div class="text-xs text-gray-600">
+    {{ if .Total }}{{ .RangeStart }}–{{ .RangeEnd }} of {{ .Total }} shown{{ else }}0 of 0 shown{{ end }}
+  </div>
+  <div class="flex gap-2 items-center">
+    {{ if .HasPrev }}
+      <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded hover:bg-gray-50 whitespace-nowrap"
+         href="/resources?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}before={{ .PrevCursor }}&start={{ .PrevStart }}"
+         hx-get="/resources?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}before={{ .PrevCursor }}&start={{ .PrevStart }}"
+         hx-target="#resources-table-wrap" hx-swap="outerHTML" hx-push-url="true">Prev</a>
+    {{ else }}
+      <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 whitespace-nowrap">Prev</span>
+    {{ end }}
+    {{ if .HasNext }}
+      <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded hover:bg-gray-50 whitespace-nowrap"
+         href="/resources?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}after={{ .NextCursor }}&start={{ .NextStart }}"
+         hx-get="/resources?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}after={{ .NextCursor }}&start={{ .NextStart }}"
+         hx-target="#resources-table-wrap" hx-swap="outerHTML" hx-push-url="true">Next</a>
+    {{ else }}
+      <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 whitespace-nowrap">Next</span>
+    {{ end }}
+  </div>
+</div>
 </div>
 <div id="modal-root"></div>
 {{ end }}

@@ -1,14 +1,9 @@
 package reports
 
-import "go.mongodb.org/mongo-driver/bson/primitive"
-
-// orgRow represents a single organization row in the members report
-// left-hand pane. The fields are exported so templates can access them.
-type orgRow struct {
-	ID    primitive.ObjectID
-	Name  string
-	Count int64
-}
+import (
+	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
+	"go.mongodb.org/mongo-driver/bson/primitive"
+)
 
 // groupRow represents a single group row in the middle pane of the
 // members report. Count is the number of members in that group (after
@@ -17,6 +12,30 @@ type groupRow struct {
 	ID    primitive.ObjectID
 	Name  string
 	Count int64
+}
+
+// orgPaneResult holds the data for the org pane in the members report.
+type orgPaneResult struct {
+	Rows       []orgutil.OrgRow
+	Total      int64
+	HasPrev    bool
+	HasNext    bool
+	PrevCursor string
+	NextCursor string
+	AllCount   int64 // total members across all orgs (respecting filters)
+}
+
+// groupsPaneResult holds the data for the groups pane in the members report.
+type groupsPaneResult struct {
+	Rows            []groupRow
+	OrgMembersCount int64 // total members in selected org
+	OrgName         string
+}
+
+// exportCountsResult holds the calculated export counts.
+type exportCountsResult struct {
+	ExportRecordCount    int64
+	MembersInGroupsCount int64
 }
 
 // pageData is the view model for the HTML Members Report page. It
@@ -45,7 +64,7 @@ type pageData struct {
 	OrgNextCur      string
 	SelectedOrg     string // "all" or hex string
 	SelectedOrgName string
-	OrgRows         []orgRow
+	OrgRows         []orgutil.OrgRow
 	AllCount        int64 // total members across all orgs (respecting filters)
 
 	// Middle groups pane (only when an org is selected)

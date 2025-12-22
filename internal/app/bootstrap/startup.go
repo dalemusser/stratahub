@@ -9,10 +9,30 @@ import (
 	"go.uber.org/zap"
 )
 
-// Startup runs one-time application initialization after DB connections and
-// schema setup are complete, but before the HTTP handler is built. It is the
-// place to load shared resources (like templates), warm caches, or perform
-// any app-wide setup that depends on config and backends.
+// Startup runs once after DB connections and schema/index setup are complete,
+// but before the HTTP handler is built and requests are served.
+//
+// This is the place for one-time initialization that depends on having live
+// database connections and fully loaded configuration. Unlike ConnectDB and
+// EnsureSchema which focus on infrastructure, Startup is for application-level
+// initialization.
+//
+// Common uses for Startup:
+//   - Load shared templates from the resources directory
+//   - Warm caches with frequently accessed data
+//   - Initialize in-memory lookup tables
+//   - Validate external service connectivity
+//   - Set up background workers or scheduled tasks
+//   - Perform health checks on dependencies
+//
+// Returning a non-nil error will abort startup and prevent the server from
+// starting. Returning nil signals that initialization succeeded.
+//
+// The context will be cancelled if the process is asked to shut down while
+// Startup is running; honor it in any long-running work.
+//
+// StrataHub uses Startup to load shared templates (layouts, navigation, etc.)
+// that are used across all features.
 func Startup(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, logger *zap.Logger) error {
 	resources.LoadSharedTemplates()
 	return nil

@@ -2,7 +2,6 @@
 package reports
 
 import (
-	"context"
 	"encoding/csv"
 	"fmt"
 	"net/http"
@@ -10,9 +9,14 @@ import (
 	"strings"
 	"time"
 
+	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/policy/reportpolicy"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
-	"github.com/dalemusser/stratahub/internal/domain/models"
-	textfold "github.com/dalemusser/waffle/toolkit/text/textfold"
+	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
+	"github.com/dalemusser/waffle/pantry/query"
+	"github.com/dalemusser/stratahub/internal/app/system/search"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/waffle/pantry/text"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -25,45 +29,45 @@ import (
 // filters. It mirrors the semantics of the old strata_hub handler
 // but uses the new Handler shape and authz.UserCtx.
 func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
-	role, userName, uid, ok := authz.UserCtx(r)
+	_, userName, _, ok := authz.UserCtx(r)
 	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), reportsLongTimeout)
+	// Check authorization using policy layer
+	reportScope := reportpolicy.CanViewMembersReport(r)
+	if !reportScope.CanView {
+		uierrors.RenderForbidden(w, r, "You do not have access to this report.", "/")
+		return
+	}
+
+	ctx, cancel := timeouts.WithTimeout(r.Context(), timeouts.Long(), h.Log, "members CSV export")
 	defer cancel()
 	db := h.DB
 
 	// Parse filters
-	orgParam := strings.TrimSpace(r.URL.Query().Get("org"))   // "all"|""|hex
-	groupHex := strings.TrimSpace(r.URL.Query().Get("group")) // group id or ""
-	search := strings.TrimSpace(r.URL.Query().Get("search"))
-	status := strings.TrimSpace(r.URL.Query().Get("status"))
+	orgParam := query.Get(r, "org")   // "all"|""|hex
+	groupHex := query.Get(r, "group") // group id or ""
+	searchQuery := query.Search(r, "search")
+	status := query.Get(r, "status")
 	if status == "" {
 		// accept member_status from the page form
-		status = strings.TrimSpace(r.URL.Query().Get("member_status"))
+		status = query.Get(r, "member_status")
 	}
 
-	// Scope: admin/analyst can pass org, leader is forced to their org
+	// Determine scope based on policy
 	var scopeOrg *primitive.ObjectID
-	switch strings.ToLower(role) {
-	case "admin", "analyst":
+	if reportScope.AllOrgs {
+		// Admin/Analyst can pass org or see all
 		if orgParam != "" && orgParam != "all" {
 			if oid, err := primitive.ObjectIDFromHex(orgParam); err == nil {
 				scopeOrg = &oid
 			}
 		}
-	case "leader":
-		var me models.User
-		if err := db.Collection("users").FindOne(ctx, bson.M{"_id": uid}).Decode(&me); err != nil || me.OrganizationID == nil {
-			http.Error(w, "your account is not linked to an organization", http.StatusForbidden)
-			return
-		}
-		scopeOrg = me.OrganizationID
-	default:
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
+	} else {
+		// Leader is scoped to their org
+		scopeOrg = &reportScope.OrgID
 	}
 
 	// ----- Load all members in scope (users.role=member) -----
@@ -74,14 +78,13 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 	if status == "active" || status == "disabled" {
 		userFilter["status"] = status
 	}
-	if search != "" {
-		qFold := textfold.Fold(search)
+	if searchQuery != "" {
+		qFold := text.Fold(searchQuery)
 		hiFold := qFold + "\uffff"
-		sLower := strings.ToLower(search)
+		sLower := strings.ToLower(searchQuery)
 		hiEmail := sLower + "\uffff"
 
-		emailMode := strings.Contains(search, "@")
-		if emailMode && scopeOrg != nil && (status == "active" || status == "disabled") {
+		if search.EmailPivotOK(searchQuery, status, scopeOrg != nil) {
 			userFilter["email"] = bson.M{"$gte": sLower, "$lt": hiEmail}
 		} else {
 			userFilter["$or"] = []bson.M{
@@ -101,8 +104,7 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 			"organization_id": 1,
 		}))
 	if err != nil {
-		h.Log.Error("find users for CSV failed", zap.Error(err))
-		http.Error(w, "database error", http.StatusInternalServerError)
+		h.ErrLog.LogServerError(w, r, "find users for CSV failed", err, "A database error occurred.", "/")
 		return
 	}
 	defer uCur.Close(ctx)
@@ -126,8 +128,8 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 			OrgID      *primitive.ObjectID `bson:"organization_id"`
 		}
 		if err := uCur.Decode(&row); err != nil {
-			h.Log.Warn("decode user row failed", zap.Error(err))
-			continue
+			h.ErrLog.LogServerError(w, r, "database error decoding user row", err, "A database error occurred.", "/")
+			return
 		}
 		if row.OrgID == nil {
 			// Skip users without an organization; they shouldn't appear in this report.
@@ -148,6 +150,19 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Preload org names (batch query to avoid N+1)
+	orgIDs := make([]primitive.ObjectID, 0, len(userByID))
+	for _, ui := range userByID {
+		if ui.OrgID != primitive.NilObjectID {
+			orgIDs = append(orgIDs, ui.OrgID)
+		}
+	}
+	orgName, err := orgutil.FetchOrgNames(ctx, db, orgIDs)
+	if err != nil {
+		h.ErrLog.LogServerError(w, r, "find organizations for CSV failed", err, "A database error occurred.", "/")
+		return
+	}
+
 	// Preload group names
 	groupFilter := bson.M{}
 	if scopeOrg != nil {
@@ -165,8 +180,7 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 	var groupIDs []primitive.ObjectID
 	gcur, err := db.Collection("groups").Find(ctx, groupFilter, options.Find().SetProjection(bson.M{"name": 1}))
 	if err != nil {
-		h.Log.Error("find groups for CSV failed", zap.Error(err))
-		http.Error(w, "database error", http.StatusInternalServerError)
+		h.ErrLog.LogServerError(w, r, "find groups for CSV failed", err, "A database error occurred.", "/")
 		return
 	}
 	defer gcur.Close(ctx)
@@ -176,10 +190,12 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 			ID   primitive.ObjectID `bson:"_id"`
 			Name string             `bson:"name"`
 		}
-		if err := gcur.Decode(&g); err == nil {
-			groupNames[g.ID] = g.Name
-			groupIDs = append(groupIDs, g.ID)
+		if err := gcur.Decode(&g); err != nil {
+			h.Log.Warn("decode group row for CSV", zap.Error(err))
+			continue
 		}
+		groupNames[g.ID] = g.Name
+		groupIDs = append(groupIDs, g.ID)
 	}
 
 	// Preload leaders per group (pipe-separated full names)
@@ -195,8 +211,7 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 
 		lmCur, err := db.Collection("group_memberships").Find(ctx, lmFilter, options.Find().SetProjection(bson.M{"group_id": 1, "user_id": 1}))
 		if err != nil {
-			h.Log.Error("find group memberships for leaders failed", zap.Error(err))
-			http.Error(w, "database error", http.StatusInternalServerError)
+			h.ErrLog.LogServerError(w, r, "find group memberships for leaders failed", err, "A database error occurred.", "/")
 			return
 		}
 		defer lmCur.Close(ctx)
@@ -206,10 +221,12 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 				GroupID primitive.ObjectID `bson:"group_id"`
 				UserID  primitive.ObjectID `bson:"user_id"`
 			}
-			if err := lmCur.Decode(&row); err == nil {
-				groupLeaderIDs[row.GroupID] = append(groupLeaderIDs[row.GroupID], row.UserID)
-				leaderIDSet[row.UserID] = struct{}{}
+			if err := lmCur.Decode(&row); err != nil {
+				h.Log.Warn("decode leader membership row for CSV", zap.Error(err))
+				continue
 			}
+			groupLeaderIDs[row.GroupID] = append(groupLeaderIDs[row.GroupID], row.UserID)
+			leaderIDSet[row.UserID] = struct{}{}
 		}
 
 		if len(leaderIDSet) > 0 {
@@ -221,8 +238,7 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 			nameByID := make(map[primitive.ObjectID]string)
 			uCur2, err := db.Collection("users").Find(ctx, bson.M{"_id": bson.M{"$in": ids}}, options.Find().SetProjection(bson.M{"full_name": 1}))
 			if err != nil {
-				h.Log.Error("find leader users failed", zap.Error(err))
-				http.Error(w, "database error", http.StatusInternalServerError)
+				h.ErrLog.LogServerError(w, r, "find leader users failed", err, "A database error occurred.", "/")
 				return
 			}
 			defer uCur2.Close(ctx)
@@ -232,9 +248,11 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 					ID       primitive.ObjectID `bson:"_id"`
 					FullName string             `bson:"full_name"`
 				}
-				if err := uCur2.Decode(&urow); err == nil {
-					nameByID[urow.ID] = urow.FullName
+				if err := uCur2.Decode(&urow); err != nil {
+					h.Log.Warn("decode leader user row for CSV", zap.Error(err))
+					continue
 				}
+				nameByID[urow.ID] = urow.FullName
 			}
 
 			for gid, uids := range groupLeaderIDs {
@@ -267,8 +285,7 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 		SetSort(bson.D{{Key: "group_id", Value: 1}, {Key: "_id", Value: 1}}).
 		SetProjection(bson.M{"group_id": 1, "user_id": 1}))
 	if err != nil {
-		h.Log.Error("find group memberships for CSV failed", zap.Error(err))
-		http.Error(w, "database error", http.StatusInternalServerError)
+		h.ErrLog.LogServerError(w, r, "find group memberships for CSV failed", err, "A database error occurred.", "/")
 		return
 	}
 	defer mCur.Close(ctx)
@@ -285,41 +302,31 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, url.PathEscape(filename)))
 
 	// UTF-8 BOM for Excel
-	_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF})
+	if _, err := w.Write([]byte{0xEF, 0xBB, 0xBF}); err != nil {
+		h.Log.Error("CSV write failed (BOM)", zap.Error(err), zap.String("user", userName))
+		return
+	}
 
 	cw := csv.NewWriter(w)
 	cw.UseCRLF = true
 	defer cw.Flush()
 
-	_ = cw.Write([]string{"full_name", "email", "organization", "group", "leaders", "status"})
-
-	// org name cache
-	orgName := make(map[primitive.ObjectID]string)
-	resolveOrgName := func(orgID primitive.ObjectID) string {
-		if orgID == primitive.NilObjectID {
-			return ""
-		}
-		if name, ok := orgName[orgID]; ok {
-			return name
-		}
-		var o models.Organization
-		if err := db.Collection("organizations").FindOne(ctx, bson.M{"_id": orgID}).Decode(&o); err == nil {
-			orgName[orgID] = o.Name
-			return o.Name
-		}
-		return ""
+	if err := cw.Write([]string{"full_name", "email", "organization", "group", "leaders", "status"}); err != nil {
+		h.Log.Error("CSV write failed (header)", zap.Error(err), zap.String("user", userName))
+		return
 	}
 
 	// membershipSeen: which members have at least one membership in scope
 	membershipSeen := make(map[primitive.ObjectID]bool)
 	rowCount := 0
+	var writeErr error
 
 	// 1) Write membership rows
 	for mCur.Next(ctx) {
 		var m memDoc
 		if err := mCur.Decode(&m); err != nil {
-			h.Log.Warn("decode membership row failed", zap.Error(err))
-			continue
+			h.Log.Error("database error decoding membership row", zap.Error(err))
+			return
 		}
 		ui, ok := userByID[m.UserID]
 		if !ok {
@@ -327,18 +334,21 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 		}
 		membershipSeen[m.UserID] = true
 
-		org := resolveOrgName(ui.OrgID)
+		org := orgName[ui.OrgID]
 		groupName := groupNames[m.GroupID]
 		leaders := leadersByGroup[m.GroupID]
 
-		_ = cw.Write([]string{
-			ui.FullName,
+		if writeErr = cw.Write([]string{
+			sanitizeCSVField(ui.FullName),
 			strings.ToLower(ui.Email),
-			org,
-			groupName,
-			leaders,
+			sanitizeCSVField(org),
+			sanitizeCSVField(groupName),
+			sanitizeCSVField(leaders),
 			ui.Status,
-		})
+		}); writeErr != nil {
+			h.Log.Error("CSV write failed (row)", zap.Error(writeErr), zap.String("user", userName), zap.Int("rows_written", rowCount))
+			return
+		}
 		rowCount++
 	}
 
@@ -349,15 +359,18 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 			if membershipSeen[id] {
 				continue
 			}
-			org := resolveOrgName(ui.OrgID)
-			_ = cw.Write([]string{
-				ui.FullName,
+			org := orgName[ui.OrgID]
+			if writeErr = cw.Write([]string{
+				sanitizeCSVField(ui.FullName),
 				strings.ToLower(ui.Email),
-				org,
+				sanitizeCSVField(org),
 				"",
 				"",
 				ui.Status,
-			})
+			}); writeErr != nil {
+				h.Log.Error("CSV write failed (row)", zap.Error(writeErr), zap.String("user", userName), zap.Int("rows_written", rowCount))
+				return
+			}
 			rowCount++
 		}
 	}
@@ -367,6 +380,8 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 
 // writeEmptyCSV streams an empty CSV file (headers only). It is used when
 // there are no members in scope for the current filters.
+// Note: Errors are not logged here since this function has no logger access.
+// In practice, write failures at this point indicate client disconnect.
 func writeEmptyCSV(w http.ResponseWriter, r *http.Request) {
 	filename := csvFilenameFromQuery(r)
 
@@ -374,13 +389,16 @@ func writeEmptyCSV(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, url.PathEscape(filename)))
 
 	// UTF-8 BOM so Excel treats it as Unicode
-	_, _ = w.Write([]byte{0xEF, 0xBB, 0xBF})
+	if _, err := w.Write([]byte{0xEF, 0xBB, 0xBF}); err != nil {
+		return
+	}
 
 	cw := csv.NewWriter(w)
 	cw.UseCRLF = true
 	defer cw.Flush()
 
-	_ = cw.Write([]string{"full_name", "email", "organization", "group", "leaders", "status"})
+	// Error intentionally not checked - headers only, client likely disconnected
+	cw.Write([]string{"full_name", "email", "organization", "group", "leaders", "status"})
 }
 
 // csvFilenameFromQuery returns a sanitized CSV filename based on the
@@ -394,4 +412,18 @@ func csvFilenameFromQuery(r *http.Request) string {
 		filename += ".csv"
 	}
 	return filename
+}
+
+// sanitizeCSVField prevents CSV formula injection by prefixing dangerous
+// characters with a single quote. Excel/LibreOffice interpret cells starting
+// with =, +, -, or @ as formulas, which can be exploited for code execution.
+func sanitizeCSVField(s string) string {
+	if len(s) == 0 {
+		return s
+	}
+	switch s[0] {
+	case '=', '+', '-', '@':
+		return "'" + s
+	}
+	return s
 }

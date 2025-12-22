@@ -11,14 +11,14 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/policy/grouppolicy"
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/templates"
-	nav "github.com/dalemusser/waffle/toolkit/ui/nav"
+	"github.com/dalemusser/waffle/pantry/httpnav"
+	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.uber.org/zap"
 )
 
 // ServeGroupView renders a read-only view of a group.
@@ -32,44 +32,72 @@ func (h *Handler) ServeGroupView(w http.ResponseWriter, r *http.Request) {
 	gid := chi.URLParam(r, "id")
 	groupOID, err := primitive.ObjectIDFromHex(gid)
 	if err != nil {
-		uierrors.RenderForbidden(w, r, "Bad group id.", nav.ResolveBackURL(r, "/groups"))
+		uierrors.RenderForbidden(w, r, "Bad group id.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), metaShortTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
 
 	grpStore := groupstore.New(db)
 	group, err := grpStore.GetByID(ctx, groupOID)
 	if err == mongo.ErrNoDocuments {
-		uierrors.RenderForbidden(w, r, "Group not found.", nav.ResolveBackURL(r, "/groups"))
+		uierrors.RenderForbidden(w, r, "Group not found.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
 	if err != nil {
-		h.Log.Warn("group GetByID(view)", zap.Error(err))
-		uierrors.RenderForbidden(w, r, "A database error occurred.", nav.ResolveBackURL(r, "/groups"))
+		h.ErrLog.LogForbidden(w, r, "database error loading group", err, "A database error occurred.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
 
-	if !grouppolicy.CanManageGroup(ctx, db, r, group.ID) {
-		uierrors.RenderForbidden(w, r, "You do not have access to this group.", nav.ResolveBackURL(r, "/groups"))
+	canManage, policyErr := grouppolicy.CanManageGroup(ctx, db, r, group.ID, group.OrganizationID)
+	if policyErr != nil {
+		h.ErrLog.LogServerError(w, r, "database error checking group access", policyErr, "A database error occurred.", "/groups")
+		return
+	}
+	if !canManage {
+		uierrors.RenderForbidden(w, r, "You do not have access to this group.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
 
-	var org models.Organization
-	_ = db.Collection("organizations").FindOne(ctx, bson.M{"_id": group.OrganizationID}).Decode(&org)
+	orgName := ""
+	{
+		var org models.Organization
+		if err := db.Collection("organizations").FindOne(ctx, bson.M{"_id": group.OrganizationID}).Decode(&org); err != nil {
+			if err == mongo.ErrNoDocuments {
+				orgName = "(Deleted)"
+			} else {
+				h.ErrLog.LogServerError(w, r, "database error loading organization for group", err, "A database error occurred.", "/groups")
+				return
+			}
+		} else {
+			orgName = org.Name
+		}
+	}
 
-	assigned, _ := fetchAssignedResourcesForGroup(ctx, db, group.ID)
+	assigned, assignErr := fetchAssignedResourcesForGroup(ctx, db, group.ID)
+	if assignErr != nil {
+		h.ErrLog.LogServerError(w, r, "database error fetching assigned resources", assignErr, "A database error occurred.", "/groups")
+		return
+	}
 
-	leadersCount, _ := db.Collection("group_memberships").CountDocuments(ctx, bson.M{
+	leadersCount, lcErr := db.Collection("group_memberships").CountDocuments(ctx, bson.M{
 		"group_id": group.ID,
 		"role":     "leader",
 	})
-	membersCount, _ := db.Collection("group_memberships").CountDocuments(ctx, bson.M{
+	if lcErr != nil {
+		h.ErrLog.LogServerError(w, r, "database error counting group leaders", lcErr, "A database error occurred.", "/groups")
+		return
+	}
+	membersCount, mcErr := db.Collection("group_memberships").CountDocuments(ctx, bson.M{
 		"group_id": group.ID,
 		"role":     "member",
 	})
+	if mcErr != nil {
+		h.ErrLog.LogServerError(w, r, "database error counting group members", mcErr, "A database error occurred.", "/groups")
+		return
+	}
 
 	templates.Render(w, r, "group_view", groupViewData{
 		Title:             "View Group",
@@ -79,14 +107,14 @@ func (h *Handler) ServeGroupView(w http.ResponseWriter, r *http.Request) {
 		GroupID:           group.ID.Hex(),
 		Name:              group.Name,
 		Description:       group.Description,
-		OrganizationName:  org.Name,
+		OrganizationName:  orgName,
 		LeadersCount:      int(leadersCount),
 		MembersCount:      int(membersCount),
 		CreatedAt:         group.CreatedAt,
 		UpdatedAt:         group.UpdatedAt,
 		AssignedResources: assigned,
-		BackURL:           nav.ResolveBackURL(r, "/groups"),
-		CurrentPath:       nav.CurrentPath(r),
+		BackURL:           httpnav.ResolveBackURL(r, "/groups"),
+		CurrentPath:       httpnav.CurrentPath(r),
 	})
 }
 
@@ -99,7 +127,9 @@ func fetchAssignedResourcesForGroup(ctx context.Context, db *mongo.Database, gro
 	defer cur.Close(ctx)
 
 	var assigns []models.GroupResourceAssignment
-	_ = cur.All(ctx, &assigns)
+	if err := cur.All(ctx, &assigns); err != nil {
+		return nil, err
+	}
 	if len(assigns) == 0 {
 		return nil, nil
 	}
@@ -118,7 +148,9 @@ func fetchAssignedResourcesForGroup(ctx context.Context, db *mongo.Database, gro
 	items := make([]assignedResourceViewItem, 0, len(ids))
 	for cg.Next(ctx) {
 		var r models.Resource
-		_ = cg.Decode(&r)
+		if err := cg.Decode(&r); err != nil {
+			return nil, err
+		}
 		items = append(items, assignedResourceViewItem{
 			ResourceID:    r.ID.Hex(),
 			ResourceTitle: r.Title,

@@ -7,10 +7,11 @@ import (
 	"time"
 
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/toolkit/db/mongodb"
+	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Store struct {
@@ -68,7 +69,7 @@ func (s *Store) Add(ctx context.Context, groupID, userID primitive.ObjectID, rol
 	}
 	_, err := s.c.InsertOne(ctx, doc)
 	if err != nil {
-		if mongodb.IsDup(err) {
+		if wafflemongo.IsDup(err) {
 			return ErrDuplicateMembership
 		}
 		return err
@@ -80,4 +81,71 @@ func (s *Store) Add(ctx context.Context, groupID, userID primitive.ObjectID, rol
 func (s *Store) Remove(ctx context.Context, groupID, userID primitive.ObjectID) error {
 	_, err := s.c.DeleteOne(ctx, bson.M{"group_id": groupID, "user_id": userID})
 	return err
+}
+
+// MembershipEntry represents a user to add to a group.
+type MembershipEntry struct {
+	UserID primitive.ObjectID
+	Role   string // "leader" or "member"
+}
+
+// AddBatchResult contains counts from a batch membership add operation.
+type AddBatchResult struct {
+	Added      int
+	Duplicates int
+}
+
+// AddBatch adds multiple memberships in a single batch operation.
+// Caller must have already verified that all users belong to the same org as the group.
+// This method skips individual user/group lookups for efficiency.
+// Duplicates are silently counted (not treated as errors).
+func (s *Store) AddBatch(ctx context.Context, groupID, orgID primitive.ObjectID, entries []MembershipEntry) (AddBatchResult, error) {
+	if len(entries) == 0 {
+		return AddBatchResult{}, nil
+	}
+
+	// Validate roles and build documents
+	now := time.Now().UTC()
+	docs := make([]interface{}, 0, len(entries))
+	for _, e := range entries {
+		if e.Role != "leader" && e.Role != "member" {
+			return AddBatchResult{}, errBadRole
+		}
+		docs = append(docs, bson.M{
+			"group_id":   groupID,
+			"user_id":    e.UserID,
+			"org_id":     orgID,
+			"role":       e.Role,
+			"created_at": now,
+		})
+	}
+
+	// Use ordered:false so all inserts are attempted even if some fail (duplicates)
+	opts := options.InsertMany().SetOrdered(false)
+	result, err := s.c.InsertMany(ctx, docs, opts)
+
+	// Count successful inserts
+	added := 0
+	if result != nil {
+		added = len(result.InsertedIDs)
+	}
+	duplicates := len(entries) - added
+
+	// InsertMany with ordered:false returns a BulkWriteException for duplicate key errors.
+	// We treat duplicates as expected (not an error), but propagate other errors.
+	if err != nil {
+		if bulkErr, ok := err.(mongo.BulkWriteException); ok {
+			// Check if all errors are duplicate key errors (code 11000)
+			for _, we := range bulkErr.WriteErrors {
+				if we.Code != 11000 {
+					return AddBatchResult{Added: added, Duplicates: duplicates}, err
+				}
+			}
+			// All errors were duplicates - this is expected
+			return AddBatchResult{Added: added, Duplicates: duplicates}, nil
+		}
+		return AddBatchResult{Added: added, Duplicates: duplicates}, err
+	}
+
+	return AddBatchResult{Added: added, Duplicates: duplicates}, nil
 }

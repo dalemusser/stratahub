@@ -1,0 +1,13 @@
+{{ define "error_server" }}
+  {{ template "layout" . }}
+{{ end }}
+{{ define "content" }}
+<div class="max-w-xl bg-white rounded shadow p-4">
+  <h1 class="text-xl font-semibold text-red-600 mb-1">{{ .Title }}</h1>
+  <p class="text-gray-600 text-sm mb-3">{{ .Message }}</p>
+  <div class="flex gap-2">
+    <a href="{{ .BackURL }}" class="px-3 py-1.5 border rounded">← Back</a>
+    <a href="/" class="px-3 py-1.5 bg-indigo-600 text-white rounded">Home</a>
+  </div>
+</div>
+{{ end }}

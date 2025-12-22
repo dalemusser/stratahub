@@ -2,13 +2,35 @@
 package bootstrap
 
 // AppConfig holds service-specific configuration for this WAFFLE app.
-// Extend this struct as your app grows.
+//
+// These values come from environment variables, configuration files, or
+// command-line flags (loaded in LoadConfig). They represent *app-level*
+// configuration, not WAFFLE core configuration.
+//
+// WAFFLE's CoreConfig handles framework-level settings like:
+//   - HTTP/HTTPS ports and TLS configuration
+//   - Logging level and format
+//   - CORS settings
+//   - Request body size limits
+//   - Database connection timeouts
+//
+// AppConfig is where you put everything specific to YOUR application:
+//   - Database connection strings (MongoDB URI, Postgres DSN, etc.)
+//   - External service API keys and endpoints
+//   - Feature flags and application modes
+//   - Business logic configuration
+//   - Default values for your domain
+//
+// Add fields here as your application grows. The struct is passed to
+// most lifecycle hooks, so any configuration needed during startup,
+// request handling, or shutdown should live here.
 type AppConfig struct {
-	Greeting string
+	// MongoDB connection configuration
+	MongoURI      string // MongoDB connection string (e.g., mongodb://localhost:27017)
+	MongoDatabase string // Database name within MongoDB
 
-	StrataHubMongoURI      string
-	StrataHubMongoDatabase string
-
-	SessionKey    string
-	SessionDomain string
+	// Session management configuration
+	SessionKey    string // Secret key for signing session cookies (must be strong in production)
+	SessionName   string // Cookie name for sessions (default: stratahub-session)
+	SessionDomain string // Cookie domain (blank means current host)
 }

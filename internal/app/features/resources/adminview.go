@@ -6,9 +6,10 @@ import (
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/templates"
-	"github.com/dalemusser/waffle/toolkit/ui/nav"
+	"github.com/dalemusser/waffle/pantry/httpnav"
+	"github.com/dalemusser/waffle/pantry/templates"
 
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
@@ -23,21 +24,21 @@ func (h *AdminHandler) ServeView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), resourcesShortTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
 
 	idHex := chi.URLParam(r, "id")
 	oid, err := primitive.ObjectIDFromHex(idHex)
 	if err != nil {
-		http.Error(w, "bad id", http.StatusBadRequest)
+		uierrors.RenderBadRequest(w, r, "Invalid resource ID.", "/resources")
 		return
 	}
 
 	var res models.Resource
 	if err := db.Collection("resources").FindOne(ctx, bson.M{"_id": oid}).Decode(&res); err != nil {
 		// Treat not found as a 404 to match other admin handlers
-		http.NotFound(w, r)
+		uierrors.RenderNotFound(w, r, "Resource not found.", "/resources")
 		return
 	}
 
@@ -55,7 +56,7 @@ func (h *AdminHandler) ServeView(w http.ResponseWriter, r *http.Request) {
 		Status:              res.Status,
 		ShowInLibrary:       res.ShowInLibrary,
 		DefaultInstructions: res.DefaultInstructions,
-		BackURL:             nav.ResolveBackURL(r, "/resources"),
+		BackURL:             httpnav.ResolveBackURL(r, "/resources"),
 	}
 
 	templates.Render(w, r, "resource_view", data)

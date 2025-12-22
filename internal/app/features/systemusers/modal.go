@@ -4,10 +4,12 @@ package systemusers
 import (
 	"context"
 	"net/http"
-	"strings"
 
+	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/system/normalize"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/templates"
+	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -20,19 +22,19 @@ import (
 // (system_user_manage_modal).
 func (h *Handler) ServeManageModal(w http.ResponseWriter, r *http.Request) {
 	// Only admins can manage system users.
-	_, _, _, ok := requireAdmin(w, r)
+	_, _, _, ok := userContext(r)
 	if !ok {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), sysUsersShortTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
 
 	idHex := chi.URLParam(r, "id")
 	uid, err := primitive.ObjectIDFromHex(idHex)
 	if err != nil {
-		http.Error(w, "bad id", http.StatusBadRequest)
+		uierrors.HTMXBadRequest(w, r, "Invalid user ID.", "/system-users")
 		return
 	}
 
@@ -41,7 +43,7 @@ func (h *Handler) ServeManageModal(w http.ResponseWriter, r *http.Request) {
 		FindOne(ctx, bson.M{"_id": uid}).
 		Decode(&u); err != nil {
 
-		http.NotFound(w, r)
+		uierrors.HTMXNotFound(w, r, "User not found.", "/system-users")
 		return
 	}
 
@@ -50,10 +52,10 @@ func (h *Handler) ServeManageModal(w http.ResponseWriter, r *http.Request) {
 	data := manageModalData{
 		ID:       idHex,
 		FullName: u.FullName,
-		Email:    strings.ToLower(u.Email),
-		Role:     strings.ToLower(u.Role),
-		Auth:     strings.ToLower(u.AuthMethod),
-		Status:   strings.ToLower(u.Status),
+		Email:    normalize.Email(u.Email),
+		Role:     normalize.Role(u.Role),
+		Auth:     normalize.AuthMethod(u.AuthMethod),
+		Status:   normalize.Status(u.Status),
 		BackURL:  back,
 	}
 

@@ -2,17 +2,9 @@
 package resources
 
 import (
-	"time"
-
+	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
-)
-
-// Standard timeouts used by the Resources feature.
-const (
-	resourcesShortTimeout = 5 * time.Second
-	resourcesMedTimeout   = 10 * time.Second
-	resourcesLongTimeout  = 30 * time.Second
 )
 
 // AdminHandler owns all admin/library-facing Resource handlers
@@ -21,8 +13,9 @@ const (
 // It is constructed once at startup in bootstrap, using the
 // shared Mongo database handle and logger.
 type AdminHandler struct {
-	DB  *mongo.Database
-	Log *zap.Logger
+	DB     *mongo.Database
+	Log    *zap.Logger
+	ErrLog *uierrors.ErrorLogger
 }
 
 // MemberHandler owns the member-facing Resource handlers
@@ -31,24 +24,27 @@ type AdminHandler struct {
 // It shares the same underlying DB and logger pattern as
 // AdminHandler but keeps the responsibilities clearly separated.
 type MemberHandler struct {
-	DB  *mongo.Database
-	Log *zap.Logger
+	DB     *mongo.Database
+	Log    *zap.Logger
+	ErrLog *uierrors.ErrorLogger
 }
 
 // NewAdminHandler constructs an AdminHandler bound to the
 // given Mongo database and logger.
-func NewAdminHandler(db *mongo.Database, logger *zap.Logger) *AdminHandler {
+func NewAdminHandler(db *mongo.Database, errLog *uierrors.ErrorLogger, logger *zap.Logger) *AdminHandler {
 	return &AdminHandler{
-		DB:  db,
-		Log: logger,
+		DB:     db,
+		Log:    logger,
+		ErrLog: errLog,
 	}
 }
 
 // NewMemberHandler constructs a MemberHandler bound to the
 // given Mongo database and logger.
-func NewMemberHandler(db *mongo.Database, logger *zap.Logger) *MemberHandler {
+func NewMemberHandler(db *mongo.Database, errLog *uierrors.ErrorLogger, logger *zap.Logger) *MemberHandler {
 	return &MemberHandler{
-		DB:  db,
-		Log: logger,
+		DB:     db,
+		Log:    logger,
+		ErrLog: errLog,
 	}
 }

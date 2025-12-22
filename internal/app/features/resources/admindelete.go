@@ -5,30 +5,42 @@ import (
 	"context"
 	"net/http"
 
-	webutil "github.com/dalemusser/waffle/toolkit/http/webutil"
+	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/txn"
+	"github.com/dalemusser/waffle/pantry/urlutil"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+// HandleDelete deletes a resource and its assignments.
+// Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
 func (h *AdminHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	idHex := chi.URLParam(r, "id")
 	oid, err := primitive.ObjectIDFromHex(idHex)
 	if err != nil {
-		http.Error(w, "bad id", http.StatusBadRequest)
+		uierrors.RenderBadRequest(w, r, "Invalid resource ID.", "/resources")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), resourcesMedTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 	db := h.DB
 
-	// Best-effort cleanup of assignments
-	_, _ = db.Collection("group_resource_assignments").DeleteMany(ctx, bson.M{"resource_id": oid})
-
-	// Delete resource
-	if _, err := db.Collection("resources").DeleteOne(ctx, bson.M{"_id": oid}); err != nil {
-		http.Error(w, "delete error", http.StatusInternalServerError)
+	// Use transaction for atomic deletion of resource and assignments.
+	if err := txn.Run(ctx, db, h.Log, func(ctx context.Context) error {
+		// 1) Clean up assignments first
+		if _, err := db.Collection("group_resource_assignments").DeleteMany(ctx, bson.M{"resource_id": oid}); err != nil {
+			return err
+		}
+		// 2) Delete resource
+		if _, err := db.Collection("resources").DeleteOne(ctx, bson.M{"_id": oid}); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		h.ErrLog.LogServerError(w, r, "delete resource failed", err, "Unable to delete resource.", "")
 		return
 	}
 
@@ -40,6 +52,6 @@ func (h *AdminHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Normal redirect
-	ret := webutil.SafeReturn(r.FormValue("return"), idHex, "/resources")
+	ret := urlutil.SafeReturn(r.FormValue("return"), idHex, "/resources")
 	http.Redirect(w, r, ret, http.StatusSeeOther)
 }

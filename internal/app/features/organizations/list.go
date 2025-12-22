@@ -3,15 +3,18 @@ package organizations
 
 import (
 	"context"
+	"maps"
 	"net/http"
-	"strings"
 
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
-	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/templates"
-	textfold "github.com/dalemusser/waffle/toolkit/text/textfold"
-	nav "github.com/dalemusser/waffle/toolkit/ui/nav"
-	"go.uber.org/zap"
+	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
+	"github.com/dalemusser/stratahub/internal/app/system/paging"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/waffle/pantry/httpnav"
+	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
+	"github.com/dalemusser/waffle/pantry/query"
+	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/dalemusser/waffle/pantry/text"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -20,51 +23,95 @@ import (
 
 // ServeList handles GET /organizations (with optional ?q= search).
 // It supports HTMX partial refresh of the table when HX-Target="orgs-table-wrap".
+// Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
 func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := authz.UserCtx(r)
-	if !ok {
-		// In practice, this should be guarded by auth middleware, but we fail safe.
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
+	role, uname, _, _ := authz.UserCtx(r)
 
-	q := strings.TrimSpace(r.URL.Query().Get("q"))
+	q := query.Search(r, "q")
+	after := query.Get(r, "after")
+	before := query.Get(r, "before")
+	start := paging.ParseStart(r)
 
-	ctx, cancel := context.WithTimeout(r.Context(), orgsMedTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 
 	db := h.DB
 
-	filter := bson.M{}
+	// Build base filter
+	base := bson.M{}
+	var searchOr []bson.M
 	if q != "" {
-		fq := textfold.Fold(q)
+		fq := text.Fold(q)
 		if fq != "" {
 			hi := fq + "\uffff"
-			filter["$or"] = []bson.M{
+			searchOr = []bson.M{
 				{"name_ci": bson.M{"$gte": fq, "$lt": hi}},
 				{"city_ci": bson.M{"$gte": fq, "$lt": hi}},
 				{"state_ci": bson.M{"$gte": fq, "$lt": hi}},
 			}
+			base["$or"] = searchOr
 		}
 	}
 
-	find := options.Find().
-		SetSort(bson.D{{Key: "name_ci", Value: 1}, {Key: "_id", Value: 1}})
-
-	cur, err := db.Collection("organizations").Find(ctx, filter, find)
+	// Count total
+	total, err := db.Collection("organizations").CountDocuments(ctx, base)
 	if err != nil {
-		h.Log.Error("find organizations failed", zap.Error(err))
-		http.Error(w, "database error", http.StatusInternalServerError)
+		h.ErrLog.LogServerError(w, r, "count organizations failed", err, "Unable to load organizations.", "")
+		return
+	}
+
+	// Clone base filter for pagination query
+	f := maps.Clone(base)
+	find := options.Find()
+	sortField := "name_ci"
+
+	// Configure keyset pagination
+	cfg := paging.ConfigureKeyset(before, after)
+	cfg.ApplyToFind(find, sortField)
+
+	// Apply cursor conditions (handle $or clause specially)
+	if ks := cfg.KeysetWindow(sortField); ks != nil {
+		if q != "" && len(searchOr) > 0 {
+			f["$and"] = []bson.M{{"$or": searchOr}, ks}
+			delete(f, "$or")
+		} else {
+			maps.Copy(f, ks)
+		}
+	}
+
+	// Fetch organizations
+	type orgRow struct {
+		ID     primitive.ObjectID `bson:"_id"`
+		Name   string             `bson:"name"`
+		NameCI string             `bson:"name_ci"`
+		City   string             `bson:"city"`
+		State  string             `bson:"state"`
+	}
+
+	cur, err := db.Collection("organizations").Find(ctx, f, find)
+	if err != nil {
+		h.ErrLog.LogServerError(w, r, "find organizations failed", err, "Unable to load organizations.", "")
 		return
 	}
 	defer cur.Close(ctx)
 
-	var orgs []models.Organization
+	var orgs []orgRow
 	if err := cur.All(ctx, &orgs); err != nil {
-		h.Log.Error("decode organizations failed", zap.Error(err))
-		http.Error(w, "database error", http.StatusInternalServerError)
+		h.ErrLog.LogServerError(w, r, "decode organizations failed", err, "Unable to load organizations.", "")
 		return
 	}
+
+	// Reverse if paging backwards
+	if cfg.Direction == paging.Backward {
+		paging.Reverse(orgs)
+	}
+
+	// Apply pagination trimming
+	page := paging.TrimPage(&orgs, before, after)
+
+	// Compute range
+	shown := len(orgs)
+	rng := paging.ComputeRange(start, shown)
 
 	// Build ID list for aggregates
 	orgIDs := make([]primitive.ObjectID, 0, len(orgs))
@@ -72,25 +119,41 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		orgIDs = append(orgIDs, o.ID)
 	}
 
-	leadersMap, _ := aggregateCountByOrg(ctx, db, "users", bson.M{
+	leadersMap, err := orgutil.AggregateCountByField(ctx, db, "users", bson.M{
 		"role":            "leader",
 		"organization_id": bson.M{"$in": orgIDs},
 	}, "organization_id")
+	if err != nil {
+		h.ErrLog.LogServerError(w, r, "aggregate leader counts failed", err, "Unable to load organization data.", "")
+		return
+	}
 
-	groupsMap, _ := aggregateCountByOrg(ctx, db, "groups", bson.M{
+	groupsMap, err := orgutil.AggregateCountByField(ctx, db, "groups", bson.M{
 		"organization_id": bson.M{"$in": orgIDs},
 	}, "organization_id")
+	if err != nil {
+		h.ErrLog.LogServerError(w, r, "aggregate group counts failed", err, "Unable to load organization data.", "")
+		return
+	}
 
 	items := make([]listItem, 0, len(orgs))
 	for _, o := range orgs {
 		items = append(items, listItem{
 			ID:           o.ID,
 			Name:         o.Name,
+			NameCI:       o.NameCI,
 			City:         o.City,
 			State:        o.State,
-			LeadersCount: leadersMap[o.ID.Hex()],
-			GroupsCount:  groupsMap[o.ID.Hex()],
+			LeadersCount: leadersMap[o.ID],
+			GroupsCount:  groupsMap[o.ID],
 		})
+	}
+
+	// Build cursors
+	prevCur, nextCur := "", ""
+	if len(orgs) > 0 {
+		prevCur = wafflemongo.EncodeCursor(orgs[0].NameCI, orgs[0].ID)
+		nextCur = wafflemongo.EncodeCursor(orgs[len(orgs)-1].NameCI, orgs[len(orgs)-1].ID)
 	}
 
 	data := listData{
@@ -100,7 +163,18 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		UserName:    uname,
 		Q:           q,
 		Items:       items,
-		CurrentPath: nav.CurrentPath(r),
+		CurrentPath: httpnav.CurrentPath(r),
+
+		Shown:      shown,
+		Total:      total,
+		HasPrev:    page.HasPrev,
+		HasNext:    page.HasNext,
+		PrevCursor: prevCur,
+		NextCursor: nextCur,
+		RangeStart: rng.Start,
+		RangeEnd:   rng.End,
+		PrevStart:  rng.PrevStart,
+		NextStart:  rng.NextStart,
 	}
 
 	// HTMX partial: just the table

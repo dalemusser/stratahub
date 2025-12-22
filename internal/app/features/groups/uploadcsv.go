@@ -3,29 +3,40 @@ package groups
 
 import (
 	"context"
-	"encoding/csv"
 	"html/template"
-	"io"
 	"net/http"
-	"strconv"
 	"strings"
 	"time"
 
+	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/policy/grouppolicy"
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
 	membershipstore "github.com/dalemusser/stratahub/internal/app/store/memberships"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/csvutil"
+	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/templates"
-	mongodb "github.com/dalemusser/waffle/toolkit/db/mongodb"
-	textfold "github.com/dalemusser/waffle/toolkit/text/textfold"
-	nav "github.com/dalemusser/waffle/toolkit/ui/nav"
+	"github.com/dalemusser/waffle/pantry/httpnav"
+	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
+	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/dalemusser/waffle/pantry/text"
 
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.uber.org/zap"
 )
+
+// csvProcessResult holds the result of processing CSV rows into the database.
+type csvProcessResult struct {
+	Created       int
+	Previously    int
+	Skipped       int
+	SkippedEmails []string
+	Memberships   []membershipstore.MembershipEntry
+}
 
 // groupCSVData is the view model for the CSV upload page.
 type groupCSVData struct {
@@ -53,45 +64,195 @@ type groupCSVData struct {
 	SkippedEmails  []string
 }
 
+// deduplicateCSVRows removes duplicate emails and returns unique emails with their row data.
+func deduplicateCSVRows(rows []csvutil.MemberRow) ([]string, map[string]csvutil.MemberRow) {
+	seen := map[string]struct{}{}
+	uniqueEmails := make([]string, 0, len(rows))
+	emailToRow := make(map[string]csvutil.MemberRow, len(rows))
+
+	for _, row := range rows {
+		emailLower := strings.ToLower(row.Email)
+		if _, dup := seen[emailLower]; dup {
+			continue
+		}
+		seen[emailLower] = struct{}{}
+		uniqueEmails = append(uniqueEmails, emailLower)
+		emailToRow[emailLower] = row
+	}
+
+	return uniqueEmails, emailToRow
+}
+
+// batchFetchUsersByEmail loads all users with the given emails in a single query.
+func (h *Handler) batchFetchUsersByEmail(ctx context.Context, emails []string) (map[string]*models.User, error) {
+	if len(emails) == 0 {
+		return make(map[string]*models.User), nil
+	}
+
+	cur, err := h.DB.Collection("users").Find(ctx, bson.M{"email": bson.M{"$in": emails}})
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+
+	users := make(map[string]*models.User, len(emails))
+	for cur.Next(ctx) {
+		var u models.User
+		if err := cur.Decode(&u); err != nil {
+			return nil, err
+		}
+		users[strings.ToLower(u.Email)] = &u
+	}
+	if err := cur.Err(); err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
+// processCSVUsers processes deduplicated CSV rows, creating new users and collecting membership entries.
+func (h *Handler) processCSVUsers(
+	ctx context.Context,
+	uniqueEmails []string,
+	emailToRow map[string]csvutil.MemberRow,
+	existingUsers map[string]*models.User,
+	group *models.Group,
+) (csvProcessResult, error) {
+	var result csvProcessResult
+	result.Memberships = make([]membershipstore.MembershipEntry, 0, len(uniqueEmails))
+	now := time.Now()
+
+	for _, emailLower := range uniqueEmails {
+		row := emailToRow[emailLower]
+		u, exists := existingUsers[emailLower]
+
+		if !exists {
+			// User doesn't exist - create new user in this org
+			orgPtr := group.OrganizationID
+			doc := models.User{
+				ID:             primitive.NewObjectID(),
+				FullName:       row.FullName,
+				FullNameCI:     text.Fold(row.FullName),
+				Email:          emailLower,
+				AuthMethod:     row.Auth,
+				Role:           "member",
+				Status:         "active",
+				OrganizationID: &orgPtr,
+				CreatedAt:      now,
+				UpdatedAt:      now,
+			}
+			_, ierr := h.DB.Collection("users").InsertOne(ctx, doc)
+			if ierr != nil {
+				if wafflemongo.IsDup(ierr) {
+					// Race condition: reload and treat as existing
+					var raceUser models.User
+					if e2 := h.DB.Collection("users").FindOne(ctx, bson.M{"email": emailLower}).Decode(&raceUser); e2 != nil {
+						return result, e2
+					}
+					if raceUser.OrganizationID == nil || *raceUser.OrganizationID != group.OrganizationID {
+						actualOrg := "<nil>"
+						if raceUser.OrganizationID != nil {
+							actualOrg = raceUser.OrganizationID.Hex()
+						}
+						h.Log.Warn("CSV upload race condition: user created by concurrent request in different org",
+							zap.String("email", emailLower),
+							zap.String("target_org", group.OrganizationID.Hex()),
+							zap.String("actual_org", actualOrg),
+						)
+						result.SkippedEmails = append(result.SkippedEmails, emailLower+" (concurrent create in different org)")
+						result.Skipped++
+						continue
+					}
+					result.Previously++
+					result.Memberships = append(result.Memberships, membershipstore.MembershipEntry{
+						UserID: raceUser.ID,
+						Role:   "member",
+					})
+					continue
+				}
+				return result, ierr
+			}
+			result.Created++
+			result.Memberships = append(result.Memberships, membershipstore.MembershipEntry{
+				UserID: doc.ID,
+				Role:   "member",
+			})
+			continue
+		}
+
+		// Existing user - check org membership
+		if u.OrganizationID == nil || *u.OrganizationID != group.OrganizationID {
+			result.SkippedEmails = append(result.SkippedEmails, emailLower)
+			result.Skipped++
+			continue
+		}
+
+		result.Previously++
+
+		// Ensure full_name_ci is populated/correct
+		folded := text.Fold(u.FullName)
+		if u.FullNameCI == "" || u.FullNameCI != folded {
+			if _, err := h.DB.Collection("users").UpdateOne(
+				ctx,
+				bson.M{"_id": u.ID},
+				bson.M{"$set": bson.M{"full_name_ci": folded, "updated_at": now}},
+			); err != nil {
+				return result, err
+			}
+		}
+
+		result.Memberships = append(result.Memberships, membershipstore.MembershipEntry{
+			UserID: u.ID,
+			Role:   "member",
+		})
+	}
+
+	return result, nil
+}
+
 // ServeUploadCSV handles GET /groups/{id}/upload_csv.
 func (h *Handler) ServeUploadCSV(w http.ResponseWriter, r *http.Request) {
 	role, uname, _, ok := authz.UserCtx(r)
 	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
 
 	gid := chi.URLParam(r, "id")
 	groupOID, err := primitive.ObjectIDFromHex(gid)
 	if err != nil {
-		http.Error(w, "bad group id", http.StatusBadRequest)
+		uierrors.RenderBadRequest(w, r, "Invalid group ID.", "/groups")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
 
 	group, err := groupstore.New(db).GetByID(ctx, groupOID)
 	if err == mongo.ErrNoDocuments {
-		http.NotFound(w, r)
+		uierrors.RenderNotFound(w, r, "Group not found.", "/groups")
 		return
 	}
 	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		uierrors.RenderServerError(w, r, "A database error occurred.", "/groups")
 		return
 	}
 
-	if !grouppolicy.CanManageGroup(ctx, db, r, group.ID) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	canManage, policyErr := grouppolicy.CanManageGroup(ctx, db, r, group.ID, group.OrganizationID)
+	if policyErr != nil {
+		h.ErrLog.LogServerError(w, r, "database error checking group access", policyErr, "A database error occurred.", "/groups")
+		return
+	}
+	if !canManage {
+		uierrors.RenderForbidden(w, r, "You don't have permission to manage this group.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
 
-	orgName := ""
-	if !group.OrganizationID.IsZero() {
-		var org models.Organization
-		_ = db.Collection("organizations").FindOne(ctx, bson.M{"_id": group.OrganizationID}).Decode(&org)
-		orgName = org.Name
+	orgName, err := orgutil.GetOrgName(ctx, db, group.OrganizationID)
+	if err != nil {
+		h.ErrLog.LogServerError(w, r, "database error loading organization for group", err, "A database error occurred.", "/groups")
+		return
 	}
 
 	templates.Render(w, r, "group_upload_csv", groupCSVData{
@@ -102,8 +263,8 @@ func (h *Handler) ServeUploadCSV(w http.ResponseWriter, r *http.Request) {
 		GroupID:     group.ID.Hex(),
 		GroupName:   group.Name,
 		OrgName:     orgName,
-		BackURL:     nav.ResolveBackURL(r, "/groups/"+group.ID.Hex()+"/manage"),
-		CurrentPath: nav.CurrentPath(r),
+		BackURL:     httpnav.ResolveBackURL(r, "/groups/"+group.ID.Hex()+"/manage"),
+		CurrentPath: httpnav.CurrentPath(r),
 	})
 }
 
@@ -111,160 +272,68 @@ func (h *Handler) ServeUploadCSV(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) HandleUploadCSV(w http.ResponseWriter, r *http.Request) {
 	role, uname, _, ok := authz.UserCtx(r)
 	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
+
+	// Limit request body size
+	r.Body = http.MaxBytesReader(w, r.Body, csvutil.MaxUploadSize)
+
 	gid := chi.URLParam(r, "id")
 	groupOID, err := primitive.ObjectIDFromHex(gid)
 	if err != nil {
-		http.Error(w, "bad group id", http.StatusBadRequest)
+		uierrors.RenderBadRequest(w, r, "Invalid group ID.", "/groups")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), 60*time.Second)
+	ctx, cancel := timeouts.WithTimeout(r.Context(), timeouts.Batch(), h.Log, "group CSV upload")
 	defer cancel()
-	db := h.DB
 
-	group, err := groupstore.New(db).GetByID(ctx, groupOID)
+	group, err := groupstore.New(h.DB).GetByID(ctx, groupOID)
 	if err == mongo.ErrNoDocuments {
-		http.NotFound(w, r)
+		uierrors.RenderNotFound(w, r, "Group not found.", "/groups")
 		return
 	}
 	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		uierrors.RenderServerError(w, r, "A database error occurred.", "/groups")
 		return
 	}
 
-	if !grouppolicy.CanManageGroup(ctx, db, r, group.ID) {
-		http.Error(w, "forbidden", http.StatusForbidden)
+	canManage, policyErr := grouppolicy.CanManageGroup(ctx, h.DB, r, group.ID, group.OrganizationID)
+	if policyErr != nil {
+		h.ErrLog.LogServerError(w, r, "database error checking group access", policyErr, "A database error occurred.", "/groups")
+		return
+	}
+	if !canManage {
+		uierrors.RenderForbidden(w, r, "You don't have permission to manage this group.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
 
+	// Get uploaded file
 	file, _, err := r.FormFile("csv")
 	if err != nil {
-		http.Error(w, "missing file", http.StatusBadRequest)
+		msg := "CSV file is required."
+		if strings.Contains(err.Error(), "request body too large") {
+			msg = "CSV file is too large. Maximum size is 5 MB."
+		}
+		uierrors.RenderBadRequest(w, r, msg, "/groups/"+gid+"/upload_csv")
 		return
 	}
 	defer file.Close()
 
-	cr := csv.NewReader(file)
-	cr.TrimLeadingSpace = true
-
-	const maxRows = 20000
-
-	// Pre-scan CSV to validate all rows before any writes
-	type csvRow struct {
-		Full  string
-		Email string
-		Auth  string
+	// Parse and validate CSV
+	parsed, parseErr := csvutil.ParseMemberCSV(file, csvutil.ParseOptions{MaxRows: csvutil.MaxRows})
+	if parseErr == csvutil.ErrTooManyRows {
+		uierrors.RenderBadRequest(w, r, "CSV contains too many rows.", "/groups/"+gid+"/upload_csv")
+		return
 	}
-	var rows []csvRow
-
-	type badRow struct {
-		line   int
-		reason string
-		raw    []string
-	}
-	var invalid []badRow
-
-	line := 0
-	allowedAuths := map[string]struct{}{
-		"internal":  {},
-		"google":    {},
-		"classlink": {},
-		"clever":    {},
-		"microsoft": {},
+	if parseErr != nil {
+		uierrors.RenderBadRequest(w, r, parseErr.Error(), "/groups/"+gid+"/upload_csv")
+		return
 	}
 
-	for {
-		rec, readErr := cr.Read()
-		if readErr == io.EOF {
-			break
-		}
-		if readErr != nil {
-			http.Error(w, readErr.Error(), http.StatusBadRequest)
-			return
-		}
-		line++
-		if line > maxRows {
-			http.Error(w, "CSV too large", http.StatusRequestEntityTooLarge)
-			return
-		}
-		if len(rec) == 0 {
-			continue
-		}
-
-		// Header/BOM-tolerant detection on first row
-		if line == 1 {
-			c0 := strings.ToLower(strings.TrimSpace(strings.TrimPrefix(rec[0], "\ufeff")))
-			c1, c2 := "", ""
-			if len(rec) > 1 {
-				c1 = strings.ToLower(strings.TrimSpace(rec[1]))
-			}
-			if len(rec) > 2 {
-				c2 = strings.ToLower(strings.TrimSpace(rec[2]))
-			}
-			isHeader := (c0 == "full name" || c0 == "name") && c1 == "email"
-			hasAuth := (c1 == "email" && strings.Contains(c2, "auth"))
-			if isHeader || hasAuth {
-				continue
-			}
-		}
-
-		full := ""
-		if len(rec) > 0 {
-			full = strings.TrimSpace(rec[0])
-		}
-		email := ""
-		if len(rec) > 1 {
-			email = strings.TrimSpace(rec[1])
-		}
-		authm := ""
-		if len(rec) > 2 {
-			authm = strings.TrimSpace(rec[2])
-		}
-
-		authmLower := strings.ToLower(authm)
-
-		if full == "" || email == "" || authm == "" {
-			invalid = append(invalid, badRow{line: line, reason: "missing Full Name/Email/Auth Method", raw: rec})
-			continue
-		}
-		if _, ok := allowedAuths[authmLower]; !ok {
-			invalid = append(invalid, badRow{line: line, reason: "Auth Method not allowed", raw: rec})
-			continue
-		}
-
-		rows = append(rows, csvRow{Full: full, Email: email, Auth: authmLower})
-	}
-
-	if len(invalid) > 0 {
-		var hb strings.Builder
-		hb.WriteString("Invalid CSV: ")
-		hb.WriteString(strconv.Itoa(len(invalid)))
-		hb.WriteString(" row(s) failed validation. Allowed Auth Methods: internal, google, classlink, clever, microsoft.<br>")
-		maxShow := 3
-		if len(invalid) < maxShow {
-			maxShow = len(invalid)
-		}
-		for i := 0; i < maxShow; i++ {
-			br := invalid[i]
-			hb.WriteString("- row ")
-			hb.WriteString(strconv.Itoa(br.line))
-			hb.WriteString(": ")
-			hb.WriteString(template.HTMLEscapeString(br.reason))
-			if len(br.raw) > 0 {
-				hb.WriteString(" | values: ")
-				hb.WriteString(template.HTMLEscapeString(strings.Join(br.raw, ", ")))
-			}
-			hb.WriteString("<br>")
-		}
-		if len(invalid) > maxShow {
-			hb.WriteString("... and ")
-			hb.WriteString(strconv.Itoa(len(invalid) - maxShow))
-			hb.WriteString(" more.")
-		}
-
+	// Return validation errors if any
+	if parsed.HasErrors() {
 		templates.Render(w, r, "group_upload_csv", groupCSVData{
 			Title:       "Upload CSV",
 			IsLoggedIn:  true,
@@ -272,146 +341,64 @@ func (h *Handler) HandleUploadCSV(w http.ResponseWriter, r *http.Request) {
 			UserName:    uname,
 			GroupID:     group.ID.Hex(),
 			GroupName:   group.Name,
-			OrgName:     "",
-			BackURL:     nav.ResolveBackURL(r, "/groups/"+group.ID.Hex()+"/manage"),
-			CurrentPath: nav.CurrentPath(r),
-			Error:       template.HTML(hb.String()),
+			BackURL:     httpnav.ResolveBackURL(r, "/groups/"+group.ID.Hex()+"/manage"),
+			CurrentPath: httpnav.CurrentPath(r),
+			Error:       parsed.FormatErrorsHTML(3),
 		})
 		return
 	}
 
-	// Now process rows
-	var created, previously, addedToGroup, alreadyInGroup, skipped int
-	var skippedEmails []string
+	// Deduplicate and batch fetch existing users
+	uniqueEmails, emailToRow := deduplicateCSVRows(parsed.Rows)
 
-	seen := map[string]struct{}{}
-
-	for _, row := range rows {
-		emailLower := strings.ToLower(row.Email)
-
-		// per-upload de-dupe
-		if _, dup := seen[emailLower]; dup {
-			continue
-		}
-		seen[emailLower] = struct{}{}
-
-		now := time.Now()
-
-		var u models.User
-		findErr := db.Collection("users").FindOne(ctx, bson.M{"email": emailLower}).Decode(&u)
-
-		switch {
-		case mongodb.IsDup(findErr):
-			// unlikely here, but treat as existing user
-			if e2 := db.Collection("users").FindOne(ctx, bson.M{"email": emailLower}).Decode(&u); e2 != nil {
-				http.Error(w, "db error", http.StatusInternalServerError)
-				return
-			}
-			fallthrough
-
-		case findErr == mongo.ErrNoDocuments:
-			// create new user in this org
-			orgPtr := group.OrganizationID
-			doc := models.User{
-				ID:             primitive.NewObjectID(),
-				FullName:       row.Full,
-				FullNameCI:     textfold.Fold(row.Full),
-				Email:          emailLower,
-				AuthMethod:     row.Auth,
-				Role:           "member",
-				Status:         "active",
-				OrganizationID: &orgPtr,
-				CreatedAt:      now,
-				UpdatedAt:      now,
-			}
-			_, ierr := db.Collection("users").InsertOne(ctx, doc)
-			if ierr != nil {
-				if mongodb.IsDup(ierr) {
-					// Reload user and treat as existing
-					if e2 := db.Collection("users").FindOne(ctx, bson.M{"email": emailLower}).Decode(&u); e2 != nil {
-						http.Error(w, "db error", http.StatusInternalServerError)
-						return
-					}
-					// fallthrough to existing user handling below
-				} else {
-					http.Error(w, "db error", http.StatusInternalServerError)
-					return
-				}
-			} else {
-				created++
-				// Add membership for new user
-				err := membershipstore.New(db).Add(ctx, group.ID, doc.ID, "member")
-				if err == membershipstore.ErrDuplicateMembership {
-					alreadyInGroup++
-				} else if err == nil {
-					addedToGroup++
-				} else {
-					http.Error(w, "db error", http.StatusInternalServerError)
-					return
-				}
-				continue
-			}
-
-			fallthrough
-
-		case findErr == nil:
-			// existing user: must belong to same org
-			if u.OrganizationID == nil || *u.OrganizationID != group.OrganizationID {
-				skipped++
-				skippedEmails = append(skippedEmails, emailLower)
-				continue
-			}
-
-			previously++
-
-			// ensure full_name_ci is populated/correct
-			folded := textfold.Fold(u.FullName)
-			if u.FullNameCI == "" || u.FullNameCI != folded {
-				_, _ = db.Collection("users").UpdateOne(
-					ctx,
-					bson.M{"_id": u.ID},
-					bson.M{"$set": bson.M{"full_name_ci": folded, "updated_at": now}},
-				)
-			}
-
-			// Add membership
-			err := membershipstore.New(db).Add(ctx, group.ID, u.ID, "member")
-			if err == membershipstore.ErrDuplicateMembership {
-				alreadyInGroup++
-			} else if err == nil {
-				addedToGroup++
-			} else {
-				http.Error(w, "db error", http.StatusInternalServerError)
-				return
-			}
-
-		default:
-			http.Error(w, "db error", http.StatusInternalServerError)
-			return
-		}
+	existingUsers, err := h.batchFetchUsersByEmail(ctx, uniqueEmails)
+	if err != nil {
+		h.ErrLog.LogServerError(w, r, "database error batch loading users", err, "A database error occurred.", "/groups/"+gid+"/upload_csv")
+		return
 	}
 
-	// load org name for UI
-	var org models.Organization
-	_ = db.Collection("organizations").FindOne(ctx, bson.M{"_id": group.OrganizationID}).Decode(&org)
+	// Process rows: create users, collect memberships
+	processed, err := h.processCSVUsers(ctx, uniqueEmails, emailToRow, existingUsers, &group)
+	if err != nil {
+		h.ErrLog.LogServerError(w, r, "database error processing CSV users", err, "A database error occurred.", "/groups/"+gid+"/upload_csv")
+		return
+	}
+
+	// Batch add memberships
+	var addedToGroup, alreadyInGroup int
+	if len(processed.Memberships) > 0 {
+		result, err := membershipstore.New(h.DB).AddBatch(ctx, group.ID, group.OrganizationID, processed.Memberships)
+		if err != nil {
+			h.ErrLog.LogServerError(w, r, "database error batch adding memberships", err, "A database error occurred.", "/groups/"+gid+"/upload_csv")
+			return
+		}
+		addedToGroup = result.Added
+		alreadyInGroup = result.Duplicates
+	}
+
+	// Load org name for UI
+	orgName, err := orgutil.GetOrgName(ctx, h.DB, group.OrganizationID)
+	if err != nil {
+		h.ErrLog.LogServerError(w, r, "database error loading organization", err, "A database error occurred.", "/groups/"+gid+"/upload_csv")
+		return
+	}
 
 	templates.Render(w, r, "group_upload_csv", groupCSVData{
-		Title:       "Upload CSV",
-		IsLoggedIn:  true,
-		Role:        role,
-		UserName:    uname,
-		GroupID:     group.ID.Hex(),
-		GroupName:   group.Name,
-		OrgName:     org.Name,
-		BackURL:     nav.ResolveBackURL(r, "/groups/"+group.ID.Hex()+"/manage"),
-		CurrentPath: nav.CurrentPath(r),
-
-		Created:        created,
-		Previously:     previously,
+		Title:          "Upload CSV",
+		IsLoggedIn:     true,
+		Role:           role,
+		UserName:       uname,
+		GroupID:        group.ID.Hex(),
+		GroupName:      group.Name,
+		OrgName:        orgName,
+		BackURL:        httpnav.ResolveBackURL(r, "/groups/"+group.ID.Hex()+"/manage"),
+		CurrentPath:    httpnav.CurrentPath(r),
+		Created:        processed.Created,
+		Previously:     processed.Previously,
 		AddedToGroup:   addedToGroup,
 		AlreadyInGroup: alreadyInGroup,
-		SkippedCount:   skipped,
-		SkippedEmails:  skippedEmails,
+		SkippedCount:   processed.Skipped,
+		SkippedEmails:  processed.SkippedEmails,
 		Success:        template.HTML("Upload complete."),
 	})
 }

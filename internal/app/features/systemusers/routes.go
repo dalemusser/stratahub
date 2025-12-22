@@ -12,14 +12,14 @@ import (
 // Example mount from bootstrap:
 //
 //	h := systemusers.NewHandler(db, logger)
-//	r.Mount("/system-users", systemusers.Routes(h))
-func Routes(h *Handler) chi.Router {
+//	r.Mount("/system-users", systemusers.Routes(h, sessionMgr))
+func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 	r := chi.NewRouter()
 
 	r.Group(func(pr chi.Router) {
 		// Only signed-in admins can access system users.
-		pr.Use(auth.RequireSignedIn)
-		pr.Use(auth.RequireRole("admin"))
+		pr.Use(sm.RequireSignedIn)
+		pr.Use(sm.RequireRole("admin"))
 
 		// List all system users
 		pr.Get("/", h.ServeList)

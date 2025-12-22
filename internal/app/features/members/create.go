@@ -3,85 +3,90 @@ package members
 
 import (
 	"context"
-	"html/template"
+	"errors"
 	"net/http"
-	"strings"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/policy/memberpolicy"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/formutil"
+	"github.com/dalemusser/stratahub/internal/app/system/inputval"
+	"github.com/dalemusser/stratahub/internal/app/system/navigation"
+	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
+	"github.com/dalemusser/stratahub/internal/app/system/status"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/templates"
-	nav "github.com/dalemusser/waffle/toolkit/ui/nav"
-	validate "github.com/dalemusser/waffle/toolkit/validate"
-
-	"go.mongodb.org/mongo-driver/bson"
+	"github.com/dalemusser/waffle/pantry/httpnav"
+	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
+	"github.com/dalemusser/waffle/pantry/templates"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.uber.org/zap"
 )
 
 // ServeNew renders the "Add Member" form.
 func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
-	role, uname, uid, ok := userCtx(r)
+	role, _, uid, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), membersShortTimeout)
+	// Check authorization using policy layer
+	listScope := memberpolicy.CanListMembers(r)
+	if !listScope.CanList {
+		uierrors.RenderForbidden(w, r, "You don't have permission to add members.", httpnav.ResolveBackURL(r, "/"))
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
 
-	selectedOrg := strings.TrimSpace(r.URL.Query().Get("org"))
+	selectedOrg := normalize.QueryParam(r.URL.Query().Get("org"))
 	data := newData{
-		Title:       "Add Member",
-		IsLoggedIn:  true,
-		Role:        role,
-		UserName:    uname,
-		BackURL:     nav.ResolveBackURL(r, "/members"),
-		CurrentPath: nav.CurrentPath(r),
-		Auth:        "internal",
-		Status:      "active",
+		Auth:   "internal",
+		Status: status.Active,
 	}
+	formutil.SetBase(&data.Base, r, "Add Member", "/members")
 
 	if role == "leader" {
-		var u models.User
-		if err := db.Collection("users").
-			FindOne(ctx, bson.M{"_id": uid}).
-			Decode(&u); err != nil || u.OrganizationID == nil {
-
-			h.Log.Warn("leader org resolve failed", zap.Error(err))
-			uierrors.RenderForbidden(w, r, "Your account is not linked to an organization.", nav.ResolveBackURL(r, "/members"))
+		orgID, orgName, err := orgutil.ResolveLeaderOrg(ctx, db, uid)
+		if errors.Is(err, orgutil.ErrUserNotFound) {
+			uierrors.RenderForbidden(w, r, "User not found.", httpnav.ResolveBackURL(r, "/members"))
 			return
 		}
-
+		if errors.Is(err, orgutil.ErrNoOrganization) {
+			uierrors.RenderForbidden(w, r, "Your account is not linked to an organization.", httpnav.ResolveBackURL(r, "/members"))
+			return
+		}
+		if err != nil {
+			h.ErrLog.LogServerError(w, r, "database error resolving leader org", err, "A database error occurred.", "/members")
+			return
+		}
 		data.OrgLocked = true
-		data.OrgHex = u.OrganizationID.Hex()
-
-		var org models.Organization
-		_ = db.Collection("organizations").
-			FindOne(ctx, bson.M{"_id": *u.OrganizationID}).
-			Decode(&org)
-		data.OrgName = org.Name
+		data.OrgHex = orgID.Hex()
+		data.OrgName = orgName
 	} else {
-		// Admin: either locked to selected org (if valid) or show org picker
+		// Admin: either locked to selected org (if valid and active) or show org picker
 		if selectedOrg != "" && selectedOrg != "all" {
-			if oid, err := primitive.ObjectIDFromHex(selectedOrg); err == nil {
+			orgID, orgName, err := orgutil.ResolveActiveOrgFromHex(ctx, db, selectedOrg)
+			switch {
+			case err == nil:
 				data.OrgLocked = true
-				data.OrgHex = selectedOrg
-
-				var org models.Organization
-				_ = db.Collection("organizations").
-					FindOne(ctx, bson.M{"_id": oid}).
-					Decode(&org)
-				data.OrgName = org.Name
+				data.OrgHex = orgID.Hex()
+				data.OrgName = orgName
+			case orgutil.IsExpectedOrgError(err):
+				// Bad ID, not found, or not active - fall through to show org picker
+			default:
+				h.ErrLog.LogServerError(w, r, "database error loading organization", err, "A database error occurred.", "/members")
+				return
 			}
 		}
 		if !data.OrgLocked {
 			orgs, err := orgutil.ListActiveOrgs(ctx, db)
 			if err != nil {
-				h.Log.Warn("list active orgs", zap.Error(err))
-				uierrors.RenderForbidden(w, r, "A database error occurred.", nav.ResolveBackURL(r, "/members"))
+				h.ErrLog.LogServerError(w, r, "database error listing active organizations", err, "A database error occurred.", "/members")
 				return
 			}
 			for _, o := range orgs {
@@ -95,44 +100,43 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 
 // HandleCreate processes the Add Member form POST.
 func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
-	role, uname, uid, ok := userCtx(r)
+	role, _, uid, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		uierrors.RenderForbidden(w, r, "Bad request.", nav.ResolveBackURL(r, "/members"))
+		uierrors.RenderForbidden(w, r, "Bad request.", httpnav.ResolveBackURL(r, "/members"))
 		return
 	}
 
-	full := strings.TrimSpace(r.FormValue("full_name"))
-	email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
-	authm := strings.ToLower(strings.TrimSpace(r.FormValue("auth_method")))
+	// Check authorization using policy layer
+	listScope := memberpolicy.CanListMembers(r)
+	if !listScope.CanList {
+		uierrors.RenderForbidden(w, r, "You don't have permission to add members.", httpnav.ResolveBackURL(r, "/"))
+		return
+	}
+
+	full := normalize.Name(r.FormValue("full_name"))
+	email := normalize.Email(r.FormValue("email"))
+	authm := normalize.AuthMethod(r.FormValue("auth_method"))
 	// New members always start as active
-	status := "active"
-	orgHex := strings.TrimSpace(r.FormValue("orgID"))
+	stat := status.Active
+	orgHex := normalize.OrgID(r.FormValue("orgID"))
 
-	// Inline validation with specific messages
-	if full == "" {
-		h.reRenderNewWithError(w, r, role, uname, newData{
-			FullName: full, Email: email, Auth: authm, Status: status, OrgHex: orgHex,
-			Error: template.HTML("Full name is required."),
-		})
-		return
-	}
-	if email == "" || !validate.SimpleEmailValid(email) {
-		h.reRenderNewWithError(w, r, role, uname, newData{
-			FullName: full, Email: email, Auth: authm, Status: status, OrgHex: orgHex,
-			Error: template.HTML("A valid email address is required."),
-		})
+	// Validate required fields using struct tags
+	input := memberInput{FullName: full, Email: email}
+	if result := inputval.Validate(input); result.HasErrors() {
+		h.reRenderNewWithError(w, r, newData{
+			FullName: full, Email: email, Auth: authm, Status: stat, OrgHex: orgHex,
+		}, result.First())
 		return
 	}
 	// Organization required for admins (leaders are locked to their org)
-	if role != "leader" && (orgHex == "" || orgHex == "all") {
-		h.reRenderNewWithError(w, r, role, uname, newData{
-			FullName: full, Email: email, Auth: authm, Status: status, OrgHex: orgHex,
-			Error: template.HTML("Organization is required."),
-		})
+	if role != "leader" && orgHex == "" {
+		h.reRenderNewWithError(w, r, newData{
+			FullName: full, Email: email, Auth: authm, Status: stat, OrgHex: orgHex,
+		}, "Organization is required.")
 		return
 	}
 
@@ -140,41 +144,47 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		authm = "internal"
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), membersMedTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 	db := h.DB
 
 	us := userstore.New(db)
-	if u, err := us.GetByEmail(ctx, email); err == nil && u != nil {
-		h.reRenderNewWithError(w, r, role, uname, newData{
-			FullName: full, Email: email, Auth: authm, Status: status, OrgHex: orgHex,
-			Error: template.HTML("A user with that email already exists."),
-		})
-		return
-	}
 
 	var orgID primitive.ObjectID
 	if role == "leader" {
-		var me models.User
-		if err := db.Collection("users").
-			FindOne(ctx, bson.M{"_id": uid}).
-			Decode(&me); err != nil || me.OrganizationID == nil {
-
-			h.Log.Warn("leader org resolve failed", zap.Error(err))
-			uierrors.RenderForbidden(w, r, "Your account is not linked to an organization.", nav.ResolveBackURL(r, "/members"))
+		oid, _, err := orgutil.ResolveLeaderOrg(ctx, db, uid)
+		if errors.Is(err, orgutil.ErrUserNotFound) {
+			uierrors.RenderForbidden(w, r, "User not found.", httpnav.ResolveBackURL(r, "/members"))
 			return
 		}
-		orgID = *me.OrganizationID
-	} else {
-		oid, err := primitive.ObjectIDFromHex(orgHex)
+		if errors.Is(err, orgutil.ErrNoOrganization) {
+			uierrors.RenderForbidden(w, r, "Your account is not linked to an organization.", httpnav.ResolveBackURL(r, "/members"))
+			return
+		}
 		if err != nil {
-			h.reRenderNewWithError(w, r, role, uname, newData{
-				FullName: full, Email: email, Auth: authm, Status: status, OrgHex: orgHex,
-				Error: template.HTML("Bad organization id."),
-			})
+			h.ErrLog.LogServerError(w, r, "database error resolving leader org", err, "A database error occurred.", "/members")
 			return
 		}
 		orgID = oid
+	} else {
+		oid, _, err := orgutil.ResolveActiveOrgFromHex(ctx, db, orgHex)
+		switch {
+		case err == nil:
+			orgID = oid
+		case errors.Is(err, orgutil.ErrBadOrgID):
+			h.reRenderNewWithError(w, r, newData{
+				FullName: full, Email: email, Auth: authm, Status: stat, OrgHex: orgHex,
+			}, "Invalid organization ID.")
+			return
+		case errors.Is(err, orgutil.ErrOrgNotFound), errors.Is(err, orgutil.ErrOrgNotActive):
+			h.reRenderNewWithError(w, r, newData{
+				FullName: full, Email: email, Auth: authm, Status: stat, OrgHex: orgHex,
+			}, "Organization not found or is not active.")
+			return
+		default:
+			h.ErrLog.LogServerError(w, r, "database error validating organization", err, "A database error occurred.", "/members")
+			return
+		}
 	}
 
 	orgPtr := orgID
@@ -183,35 +193,30 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		Email:          email,
 		AuthMethod:     authm,
 		Role:           "member",
-		Status:         status,
+		Status:         stat,
 		OrganizationID: &orgPtr,
 	}
 	if _, err := us.Create(ctx, doc); err != nil {
-		h.Log.Warn("user create failed", zap.Error(err))
-		h.reRenderNewWithError(w, r, role, uname, newData{
-			FullName: full, Email: email, Auth: authm, Status: status, OrgHex: orgHex,
-			Error: template.HTML("Database error while creating member."),
-		})
+		if wafflemongo.IsDup(err) {
+			h.reRenderNewWithError(w, r, newData{
+				FullName: full, Email: email, Auth: authm, Status: stat, OrgHex: orgHex,
+			}, "A user with that email already exists.")
+			return
+		}
+		h.ErrLog.LogServerError(w, r, "database error creating user", err, "A database error occurred.", "/members")
 		return
 	}
 
-	if ret := r.FormValue("return"); ret != "" && strings.HasPrefix(ret, "/") {
-		http.Redirect(w, r, ret, http.StatusSeeOther)
-		return
-	}
-	http.Redirect(w, r, "/members", http.StatusSeeOther)
+	ret := navigation.SafeBackURL(r, navigation.MembersBackURL)
+	http.Redirect(w, r, ret, http.StatusSeeOther)
 }
 
 // Helper to re-render form with an inline error message and keep org options for admins.
-func (h *Handler) reRenderNewWithError(w http.ResponseWriter, r *http.Request, role, uname string, data newData) {
-	data.Title = "Add Member"
-	data.IsLoggedIn = true
-	data.Role = role
-	data.UserName = uname
-	data.BackURL = nav.ResolveBackURL(r, "/members")
-	data.CurrentPath = nav.CurrentPath(r)
+func (h *Handler) reRenderNewWithError(w http.ResponseWriter, r *http.Request, data newData, msg string) {
+	formutil.SetBase(&data.Base, r, "Add Member", "/members")
+	data.SetError(msg)
 
-	ctx, cancel := context.WithTimeout(r.Context(), membersShortTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
 
@@ -219,25 +224,25 @@ func (h *Handler) reRenderNewWithError(w http.ResponseWriter, r *http.Request, r
 	// can show a friendly label when re-rendering.
 	if data.OrgLocked && data.OrgHex != "" {
 		if oid, err := primitive.ObjectIDFromHex(data.OrgHex); err == nil {
-			var org models.Organization
-			if err := db.Collection("organizations").
-				FindOne(ctx, bson.M{"_id": oid}).
-				Decode(&org); err == nil {
-				data.OrgName = org.Name
+			name, err := orgutil.GetOrgName(ctx, db, oid)
+			if err != nil {
+				h.ErrLog.LogServerError(w, r, "database error loading organization (re-render)", err, "A database error occurred.", "/members")
+				return
 			}
+			data.OrgName = name
 		}
 	}
 
 	// Load org choices for admins whenever the org is NOT locked,
 	// regardless of whether OrgHex is currently set to something.
-	if role == "admin" && !data.OrgLocked {
+	if data.Role == "admin" && !data.OrgLocked {
 		orgs, err := orgutil.ListActiveOrgs(ctx, db)
 		if err != nil {
-			h.Log.Warn("list active orgs (re-render)", zap.Error(err))
-		} else {
-			for _, o := range orgs {
-				data.Orgs = append(data.Orgs, orgOption{ID: o.ID, Name: o.Name})
-			}
+			h.ErrLog.LogServerError(w, r, "database error listing active organizations (re-render)", err, "A database error occurred.", "/members")
+			return
+		}
+		for _, o := range orgs {
+			data.Orgs = append(data.Orgs, orgOption{ID: o.ID, Name: o.Name})
 		}
 	}
 

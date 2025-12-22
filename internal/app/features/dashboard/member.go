@@ -5,29 +5,20 @@ import (
 	"net/http"
 
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
-	"github.com/dalemusser/waffle/templates"
-	"github.com/dalemusser/waffle/toolkit/ui/nav"
+	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/dalemusser/waffle/pantry/httpnav"
 	"go.uber.org/zap"
 )
-
-type memberData struct {
-	Title      string
-	IsLoggedIn bool
-	Role       string
-	UserName   string
-
-	CurrentPath string
-}
 
 func (h *Handler) ServeMember(w http.ResponseWriter, r *http.Request) {
 	role, uname, _, signedIn := authz.UserCtx(r)
 
-	data := memberData{
+	data := baseDashboardData{
 		Title:       "Member Dashboard",
 		IsLoggedIn:  signedIn,
 		Role:        role,
 		UserName:    uname,
-		CurrentPath: nav.CurrentPath(r),
+		CurrentPath: httpnav.CurrentPath(r),
 	}
 
 	h.Log.Debug("member dashboard served", zap.String("user", uname))

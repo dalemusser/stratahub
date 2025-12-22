@@ -7,34 +7,32 @@ import (
 	"strings"
 	"time"
 
+	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/policy/resourcepolicy"
 	"github.com/dalemusser/stratahub/internal/app/store/queries/memberresources"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/timezones"
-	"github.com/dalemusser/waffle/templates"
-	"github.com/dalemusser/waffle/toolkit/http/webutil"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/dalemusser/waffle/pantry/urlutil"
 )
 
 func (h *MemberHandler) ServeListResources(w http.ResponseWriter, r *http.Request) {
-	role, uname, memberOID, ok := authz.UserCtx(r)
-	role = strings.ToLower(role)
+	role, uname, _, ok := authz.UserCtx(r)
 	logged := ok
 
-	ctx, cancel := context.WithTimeout(r.Context(), resourcesShortTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
 
-	var member struct {
-		ID             primitive.ObjectID  `bson:"_id"`
-		Email          string              `bson:"email"`
-		OrganizationID *primitive.ObjectID `bson:"organization_id"`
-	}
-	err := db.Collection("users").FindOne(ctx, map[string]interface{}{
-		"_id":  memberOID,
-		"role": "member",
-	}).Decode(&member)
+	// Verify member access using policy layer
+	member, err := resourcepolicy.VerifyMemberAccess(ctx, db, r)
 	if err != nil {
-		http.Error(w, "member not found", http.StatusInternalServerError)
+		h.ErrLog.LogServerError(w, r, "database error verifying member access", err, "A database error occurred.", "/")
+		return
+	}
+	if member == nil {
+		uierrors.RenderNotFound(w, r, "Member not found.", "/login")
 		return
 	}
 
@@ -44,9 +42,9 @@ func (h *MemberHandler) ServeListResources(w http.ResponseWriter, r *http.Reques
 		tzLabel = timezones.Label(tzID)
 	}
 
-	results, err := memberresources.ListResourcesForMember(ctx, db, memberOID, memberresources.StatusFilter{Resource: "active", Group: ""})
+	results, err := memberresources.ListResourcesForMember(ctx, db, member.ID, memberresources.StatusFilter{Resource: "active", Group: ""})
 	if err != nil {
-		http.Error(w, "error loading resources", http.StatusInternalServerError)
+		uierrors.RenderServerError(w, r, "A database error occurred.", "/")
 		return
 	}
 
@@ -84,7 +82,7 @@ func (h *MemberHandler) ServeListResources(w http.ResponseWriter, r *http.Reques
 			availableUntil = end.Format("2006-01-02 15:04")
 		}
 
-		launchURL := webutil.AddOrSetQueryParams(row.Resource.LaunchURL, map[string]string{
+		launchURL := urlutil.AddOrSetQueryParams(row.Resource.LaunchURL, map[string]string{
 			"id":    member.Email,
 			"group": row.GroupName,
 			"org":   orgName,

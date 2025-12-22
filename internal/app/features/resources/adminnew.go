@@ -7,13 +7,23 @@ import (
 	"time"
 
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/inputval"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/toolkit/db/mongodb"
-	"github.com/dalemusser/waffle/toolkit/http/webutil"
-	"github.com/dalemusser/waffle/toolkit/text/textfold"
+	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
+	"github.com/dalemusser/stratahub/internal/app/system/navigation"
+	"github.com/dalemusser/waffle/pantry/text"
+	"github.com/dalemusser/waffle/pantry/urlutil"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
+
+// createResourceInput defines validation rules for creating a resource.
+type createResourceInput struct {
+	Title     string `validate:"required,max=200" label:"Title"`
+	LaunchURL string `validate:"required,url" label:"Launch URL"`
+	Status    string `validate:"required,oneof=active disabled" label:"Status"`
+}
 
 func (h *AdminHandler) ServeNew(w http.ResponseWriter, r *http.Request) {
 	vm := resourceFormVM{}
@@ -22,7 +32,7 @@ func (h *AdminHandler) ServeNew(w http.ResponseWriter, r *http.Request) {
 
 func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		h.ErrLog.LogBadRequest(w, r, "parse form failed", err, "Invalid form data.", "/resources")
 		return
 	}
 
@@ -38,25 +48,12 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	if typeValue == "" {
 		typeValue = models.DefaultResourceType
 	}
-	if !isValidResourceType(typeValue) {
-		vm := resourceFormVM{
-			ResourceTitle:       title,
-			Subject:             subject,
-			Description:         description,
-			LaunchURL:           launchURL,
-			Type:                typeValue,
-			Status:              status,
-			ShowInLibrary:       showInLibrary,
-			DefaultInstructions: defaultInstructions,
-		}
-		h.renderNewForm(w, r, vm, "Type is invalid.")
-		return
-	}
-
 	if status == "" {
 		status = "active"
 	}
-	if status != "active" && status != "disabled" {
+
+	// Helper to re-render the form with a message
+	reRender := func(msg string) {
 		vm := resourceFormVM{
 			ResourceTitle:       title,
 			Subject:             subject,
@@ -67,37 +64,25 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 			ShowInLibrary:       showInLibrary,
 			DefaultInstructions: defaultInstructions,
 		}
-		h.renderNewForm(w, r, vm, "Status must be Active or Disabled.")
+		h.renderNewForm(w, r, vm, msg)
+	}
+
+	// Validate required fields using struct tags
+	input := createResourceInput{Title: title, LaunchURL: launchURL, Status: status}
+	if result := inputval.Validate(input); result.HasErrors() {
+		reRender(result.First())
 		return
 	}
 
-	if title == "" {
-		vm := resourceFormVM{
-			ResourceTitle:       title,
-			Subject:             subject,
-			Description:         description,
-			LaunchURL:           launchURL,
-			Type:                typeValue,
-			Status:              status,
-			ShowInLibrary:       showInLibrary,
-			DefaultInstructions: defaultInstructions,
-		}
-		h.renderNewForm(w, r, vm, "Title is required.")
+	// Validate resource type
+	if !inputval.IsValidResourceType(typeValue) {
+		reRender("Type is invalid.")
 		return
 	}
 
-	if launchURL != "" && !webutil.IsValidAbsHTTPURL(launchURL) {
-		vm := resourceFormVM{
-			ResourceTitle:       title,
-			Subject:             subject,
-			Description:         description,
-			LaunchURL:           launchURL,
-			Type:                typeValue,
-			Status:              status,
-			ShowInLibrary:       showInLibrary,
-			DefaultInstructions: defaultInstructions,
-		}
-		h.renderNewForm(w, r, vm, "Launch URL must be a valid absolute URL (e.g., https://example.com).")
+	// Validate launch URL is an absolute HTTP/HTTPS URL
+	if !urlutil.IsValidAbsHTTPURL(launchURL) {
+		reRender("Launch URL must be a valid absolute URL (e.g., https://example.com).")
 		return
 	}
 
@@ -109,7 +94,7 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		createdByName = uname
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), resourcesMedTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 	db := h.DB
 
@@ -117,9 +102,9 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	doc := bson.M{
 		"_id":                  primitive.NewObjectID(),
 		"title":                title,
-		"title_ci":             textfold.Fold(title),
+		"title_ci":             text.Fold(title),
 		"subject":              subject,
-		"subject_ci":           textfold.Fold(subject),
+		"subject_ci":           text.Fold(subject),
 		"description":          description,
 		"launch_url":           launchURL,
 		"status":               status,
@@ -135,28 +120,13 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	_, err := db.Collection("resources").InsertOne(ctx, doc)
 	if err != nil {
 		msg := "Database error while creating resource."
-		if mongodb.IsDup(err) {
+		if wafflemongo.IsDup(err) {
 			msg = "A resource with that title already exists."
 		}
-		vm := resourceFormVM{
-			ResourceTitle:       title,
-			Subject:             subject,
-			Description:         description,
-			LaunchURL:           launchURL,
-			Type:                typeValue,
-			Status:              status,
-			ShowInLibrary:       showInLibrary,
-			DefaultInstructions: defaultInstructions,
-		}
-		h.renderNewForm(w, r, vm, msg)
+		reRender(msg)
 		return
 	}
 
-	ret := r.FormValue("return")
-	if ret != "" && strings.HasPrefix(ret, "/") {
-		http.Redirect(w, r, ret, http.StatusSeeOther)
-		return
-	}
-
-	http.Redirect(w, r, "/resources", http.StatusSeeOther)
+	ret := navigation.SafeBackURL(r, navigation.ResourcesBackURL)
+	http.Redirect(w, r, ret, http.StatusSeeOther)
 }

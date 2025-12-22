@@ -9,7 +9,10 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/policy/grouppolicy"
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
-	nav "github.com/dalemusser/waffle/toolkit/ui/nav"
+	"github.com/dalemusser/stratahub/internal/app/system/navigation"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/txn"
+	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -26,18 +29,18 @@ func (h *Handler) HandleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 	}
 	// Admin only delete (safer). Change later if you want leader-of-group delete.
 	if role != "admin" {
-		uierrors.RenderForbidden(w, r, "You do not have access to delete groups.", nav.ResolveBackURL(r, "/groups"))
+		uierrors.RenderForbidden(w, r, "You do not have access to delete groups.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
 
 	gid := chi.URLParam(r, "id")
 	groupOID, err := primitive.ObjectIDFromHex(gid)
 	if err != nil {
-		uierrors.RenderForbidden(w, r, "Bad group id.", nav.ResolveBackURL(r, "/groups"))
+		uierrors.RenderForbidden(w, r, "Bad group id.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), metaMedTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 	db := h.DB
 
@@ -46,34 +49,45 @@ func (h *Handler) HandleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 	group, err := grpStore.GetByID(ctx, groupOID)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
-			uierrors.RenderForbidden(w, r, "Group not found.", nav.ResolveBackURL(r, "/groups"))
+			uierrors.RenderForbidden(w, r, "Group not found.", httpnav.ResolveBackURL(r, "/groups"))
 			return
 		}
 		h.Log.Warn("GetByID(delete)", zap.Error(err))
-		uierrors.RenderForbidden(w, r, "A database error occurred.", nav.ResolveBackURL(r, "/groups"))
+		uierrors.RenderForbidden(w, r, "A database error occurred.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
 
-	if !grouppolicy.CanManageGroup(ctx, db, r, group.ID) {
-		uierrors.RenderForbidden(w, r, "You do not have access to this group.", nav.ResolveBackURL(r, "/groups"))
+	canManage, policyErr := grouppolicy.CanManageGroup(ctx, db, r, group.ID, group.OrganizationID)
+	if policyErr != nil {
+		h.ErrLog.LogServerError(w, r, "database error checking group access", policyErr, "A database error occurred.", "/groups")
+		return
+	}
+	if !canManage {
+		uierrors.RenderForbidden(w, r, "You do not have access to this group.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
 
-	// Remove all memberships and assignments for this group.
-	_, _ = db.Collection("group_memberships").DeleteMany(ctx, bson.M{"group_id": groupOID})
-	_, _ = db.Collection("group_resource_assignments").DeleteMany(ctx, bson.M{"group_id": groupOID})
-
-	// Finally delete the group itself.
-	if _, err := db.Collection("groups").DeleteOne(ctx, bson.M{"_id": groupOID}); err != nil {
-		h.Log.Warn("delete group failed", zap.Error(err))
-		uierrors.RenderForbidden(w, r, "Delete failed.", nav.ResolveBackURL(r, "/groups"))
+	// Use transaction for atomic deletion of group and related data.
+	if err := txn.Run(ctx, db, h.Log, func(ctx context.Context) error {
+		// 1) Remove all memberships for this group.
+		if _, err := db.Collection("group_memberships").DeleteMany(ctx, bson.M{"group_id": groupOID}); err != nil {
+			return err
+		}
+		// 2) Remove all resource assignments for this group.
+		if _, err := db.Collection("group_resource_assignments").DeleteMany(ctx, bson.M{"group_id": groupOID}); err != nil {
+			return err
+		}
+		// 3) Delete the group itself.
+		if _, err := db.Collection("groups").DeleteOne(ctx, bson.M{"_id": groupOID}); err != nil {
+			return err
+		}
+		return nil
+	}); err != nil {
+		h.ErrLog.LogServerError(w, r, "database error deleting group", err, "Failed to delete group.", "/groups")
 		return
 	}
 
 	// Redirect back to caller or to /groups.
-	if ret := r.FormValue("return"); ret != "" && len(ret) > 0 && ret[0] == '/' {
-		http.Redirect(w, r, ret, http.StatusSeeOther)
-		return
-	}
-	http.Redirect(w, r, "/groups", http.StatusSeeOther)
+	ret := navigation.SafeBackURL(r, navigation.GroupsBackURL)
+	http.Redirect(w, r, ret, http.StatusSeeOther)
 }
