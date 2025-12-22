@@ -44,7 +44,7 @@
 
   <div>
     <label class="block text-sm font-medium mb-1">Time Zone</label>
-    <select name="timezone" class="w-full border p-2 rounded">
+    <select name="timezone" class="w-full border p-2 rounded" required>
       <option value="" {{ if eq .TimeZone "" }}selected{{ end }}>Select a time zone</option>
       {{ range .TimeZoneGroups }}
         <optgroup label="{{ .Region }}">

@@ -3,41 +3,46 @@ package organizations
 
 import (
 	"context"
-	"html/template"
 	"net/http"
 	"strings"
 	"time"
 
-	"github.com/dalemusser/stratahub/internal/app/system/auth"
+	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/system/formutil"
+	"github.com/dalemusser/stratahub/internal/app/system/inputval"
+	"github.com/dalemusser/stratahub/internal/app/system/navigation"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/timezones"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/templates"
-	mongodb "github.com/dalemusser/waffle/toolkit/db/mongodb"
-	textfold "github.com/dalemusser/waffle/toolkit/text/textfold"
-	nav "github.com/dalemusser/waffle/toolkit/ui/nav"
+	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
+	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/dalemusser/waffle/pantry/text"
 
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// ServeEdit renders the Edit Organization page.
-func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
-	// Get viewer context for header/sidebar (we still enforce admin in routing).
-	role, uname := "admin", ""
-	if u, ok := auth.CurrentUser(r); ok {
-		role = strings.ToLower(u.Role)
-		uname = u.Name
-	}
+// editOrgInput defines validation rules for editing an organization.
+type editOrgInput struct {
+	Name     string `validate:"required,max=200" label:"Organization name"`
+	City     string `validate:"max=100" label:"City"`
+	State    string `validate:"max=100" label:"State"`
+	Contact  string `validate:"max=500" label:"Contact info"`
+	TimeZone string `validate:"required,timezone" label:"Time zone"`
+}
 
+// ServeEdit renders the Edit Organization page.
+// Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
+func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 	idHex := chi.URLParam(r, "id")
 	oid, err := primitive.ObjectIDFromHex(idHex)
 	if err != nil {
-		http.Error(w, "bad organization id", http.StatusBadRequest)
+		uierrors.RenderBadRequest(w, r, "Invalid organization ID.", "/organizations")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), orgsShortTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
 
@@ -46,46 +51,42 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 		FindOne(ctx, bson.M{"_id": oid}).
 		Decode(&org); err != nil {
 
-		http.NotFound(w, r)
+		uierrors.RenderNotFound(w, r, "Organization not found.", "/organizations")
 		return
 	}
 
 	tzGroups, err := timezones.Groups()
 	if err != nil {
-		http.Error(w, "failed to load time zones", http.StatusInternalServerError)
+		uierrors.RenderServerError(w, r, "Failed to load time zones.", "/organizations")
 		return
 	}
 
 	data := editData{
-		Title:          "Edit Organization",
-		IsLoggedIn:     true,
-		Role:           role,
-		UserName:       uname,
 		ID:             org.ID.Hex(),
 		Name:           org.Name,
 		City:           org.City,
 		State:          org.State,
 		TimeZone:       org.TimeZone,
 		Contact:        org.ContactInfo,
-		BackURL:        "/organizations",   // canonical “back to list”
-		CurrentPath:    nav.CurrentPath(r), // for ?return propagation
 		TimeZoneGroups: tzGroups,
 	}
+	formutil.SetBase(&data.Base, r, "Edit Organization", "/organizations")
 
 	templates.Render(w, r, "organization_edit", data)
 }
 
 // HandleEdit processes the Edit Organization form POST.
+// Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
 func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		h.ErrLog.LogBadRequest(w, r, "parse form failed", err, "Invalid form submission.", "/organizations")
 		return
 	}
 
 	idHex := chi.URLParam(r, "id")
 	oid, err := primitive.ObjectIDFromHex(idHex)
 	if err != nil {
-		http.Error(w, "bad organization id", http.StatusBadRequest)
+		uierrors.RenderBadRequest(w, r, "Invalid organization ID.", "/organizations")
 		return
 	}
 
@@ -95,20 +96,13 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	contact := strings.TrimSpace(r.FormValue("contact"))
 	tz := strings.TrimSpace(r.FormValue("timezone"))
 
-	// Viewer context for re-rendering (header, role, name).
-	role, uname := "admin", ""
-	if u, ok := auth.CurrentUser(r); ok {
-		role = strings.ToLower(u.Role)
-		uname = u.Name
-	}
-
 	tzGroups, err := timezones.Groups()
 	if err != nil {
-		http.Error(w, "failed to load time zones", http.StatusInternalServerError)
+		uierrors.RenderServerError(w, r, "Failed to load time zones.", "/organizations")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), orgsMedTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 	db := h.DB
 
@@ -118,45 +112,41 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		FindOne(ctx, bson.M{"_id": oid}).
 		Decode(&cur); err != nil {
 
-		http.NotFound(w, r)
+		uierrors.RenderNotFound(w, r, "Organization not found.", "/organizations")
 		return
 	}
 
 	// Helper to re-render the form with an error and posted values.
 	reRender := func(msg string) {
 		data := editData{
-			Title:          "Edit Organization",
-			IsLoggedIn:     true,
-			Role:           role,
-			UserName:       uname,
 			ID:             idHex,
 			Name:           name,
 			City:           city,
 			State:          state,
 			TimeZone:       tz,
 			Contact:        contact,
-			Error:          template.HTML(msg),
-			BackURL:        "/organizations",
-			CurrentPath:    nav.CurrentPath(r),
 			TimeZoneGroups: tzGroups,
 		}
+		formutil.SetBase(&data.Base, r, "Edit Organization", "/organizations")
+		data.SetError(msg)
 		templates.Render(w, r, "organization_edit", data)
 	}
 
-	// Validation: name required
-	if name == "" {
-		reRender("Organization name is required.")
+	// Validate required fields and length limits using struct tags
+	input := editOrgInput{Name: name, City: city, State: state, Contact: contact, TimeZone: tz}
+	if result := inputval.Validate(input); result.HasErrors() {
+		reRender(result.First())
 		return
 	}
 
-	// Validation: timezone required
-	if tz == "" {
-		reRender("Time zone is required.")
+	// Validate timezone is in the curated list
+	if !timezones.Valid(tz) {
+		reRender("Please select a valid time zone.")
 		return
 	}
 
 	// Preflight duplicate by name_ci excluding self
-	ci := textfold.Fold(name)
+	ci := text.Fold(name)
 	if err := db.Collection("organizations").
 		FindOne(ctx, bson.M{
 			"name_ci": ci,
@@ -172,9 +162,9 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		"name":         name,
 		"name_ci":      ci,
 		"city":         city,
-		"city_ci":      textfold.Fold(city),
+		"city_ci":      text.Fold(city),
 		"state":        state,
-		"state_ci":     textfold.Fold(state),
+		"state_ci":     text.Fold(state),
 		"contact_info": contact,
 		"time_zone":    tz,
 		"updated_at":   time.Now(),
@@ -184,7 +174,7 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		UpdateOne(ctx, bson.M{"_id": oid}, bson.M{"$set": up}); err != nil {
 
 		msg := "Database error while updating organization."
-		if mongodb.IsDup(err) {
+		if wafflemongo.IsDup(err) {
 			msg = "Another organization already uses that name."
 		}
 		reRender(msg)
@@ -192,9 +182,6 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Redirect to explicit return (if safe), otherwise back to the list.
-	if ret := strings.TrimSpace(r.FormValue("return")); ret != "" && strings.HasPrefix(ret, "/") {
-		http.Redirect(w, r, ret, http.StatusSeeOther)
-		return
-	}
-	http.Redirect(w, r, "/organizations", http.StatusSeeOther)
+	ret := navigation.SafeBackURL(r, navigation.OrganizationsBackURL)
+	http.Redirect(w, r, ret, http.StatusSeeOther)
 }

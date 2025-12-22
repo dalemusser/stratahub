@@ -4,14 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
-	"time"
 
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.uber.org/zap"
 )
-
-const mongoPingTimeout = 2 * time.Second
 
 // Handler holds dependencies needed for health checks.
 type Handler struct {
@@ -37,7 +35,7 @@ func NewHandler(client *mongo.Client, logger *zap.Logger) *Handler {
 //
 //	{ "status":"error", "message":"Database unavailable", "error":"…"}
 func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
-	ctx, cancel := context.WithTimeout(r.Context(), mongoPingTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Ping())
 	defer cancel()
 
 	w.Header().Set("Content-Type", "application/json")

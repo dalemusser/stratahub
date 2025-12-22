@@ -6,12 +6,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func Routes(h *Handler) chi.Router {
+func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 	r := chi.NewRouter()
 
 	r.Group(func(pr chi.Router) {
-		pr.Use(auth.RequireSignedIn)
-		pr.Use(auth.RequireRole("admin"))
+		pr.Use(sm.RequireSignedIn)
+		pr.Use(sm.RequireRole("admin"))
 
 		pr.Get("/", h.ServeList)
 		pr.Get("/new", h.ServeNew)

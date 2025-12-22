@@ -3,55 +3,80 @@ package members
 
 import (
 	"context"
-	"html/template"
+	"errors"
 	"net/http"
-	"strings"
-	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
-	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/templates"
-	mongodb "github.com/dalemusser/waffle/toolkit/db/mongodb"
-	textfold "github.com/dalemusser/waffle/toolkit/text/textfold"
-	nav "github.com/dalemusser/waffle/toolkit/ui/nav"
-	"github.com/dalemusser/waffle/toolkit/validate"
+	"github.com/dalemusser/stratahub/internal/app/policy/memberpolicy"
+	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/formutil"
+	"github.com/dalemusser/stratahub/internal/app/system/inputval"
+	"github.com/dalemusser/stratahub/internal/app/system/navigation"
+	"github.com/dalemusser/stratahub/internal/app/system/normalize"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/txn"
+	"github.com/dalemusser/waffle/pantry/httpnav"
+	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
-	"go.uber.org/zap"
-
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
+	"go.uber.org/zap"
 )
 
 // ServeView – View Member (Back goes to /members or safe return)
+// Authorization: Admin can view any member; Leader can only view members in their org.
 func (h *Handler) ServeView(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := userCtx(r)
+	role, uname, _, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), membersShortTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
-	db := h.DB
 
 	uidHex := chi.URLParam(r, "id")
 	uid, err := primitive.ObjectIDFromHex(uidHex)
 	if err != nil {
-		uierrors.RenderForbidden(w, r, "Bad member id.", nav.ResolveBackURL(r, "/members"))
+		uierrors.RenderBadRequest(w, r, "Invalid member ID.", httpnav.ResolveBackURL(r, "/members"))
 		return
 	}
 
-	var u models.User
-	if err := db.Collection("users").FindOne(ctx, bson.M{"_id": uid, "role": "member"}).Decode(&u); err != nil {
-		uierrors.RenderForbidden(w, r, "Member not found.", nav.ResolveBackURL(r, "/members"))
+	u, err := h.Users.GetMemberByID(ctx, uid)
+	if err != nil {
+		uierrors.RenderNotFound(w, r, "Member not found.", httpnav.ResolveBackURL(r, "/members"))
+		return
+	}
+
+	// Check authorization: can this user view this member?
+	canView, policyErr := memberpolicy.CanViewMember(ctx, h.DB, r, u.OrganizationID)
+	if policyErr != nil {
+		h.ErrLog.LogServerError(w, r, "policy check failed", policyErr, "A database error occurred.", "/members")
+		return
+	}
+	if !canView {
+		uierrors.RenderForbidden(w, r, "You don't have permission to view this member.", httpnav.ResolveBackURL(r, "/members"))
 		return
 	}
 
 	orgName := ""
 	if u.OrganizationID != nil {
-		var o models.Organization
-		_ = db.Collection("organizations").FindOne(ctx, bson.M{"_id": *u.OrganizationID}).Decode(&o)
-		orgName = o.Name
+		o, err := h.Orgs.GetByID(ctx, *u.OrganizationID)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				h.Log.Warn("organization not found for member (may have been deleted)",
+					zap.String("user_id", uid.Hex()),
+					zap.String("org_id", u.OrganizationID.Hex()))
+				orgName = "(Deleted)"
+			} else {
+				h.ErrLog.LogServerError(w, r, "database error loading organization for member", err, "A database error occurred.", "/members")
+				return
+			}
+		} else {
+			orgName = o.Name
+		}
 	}
 
 	templates.Render(w, r, "member_view", viewData{
@@ -61,36 +86,47 @@ func (h *Handler) ServeView(w http.ResponseWriter, r *http.Request) {
 		UserName:   uname,
 		ID:         u.ID.Hex(),
 		FullName:   u.FullName,
-		Email:      strings.ToLower(u.Email),
+		Email:      normalize.Email(u.Email),
 		OrgName:    orgName,
 		Status:     u.Status,
 		Auth:       u.AuthMethod,
-		BackURL:    nav.ResolveBackURL(r, "/members"),
+		BackURL:    httpnav.ResolveBackURL(r, "/members"),
 	})
 }
 
 // ServeEdit – show edit form (Organization is read-only)
+// Authorization: Admin can edit any member; Leader can only edit members in their org.
 func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := userCtx(r)
+	_, _, _, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), membersShortTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
-	db := h.DB
 
 	uidHex := chi.URLParam(r, "id")
 	uid, err := primitive.ObjectIDFromHex(uidHex)
 	if err != nil {
-		uierrors.RenderForbidden(w, r, "Bad member id.", nav.ResolveBackURL(r, "/members"))
+		uierrors.RenderBadRequest(w, r, "Invalid member ID.", httpnav.ResolveBackURL(r, "/members"))
 		return
 	}
 
-	var u models.User
-	if err := db.Collection("users").FindOne(ctx, bson.M{"_id": uid, "role": "member"}).Decode(&u); err != nil {
-		uierrors.RenderForbidden(w, r, "Member not found.", nav.ResolveBackURL(r, "/members"))
+	u, err := h.Users.GetMemberByID(ctx, uid)
+	if err != nil {
+		uierrors.RenderNotFound(w, r, "Member not found.", httpnav.ResolveBackURL(r, "/members"))
+		return
+	}
+
+	// Check authorization: can this user manage this member?
+	canManage, policyErr := memberpolicy.CanManageMember(ctx, h.DB, r, u.OrganizationID)
+	if policyErr != nil {
+		h.ErrLog.LogServerError(w, r, "policy check failed", policyErr, "A database error occurred.", "/members")
+		return
+	}
+	if !canManage {
+		uierrors.RenderForbidden(w, r, "You don't have permission to edit this member.", httpnav.ResolveBackURL(r, "/members"))
 		return
 	}
 
@@ -98,190 +134,171 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 	orgName := ""
 	if u.OrganizationID != nil {
 		orgHex = u.OrganizationID.Hex()
-		var o models.Organization
-		_ = db.Collection("organizations").FindOne(ctx, bson.M{"_id": *u.OrganizationID}).Decode(&o)
-		orgName = o.Name
+		o, err := h.Orgs.GetByID(ctx, *u.OrganizationID)
+		if err != nil {
+			if err == mongo.ErrNoDocuments {
+				h.Log.Warn("organization not found for member (may have been deleted)",
+					zap.String("user_id", uid.Hex()),
+					zap.String("org_id", u.OrganizationID.Hex()))
+				orgName = "(Deleted)"
+			} else {
+				h.ErrLog.LogServerError(w, r, "database error loading organization for member", err, "A database error occurred.", "/members")
+				return
+			}
+		} else {
+			orgName = o.Name
+		}
 	}
 
-	templates.Render(w, r, "member_edit", editData{
-		Title:       "Edit Member",
-		IsLoggedIn:  true,
-		Role:        role,
-		UserName:    uname,
-		ID:          u.ID.Hex(),
-		FullName:    u.FullName,
-		Email:       strings.ToLower(u.Email),
-		OrgID:       orgHex,  // hidden input will carry this
-		OrgName:     orgName, // read-only display
-		Status:      u.Status,
-		Auth:        u.AuthMethod,
-		BackURL:     nav.ResolveBackURL(r, "/members"),
-		CurrentPath: nav.CurrentPath(r),
-	})
+	data := editData{
+		ID:       u.ID.Hex(),
+		FullName: u.FullName,
+		Email:    normalize.Email(u.Email),
+		OrgID:    orgHex,  // hidden input will carry this
+		OrgName:  orgName, // read-only display
+		Status:   u.Status,
+		Auth:     u.AuthMethod,
+	}
+	formutil.SetBase(&data.Base, r, "Edit Member", "/members")
+
+	templates.Render(w, r, "member_edit", data)
 }
 
 // HandleEdit – update a member (re-render form on validation errors)
+// Authorization: Admin can edit any member; Leader can only edit members in their org.
 func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := userCtx(r)
+	_, _, _, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
 	if err := r.ParseForm(); err != nil {
-		uierrors.RenderForbidden(w, r, "Bad request.", nav.ResolveBackURL(r, "/members"))
+		uierrors.RenderBadRequest(w, r, "Invalid form data.", httpnav.ResolveBackURL(r, "/members"))
 		return
 	}
 
 	uidHex := chi.URLParam(r, "id")
 	uid, err := primitive.ObjectIDFromHex(uidHex)
 	if err != nil {
-		uierrors.RenderForbidden(w, r, "Bad member id.", nav.ResolveBackURL(r, "/members"))
+		uierrors.RenderBadRequest(w, r, "Invalid member ID.", httpnav.ResolveBackURL(r, "/members"))
 		return
 	}
 
-	full := strings.TrimSpace(r.FormValue("full_name"))
-	email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
-	authm := strings.ToLower(strings.TrimSpace(r.FormValue("auth_method")))
-	status := strings.ToLower(strings.TrimSpace(r.FormValue("status")))
-	orgHex := strings.TrimSpace(r.FormValue("orgID"))
+	// Check authorization before processing the edit
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
+	defer cancel()
+
+	memberInfo, canManage, policyErr := memberpolicy.CheckMemberAccess(ctx, h.DB, r, uid)
+	if policyErr != nil {
+		h.ErrLog.LogServerError(w, r, "policy check failed", policyErr, "A database error occurred.", "/members")
+		return
+	}
+	if memberInfo == nil {
+		uierrors.RenderNotFound(w, r, "Member not found.", httpnav.ResolveBackURL(r, "/members"))
+		return
+	}
+	if !canManage {
+		uierrors.RenderForbidden(w, r, "You don't have permission to edit this member.", httpnav.ResolveBackURL(r, "/members"))
+		return
+	}
+
+	full := normalize.Name(r.FormValue("full_name"))
+	email := normalize.Email(r.FormValue("email"))
+	authm := normalize.AuthMethod(r.FormValue("auth_method"))
+	status := normalize.Status(r.FormValue("status"))
+	orgHex := normalize.QueryParam(r.FormValue("orgID"))
 
 	// Normalize status to allowed values: active or disabled
 	if status != "disabled" {
 		status = "active"
 	}
 
-	// Specific validation messages
-	if full == "" || email == "" || !validate.SimpleEmailValid(email) || orgHex == "" {
-		ctx, cancel := context.WithTimeout(r.Context(), membersShortTimeout)
-		defer cancel()
-		db := h.DB
-
-		orgName := ""
+	// Helper to get org name for re-render
+	getOrgName := func() string {
 		if oid, e := primitive.ObjectIDFromHex(orgHex); e == nil {
-			var o models.Organization
-			_ = db.Collection("organizations").FindOne(ctx, bson.M{"_id": oid}).Decode(&o)
-			orgName = o.Name
+			ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
+			defer cancel()
+			o, err := h.Orgs.GetByID(ctx, oid)
+			if err != nil {
+				if err != mongo.ErrNoDocuments {
+					h.Log.Error("database error loading organization for member (re-render)", zap.Error(err), zap.String("org_id", oid.Hex()))
+				}
+				return ""
+			}
+			return o.Name
 		}
+		return ""
+	}
 
-		var msg string
-		switch {
-		case full == "":
-			msg = "Full name is required."
-		case email == "" || !validate.SimpleEmailValid(email):
-			msg = "A valid email address is required."
-		default:
-			msg = "An unexpected error occurred. Please reload the page."
+	reRender := func(msg string) {
+		data := editData{
+			ID:       uidHex,
+			FullName: full,
+			Email:    email,
+			OrgID:    orgHex,
+			OrgName:  getOrgName(),
+			Status:   status,
+			Auth:     authm,
 		}
+		formutil.SetBase(&data.Base, r, "Edit Member", "/members")
+		data.SetError(msg)
+		templates.Render(w, r, "member_edit", data)
+	}
 
-		templates.Render(w, r, "member_edit", editData{
-			Title:       "Edit Member",
-			IsLoggedIn:  true,
-			Role:        role,
-			UserName:    uname,
-			ID:          uidHex,
-			FullName:    full,
-			Email:       email,
-			OrgID:       orgHex,
-			OrgName:     orgName,
-			Status:      status,
-			Auth:        authm,
-			BackURL:     nav.ResolveBackURL(r, "/members"),
-			CurrentPath: nav.CurrentPath(r),
-			Error:       template.HTML(msg),
-		})
+	// Validate required fields using struct tags
+	input := memberInput{FullName: full, Email: email}
+	if result := inputval.Validate(input); result.HasErrors() {
+		reRender(result.First())
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), membersMedTimeout)
-	defer cancel()
-	db := h.DB
+	// Org is required (carried from hidden field)
+	if orgHex == "" {
+		reRender("An unexpected error occurred. Please reload the page.")
+		return
+	}
 
 	oid, err := primitive.ObjectIDFromHex(orgHex)
 	if err != nil {
-		h.Log.Warn("bad org id on edit", zap.String("orgID", orgHex), zap.Error(err))
-		uierrors.RenderForbidden(w, r, "Bad organization id.", nav.ResolveBackURL(r, "/members"))
+		h.ErrLog.LogForbidden(w, r, "bad org id on edit", err, "Bad organization id.", httpnav.ResolveBackURL(r, "/members"))
 		return
 	}
 
 	// Check duplicate email (exclude this user)
-	if err := db.Collection("users").FindOne(ctx, bson.M{
-		"email": email,
-		"_id":   bson.M{"$ne": uid},
-	}).Err(); err == nil {
-		orgName := ""
-		if oid2, e := primitive.ObjectIDFromHex(orgHex); e == nil {
-			var o models.Organization
-			_ = db.Collection("organizations").FindOne(ctx, bson.M{"_id": oid2}).Decode(&o)
-			orgName = o.Name
-		}
-		templates.Render(w, r, "member_edit", editData{
-			Title:       "Edit Member",
-			IsLoggedIn:  true,
-			Role:        role,
-			UserName:    uname,
-			ID:          uid.Hex(),
-			FullName:    full,
-			Email:       email,
-			OrgID:       oid.Hex(),
-			OrgName:     orgName,
-			Status:      status,
-			Auth:        authm,
-			BackURL:     nav.ResolveBackURL(r, "/members"),
-			CurrentPath: nav.CurrentPath(r),
-			Error:       template.HTML("A user with that email already exists."),
-		})
+	exists, err := h.Users.EmailExistsForOther(ctx, email, uid)
+	if err != nil {
+		h.ErrLog.LogServerError(w, r, "database error checking duplicate email", err, "A database error occurred.", "/members")
+		return
+	}
+	if exists {
+		reRender("A user with that email already exists.")
 		return
 	}
 
-	set := bson.M{
-		"full_name":       full,
-		"full_name_ci":    textfold.Fold(full),
-		"email":           email,
-		"auth_method":     authm,
-		"status":          status,
-		"organization_id": oid,
-		"updated_at":      time.Now(),
+	upd := userstore.MemberUpdate{
+		FullName:       full,
+		Email:          email,
+		AuthMethod:     authm,
+		Status:         status,
+		OrganizationID: oid,
 	}
-	if _, err := db.Collection("users").UpdateOne(ctx, bson.M{"_id": uid, "role": "member"}, bson.M{"$set": set}); err != nil {
-		orgName := ""
-		if oid2, e := primitive.ObjectIDFromHex(orgHex); e == nil {
-			var o models.Organization
-			_ = db.Collection("organizations").FindOne(ctx, bson.M{"_id": oid2}).Decode(&o)
-			orgName = o.Name
+	if err := h.Users.UpdateMember(ctx, uid, upd); err != nil {
+		msg := "Database error while updating the member."
+		if errors.Is(err, userstore.ErrDuplicateEmail) {
+			msg = "A user with that email already exists."
 		}
-		msg := template.HTML("Database error while updating the member.")
-		if mongodb.IsDup(err) {
-			msg = template.HTML("A user with that email already exists.")
-		}
-		templates.Render(w, r, "member_edit", editData{
-			Title:       "Edit Member",
-			IsLoggedIn:  true,
-			Role:        role,
-			UserName:    uname,
-			ID:          uid.Hex(),
-			FullName:    full,
-			Email:       email,
-			OrgID:       oid.Hex(),
-			OrgName:     orgName,
-			Status:      status,
-			Auth:        authm,
-			BackURL:     nav.ResolveBackURL(r, "/members"),
-			CurrentPath: nav.CurrentPath(r),
-			Error:       msg,
-		})
+		reRender(msg)
 		return
 	}
 
-	if ret := r.FormValue("return"); ret != "" && strings.HasPrefix(ret, "/") {
-		http.Redirect(w, r, ret, http.StatusSeeOther)
-		return
-	}
-	http.Redirect(w, r, "/members", http.StatusSeeOther)
+	ret := navigation.SafeBackURL(r, navigation.MembersBackURL)
+	http.Redirect(w, r, ret, http.StatusSeeOther)
 }
 
 // HandleDelete – remove memberships then delete the user
+// Authorization: Admin can delete any member; Leader can only delete members in their org.
 func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
-	_, _, _, ok := userCtx(r)
+	_, _, _, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
@@ -290,39 +307,53 @@ func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	uidHex := chi.URLParam(r, "id")
 	uid, err := primitive.ObjectIDFromHex(uidHex)
 	if err != nil {
-		uierrors.RenderForbidden(w, r, "Bad member id.", nav.ResolveBackURL(r, "/members"))
+		uierrors.RenderBadRequest(w, r, "Invalid member ID.", httpnav.ResolveBackURL(r, "/members"))
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), membersMedTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
-	db := h.DB
 
-	// 1) Remove ALL memberships for this user (defensive: any role)
-	res, delErr := db.Collection("group_memberships").DeleteMany(ctx, bson.M{"user_id": uid})
-	if delErr != nil {
-		h.Log.Warn("delete memberships failed", zap.Error(delErr), zap.String("user_id", uid.Hex()))
-		uierrors.RenderForbidden(w, r, "Delete failed.", nav.ResolveBackURL(r, "/members"))
+	// Check authorization before deleting
+	memberInfo, canManage, policyErr := memberpolicy.CheckMemberAccess(ctx, h.DB, r, uid)
+	if policyErr != nil {
+		h.ErrLog.LogServerError(w, r, "policy check failed", policyErr, "A database error occurred.", "/members")
 		return
 	}
-	h.Log.Info("memberships deleted for user",
-		zap.String("user_id", uid.Hex()),
-		zap.Int64("deleted_count", res.DeletedCount))
-
-	// 2) Delete the member user itself (guard on role to be safe)
-	ur, uErr := db.Collection("users").DeleteOne(ctx, bson.M{"_id": uid, "role": "member"})
-	if uErr != nil {
-		h.Log.Warn("delete user failed", zap.Error(uErr), zap.String("user_id", uid.Hex()))
-		uierrors.RenderForbidden(w, r, "Delete failed.", nav.ResolveBackURL(r, "/members"))
+	if memberInfo == nil {
+		uierrors.RenderNotFound(w, r, "Member not found.", httpnav.ResolveBackURL(r, "/members"))
 		return
 	}
-	if ur.DeletedCount == 0 {
-		h.Log.Info("delete user: no document found (idempotent)", zap.String("user_id", uid.Hex()))
-	}
-
-	if ret := r.FormValue("return"); ret != "" && strings.HasPrefix(ret, "/") {
-		http.Redirect(w, r, ret, http.StatusSeeOther)
+	if !canManage {
+		uierrors.RenderForbidden(w, r, "You don't have permission to delete this member.", httpnav.ResolveBackURL(r, "/members"))
 		return
 	}
-	http.Redirect(w, r, "/members", http.StatusSeeOther)
+
+	// Use transaction for atomic deletion of memberships and user.
+	if err := txn.Run(ctx, h.DB, h.Log, func(ctx context.Context) error {
+		// 1) Remove ALL memberships for this user (defensive: any role)
+		res, err := h.DB.Collection("group_memberships").DeleteMany(ctx, bson.M{"user_id": uid})
+		if err != nil {
+			return err
+		}
+		h.Log.Info("memberships deleted for user",
+			zap.String("user_id", uid.Hex()),
+			zap.Int64("deleted_count", res.DeletedCount))
+
+		// 2) Delete the member user itself (guard on role to be safe)
+		deletedCount, err := h.Users.DeleteMember(ctx, uid)
+		if err != nil {
+			return err
+		}
+		if deletedCount == 0 {
+			h.Log.Info("delete user: no document found (idempotent)", zap.String("user_id", uid.Hex()))
+		}
+		return nil
+	}); err != nil {
+		h.ErrLog.LogServerError(w, r, "database error deleting member", err, "A database error occurred.", "/members")
+		return
+	}
+
+	ret := navigation.SafeBackURL(r, navigation.MembersBackURL)
+	http.Redirect(w, r, ret, http.StatusSeeOther)
 }

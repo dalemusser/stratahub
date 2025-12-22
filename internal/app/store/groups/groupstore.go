@@ -7,10 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dalemusser/stratahub/internal/app/system/status"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/toolkit/db/mongodb"
+	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 
-	"github.com/dalemusser/waffle/toolkit/text/textfold"
+	"github.com/dalemusser/waffle/pantry/text"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -36,16 +37,16 @@ func (s *Store) GetByID(ctx context.Context, id primitive.ObjectID) (models.Grou
 
 func (s *Store) Create(ctx context.Context, g models.Group) (models.Group, error) {
 	now := time.Now().UTC()
-	g.ID = primitive.NilObjectID
-	g.NameCI = textfold.Fold(g.Name)
+	g.ID = primitive.NewObjectID()
+	g.NameCI = text.Fold(g.Name)
 	if g.Status == "" {
-		g.Status = "active"
+		g.Status = status.Active
 	}
 	g.CreatedAt = now
 	g.UpdatedAt = now
 	_, err := s.c.InsertOne(ctx, g)
 	if err != nil {
-		if mongodb.IsDup(err) {
+		if wafflemongo.IsDup(err) {
 			return models.Group{}, ErrDuplicateGroupName
 		}
 		return models.Group{}, err
@@ -53,22 +54,22 @@ func (s *Store) Create(ctx context.Context, g models.Group) (models.Group, error
 	return g, nil
 }
 
-func (s *Store) UpdateInfo(ctx context.Context, id primitive.ObjectID, name, desc, status string) error {
+func (s *Store) UpdateInfo(ctx context.Context, id primitive.ObjectID, name, desc, stat string) error {
 	set := bson.M{
 		"updated_at": time.Now().UTC(),
 	}
 	if strings.TrimSpace(name) != "" {
 		set["name"] = name
-		set["name_ci"] = textfold.Fold(name)
+		set["name_ci"] = text.Fold(name)
 	}
 	if desc != "" {
 		set["description"] = desc
 	}
-	if status != "" {
-		if status != "active" {
+	if stat != "" {
+		if stat != status.Active {
 			return mongo.CommandError{Message: "status must be active"}
 		}
-		set["status"] = status
+		set["status"] = stat
 	}
 	_, err := s.c.UpdateByID(ctx, id, bson.M{"$set": set})
 	return err

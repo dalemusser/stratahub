@@ -4,17 +4,18 @@ import (
 	"context"
 	"net/http"
 	"strings"
-	"time"
 
+	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/waffle/pantry/query"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/templates"
-	"github.com/dalemusser/waffle/toolkit/ui/nav"
+	"github.com/dalemusser/waffle/pantry/httpnav"
+	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 )
-
-const modalTimeout = 5 * time.Second
 
 // leaderManageModalData is the view model for the HTMX leader manage modal.
 type leaderManageModalData struct {
@@ -32,29 +33,39 @@ func (h *Handler) ServeLeaderManageModal(w http.ResponseWriter, r *http.Request)
 	uidHex := chi.URLParam(r, "id")
 	uid, err := primitive.ObjectIDFromHex(uidHex)
 	if err != nil {
-		http.Error(w, "bad id", http.StatusBadRequest)
+		uierrors.HTMXBadRequest(w, r, "Invalid leader ID.", "/leaders")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), modalTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 
 	var usr models.User
 	if err := h.DB.Collection("users").FindOne(ctx, bson.M{"_id": uid, "role": "leader"}).Decode(&usr); err != nil {
-		http.NotFound(w, r)
+		uierrors.HTMXError(w, r, http.StatusNotFound, "Leader not found.", func() {
+			uierrors.RenderNotFound(w, r, "Leader not found.", "/leaders")
+		})
 		return
 	}
 
 	orgName := ""
 	if usr.OrganizationID != nil {
 		var o models.Organization
-		_ = h.DB.Collection("organizations").FindOne(ctx, bson.M{"_id": *usr.OrganizationID}).Decode(&o)
-		orgName = o.Name
+		if err := h.DB.Collection("organizations").FindOne(ctx, bson.M{"_id": *usr.OrganizationID}).Decode(&o); err != nil {
+			if err == mongo.ErrNoDocuments {
+				orgName = "(Deleted)"
+			} else {
+				h.ErrLog.HTMXLogServerError(w, r, "database error loading organization for leader", err, "A database error occurred.", "/leaders")
+				return
+			}
+		} else {
+			orgName = o.Name
+		}
 	}
 
-	back := strings.TrimSpace(r.URL.Query().Get("return"))
+	back := query.Get(r, "return")
 	if back == "" {
-		back = nav.ResolveBackURL(r, "/leaders")
+		back = httpnav.ResolveBackURL(r, "/leaders")
 	}
 
 	data := leaderManageModalData{

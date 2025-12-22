@@ -6,12 +6,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func Routes(h *Handler) chi.Router {
+func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 	r := chi.NewRouter()
 
 	// Everything under /groups requires authentication
 	r.Group(func(pr chi.Router) {
-		pr.Use(auth.RequireSignedIn)
+		pr.Use(sm.RequireSignedIn)
 
 		// LIST
 		pr.Get("/", h.ServeGroupsList)
@@ -42,12 +42,12 @@ func Routes(h *Handler) chi.Router {
 		pr.Post("/{id}/manage/remove-leader", h.HandleRemoveLeader)
 		pr.Post("/{id}/manage/add-member", h.HandleAddMember)
 		pr.Post("/{id}/manage/remove-member", h.HandleRemoveMember)
-		pr.Get("/{id}/manage/search-members", h.HandleSearchMembers)
+		pr.Get("/{id}/manage/search-members", h.ServeSearchMembers)
 
 		// ASSIGN RESOURCES — THIS IS WHAT YOUR 404 NEEDS
 		pr.Get("/{id}/assign_resources", h.ServeAssignResources)
 		pr.Get("/{id}/assign_resources/new", h.ServeAssignResourceModal)
-		pr.Get("/{id}/assign_resources/search-resources", h.HandleSearchResources)
+		pr.Get("/{id}/assign_resources/search-resources", h.ServeSearchResources)
 		pr.Get("/{id}/assign_resources/create", h.ServeAssignResourcePage)
 		pr.Get("/{id}/assign_resources/{assignmentID}/view", h.ServeViewResourceAssignmentPage)
 		pr.Get("/{id}/assign_resources/{assignmentID}/edit", h.ServeEditResourceAssignmentPage)

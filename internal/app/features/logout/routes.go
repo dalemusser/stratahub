@@ -6,12 +6,12 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func Routes(h *Handler) chi.Router {
+func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 	r := chi.NewRouter()
 
 	r.Group(func(pr chi.Router) {
 		// Only allow logged-in users to hit /logout.
-		pr.Use(auth.RequireSignedIn)
+		pr.Use(sm.RequireSignedIn)
 		pr.Get("/", h.ServeLogout)
 	})
 

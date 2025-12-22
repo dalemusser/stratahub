@@ -3,43 +3,37 @@ package leaders
 
 import (
 	"context"
-	"html/template"
 	"net/http"
-	"strings"
 	"time"
 
-	"github.com/dalemusser/stratahub/internal/app/system/auth"
-	"github.com/dalemusser/stratahub/internal/app/system/authz"
-	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/templates"
-	"github.com/dalemusser/waffle/toolkit/db/mongodb"
-	"github.com/dalemusser/waffle/toolkit/text/textfold"
-	"github.com/dalemusser/waffle/toolkit/ui/nav"
-	"github.com/dalemusser/waffle/toolkit/validate"
+	"github.com/dalemusser/stratahub/internal/app/system/formutil"
+	"github.com/dalemusser/stratahub/internal/app/system/inputval"
+	"github.com/dalemusser/stratahub/internal/app/system/navigation"
+	"github.com/dalemusser/stratahub/internal/app/system/normalize"
+	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
+	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/dalemusser/waffle/pantry/text"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-const (
-	newTimeoutShort = 5 * time.Second
-	newTimeoutMed   = 10 * time.Second
-)
-
-// orgOption represents an organization option in the new-leader form.
-type orgOption struct {
-	ID   primitive.ObjectID
-	Name string
+// createLeaderInput defines validation rules for creating a new leader.
+type createLeaderInput struct {
+	FullName string `validate:"required,max=200" label:"Full name"`
+	Email    string `validate:"required,email,max=254" label:"Email"`
+	OrgID    string `validate:"required,objectid" label:"Organization"`
 }
+
+// orgOption is a type alias for organization dropdown options.
+type orgOption = orgutil.OrgOption
 
 // newData is the view model for the new-leader page.
 type newData struct {
-	Title, Role, UserName string
-	IsLoggedIn            bool
-	BackURL, CurrentPath  string
+	formutil.Base
 
 	Organizations []orgOption
-
-	Error template.HTML
 
 	FullName string
 	Email    string
@@ -49,31 +43,17 @@ type newData struct {
 }
 
 func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
-	u, _ := auth.CurrentUser(r)
-
-	ctx, cancel := context.WithTimeout(r.Context(), newTimeoutShort)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 
-	cur, _ := h.DB.Collection("organizations").Find(ctx, bson.M{"status": "active"})
-	defer cur.Close(ctx)
-
-	var orgs []orgOption
-	for cur.Next(ctx) {
-		var o models.Organization
-		_ = cur.Decode(&o)
-		orgs = append(orgs, orgOption{ID: o.ID, Name: o.Name})
+	orgs, _, err := orgutil.LoadActiveOrgOptions(ctx, h.DB)
+	if err != nil {
+		h.ErrLog.LogServerError(w, r, "database error loading organizations", err, "A database error occurred.", "/leaders")
+		return
 	}
 
-	data := newData{
-		Title:         "New Leader",
-		IsLoggedIn:    true,
-		Role:          "admin",
-		UserName:      u.Name,
-		BackURL:       nav.ResolveBackURL(r, "/leaders"),
-		CurrentPath:   nav.CurrentPath(r),
-		Organizations: orgs,
-		Status:        "",
-	}
+	data := newData{Organizations: orgs}
+	formutil.SetBase(&data.Base, r, "New Leader", "/leaders")
 
 	templates.Render(w, r, "admin_leader_new", data)
 }
@@ -84,10 +64,10 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	full := strings.TrimSpace(r.FormValue("full_name"))
-	email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
-	authm := strings.ToLower(strings.TrimSpace(r.FormValue("auth_method")))
-	orgHex := strings.TrimSpace(r.FormValue("orgID"))
+	full := normalize.Name(r.FormValue("full_name"))
+	email := normalize.Email(r.FormValue("email"))
+	authm := normalize.AuthMethod(r.FormValue("auth_method"))
+	orgHex := normalize.OrgID(r.FormValue("orgID"))
 
 	// New leaders always start as active
 	status := "active"
@@ -97,19 +77,10 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		authm = "internal"
 	}
 
-	// Inline validation (same style as Members/Groups)
-	if full == "" {
-		h.renderNewWithError(w, r, "Full name is required.",
-			withNewEcho(full, email, orgHex, authm, status))
-		return
-	}
-	if email == "" || !validate.SimpleEmailValid(email) {
-		h.renderNewWithError(w, r, "A valid email address is required.",
-			withNewEcho(full, email, orgHex, authm, status))
-		return
-	}
-	if orgHex == "" || orgHex == "all" {
-		h.renderNewWithError(w, r, "Organization is required.",
+	// Validate required fields using struct tags
+	input := createLeaderInput{FullName: full, Email: email, OrgID: orgHex}
+	if result := inputval.Validate(input); result.HasErrors() {
+		h.renderNewWithError(w, r, result.First(),
 			withNewEcho(full, email, orgHex, authm, status))
 		return
 	}
@@ -121,22 +92,15 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), newTimeoutMed)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 
-	// Early duplicate check
-	if err := h.DB.Collection("users").FindOne(ctx, bson.M{"email": email}).Err(); err == nil {
-		h.renderNewWithError(w, r, "A user with that email already exists.",
-			withNewEcho(full, email, orgHex, authm, status))
-		return
-	}
-
-	// Build & insert
+	// Build & insert (duplicate email is caught by unique index)
 	now := time.Now()
 	doc := bson.M{
 		"_id":             primitive.NewObjectID(),
 		"full_name":       full,
-		"full_name_ci":    textfold.Fold(full),
+		"full_name_ci":    text.Fold(full),
 		"email":           email,
 		"auth_method":     authm,
 		"role":            "leader",
@@ -147,7 +111,7 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	if _, err := h.DB.Collection("users").InsertOne(ctx, doc); err != nil {
 		msg := "Database error while creating leader."
-		if mongodb.IsDup(err) {
+		if wafflemongo.IsDup(err) {
 			msg = "A user with that email already exists."
 		}
 		h.renderNewWithError(w, r, msg, withNewEcho(full, email, orgHex, authm, status))
@@ -155,39 +119,24 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Success: honor optional return parameter, otherwise go back to leaders list.
-	if ret := r.FormValue("return"); ret != "" && strings.HasPrefix(ret, "/") {
-		http.Redirect(w, r, ret, http.StatusSeeOther)
-		return
-	}
-	http.Redirect(w, r, nav.ResolveBackURL(r, "/leaders"), http.StatusSeeOther)
+	ret := navigation.SafeBackURL(r, navigation.LeadersBackURL)
+	http.Redirect(w, r, ret, http.StatusSeeOther)
 }
 
 func (h *Handler) renderNewWithError(w http.ResponseWriter, r *http.Request, msg string, echo ...newData) {
-	role, uname, _, _ := authz.UserCtx(r)
-
-	ctx, cancel := context.WithTimeout(r.Context(), newTimeoutShort)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 
-	cur, _ := h.DB.Collection("organizations").Find(ctx, bson.M{"status": "active"})
-	defer cur.Close(ctx)
-
-	var orgs []orgOption
-	for cur.Next(ctx) {
-		var o models.Organization
-		_ = cur.Decode(&o)
-		orgs = append(orgs, orgOption{ID: o.ID, Name: o.Name})
+	orgs, _, err := orgutil.LoadActiveOrgOptions(ctx, h.DB)
+	if err != nil {
+		h.ErrLog.LogServerError(w, r, "database error loading organizations", err, "A database error occurred.", "/leaders")
+		return
 	}
 
-	data := newData{
-		Title:         "New Leader",
-		IsLoggedIn:    true,
-		Role:          role,
-		UserName:      uname,
-		BackURL:       nav.ResolveBackURL(r, "/leaders"),
-		CurrentPath:   nav.CurrentPath(r),
-		Organizations: orgs,
-		Error:         template.HTML(msg),
-	}
+	data := newData{Organizations: orgs}
+	formutil.SetBase(&data.Base, r, "New Leader", "/leaders")
+	data.SetError(msg)
+
 	if len(echo) > 0 {
 		e := echo[0]
 		data.FullName = e.FullName

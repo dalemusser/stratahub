@@ -5,32 +5,28 @@ import (
 	"context"
 	"net/http"
 
+	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/system/navigation"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/templates"
+	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.uber.org/zap"
-
-	"github.com/go-chi/chi/v5"
 )
 
 // ServeManageModal renders the HTMX Manage Organization modal snippet.
-//
-// Route: GET /organizations/{id}/manage_modal
+// Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
 func (h *Handler) ServeManageModal(w http.ResponseWriter, r *http.Request) {
-	// Router should already have auth + RequireRole("admin"), so we
-	// don’t re-check here. If you want belt-and-suspenders, you can
-	// call authz.UserCtx and ensure role == "admin".
-
 	idHex := chi.URLParam(r, "id")
 	oid, err := primitive.ObjectIDFromHex(idHex)
 	if err != nil {
-		http.Error(w, "bad organization id", http.StatusBadRequest)
+		uierrors.RenderBadRequest(w, r, "Invalid organization ID.", "/organizations")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), orgsShortTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 
 	db := h.DB
@@ -41,18 +37,14 @@ func (h *Handler) ServeManageModal(w http.ResponseWriter, r *http.Request) {
 		Decode(&org); err != nil {
 
 		if err == mongo.ErrNoDocuments {
-			http.NotFound(w, r)
+			uierrors.RenderNotFound(w, r, "Organization not found.", "/organizations")
 			return
 		}
-		h.Log.Error("find org for manage modal failed", zap.Error(err))
-		http.Error(w, "database error", http.StatusInternalServerError)
+		h.ErrLog.LogServerError(w, r, "find org for manage modal failed", err, "A database error occurred.", "/organizations")
 		return
 	}
 
-	back := r.URL.Query().Get("return")
-	if back == "" {
-		back = "/organizations"
-	}
+	back := navigation.SafeBackURL(r, navigation.OrganizationsBackURL)
 
 	data := orgManageModalData{
 		ID:      org.ID.Hex(),

@@ -2,10 +2,9 @@ package home
 
 import (
 	"net/http"
-	"strings"
 
-	"github.com/dalemusser/stratahub/internal/app/system/auth" // you'll port this soon
-	"github.com/dalemusser/waffle/templates"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/waffle/pantry/templates"
 	"go.uber.org/zap"
 )
 
@@ -25,13 +24,7 @@ func NewHandler(logger *zap.Logger) *Handler {
 *─────────────────────────────────────────────────────────────────────────────*/
 
 func (h *Handler) ServeRoot(w http.ResponseWriter, r *http.Request) {
-	user, logged := auth.CurrentUser(r)
-
-	role, userName := "visitor", ""
-	if logged {
-		role = strings.ToLower(user.Role)
-		userName = user.Name
-	}
+	role, userName, _, logged := authz.UserCtx(r)
 
 	data := struct {
 		Title      string

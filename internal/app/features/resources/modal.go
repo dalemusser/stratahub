@@ -7,15 +7,15 @@ import (
 	"strings"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
-	"github.com/dalemusser/waffle/templates"
-	nav "github.com/dalemusser/waffle/toolkit/ui/nav"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/waffle/pantry/httpnav"
+	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
 
-	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"go.uber.org/zap"
 )
 
 // ServeManageModal renders the Manage Resource modal for a single resource.
@@ -27,18 +27,18 @@ func (h *AdminHandler) ServeManageModal(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	if strings.ToLower(role) != "admin" {
-		http.Error(w, "forbidden", http.StatusForbidden)
+		uierrors.HTMXForbidden(w, r, "You do not have access to manage resources.", "/resources")
 		return
 	}
 
 	idHex := chi.URLParam(r, "id")
 	oid, err := primitive.ObjectIDFromHex(idHex)
 	if err != nil {
-		http.Error(w, "bad id", http.StatusBadRequest)
+		uierrors.HTMXBadRequest(w, r, "Invalid resource ID.", "/resources")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), resourcesShortTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 
 	var row struct {
@@ -53,17 +53,16 @@ func (h *AdminHandler) ServeManageModal(w http.ResponseWriter, r *http.Request) 
 
 	if err := h.DB.Collection("resources").FindOne(ctx, bson.M{"_id": oid}).Decode(&row); err != nil {
 		if err == mongo.ErrNoDocuments {
-			http.NotFound(w, r)
+			uierrors.HTMXNotFound(w, r, "Resource not found.", "/resources")
 			return
 		}
-		h.Log.Error("resource FindOne(manage modal)", zap.Error(err))
-		http.Error(w, "database error", http.StatusInternalServerError)
+		h.ErrLog.HTMXLogServerError(w, r, "resource FindOne(manage modal)", err, "A database error occurred.", "/resources")
 		return
 	}
 
 	back := r.URL.Query().Get("return")
 	if back == "" {
-		back = nav.ResolveBackURL(r, "/resources")
+		back = httpnav.ResolveBackURL(r, "/resources")
 	}
 
 	vm := manageModalData{

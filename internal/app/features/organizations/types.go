@@ -2,8 +2,7 @@
 package organizations
 
 import (
-	"html/template"
-
+	"github.com/dalemusser/stratahub/internal/app/system/formutil"
 	"github.com/dalemusser/stratahub/internal/app/system/timezones"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -13,6 +12,7 @@ import (
 type listItem struct {
 	ID           primitive.ObjectID
 	Name         string
+	NameCI       string // case-insensitive name for cursor building
 	City         string
 	State        string
 	LeadersCount int64
@@ -29,6 +29,18 @@ type listData struct {
 	Q           string
 	Items       []listItem
 	CurrentPath string
+
+	// Pagination
+	Shown      int
+	Total      int64
+	HasPrev    bool
+	HasNext    bool
+	PrevCursor string
+	NextCursor string
+	RangeStart int
+	RangeEnd   int
+	PrevStart  int
+	NextStart  int
 }
 
 // orgManageModalData is used for the HTMX “Manage Organization” modal.
@@ -38,21 +50,15 @@ type orgManageModalData struct {
 	BackURL string
 }
 
-// newData is the view model for the “New Organization” page.
+// newData is the view model for the "New Organization" page.
 type newData struct {
-	Title       string
-	IsLoggedIn  bool
-	Role        string
-	UserName    string
-	BackURL     string
-	CurrentPath string
+	formutil.Base
 
 	Name     string
 	City     string
 	State    string
 	TimeZone string
 	Contact  string
-	Error    template.HTML
 
 	TimeZoneGroups []timezones.ZoneGroup
 }
@@ -75,12 +81,9 @@ type viewData struct {
 	TimeZoneGroups []timezones.ZoneGroup
 }
 
-// editData is the view model for the “Edit Organization” page.
+// editData is the view model for the "Edit Organization" page.
 type editData struct {
-	Title      string
-	IsLoggedIn bool
-	Role       string
-	UserName   string
+	formutil.Base
 
 	ID       string
 	Name     string
@@ -88,10 +91,7 @@ type editData struct {
 	State    string
 	TimeZone string
 	Contact  string
-	Error    template.HTML
 
-	BackURL        string
-	CurrentPath    string
 	TimeZoneGroups []timezones.ZoneGroup
 }
 

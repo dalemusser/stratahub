@@ -4,8 +4,8 @@ package about
 import (
 	"net/http"
 
-	"github.com/dalemusser/stratahub/internal/app/system/authz" // we'll port this
-	"github.com/dalemusser/waffle/templates"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/waffle/pantry/templates"
 	"go.uber.org/zap"
 )
 

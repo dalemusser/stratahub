@@ -11,12 +11,12 @@ import (
 //
 // The handler will dispatch to the appropriate role-specific view
 // based on the current user's role (admin, analyst, leader, member).
-func Routes(h *Handler) chi.Router {
+func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 	r := chi.NewRouter()
 
 	// All dashboards require the user to be signed in.
 	r.Group(func(pr chi.Router) {
-		pr.Use(auth.RequireSignedIn)
+		pr.Use(sm.RequireSignedIn)
 		// Final path will be /dashboard when mounted at "/dashboard".
 		pr.Get("/", h.ServeDashboard)
 	})

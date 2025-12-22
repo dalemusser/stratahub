@@ -5,7 +5,7 @@ import (
 	"embed"
 	"sync"
 
-	"github.com/dalemusser/waffle/templates"
+	"github.com/dalemusser/waffle/pantry/templates"
 )
 
 // Embed the shared template files.

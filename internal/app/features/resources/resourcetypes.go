@@ -23,14 +23,3 @@ func resourceTypeOptions() []ResourceTypeOption {
 	}
 	return opts
 }
-
-// isValidResourceType reports whether t is one of the known resource
-// types defined in models.ResourceTypes.
-func isValidResourceType(t string) bool {
-	for _, id := range models.ResourceTypes {
-		if t == id {
-			return true
-		}
-	}
-	return false
-}

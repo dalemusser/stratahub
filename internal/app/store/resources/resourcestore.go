@@ -7,10 +7,11 @@ import (
 	"strings"
 	"time"
 
+	"github.com/dalemusser/stratahub/internal/app/system/status"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/toolkit/db/mongodb"
-	"github.com/dalemusser/waffle/toolkit/http/webutil"
-	"github.com/dalemusser/waffle/toolkit/text/textfold"
+	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
+	"github.com/dalemusser/waffle/pantry/text"
+	"github.com/dalemusser/waffle/pantry/urlutil"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -31,13 +32,13 @@ func New(db *mongo.Database) *Store {
 func (s *Store) Create(ctx context.Context, r models.Resource) (models.Resource, error) {
 	now := time.Now().UTC()
 
-	r.ID = primitive.NilObjectID
-	r.TitleCI = textfold.Fold(r.Title)
+	r.ID = primitive.NewObjectID()
+	r.TitleCI = text.Fold(r.Title)
 	if r.Subject != "" {
-		r.SubjectCI = textfold.Fold(r.Subject)
+		r.SubjectCI = text.Fold(r.Subject)
 	}
 	if r.Status == "" {
-		r.Status = "active"
+		r.Status = status.Active
 	}
 	if r.Type == "" {
 		r.Type = "game"
@@ -52,10 +53,10 @@ func (s *Store) Create(ctx context.Context, r models.Resource) (models.Resource,
 	if strings.TrimSpace(r.LaunchURL) == "" {
 		return models.Resource{}, mongo.CommandError{Message: "launch_url is required"}
 	}
-	if !webutil.IsValidAbsHTTPURL(r.LaunchURL) {
+	if !urlutil.IsValidAbsHTTPURL(r.LaunchURL) {
 		return models.Resource{}, mongo.CommandError{Message: "launch_url must be a valid http(s) URL"}
 	}
-	if r.Status != "active" && r.Status != "disabled" {
+	if !status.IsValid(r.Status) {
 		return models.Resource{}, mongo.CommandError{Message: "status must be 'active' or 'disabled'"}
 	}
 	if strings.TrimSpace(r.Type) == "" {
@@ -64,7 +65,7 @@ func (s *Store) Create(ctx context.Context, r models.Resource) (models.Resource,
 
 	_, err := s.c.InsertOne(ctx, r)
 	if err != nil {
-		if mongodb.IsDup(err) {
+		if wafflemongo.IsDup(err) {
 			return models.Resource{}, ErrDuplicateTitle
 		}
 		return models.Resource{}, err
@@ -77,12 +78,12 @@ func (s *Store) Update(ctx context.Context, id primitive.ObjectID, mut models.Re
 	// Build a selective $set so we don't clobber unset fields.
 	set := bson.M{}
 	if strings.TrimSpace(mut.Title) != "" {
-		mut.TitleCI = textfold.Fold(mut.Title)
+		mut.TitleCI = text.Fold(mut.Title)
 		set["title"] = mut.Title
 		set["title_ci"] = mut.TitleCI
 	}
 	if strings.TrimSpace(mut.Subject) != "" {
-		mut.SubjectCI = textfold.Fold(mut.Subject)
+		mut.SubjectCI = text.Fold(mut.Subject)
 		set["subject"] = mut.Subject
 		set["subject_ci"] = mut.SubjectCI
 	}
@@ -90,13 +91,13 @@ func (s *Store) Update(ctx context.Context, id primitive.ObjectID, mut models.Re
 		set["description"] = mut.Description
 	}
 	if strings.TrimSpace(mut.LaunchURL) != "" {
-		if !webutil.IsValidAbsHTTPURL(mut.LaunchURL) {
+		if !urlutil.IsValidAbsHTTPURL(mut.LaunchURL) {
 			return mongo.CommandError{Message: "launch_url must be a valid http(s) URL"}
 		}
 		set["launch_url"] = mut.LaunchURL
 	}
 	if mut.Status != "" {
-		if mut.Status != "active" && mut.Status != "disabled" {
+		if !status.IsValid(mut.Status) {
 			return mongo.CommandError{Message: "status must be 'active' or 'disabled'"}
 		}
 		set["status"] = mut.Status

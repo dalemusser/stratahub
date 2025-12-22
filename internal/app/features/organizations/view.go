@@ -8,8 +8,9 @@ import (
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/timezones"
-	"github.com/dalemusser/waffle/templates"
+	"github.com/dalemusser/waffle/pantry/templates"
 
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
@@ -17,29 +18,18 @@ import (
 )
 
 // ServeView renders the read-only "View Organization" page.
-//
-// Route (from Routes):
-//
-//	GET /organizations/{id}/view
-//
-// Authorization:
-//   - We assume an admin-only router group in bootstrap (RequireAuth + RequireRole("admin")),
-//     but we still check for a signed-in user here so the layout gets Role/UserName.
+// Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
 func (h *Handler) ServeView(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := authz.UserCtx(r)
-	if !ok {
-		uierrors.RenderUnauthorized(w, r, "/login")
-		return
-	}
+	role, uname, _, _ := authz.UserCtx(r)
 
-	ctx, cancel := context.WithTimeout(r.Context(), orgsShortTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
 
 	idHex := chi.URLParam(r, "id")
 	orgID, err := primitive.ObjectIDFromHex(idHex)
 	if err != nil {
-		http.Error(w, "bad organization id", http.StatusBadRequest)
+		uierrors.RenderBadRequest(w, r, "Invalid organization ID.", "/organizations")
 		return
 	}
 
@@ -48,13 +38,13 @@ func (h *Handler) ServeView(w http.ResponseWriter, r *http.Request) {
 		FindOne(ctx, bson.M{"_id": orgID}).
 		Decode(&org); err != nil {
 		// Treat not-found as a normal 404; other errors as 500.
-		http.NotFound(w, r)
+		uierrors.RenderNotFound(w, r, "Organization not found.", "/organizations")
 		return
 	}
 
 	tzGroups, err := timezones.Groups()
 	if err != nil {
-		http.Error(w, "failed to load time zones", http.StatusInternalServerError)
+		uierrors.RenderServerError(w, r, "Failed to load time zones.", "/organizations")
 		return
 	}
 

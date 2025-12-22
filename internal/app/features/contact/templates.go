@@ -4,7 +4,7 @@ package contact
 import (
 	"embed"
 
-	"github.com/dalemusser/waffle/templates"
+	"github.com/dalemusser/waffle/pantry/templates"
 )
 
 //go:embed templates/*.gohtml

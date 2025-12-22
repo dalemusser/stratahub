@@ -8,48 +8,50 @@ import (
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/inputval"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	mongodb "github.com/dalemusser/waffle/toolkit/db/mongodb"
-	webutil "github.com/dalemusser/waffle/toolkit/http/webutil"
-	textfold "github.com/dalemusser/waffle/toolkit/text/textfold"
-	nav "github.com/dalemusser/waffle/toolkit/ui/nav"
+	"github.com/dalemusser/waffle/pantry/httpnav"
+	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
+	"github.com/dalemusser/waffle/pantry/text"
+	"github.com/dalemusser/waffle/pantry/urlutil"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// ServeEdit renders the Edit Resource form for admins.
-func (h *AdminHandler) ServeEdit(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := authz.UserCtx(r)
-	if !ok {
-		uierrors.RenderUnauthorized(w, r, "/login")
-		return
-	}
-	if role != "admin" {
-		uierrors.RenderForbidden(w, r, "You do not have access to edit resources.", nav.ResolveBackURL(r, "/resources"))
-		return
-	}
+// editResourceInput defines validation rules for editing a resource.
+type editResourceInput struct {
+	Title     string `validate:"required,max=200" label:"Title"`
+	LaunchURL string `validate:"required,url" label:"Launch URL"`
+	Status    string `validate:"required,oneof=active disabled" label:"Status"`
+}
 
-	ctx, cancel := context.WithTimeout(r.Context(), resourcesShortTimeout)
+// ServeEdit renders the Edit Resource form for admins.
+// Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
+func (h *AdminHandler) ServeEdit(w http.ResponseWriter, r *http.Request) {
+	role, uname, _, _ := authz.UserCtx(r)
+
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
 
 	idHex := chi.URLParam(r, "id")
 	oid, err := primitive.ObjectIDFromHex(idHex)
 	if err != nil {
-		http.Error(w, "bad id", http.StatusBadRequest)
+		uierrors.RenderBadRequest(w, r, "Invalid resource ID.", "/resources")
 		return
 	}
 
 	var res models.Resource
 	if err := db.Collection("resources").FindOne(ctx, bson.M{"_id": oid}).Decode(&res); err != nil {
-		http.NotFound(w, r)
+		uierrors.RenderNotFound(w, r, "Resource not found.", "/resources")
 		return
 	}
 
 	// Compute safe return targets for submit/delete actions
-	deleteReturn := webutil.SafeReturn(r.URL.Query().Get("return"), idHex /* filter out current id */, "/resources")
-	submitReturn := webutil.SafeReturn(r.URL.Query().Get("return"), "", "/resources")
+	deleteReturn := urlutil.SafeReturn(r.URL.Query().Get("return"), idHex /* filter out current id */, "/resources")
+	submitReturn := urlutil.SafeReturn(r.URL.Query().Get("return"), "", "/resources")
 
 	vm := resourceFormVM{
 		Title:               "Edit Resource",
@@ -65,36 +67,27 @@ func (h *AdminHandler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 		Status:              res.Status,
 		ShowInLibrary:       res.ShowInLibrary,
 		DefaultInstructions: res.DefaultInstructions,
-		BackURL:             nav.ResolveBackURL(r, "/resources"),
+		BackURL:             httpnav.ResolveBackURL(r, "/resources"),
 		DeleteReturn:        deleteReturn,
 		SubmitReturn:        submitReturn,
-		CurrentPath:         nav.CurrentPath(r),
+		CurrentPath:         httpnav.CurrentPath(r),
 	}
 
 	h.renderEditForm(w, r, vm, "")
 }
 
 // HandleEdit processes the Edit Resource form POST for admins.
+// Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
 func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
-	role, _, _, ok := authz.UserCtx(r)
-	if !ok {
-		uierrors.RenderUnauthorized(w, r, "/login")
-		return
-	}
-	if role != "admin" {
-		uierrors.RenderForbidden(w, r, "You do not have access to edit resources.", nav.ResolveBackURL(r, "/resources"))
-		return
-	}
-
 	if err := r.ParseForm(); err != nil {
-		http.Error(w, "bad form", http.StatusBadRequest)
+		h.ErrLog.LogBadRequest(w, r, "parse form failed", err, "Invalid form data.", "/resources")
 		return
 	}
 
 	idHex := chi.URLParam(r, "id")
 	rid, err := primitive.ObjectIDFromHex(idHex)
 	if err != nil {
-		http.Error(w, "bad id", http.StatusBadRequest)
+		uierrors.RenderBadRequest(w, r, "Invalid resource ID.", "/resources")
 		return
 	}
 
@@ -117,7 +110,7 @@ func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	defaultInstructions := strings.TrimSpace(r.FormValue("default_instructions"))
 
 	// Delete-return should never redirect back to a URL containing this id.
-	delReturn := webutil.SafeReturn(r.FormValue("return"), rid.Hex(), "/resources")
+	delReturn := urlutil.SafeReturn(r.FormValue("return"), rid.Hex(), "/resources")
 
 	// Helper to re-render the form with a message.
 	reRender := func(msg string) {
@@ -132,44 +125,39 @@ func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 			ShowInLibrary:       showInLibrary,
 			DefaultInstructions: defaultInstructions,
 			DeleteReturn:        delReturn,
-			SubmitReturn:        webutil.SafeReturn(r.FormValue("return"), "", "/resources"),
+			SubmitReturn:        urlutil.SafeReturn(r.FormValue("return"), "", "/resources"),
 		}
 		h.renderEditForm(w, r, vm, msg)
 	}
 
-	// Validate type
-	if !isValidResourceType(typeValue) {
+	// Validate required fields using struct tags
+	input := editResourceInput{Title: title, LaunchURL: launchURL, Status: status}
+	if result := inputval.Validate(input); result.HasErrors() {
+		reRender(result.First())
+		return
+	}
+
+	// Validate resource type
+	if !inputval.IsValidResourceType(typeValue) {
 		reRender("Type is invalid.")
 		return
 	}
 
-	// Validate status
-	if status != "active" && status != "disabled" {
-		reRender("Status must be Active or Disabled.")
-		return
-	}
-
-	// Validate title
-	if title == "" {
-		reRender("Title is required.")
-		return
-	}
-
-	// Validate launch URL (if provided)
-	if launchURL != "" && !webutil.IsValidAbsHTTPURL(launchURL) {
+	// Validate launch URL is an absolute HTTP/HTTPS URL
+	if !urlutil.IsValidAbsHTTPURL(launchURL) {
 		reRender("Launch URL must be a valid absolute URL (e.g., https://example.com).")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), resourcesMedTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 	db := h.DB
 
 	update := bson.M{
 		"title":                title,
-		"title_ci":             textfold.Fold(title),
+		"title_ci":             text.Fold(title),
 		"subject":              subject,
-		"subject_ci":           textfold.Fold(subject),
+		"subject_ci":           text.Fold(subject),
 		"description":          description,
 		"launch_url":           launchURL,
 		"type":                 typeValue,
@@ -181,7 +169,7 @@ func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 
 	if _, err := db.Collection("resources").UpdateOne(ctx, bson.M{"_id": rid}, bson.M{"$set": update}); err != nil {
 		msg := "Database error while updating resource."
-		if mongodb.IsDup(err) {
+		if wafflemongo.IsDup(err) {
 			msg = "A resource with that title already exists."
 		}
 		reRender(msg)
@@ -189,6 +177,6 @@ func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Success: redirect to provided ?return= (sanitized and MUST NOT reference this id)
-	ret := webutil.SafeReturn(r.FormValue("return"), rid.Hex(), "/resources")
+	ret := urlutil.SafeReturn(r.FormValue("return"), rid.Hex(), "/resources")
 	http.Redirect(w, r, ret, http.StatusSeeOther)
 }

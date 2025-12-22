@@ -1,16 +1,18 @@
 package systemusers
 
 import (
-	"context"
+	"maps"
 	"net/http"
 	"strings"
 
+	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/search"
-	"github.com/dalemusser/waffle/templates"
-	mongodb "github.com/dalemusser/waffle/toolkit/db/mongodb"
-	textfold "github.com/dalemusser/waffle/toolkit/text/textfold"
-	nav "github.com/dalemusser/waffle/toolkit/ui/nav"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/waffle/pantry/httpnav"
+	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
+	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/dalemusser/waffle/pantry/text"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -23,20 +25,20 @@ import (
 // filters, and keyset pagination. Admin-only access is enforced via
 // requireAdmin.
 func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := requireAdmin(w, r)
+	role, uname, _, ok := userContext(r)
 	if !ok {
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), sysUsersLongTimeout)
+	ctx, cancel := timeouts.WithTimeout(r.Context(), timeouts.Long(), h.Log, "system users list")
 	defer cancel()
 	db := h.DB
 
-	searchQ := strings.TrimSpace(r.URL.Query().Get("search"))
-	status := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("status"))) // "", active, disabled
-	uRole := strings.ToLower(strings.TrimSpace(r.URL.Query().Get("role")))    // "", admin, analyst
-	after := strings.TrimSpace(r.URL.Query().Get("after"))
-	before := strings.TrimSpace(r.URL.Query().Get("before"))
+	searchQ := normalize.QueryParam(r.URL.Query().Get("search"))
+	status := normalize.Status(r.URL.Query().Get("status"))  // "", active, disabled
+	uRole := normalize.Role(r.URL.Query().Get("role"))       // "", admin, analyst
+	after := normalize.QueryParam(r.URL.Query().Get("after"))
+	before := normalize.QueryParam(r.URL.Query().Get("before"))
 
 	// Base filter: system users (admin/analyst).
 	roleSet := []string{"admin", "analyst"}
@@ -54,9 +56,9 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 
 	// Search clause
 	if searchQ != "" {
-		qFold := textfold.Fold(searchQ)
+		qFold := text.Fold(searchQ)
 		hiFold := qFold + "\uffff"
-		sLower := strings.ToLower(strings.TrimSpace(searchQ))
+		sLower := strings.ToLower(searchQ)
 		hiEmail := sLower + "\uffff"
 
 		if emailPivot {
@@ -71,58 +73,38 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	total, _ := db.Collection("users").CountDocuments(ctx, base)
-
-	find := options.Find()
-	limit := paging.LimitPlusOne()
-
-	f := bson.M{}
-	for k, v := range base {
-		f[k] = v
+	total, countErr := db.Collection("users").CountDocuments(ctx, base)
+	if countErr != nil {
+		h.ErrLog.LogServerError(w, r, "database error counting system users", countErr, "A database error occurred.", "/")
+		return
 	}
 
-	// Sort field and keyset window
+	// Clone base filter, then add cursor conditions
+	f := maps.Clone(base)
+
+	// Sort field
 	sortField := "full_name_ci"
 	if emailPivot {
 		sortField = "email"
 	}
 
-	applyWindow := func(direction string, key string, id primitive.ObjectID) {
-		win := mongodb.KeysetWindow(sortField, direction, key, id)
+	// Configure keyset pagination
+	find := options.Find()
+	cfg := paging.ConfigureKeyset(before, after)
+	cfg.ApplyToFind(find, sortField)
+
+	// Apply cursor conditions (handle $or clause specially)
+	if ks := cfg.KeysetWindow(sortField); ks != nil {
 		if searchQ != "" {
-			// Keep the original OR, but wrap it so we can AND the keyset window.
 			if orAny, ok := base["$or"]; ok {
-				f["$and"] = []bson.M{
-					{"$or": orAny},
-					win,
-				}
+				f["$and"] = []bson.M{{"$or": orAny}, ks}
 				delete(f, "$or")
 			} else {
-				for k, v := range win {
-					f[k] = v
-				}
+				maps.Copy(f, ks)
 			}
 		} else {
-			for k, v := range win {
-				f[k] = v
-			}
+			maps.Copy(f, ks)
 		}
-	}
-
-	if before != "" {
-		if c, ok := mongodb.DecodeCursor(before); ok {
-			applyWindow("lt", c.CI, c.ID)
-		}
-		find.SetSort(bson.D{{Key: sortField, Value: -1}, {Key: "_id", Value: -1}}).
-			SetLimit(limit)
-	} else {
-		if after != "" {
-			if c, ok := mongodb.DecodeCursor(after); ok {
-				applyWindow("gt", c.CI, c.ID)
-			}
-		}
-		find.SetSort(bson.D{{Key: sortField, Value: 1}, {Key: "_id", Value: 1}}).
-			SetLimit(limit)
 	}
 
 	type u struct {
@@ -137,32 +119,25 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 
 	cur, err := db.Collection("users").Find(ctx, f, find)
 	if err != nil {
-		http.Error(w, "db error", http.StatusInternalServerError)
+		h.ErrLog.LogServerError(w, r, "database error querying system users", err, "A database error occurred.", "/")
 		return
 	}
 	defer cur.Close(ctx)
 
 	var raw []u
-	_ = cur.All(ctx, &raw)
-
-	orig := len(raw)
-	hasPrev, hasNext := false, false
-	pageSize := paging.PageSize
-
-	if before != "" {
-		if orig > pageSize {
-			raw = raw[1:]
-			hasPrev = true
-		}
-		hasNext = true
-	} else {
-		if orig > pageSize {
-			raw = raw[:pageSize]
-			hasNext = true
-		}
-		hasPrev = after != ""
+	if err := cur.All(ctx, &raw); err != nil {
+		h.ErrLog.LogServerError(w, r, "database error decoding system users", err, "A database error occurred.", "/")
+		return
 	}
 
+	// Reverse if paging backwards
+	if cfg.Direction == paging.Backward {
+		paging.Reverse(raw)
+	}
+
+	// Apply pagination trimming
+	page := paging.TrimPage(&raw, before, after)
+	hasPrev, hasNext := page.HasPrev, page.HasNext
 	shown := len(raw)
 
 	rows := make([]userRow, 0, shown)
@@ -170,10 +145,10 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		rows = append(rows, userRow{
 			ID:       rr.ID,
 			FullName: rr.FullName,
-			Email:    strings.ToLower(rr.Email),
-			Role:     strings.ToLower(rr.Role),
-			Auth:     strings.ToLower(rr.Auth),
-			Status:   strings.ToLower(rr.Status),
+			Email:    normalize.Email(rr.Email),
+			Role:     normalize.Role(rr.Role),
+			Auth:     normalize.AuthMethod(rr.Auth),
+			Status:   normalize.Status(rr.Status),
 		})
 	}
 
@@ -182,11 +157,11 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		firstKey := raw[0].FullNameCI
 		lastKey := raw[shown-1].FullNameCI
 		if emailPivot {
-			firstKey = strings.ToLower(raw[0].Email)
-			lastKey = strings.ToLower(raw[shown-1].Email)
+			firstKey = normalize.Email(raw[0].Email)
+			lastKey = normalize.Email(raw[shown-1].Email)
 		}
-		prevCur = mongodb.EncodeCursor(firstKey, raw[0].ID)
-		nextCur = mongodb.EncodeCursor(lastKey, raw[shown-1].ID)
+		prevCur = wafflemongo.EncodeCursor(firstKey, raw[0].ID)
+		nextCur = wafflemongo.EncodeCursor(lastKey, raw[shown-1].ID)
 	}
 
 	templates.RenderAutoMap(w, r, "system-users_list", nil, listData{
@@ -205,6 +180,6 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		PrevCursor:  prevCur,
 		NextCursor:  nextCur,
 		Rows:        rows,
-		CurrentPath: nav.CurrentPath(r),
+		CurrentPath: httpnav.CurrentPath(r),
 	})
 }

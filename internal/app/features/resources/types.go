@@ -19,6 +19,7 @@ import (
 type listItem struct {
 	ID            primitive.ObjectID
 	Title         string
+	TitleCI       string // case-insensitive title for cursor building
 	Subject       string
 	Type          string
 	Status        string
@@ -36,6 +37,18 @@ type listData struct {
 	Q           string
 	Items       []listItem
 	CurrentPath string
+
+	// Pagination
+	Shown      int
+	Total      int64
+	HasPrev    bool
+	HasNext    bool
+	PrevCursor string
+	NextCursor string
+	RangeStart int
+	RangeEnd   int
+	PrevStart  int
+	NextStart  int
 }
 
 // manageModalData is used to render the admin "Manage Resource" modal.

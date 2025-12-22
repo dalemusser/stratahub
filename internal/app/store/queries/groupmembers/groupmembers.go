@@ -3,6 +3,7 @@ package groupmembers
 import (
 	"context"
 
+	"github.com/dalemusser/stratahub/internal/app/system/status"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -34,7 +35,7 @@ func ListGroupMembersWithStatus(ctx context.Context, db *mongo.Database, groupID
 	}
 
 	// Optional filter on user status ("active" or "disabled")
-	if f.User == "active" || f.User == "disabled" {
+	if status.IsValid(f.User) {
 		pipe = append(pipe, bson.D{{Key: "$match", Value: bson.M{"user.status": f.User}}})
 	}
 

@@ -1,5 +1,5 @@
-// internal/app/features/organizations/helpers.go
-package organizations
+// internal/app/system/orgutil/counts.go
+package orgutil
 
 import (
 	"context"
@@ -10,28 +10,26 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// aggregator is a minimal interface satisfied by *mongo.Database.
-// It lets us unit-test aggregateCountByOrg with a fake.
-type aggregator interface {
-	// Matches the signature of (*mongo.Database).Collection.
+// Aggregator is a minimal interface satisfied by *mongo.Database.
+// It allows unit-testing aggregation helpers with a fake.
+type Aggregator interface {
 	Collection(name string, opts ...*options.CollectionOptions) *mongo.Collection
 }
 
-// aggregateCountByOrg computes counts grouped by an organization field.
+// AggregateCountByField computes counts grouped by a field.
 //
 //	coll     – collection name (e.g. "users", "groups")
-//	match    – base match filter (e.g. {"role":"leader","organization_id":{"$in": ids}}
+//	match    – base match filter (e.g. {"role":"leader","organization_id":{"$in": ids}})
 //	groupKey – field to group on (e.g. "organization_id")
 //
-// It returns a map keyed by org ObjectID (as hex string) to count.
-func aggregateCountByOrg(
+// Returns a map keyed by ObjectID to count.
+func AggregateCountByField(
 	ctx context.Context,
-	db aggregator,
+	db Aggregator,
 	coll string,
 	match bson.M,
 	groupKey string,
-) (map[string]int64, error) {
-
+) (map[primitive.ObjectID]int64, error) {
 	pipeline := mongo.Pipeline{
 		bson.D{{Key: "$match", Value: match}},
 		bson.D{{Key: "$group", Value: bson.D{
@@ -46,7 +44,7 @@ func aggregateCountByOrg(
 	}
 	defer cur.Close(ctx)
 
-	out := make(map[string]int64)
+	out := make(map[primitive.ObjectID]int64)
 	for cur.Next(ctx) {
 		var row struct {
 			ID primitive.ObjectID `bson:"_id"`
@@ -55,7 +53,7 @@ func aggregateCountByOrg(
 		if err := cur.Decode(&row); err != nil {
 			return nil, err
 		}
-		out[row.ID.Hex()] = row.N
+		out[row.ID] = row.N
 	}
 	return out, cur.Err()
 }

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/dalemusser/stratahub/internal/app/system/status"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -88,8 +89,8 @@ func ListResourcesForMember(ctx context.Context, db *mongo.Database, userID prim
 
 	// Optionally filter by resource status (currently we only support
 	// filtering for "active" resources).
-	if f.Resource == "active" {
-		pipe = append(pipe, bson.D{{Key: "$match", Value: bson.M{"resource.status": "active"}}})
+	if f.Resource == status.Active {
+		pipe = append(pipe, bson.D{{Key: "$match", Value: bson.M{"resource.status": status.Active}}})
 	}
 
 	// Join to groups to get the group name.
@@ -104,8 +105,8 @@ func ListResourcesForMember(ctx context.Context, db *mongo.Database, userID prim
 	)
 
 	// Optionally filter by group.status
-	if f.Group == "active" {
-		pipe = append(pipe, bson.D{{Key: "$match", Value: bson.M{"g.status": "active"}}})
+	if f.Group == status.Active {
+		pipe = append(pipe, bson.D{{Key: "$match", Value: bson.M{"g.status": status.Active}}})
 	}
 
 	// Project only the fields we care about, including the visibility window
@@ -135,5 +136,5 @@ func ListResourcesForMember(ctx context.Context, db *mongo.Database, userID prim
 // resources for which the member has a membership in any group and the
 // resource status is "active". Group status is not filtered.
 func ListActiveResourcesForMember(ctx context.Context, db *mongo.Database, userID primitive.ObjectID) ([]MemberResource, error) {
-	return ListResourcesForMember(ctx, db, userID, StatusFilter{Resource: "active", Group: ""})
+	return ListResourcesForMember(ctx, db, userID, StatusFilter{Resource: status.Active, Group: ""})
 }

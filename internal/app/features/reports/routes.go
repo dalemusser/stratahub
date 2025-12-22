@@ -6,11 +6,11 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-func Routes(h *Handler) chi.Router {
+func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 	r := chi.NewRouter()
 
 	r.Group(func(rr chi.Router) {
-		rr.Use(auth.RequireSignedIn)
+		rr.Use(sm.RequireSignedIn)
 		// Admin / analyst / leader gating is enforced inside the handlers.
 		rr.Get("/members", h.ServeMembersReport)
 		rr.Get("/members.csv", h.ServeMembersCSV)

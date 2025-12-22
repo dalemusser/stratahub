@@ -7,12 +7,12 @@ import (
 )
 
 // Routes mounts all member routes under the path where the caller mounts it.
-// Typically: r.Mount("/members", members.Routes(handler))
-func Routes(h *Handler) chi.Router {
+// Typically: r.Mount("/members", members.Routes(handler, sessionMgr))
+func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 	r := chi.NewRouter()
 
 	r.Group(func(pr chi.Router) {
-		pr.Use(auth.RequireSignedIn)
+		pr.Use(sm.RequireSignedIn)
 
 		// Unified screen (admin + leader; role-aware inside)
 		pr.Get("/", h.ServeList)

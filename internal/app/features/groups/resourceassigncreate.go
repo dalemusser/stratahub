@@ -11,9 +11,10 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/policy/grouppolicy"
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/templates"
-	nav "github.com/dalemusser/waffle/toolkit/ui/nav"
+	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -58,7 +59,7 @@ func (h *Handler) ServeAssignResourcePage(w http.ResponseWriter, r *http.Request
 	gid := chi.URLParam(r, "id")
 	groupOID, err := primitive.ObjectIDFromHex(gid)
 	if err != nil {
-		uierrors.RenderForbidden(w, r, "Bad group id.", nav.ResolveBackURL(r, "/groups"))
+		uierrors.RenderForbidden(w, r, "Bad group id.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
 
@@ -69,27 +70,32 @@ func (h *Handler) ServeAssignResourcePage(w http.ResponseWriter, r *http.Request
 	}
 	resourceOID, err := primitive.ObjectIDFromHex(strings.TrimSpace(resourceHex))
 	if err != nil {
-		uierrors.RenderForbidden(w, r, "Bad resource id.", nav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
+		uierrors.RenderForbidden(w, r, "Bad resource id.", httpnav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), metaShortTimeout)
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
 
 	group, err := groupstore.New(db).GetByID(ctx, groupOID)
 	if err == mongo.ErrNoDocuments {
-		uierrors.RenderForbidden(w, r, "Group not found.", nav.ResolveBackURL(r, "/groups"))
+		uierrors.RenderForbidden(w, r, "Group not found.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
 	if err != nil {
 		h.Log.Warn("group GetByID(assign page)", zap.Error(err))
-		uierrors.RenderForbidden(w, r, "A database error occurred.", nav.ResolveBackURL(r, "/groups"))
+		uierrors.RenderForbidden(w, r, "A database error occurred.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
 
-	if !grouppolicy.CanManageGroup(ctx, db, r, group.ID) {
-		uierrors.RenderForbidden(w, r, "You do not have access to this group.", nav.ResolveBackURL(r, "/groups"))
+	canManage, policyErr := grouppolicy.CanManageGroup(ctx, db, r, group.ID, group.OrganizationID)
+	if policyErr != nil {
+		h.ErrLog.LogServerError(w, r, "database error checking group access", policyErr, "A database error occurred.", "/groups")
+		return
+	}
+	if !canManage {
+		uierrors.RenderForbidden(w, r, "You do not have access to this group.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
 
@@ -101,11 +107,11 @@ func (h *Handler) ServeAssignResourcePage(w http.ResponseWriter, r *http.Request
 	var res models.Resource
 	if err := db.Collection("resources").FindOne(ctx, bson.M{"_id": resourceOID}).Decode(&res); err != nil {
 		if err == mongo.ErrNoDocuments {
-			uierrors.RenderForbidden(w, r, "Resource not found.", nav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
+			uierrors.RenderForbidden(w, r, "Resource not found.", httpnav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
 			return
 		}
 		h.Log.Warn("resource FindOne(assign page)", zap.Error(err))
-		uierrors.RenderForbidden(w, r, "A database error occurred.", nav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
+		uierrors.RenderForbidden(w, r, "A database error occurred.", httpnav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
 		return
 	}
 
@@ -119,7 +125,7 @@ func (h *Handler) ServeAssignResourcePage(w http.ResponseWriter, r *http.Request
 		IsLoggedIn:    true,
 		Role:          role,
 		UserName:      uname,
-		CurrentPath:   nav.CurrentPath(r),
+		CurrentPath:   httpnav.CurrentPath(r),
 		GroupID:       group.ID.Hex(),
 		GroupName:     group.Name,
 		ResourceID:    res.ID.Hex(),

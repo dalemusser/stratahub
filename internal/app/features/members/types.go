@@ -3,23 +3,16 @@ package members
 
 import (
 	"html/template"
-	"time"
 
+	"github.com/dalemusser/stratahub/internal/app/system/formutil"
+	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// Timeouts for member handlers.
-const (
-	membersShortTimeout = 5 * time.Second
-	membersMedTimeout   = 10 * time.Second
-	membersLongTimeout  = 60 * time.Second
-)
-
-// Left-pane organization row
-type orgRow struct {
-	ID    primitive.ObjectID
-	Name  string
-	Count int64
+// memberInput defines validation rules for creating or editing a member.
+type memberInput struct {
+	FullName string `validate:"required,max=200" label:"Full name"`
+	Email    string `validate:"required,email,max=254" label:"Email"`
 }
 
 // Table row for members list
@@ -48,7 +41,7 @@ type listData struct {
 	OrgRangeStart int
 	OrgRangeEnd   int
 	SelectedOrg   string // "all" or hex
-	OrgRows       []orgRow
+	OrgRows       []orgutil.OrgRow
 	AllCount      int64
 
 	// members list
@@ -80,14 +73,12 @@ type orgOption struct {
 }
 
 type newData struct {
-	Title, Role, UserName string
-	IsLoggedIn            bool
-	BackURL, CurrentPath  string
+	formutil.Base
 
 	// org picker state
 	OrgLocked bool
 	OrgHex    string
-	OrgName   string // NEW: display name when org is locked
+	OrgName   string // display name when org is locked
 	Orgs      []orgOption
 
 	// form echo-on-error
@@ -95,19 +86,14 @@ type newData struct {
 	Email    string
 	Auth     string
 	Status   string
-	Error    template.HTML
 }
 
 type editData struct {
-	Title, Role, UserName string
-	IsLoggedIn            bool
+	formutil.Base
 
 	ID, FullName, Email          string
 	OrgID, OrgName, Status, Auth string
-
-	BackURL, CurrentPath string
-	Orgs                 []orgOption
-	Error                template.HTML
+	Orgs                         []orgOption
 }
 
 type viewData struct {
@@ -119,18 +105,15 @@ type viewData struct {
 }
 
 type uploadData struct {
-	Title, Role, UserName string
-	IsLoggedIn            bool
-	BackURL, CurrentPath  string
-	OrgLocked             bool
-	OrgHex                string
-	OrgName               string
-	Error                 template.HTML
-	Success               template.HTML
-	Created               int
-	Previously            int
-	SkippedCount          int
-	SkippedEmails         []string
+	formutil.Base
+	OrgLocked     bool
+	OrgHex        string
+	OrgName       string
+	Success       template.HTML
+	Created       int
+	Previously    int
+	SkippedCount  int
+	SkippedEmails []string
 }
 
 // memberManageModalData is used to render the Manage Member modal.
@@ -140,4 +123,17 @@ type memberManageModalData struct {
 	Email    string
 	OrgName  string
 	BackURL  string
+}
+
+// orgPaneData holds all the data needed to render the org pane.
+type orgPaneData struct {
+	Rows       []orgutil.OrgRow
+	Total      int64
+	HasPrev    bool
+	HasNext    bool
+	PrevCursor string
+	NextCursor string
+	RangeStart int
+	RangeEnd   int
+	AllCount   int64
 }
