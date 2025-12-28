@@ -11,8 +11,10 @@ import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/policy/grouppolicy"
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
+	membershipstore "github.com/dalemusser/stratahub/internal/app/store/memberships"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -69,7 +71,7 @@ func (h *Handler) ServeManageGroup(w http.ResponseWriter, r *http.Request) {
 
 // buildPageData assembles the ManagePageData for a given group and search window.
 func (h *Handler) buildPageData(r *http.Request, gid, q, after, before string) (ManagePageData, error) {
-	role, uname, _, ok := authz.UserCtx(r)
+	_, _, _, ok := authz.UserCtx(r)
 	if !ok {
 		return ManagePageData{}, fmt.Errorf("unauthorized")
 	}
@@ -163,10 +165,7 @@ func (h *Handler) buildPageData(r *http.Request, gid, q, after, before string) (
 	}
 
 	return ManagePageData{
-		Title:            "Manage Group",
-		IsLoggedIn:       true,
-		Role:             role,
-		UserName:         uname,
+		BaseVM:           viewdata.NewBaseVM(r, db, "Manage Group", "/groups"),
 		GroupID:          group.ID.Hex(),
 		GroupName:        group.Name,
 		GroupDescription: group.Description,
@@ -184,34 +183,21 @@ func (h *Handler) buildPageData(r *http.Request, gid, q, after, before string) (
 		PrevCursor:       prevCur,
 		HasNext:          hasNext,
 		HasPrev:          hasPrev,
-		BackURL:          httpnav.ResolveBackURL(r, "/groups"),
-		CurrentPath:      httpnav.CurrentPath(r),
 	}, nil
 }
 
 // fetchMemberIDs returns all user IDs in group_memberships for a given group/role.
 func (h *Handler) fetchMemberIDs(ctx context.Context, db *mongo.Database, groupID primitive.ObjectID, role string) ([]primitive.ObjectID, error) {
-	cur, err := db.Collection("group_memberships").Find(
-		ctx,
-		bson.M{"group_id": groupID, "role": role},
-		options.Find().SetProjection(bson.M{"user_id": 1}),
-	)
+	memStore := membershipstore.New(db)
+	memberships, err := memStore.ListByGroup(ctx, groupID, role)
 	if err != nil {
 		h.Log.Error("database error finding group memberships", zap.Error(err), zap.String("group_id", groupID.Hex()), zap.String("role", role))
 		return nil, err
 	}
-	defer cur.Close(ctx)
 
-	var ids []primitive.ObjectID
-	for cur.Next(ctx) {
-		var row struct {
-			UserID primitive.ObjectID `bson:"user_id"`
-		}
-		if err := cur.Decode(&row); err != nil {
-			h.Log.Error("database error decoding membership", zap.Error(err))
-			return nil, err
-		}
-		ids = append(ids, row.UserID)
+	ids := make([]primitive.ObjectID, 0, len(memberships))
+	for _, m := range memberships {
+		ids = append(ids, m.UserID)
 	}
 	return ids, nil
 }

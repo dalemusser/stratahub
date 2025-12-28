@@ -5,11 +5,11 @@
 {{ define "content" }}
 <div class="flex items-center mb-2">
   <a href="{{ .BackURL }}"
-     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 mr-2"
+     class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
      title="Go back">
     ← Back
   </a>
-  <h1 class="text-2xl font-bold text-gray-900">⛹️ Add Member</h1>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">⛹️ Add Member</h1>
 </div>
 
 {{ if .Error }}
@@ -18,47 +18,59 @@
   </div>
 {{ end }}
 
-<form method="post" action="/members" class="space-y-3 max-w-xl bg-white p-4 rounded border">
+<form method="post" action="/members" class="space-y-3 max-w-xl bg-white dark:bg-gray-800 p-4 rounded border dark:border-gray-700">
 
   <input type="hidden" name="return" value="{{ .BackURL }}">
 
   <!-- Full name -->
   <div>
-    <label class="block text-sm font-medium mb-1">Full Name</label>
-    <input name="full_name" type="text" value="{{ .FullName }}" class="w-full border p-2 rounded" required />
+    <label class="block text-sm font-medium mb-1 dark:text-gray-200">Full Name</label>
+    <input name="full_name" type="text" value="{{ .FullName }}" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm" required />
   </div>
 
   <!-- Email -->
   <div>
-    <label class="block text-sm font-medium mb-1">Email</label>
-    <input name="email" type="email" value="{{ .Email }}" class="w-full border p-2 rounded" required />
+    <label class="block text-sm font-medium mb-1 dark:text-gray-200">Email</label>
+    <input name="email" type="email" value="{{ .Email }}" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm" required />
   </div>
 
-  {{ if .OrgLocked }}
-    <input type="hidden" name="orgID" value="{{ .OrgHex }}">
-    <div class="text-sm text-gray-600">
-      Organization:
-      <span class="font-semibold">{{ .OrgName }}</span>
-      <span class="ml-1">(locked for your role)</span>
-    </div>
-  {{ else }}
-    <div>
-      <label class="block text-sm font-medium mb-1" for="orgID">Organization</label>
-      <select id="orgID" name="orgID" class="w-full border p-2 rounded" required>
-        <option value="">-- Select organization --</option>
-        {{ range .Orgs }}
-          <option value="{{ .ID.Hex }}" {{ if eq $.OrgHex (.ID.Hex) }}selected{{ end }}>
-            {{ .Name }}
-          </option>
-        {{ end }}
-      </select>
-    </div>
-  {{ end }}
+  <!-- Organization -->
+  <div>
+    <label class="block text-sm font-medium mb-1 dark:text-gray-200">Organization</label>
+    {{ if .OrgLocked }}
+      <!-- Leader: org is locked -->
+      <input type="text" value="{{ .OrgName }}" class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm dark:text-gray-100" readonly />
+      <input type="hidden" name="orgID" value="{{ .OrgHex }}">
+    {{ else }}
+      <!-- Admin: select via picker -->
+      <div id="selected-org-display" class="min-h-[2.5rem] p-2 border dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 mb-2">
+        <div id="selected-org-name" class="text-sm text-gray-900 dark:text-gray-100 {{ if not .OrgName }}hidden{{ end }}">
+          {{ .OrgName }}
+        </div>
+        <div id="no-org-msg" class="text-gray-500 dark:text-gray-400 text-sm {{ if .OrgName }}hidden{{ end }}">
+          No organization selected
+        </div>
+      </div>
+
+      <input type="hidden" name="orgID" id="org-hidden-input" value="{{ .OrgHex }}">
+
+      <button
+        type="button"
+        id="select-org-btn"
+        class="px-3 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+        hx-get="/organizations/picker{{ if .OrgHex }}?selected={{ .OrgHex }}{{ end }}"
+        hx-target="#org-picker-root"
+        hx-swap="innerHTML"
+      >
+        {{ if .OrgName }}Change Organization...{{ else }}Select Organization...{{ end }}
+      </button>
+    {{ end }}
+  </div>
 
   <!-- Auth Method -->
   <div>
-    <label class="block text-sm font-medium mb-1">Auth Method</label>
-    <select name="auth_method" class="w-full border p-2 rounded">
+    <label class="block text-sm font-medium mb-1 dark:text-gray-200">Auth Method</label>
+    <select name="auth_method" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm">
       <option value="internal"  {{ if eq .Auth "internal" }}selected{{ end }}>internal</option>
       <option value="google"    {{ if eq .Auth "google" }}selected{{ end }}>google</option>
       <option value="classlink" {{ if eq .Auth "classlink" }}selected{{ end }}>classlink</option>
@@ -69,4 +81,60 @@
 
   <div class="pt-2"><button class="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Create Member</button></div>
 </form>
+
+{{ if not .OrgLocked }}
+<!-- Modal container (admin only) -->
+<div id="org-picker-root"></div>
+
+<script>
+(function() {
+  var selectedOrg = {
+    id: '{{ .OrgHex }}',
+    name: '{{ .OrgName }}'
+  };
+
+  window.closeOrgPicker = function() {
+    document.getElementById('org-picker-root').innerHTML = '';
+  };
+
+  window.updateOrgPickerSelection = function(radio) {
+    var hiddenField = document.getElementById('picker-selected-org');
+    if (hiddenField) hiddenField.value = radio.value;
+  };
+
+  window.confirmOrgSelection = function() {
+    var selected = document.querySelector('input[name="org-selection"]:checked');
+    if (selected) {
+      selectedOrg.id = selected.value;
+      selectedOrg.name = selected.dataset.name;
+      updateOrgDisplay();
+    }
+    closeOrgPicker();
+  };
+
+  function updateOrgDisplay() {
+    var orgNameEl = document.getElementById('selected-org-name');
+    var noOrgMsg = document.getElementById('no-org-msg');
+    var hiddenInput = document.getElementById('org-hidden-input');
+    var selectBtn = document.getElementById('select-org-btn');
+
+    hiddenInput.value = selectedOrg.id;
+
+    if (selectedOrg.id && selectedOrg.name) {
+      orgNameEl.textContent = selectedOrg.name;
+      orgNameEl.classList.remove('hidden');
+      noOrgMsg.classList.add('hidden');
+      selectBtn.textContent = 'Change Organization...';
+    } else {
+      orgNameEl.classList.add('hidden');
+      noOrgMsg.classList.remove('hidden');
+      selectBtn.textContent = 'Select Organization...';
+    }
+
+    selectBtn.setAttribute('hx-get', '/organizations/picker' + (selectedOrg.id ? '?selected=' + selectedOrg.id : ''));
+    htmx.process(selectBtn);
+  }
+})();
+</script>
+{{ end }}
 {{ end }}

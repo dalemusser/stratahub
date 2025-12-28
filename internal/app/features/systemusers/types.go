@@ -4,6 +4,7 @@ package systemusers
 import (
 	"html/template"
 
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -19,18 +20,19 @@ type userRow struct {
 
 // View model for the system users list page.
 type listData struct {
-	Title      string
-	IsLoggedIn bool
-	Role       string
-	UserName   string
+	viewdata.BaseVM
 
 	SearchQuery string
 	Status      string // "", active, disabled
 	URole       string // legacy
 	UserRole    string // preferred
 
-	Shown int
-	Total int64
+	Shown      int
+	Total      int64
+	RangeStart int
+	RangeEnd   int
+	PrevStart  int
+	NextStart  int
 
 	HasPrev    bool
 	HasNext    bool
@@ -39,14 +41,12 @@ type listData struct {
 
 	Rows []userRow
 
-	CurrentPath string
-	Flash       template.HTML
+	Flash template.HTML
 }
 
 // Form view model for New/Edit system user.
 type formData struct {
-	Title, Role, UserName string
-	IsLoggedIn            bool
+	viewdata.BaseVM
 
 	ID       string
 	FullName string
@@ -58,15 +58,12 @@ type formData struct {
 
 	IsSelf bool
 
-	Error       template.HTML
-	BackURL     string
-	CurrentPath string
+	Error template.HTML
 }
 
-// View-only model for the “View System User” page.
+// View-only model for the "View System User" page.
 type viewData struct {
-	Title, Role, UserName string
-	IsLoggedIn            bool
+	viewdata.BaseVM
 
 	ID       string
 	FullName string
@@ -75,9 +72,6 @@ type viewData struct {
 	UserRole string
 	Auth     string
 	Status   string
-
-	BackURL     string
-	CurrentPath string
 }
 
 // Used by the Manage modal.

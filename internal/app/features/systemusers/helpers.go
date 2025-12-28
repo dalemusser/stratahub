@@ -6,11 +6,11 @@ import (
 	"html/template"
 	"net/http"
 
+	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
-	"github.com/dalemusser/waffle/pantry/httpnav"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/templates"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -34,10 +34,7 @@ countActiveAdmins returns the number of users with role=admin and status=active.
 Callers pass in the DB and a context with an appropriate timeout.
 */
 func countActiveAdmins(ctx context.Context, db *mongo.Database) (int64, error) {
-	return db.Collection("users").CountDocuments(ctx, bson.M{
-		"role":   "admin",
-		"status": "active",
-	})
+	return userstore.New(db).CountActiveAdmins(ctx)
 }
 
 /*
@@ -50,25 +47,21 @@ the same form wiring.
 func renderEditForm(
 	w http.ResponseWriter,
 	r *http.Request,
-	role, uname, idHex, full, email, uRole, authm, status string,
+	db *mongo.Database,
+	idHex, full, email, uRole, authm, status string,
 	isSelf bool,
 	errMsg template.HTML,
 ) {
 	templates.Render(w, r, "system_user_edit", formData{
-		Title:       "Edit System User",
-		IsLoggedIn:  true,
-		Role:        role,
-		UserName:    uname,
-		ID:          idHex,
-		FullName:    full,
-		Email:       email,
-		URole:       uRole,
-		UserRole:    uRole,
-		Auth:        authm,
-		Status:      status,
-		IsSelf:      isSelf,
-		Error:       errMsg,
-		BackURL:     backToSystemUsersURL(r),
-		CurrentPath: httpnav.CurrentPath(r),
+		BaseVM:   viewdata.NewBaseVM(r, db, "Edit System User", backToSystemUsersURL(r)),
+		ID:       idHex,
+		FullName: full,
+		Email:    email,
+		URole:    uRole,
+		UserRole: uRole,
+		Auth:     authm,
+		Status:   status,
+		IsSelf:   isSelf,
+		Error:    errMsg,
 	})
 }

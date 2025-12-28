@@ -5,11 +5,11 @@
 {{ define "content" }}
 <div class="flex items-center mb-2">
   <a href="{{ .BackURL }}"
-     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 mr-2"
+     class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
      title="Go back">
     ← Back
   </a>
-  <h1 class="text-2xl font-bold text-gray-900">👥 Add Group</h1>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">👥 Add Group</h1>
 </div>
 
 {{ if .Error }}
@@ -18,58 +18,91 @@
   </div>
 {{ end }}
 
-<form method="post" action="/groups" class="space-y-3 max-w-xl bg-white p-4 rounded border" id="new-group-form">
+<form method="post" action="/groups" class="space-y-3 max-w-xl bg-white dark:bg-gray-800 p-4 rounded border dark:border-gray-700" id="new-group-form">
   <!-- Name -->
   <div>
-    <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
-    <input name="name" type="text" value="{{ .Name }}" class="w-full border p-2 rounded" required />
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+    <input name="name" type="text" value="{{ .Name }}" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm" required />
   </div>
 
   {{ if eq .Role "admin" }}
-    <!-- Organization -->
+    <!-- Organization (admin can select via picker) -->
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Organization</label>
-      <select name="orgID" id="orgSelect" class="w-full border p-2 rounded" required>
-        <option value="">-- Select organization --</option>
-        {{ $cur := .OrgHex }}
-        {{ range .Organizations }}
-          {{ $id := .ID.Hex }}
-          <option value="{{ $id }}" {{ if eq $cur $id }}selected{{ end }}>{{ .Name }}</option>
-        {{ end }}
-      </select>
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Organization</label>
+
+      <!-- Selected org display -->
+      <div id="selected-org-display" class="min-h-[2.5rem] p-2 border dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 mb-2">
+        <div id="selected-org-name" class="text-sm text-gray-900 dark:text-gray-100 {{ if not .LeaderOrgName }}hidden{{ end }}">
+          {{ .LeaderOrgName }}
+        </div>
+        <div id="no-org-msg" class="text-gray-500 dark:text-gray-400 text-sm {{ if .LeaderOrgName }}hidden{{ end }}">
+          No organization selected
+        </div>
+      </div>
+
+      <!-- Hidden input for form submission -->
+      <input type="hidden" name="orgID" id="org-hidden-input" value="{{ .LeaderOrgID }}" />
+
+      <!-- Button to open picker -->
+      <button
+        type="button"
+        id="select-org-btn"
+        class="px-3 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+        hx-get="/organizations/picker{{ if .LeaderOrgID }}?selected={{ .LeaderOrgID }}{{ end }}"
+        hx-target="#org-picker-root"
+        hx-swap="innerHTML"
+      >
+        {{ if .LeaderOrgName }}Change Organization...{{ else }}Select Organization...{{ end }}
+      </button>
     </div>
 
-    <!-- Leaders (optional; filtered by org) -->
+    <!-- Leaders (optional, requires org to be selected) -->
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Leader(s)</label>
-      <select name="leaderIDs" id="leaderSelect" multiple size="6" class="w-full border p-2 rounded">
-        {{ $sel := .SelectedLeader }}
-        {{ range .Leaders }}
-          {{ $lid := .ID.Hex }}
-          <option value="{{ $lid }}" data-org="{{ .OrgHex }}"
-            {{ if $sel }}{{ if (index $sel $lid) }}selected{{ end }}{{ end }}>
-            {{ .FullName }}
-          </option>
-        {{ end }}
-      </select>
-      <p class="text-xs text-gray-500 mt-1">
-        Selecting leaders is optional; you can assign leaders later.
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Leader(s)</label>
+
+      <!-- Selected leaders display -->
+      <div id="selected-leaders-display" class="min-h-[2.5rem] p-2 border dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 mb-2">
+        <div id="selected-leaders-chips" class="flex flex-wrap gap-1">
+          {{/* Leaders are managed via JavaScript */}}
+        </div>
+        <div id="no-leaders-msg" class="text-gray-500 dark:text-gray-400 text-sm">
+          No leaders selected
+        </div>
+      </div>
+
+      <!-- Hidden inputs for form submission -->
+      <div id="leader-hidden-inputs">
+        {{/* Hidden inputs are managed via JavaScript */}}
+      </div>
+
+      <!-- Button to open picker (disabled when no org selected) -->
+      <button
+        type="button"
+        id="select-leaders-btn"
+        class="{{ if .LeaderOrgID }}px-3 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700{{ else }}px-3 py-2 bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 rounded text-sm cursor-not-allowed{{ end }}"
+        {{ if not .LeaderOrgID }}disabled{{ end }}
+      >
+        Select Leaders...
+      </button>
+
+      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+        {{ if not .LeaderOrgID }}Select an organization first to choose leaders.{{ else }}Selecting leaders is optional; you can assign leaders later.{{ end }}
       </p>
     </div>
   {{ else }}
-    <!-- Leader path: org is fixed; creator auto-assigned as leader -->
+    <!-- Organization (read-only for leader) -->
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Organization</label>
-      <input type="text" value="{{ .LeaderOrgName }}" class="w-full border p-2 rounded bg-gray-50" readonly />
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Organization</label>
+      <input type="text" value="{{ .LeaderOrgName }}" class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm dark:text-gray-100" readonly />
       <input type="hidden" name="orgID" value="{{ .LeaderOrgID }}" />
-      <p class="text-xs text-gray-500 mt-1">You will be assigned as a leader of this group.</p>
+      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">You will be assigned as a leader of this group.</p>
     </div>
   {{ end }}
 
   <!-- Description -->
   <div>
-    <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-    <textarea name="description" rows="4" class="w-full border p-2 rounded">{{ .Description }}</textarea>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+    <textarea name="description" rows="4" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm">{{ .Description }}</textarea>
   </div>
 
   <!-- Propagate return so the handler can send user back -->
@@ -80,25 +113,182 @@
   </div>
 </form>
 
+<!-- Modal containers -->
+<div id="org-picker-root"></div>
+<div id="leader-picker-root"></div>
+
 {{ if eq .Role "admin" }}
 <script>
-  (function(){
-    var orgSel = document.getElementById('orgSelect');
-    var leaderSel = document.getElementById('leaderSelect');
-    function filterLeaders(){
-      var org = orgSel.value || '';
-      for (var i=0; i<leaderSel.options.length; i++){
-        var opt = leaderSel.options[i];
-        var match = (opt.getAttribute('data-org') === org);
-        opt.hidden   = !match;
-        opt.disabled = !match;
-        if (!match) { opt.selected = false; }
+(function() {
+  // Current selected organization
+  var selectedOrg = {
+    id: '{{ .LeaderOrgID }}',
+    name: '{{ .LeaderOrgName }}'
+  };
+
+  // Store for selected leaders: { id: name, ... }
+  var selectedLeaders = {};
+
+  // ===== Organization Picker Functions =====
+
+  window.closeOrgPicker = function() {
+    document.getElementById('org-picker-root').innerHTML = '';
+  };
+
+  window.updateOrgPickerSelection = function(radio) {
+    // Update hidden field for pagination preservation
+    var hiddenField = document.getElementById('picker-selected-org');
+    if (hiddenField) hiddenField.value = radio.value;
+  };
+
+  window.confirmOrgSelection = function() {
+    // Get selected radio
+    var selected = document.querySelector('input[name="org-selection"]:checked');
+    if (selected) {
+      var newOrgId = selected.value;
+      var newOrgName = selected.dataset.name;
+
+      // If org changed, clear selected leaders
+      if (newOrgId !== selectedOrg.id) {
+        selectedLeaders = {};
+        updateLeadersDisplay();
+      }
+
+      selectedOrg.id = newOrgId;
+      selectedOrg.name = newOrgName;
+      updateOrgDisplay();
+    }
+    closeOrgPicker();
+  };
+
+  function updateOrgDisplay() {
+    var orgNameEl = document.getElementById('selected-org-name');
+    var noOrgMsg = document.getElementById('no-org-msg');
+    var hiddenInput = document.getElementById('org-hidden-input');
+    var selectBtn = document.getElementById('select-org-btn');
+    var leadersBtn = document.getElementById('select-leaders-btn');
+    var leadersHint = leadersBtn.nextElementSibling;
+
+    hiddenInput.value = selectedOrg.id;
+
+    if (selectedOrg.id && selectedOrg.name) {
+      orgNameEl.textContent = selectedOrg.name;
+      orgNameEl.classList.remove('hidden');
+      noOrgMsg.classList.add('hidden');
+      selectBtn.textContent = 'Change Organization...';
+
+      // Enable leaders button
+      leadersBtn.disabled = false;
+      leadersBtn.className = 'px-3 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700';
+      leadersHint.textContent = 'Selecting leaders is optional; you can assign leaders later.';
+    } else {
+      orgNameEl.classList.add('hidden');
+      noOrgMsg.classList.remove('hidden');
+      selectBtn.textContent = 'Select Organization...';
+
+      // Disable leaders button
+      leadersBtn.disabled = true;
+      leadersBtn.className = 'px-3 py-2 bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 rounded text-sm cursor-not-allowed';
+      leadersHint.textContent = 'Select an organization first to choose leaders.';
+    }
+
+    // Update the hx-get attribute on the select org button
+    selectBtn.setAttribute('hx-get', '/organizations/picker' + (selectedOrg.id ? '?selected=' + selectedOrg.id : ''));
+    htmx.process(selectBtn);
+  }
+
+  // ===== Leader Picker Functions =====
+
+  window.closeLeaderPicker = function() {
+    document.getElementById('leader-picker-root').innerHTML = '';
+  };
+
+  window.updatePickerSelection = function() {
+    var checkboxes = document.querySelectorAll('.leader-checkbox');
+    checkboxes.forEach(function(cb) {
+      if (cb.checked) {
+        selectedLeaders[cb.value] = cb.dataset.name;
+      } else {
+        delete selectedLeaders[cb.value];
+      }
+    });
+    var hiddenField = document.getElementById('picker-selected-ids');
+    if (hiddenField) {
+      hiddenField.value = Object.keys(selectedLeaders).join(',');
+    }
+  };
+
+  window.confirmLeaderSelection = function() {
+    var checkboxes = document.querySelectorAll('.leader-checkbox');
+    selectedLeaders = {};
+    checkboxes.forEach(function(cb) {
+      if (cb.checked) {
+        selectedLeaders[cb.value] = cb.dataset.name;
+      }
+    });
+    updateLeadersDisplay();
+    closeLeaderPicker();
+  };
+
+  window.removeLeader = function(id) {
+    delete selectedLeaders[id];
+    updateLeadersDisplay();
+  };
+
+  function updateLeadersDisplay() {
+    var chipsContainer = document.getElementById('selected-leaders-chips');
+    var hiddenContainer = document.getElementById('leader-hidden-inputs');
+    var noLeadersMsg = document.getElementById('no-leaders-msg');
+
+    chipsContainer.innerHTML = '';
+    hiddenContainer.innerHTML = '';
+
+    var ids = Object.keys(selectedLeaders);
+    if (ids.length === 0) {
+      noLeadersMsg.classList.remove('hidden');
+    } else {
+      noLeadersMsg.classList.add('hidden');
+      ids.forEach(function(id) {
+        var name = selectedLeaders[id];
+        var chip = document.createElement('span');
+        chip.className = 'leader-chip inline-flex items-center gap-1 px-2 py-1 bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-300 rounded text-xs';
+        chip.dataset.id = id;
+        chip.innerHTML = name + ' <button type="button" class="hover:text-red-600" onclick="removeLeader(\'' + id + '\')">&times;</button>';
+        chipsContainer.appendChild(chip);
+
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'leaderIDs';
+        input.value = id;
+        hiddenContainer.appendChild(input);
+      });
+    }
+  }
+
+  // ===== Event Handlers =====
+
+  // Handle click on leaders button (use event delegation since button state changes)
+  document.getElementById('select-leaders-btn').addEventListener('click', function(e) {
+    if (!this.disabled && selectedOrg.id) {
+      htmx.ajax('GET', '/leaders/picker?org=' + selectedOrg.id, {target: '#leader-picker-root', swap: 'innerHTML'});
+    }
+  });
+
+  // When modal opens, sync state
+  document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target.id === 'leader-picker-root' || evt.detail.target.id === 'leader-picker-list') {
+      // Update checkboxes to match our current selection
+      document.querySelectorAll('.leader-checkbox').forEach(function(cb) {
+        cb.checked = !!selectedLeaders[cb.value];
+      });
+      var hiddenField = document.getElementById('picker-selected-ids');
+      if (hiddenField) {
+        hiddenField.value = Object.keys(selectedLeaders).join(',');
       }
     }
-    orgSel && orgSel.addEventListener('change', filterLeaders);
-    filterLeaders(); // initial pass
-    // No "must select leader" guard — leaders are optional now
-  })();
+  });
+})();
 </script>
 {{ end }}
+
 {{ end }}

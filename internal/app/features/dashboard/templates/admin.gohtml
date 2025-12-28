@@ -5,8 +5,8 @@
 {{ define "content" }}
 <div class="mb-3">
   <!-- Slightly smaller heading -->
-  <h1 class="text-2xl font-semibold text-gray-800">🎛️ Dashboard</h1>
-  <p class="text-gray-500 text-sm">Admin Panel</p>
+  <h1 class="text-2xl font-semibold text-gray-800 dark:text-gray-200">🎛️ Dashboard</h1>
+  <p class="text-gray-500 dark:text-gray-400 text-sm">Admin Panel</p>
 </div>
 
 <!-- Stats row with reduced gap, smaller padding -->
@@ -15,53 +15,53 @@
   <!-- Organizations -->
   <a
     href="/organizations?return={{ .CurrentPath | urlquery }}"
-    class="bg-white rounded-lg shadow p-2 text-center hover:bg-gray-50 transition block"
+    class="bg-white dark:bg-gray-800 rounded-lg shadow p-2 text-center hover:bg-indigo-50 transition block"
   >
-    <div class="text-gray-500 text-xs">Organizations</div>
-    <div class="text-indigo-600 text-xl font-bold">{{ .OrganizationsCount }}</div>
+    <div class="text-gray-500 dark:text-gray-400 text-xs">Organizations</div>
+    <div class="text-indigo-600 dark:text-indigo-400 text-xl font-bold">{{ .OrganizationsCount }}</div>
   </a>
 
   <!-- Leaders -->
   <a
     href="/leaders?return={{ .CurrentPath | urlquery }}"
-    class="bg-white rounded-lg shadow p-2 text-center hover:bg-gray-50 transition block"
+    class="bg-white dark:bg-gray-800 rounded-lg shadow p-2 text-center hover:bg-indigo-50 transition block"
   >
-    <div class="text-gray-500 text-xs">Leaders</div>
-    <div class="text-indigo-600 text-xl font-bold">{{ .LeadersCount }}</div>
+    <div class="text-gray-500 dark:text-gray-400 text-xs">Leaders</div>
+    <div class="text-indigo-600 dark:text-indigo-400 text-xl font-bold">{{ .LeadersCount }}</div>
   </a>
 
   <!-- Groups -->
   <a
     href="/groups?return={{ .CurrentPath | urlquery }}"
-    class="bg-white rounded-lg shadow p-2 text-center hover:bg-gray-50 transition block"
+    class="bg-white dark:bg-gray-800 rounded-lg shadow p-2 text-center hover:bg-indigo-50 transition block"
   >
-    <div class="text-gray-500 text-xs">Groups</div>
-    <div class="text-indigo-600 text-xl font-bold">{{ .GroupsCount }}</div>
+    <div class="text-gray-500 dark:text-gray-400 text-xs">Groups</div>
+    <div class="text-indigo-600 dark:text-indigo-400 text-xl font-bold">{{ .GroupsCount }}</div>
   </a>
 
   <!-- Members -->
   <a
     href="/members?return={{ .CurrentPath | urlquery }}"
-    class="bg-white rounded-lg shadow p-2 text-center hover:bg-gray-50 transition block"
+    class="bg-white dark:bg-gray-800 rounded-lg shadow p-2 text-center hover:bg-indigo-50 transition block"
   >
-    <div class="text-gray-500 text-xs">Members</div>
-    <div class="text-indigo-600 text-xl font-bold">{{ .MembersCount }}</div>
+    <div class="text-gray-500 dark:text-gray-400 text-xs">Members</div>
+    <div class="text-indigo-600 dark:text-indigo-400 text-xl font-bold">{{ .MembersCount }}</div>
   </a>
 
   <!-- Resources -->
   <a
     href="/resources?return={{ .CurrentPath | urlquery }}"
-    class="bg-white rounded-lg shadow p-2 text-center hover:bg-gray-50 transition block"
+    class="bg-white dark:bg-gray-800 rounded-lg shadow p-2 text-center hover:bg-indigo-50 transition block"
   >
-    <div class="text-gray-500 text-xs">Resources</div>
-    <div class="text-indigo-600 text-xl font-bold">{{ .ResourcesCount }}</div>
+    <div class="text-gray-500 dark:text-gray-400 text-xs">Resources</div>
+    <div class="text-indigo-600 dark:text-indigo-400 text-xl font-bold">{{ .ResourcesCount }}</div>
   </a>
 </div>
 
 <!-- Quick Actions area with smaller padding and buttons -->
-<div class="bg-white rounded-lg shadow p-2">
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-2">
   <!-- Slightly smaller subheading -->
-  <h2 class="text-base font-semibold text-gray-800 mb-2">Quick Actions</h2>
+  <h2 class="text-base font-semibold text-gray-800 dark:text-gray-200 mb-2">Quick Actions</h2>
 
   <!-- Quick action buttons are smaller -->
   <div class="flex flex-wrap gap-2">
@@ -72,6 +72,13 @@
     >
       + Add Organization
     </a>
+    <!-- Link to Add Group -->
+    <a
+      href="/groups/new?return={{ .CurrentPath | urlquery }}"
+      class="px-2 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 inline-block"
+    >
+      + Add Group
+    </a>
     <!-- Link to Add Leader -->
     <a
       href="/leaders/new?return={{ .CurrentPath | urlquery }}"
@@ -79,12 +86,26 @@
     >
       + Add Leader
     </a>
+    <!-- Link to Add Member -->
+    <a
+      href="/members/new?return={{ .CurrentPath | urlquery }}"
+      class="px-2 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 inline-block"
+    >
+      + Add Member
+    </a>
     <!-- Link to Add Resource -->
     <a
       href="/resources/new?return={{ .CurrentPath | urlquery }}"
       class="px-2 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 inline-block"
     >
       + Add Resource
+    </a>
+    <!-- Link to Add Material -->
+    <a
+      href="/materials/new?return={{ .CurrentPath | urlquery }}"
+      class="px-2 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 inline-block"
+    >
+      + Add Material
     </a>
     <!-- Link to Download Member Data -->
     <a href="/reports/members?return={{ .CurrentPath | urlquery }}" class="px-2 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 inline-block">

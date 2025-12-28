@@ -7,6 +7,7 @@ import (
 
 	"github.com/dalemusser/stratahub/internal/app/system/formutil"
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 )
 
 // Type aliases for shared org/leader option types used in templates.
@@ -51,10 +52,7 @@ type assignedResourceViewItem struct {
 
 // groupViewData is the view model for the View Group page.
 type groupViewData struct {
-	Title      string
-	IsLoggedIn bool
-	Role       string
-	UserName   string
+	viewdata.BaseVM
 
 	GroupID          string
 	Name             string
@@ -66,18 +64,12 @@ type groupViewData struct {
 	UpdatedAt        time.Time
 
 	AssignedResources []assignedResourceViewItem
-
-	BackURL     string
-	CurrentPath string
 }
 
 // groupResourceViewData is the view model for viewing a single resource
 // in the context of a group.
 type groupResourceViewData struct {
-	Title      string
-	IsLoggedIn bool
-	Role       string
-	UserName   string
+	viewdata.BaseVM
 
 	GroupID   string
 	GroupName string
@@ -88,9 +80,6 @@ type groupResourceViewData struct {
 	Description   string
 	Status        string
 	LaunchURL     string
-
-	BackURL     string
-	CurrentPath string
 }
 
 // toSet converts a slice of strings into a set (map[string]bool) with

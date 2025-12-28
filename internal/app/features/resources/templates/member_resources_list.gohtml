@@ -4,13 +4,13 @@
 
 {{ define "content" }}
 <div class="mb-4">
-  <h1 class="text-2xl font-bold text-gray-800 mb-1">📚 My Assigned Resources</h1>
+  <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-1">📚 My Assigned Resources</h1>
 </div>
 
 {{ if .Resources }}
-  <div class="bg-white shadow rounded overflow-x-auto">
-    <table class="min-w-full text-sm text-left text-gray-700">
-      <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
+  <div class="bg-white dark:bg-gray-800 shadow rounded overflow-x-auto">
+    <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+      <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 uppercase text-xs">
         <tr>
           <th class="px-2 py-2">Title</th>
           <th class="px-2 py-2">Subject</th>
@@ -19,32 +19,42 @@
           <th class="px-2 py-2 text-right">Actions</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-gray-200">
+      <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
         {{ range .Resources }}
         <tr>
-          <td class="px-2 py-1">{{ .Title }}</td>
-          <td class="px-2 py-1">{{ .Subject }}</td>
-          <td class="px-2 py-1">{{ .Type }}</td>
-          <td class="px-2 py-1">{{ .AvailableUntil }}</td>
-          <td class="px-2 py-1 text-right">
-            <!-- View -->
-            <a
-              href="/member/resources/{{ .ID }}"
-              class="bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700"
-            >
-              View
-            </a>
-
-            <!-- Open (LaunchURL already has id, group, org) -->
-            {{ if .LaunchURL }}
+          <td class="px-2 py-2">{{ .Title }}</td>
+          <td class="px-2 py-2">{{ .Subject }}</td>
+          <td class="px-2 py-2">{{ .Type }}</td>
+          <td class="px-2 py-2">{{ .AvailableUntil }}</td>
+          <td class="px-2 py-2 text-right">
+            <div class="inline-flex gap-2 whitespace-nowrap">
+              <!-- View -->
               <a
-                href="{{ .LaunchURL }}"
-                target="_blank" rel="noopener"
-                class="ml-2 bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700"
+                href="/member/resources/{{ .ID }}"
+                class="bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 text-xs md:text-sm"
               >
-                Open
+                View
               </a>
-            {{ end }}
+
+              <!-- Open/Download -->
+              {{ if .HasFile }}
+                <a
+                  href="/member/resources/{{ .ID }}/download"
+                  target="_blank"
+                  class="bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 text-xs md:text-sm"
+                >
+                  Download
+                </a>
+              {{ else if .LaunchURL }}
+                <a
+                  href="{{ .LaunchURL }}"
+                  target="_blank" rel="noopener"
+                  class="bg-green-600 text-white px-2 py-1 rounded hover:bg-green-700 text-xs md:text-sm"
+                >
+                  Open
+                </a>
+              {{ end }}
+            </div>
           </td>
         </tr>
         {{ end }}
@@ -52,11 +62,11 @@
     </table>
   </div>
   {{ if .TimeZone }}
-    <p class="mt-2 text-xs text-gray-500">
+    <p class="mt-2 text-xs text-gray-500 dark:text-gray-400">
       Times shown in {{ .TimeZone }} (group timezone)
     </p>
   {{ end }}
 {{ else }}
-  <p class="text-gray-500">No resources assigned.</p>
+  <p class="text-gray-500 dark:text-gray-400">No resources assigned.</p>
 {{ end }}
 {{ end }}

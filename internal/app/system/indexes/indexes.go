@@ -39,9 +39,18 @@ func EnsureAll(ctx context.Context, db *mongo.Database) error {
 	if err := ensureGroupResourceAssignments(ctx, db); err != nil {
 		problems = append(problems, "group_resource_assignments: "+err.Error())
 	}
+	if err := ensureMaterials(ctx, db); err != nil {
+		problems = append(problems, "materials: "+err.Error())
+	}
+	if err := ensureMaterialAssignments(ctx, db); err != nil {
+		problems = append(problems, "material_assignments: "+err.Error())
+	}
 	// dashboards typically read "recent activity" from login_records
 	if err := ensureLoginRecords(ctx, db); err != nil {
 		problems = append(problems, "login_records: "+err.Error())
+	}
+	if err := ensurePages(ctx, db); err != nil {
+		problems = append(problems, "pages: "+err.Error())
 	}
 
 	if len(problems) > 0 {
@@ -610,5 +619,93 @@ func ensureLoginRecords(ctx context.Context, db *mongo.Database) error {
 		//         SetExpireAfterSeconds(180 * 24 * 60 * 60).
 		//         SetName("idx_logins_created_ttl_180d"),
 		// },
+	})
+}
+
+func ensureMaterials(ctx context.Context, db *mongo.Database) error {
+	c := db.Collection("materials")
+	return ensureIndexSet(ctx, c, []mongo.IndexModel{
+		// Enforce unique material titles (case-insensitive via title_ci)
+		{
+			Keys: bson.D{
+				{Key: "title_ci", Value: 1},
+			},
+			Options: options.Index().
+				SetUnique(true).
+				SetName("uniq_materials_titleci"),
+		},
+		// Status + title_ci + _id listing index
+		{
+			Keys: bson.D{
+				{Key: "status", Value: 1},
+				{Key: "title_ci", Value: 1},
+				{Key: "_id", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_materials_status_titleci__id"),
+		},
+		// Type index
+		{
+			Keys: bson.D{
+				{Key: "type", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_materials_type"),
+		},
+	})
+}
+
+func ensureMaterialAssignments(ctx context.Context, db *mongo.Database) error {
+	c := db.Collection("material_assignments")
+	return ensureIndexSet(ctx, c, []mongo.IndexModel{
+		// Organization-wide assignments lookup
+		{
+			Keys: bson.D{
+				{Key: "organization_id", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_matassign_org"),
+		},
+		// Individual leader assignments lookup
+		{
+			Keys: bson.D{
+				{Key: "leader_id", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_matassign_leader"),
+		},
+		// Material lookup (for cascade deletes and listing assignments per material)
+		{
+			Keys: bson.D{
+				{Key: "material_id", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_matassign_material"),
+		},
+		// Combined lookup: all assignments for a leader (both org-wide and individual)
+		// This supports the query: (organization_id = leaderOrgID) OR (leader_id = leaderID)
+		{
+			Keys: bson.D{
+				{Key: "organization_id", Value: 1},
+				{Key: "leader_id", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_matassign_org_leader"),
+		},
+	})
+}
+
+func ensurePages(ctx context.Context, db *mongo.Database) error {
+	c := db.Collection("pages")
+	return ensureIndexSet(ctx, c, []mongo.IndexModel{
+		// Unique slug for each page (about, contact, terms-of-service, privacy-policy)
+		{
+			Keys: bson.D{
+				{Key: "slug", Value: 1},
+			},
+			Options: options.Index().
+				SetUnique(true).
+				SetName("uniq_pages_slug"),
+		},
 	})
 }

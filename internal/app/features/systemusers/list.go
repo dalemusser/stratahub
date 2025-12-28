@@ -3,19 +3,19 @@ package systemusers
 import (
 	"maps"
 	"net/http"
+	"strconv"
 	"strings"
 
+	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/search"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
-	"github.com/dalemusser/waffle/pantry/httpnav"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/dalemusser/waffle/pantry/text"
-
 	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
@@ -25,7 +25,7 @@ import (
 // filters, and keyset pagination. Admin-only access is enforced via
 // requireAdmin.
 func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := userContext(r)
+	_, _, _, ok := userContext(r)
 	if !ok {
 		return
 	}
@@ -39,6 +39,14 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 	uRole := normalize.Role(r.URL.Query().Get("role"))       // "", admin, analyst
 	after := normalize.QueryParam(r.URL.Query().Get("after"))
 	before := normalize.QueryParam(r.URL.Query().Get("before"))
+
+	// Track range start for display (defaults to 1)
+	rangeStart := 1
+	if startStr := r.URL.Query().Get("start"); startStr != "" {
+		if s, err := strconv.Atoi(startStr); err == nil && s > 0 {
+			rangeStart = s
+		}
+	}
 
 	// Base filter: system users (admin/analyst).
 	roleSet := []string{"admin", "analyst"}
@@ -73,7 +81,9 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	total, countErr := db.Collection("users").CountDocuments(ctx, base)
+	// Count and find via store
+	usrStore := userstore.New(db)
+	total, countErr := usrStore.Count(ctx, base)
 	if countErr != nil {
 		h.ErrLog.LogServerError(w, r, "database error counting system users", countErr, "A database error occurred.", "/")
 		return
@@ -107,26 +117,10 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	type u struct {
-		ID         primitive.ObjectID `bson:"_id"`
-		FullName   string             `bson:"full_name"`
-		FullNameCI string             `bson:"full_name_ci"`
-		Email      string             `bson:"email"`
-		Auth       string             `bson:"auth_method"`
-		Role       string             `bson:"role"`
-		Status     string             `bson:"status"`
-	}
-
-	cur, err := db.Collection("users").Find(ctx, f, find)
+	// Fetch users via store
+	raw, err := usrStore.Find(ctx, f, find)
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "database error querying system users", err, "A database error occurred.", "/")
-		return
-	}
-	defer cur.Close(ctx)
-
-	var raw []u
-	if err := cur.All(ctx, &raw); err != nil {
-		h.ErrLog.LogServerError(w, r, "database error decoding system users", err, "A database error occurred.", "/")
 		return
 	}
 
@@ -147,7 +141,7 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 			FullName: rr.FullName,
 			Email:    normalize.Email(rr.Email),
 			Role:     normalize.Role(rr.Role),
-			Auth:     normalize.AuthMethod(rr.Auth),
+			Auth:     normalize.AuthMethod(rr.AuthMethod),
 			Status:   normalize.Status(rr.Status),
 		})
 	}
@@ -164,22 +158,35 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		nextCur = wafflemongo.EncodeCursor(lastKey, raw[shown-1].ID)
 	}
 
+	// Calculate range end
+	rangeEnd := rangeStart + shown - 1
+	if rangeEnd < rangeStart {
+		rangeEnd = rangeStart
+	}
+
+	// Calculate next/prev start positions for pagination
+	nextStart := rangeStart + shown
+	prevStart := rangeStart - shown
+	if prevStart < 1 {
+		prevStart = 1
+	}
+
 	templates.RenderAutoMap(w, r, "system-users_list", nil, listData{
-		Title:       "System Users",
-		IsLoggedIn:  true,
-		Role:        role,
-		UserName:    uname,
+		BaseVM:      viewdata.NewBaseVM(r, h.DB, "System Users", "/"),
 		SearchQuery: searchQ,
 		Status:      status,
 		URole:       uRole,
 		UserRole:    uRole,
 		Shown:       shown,
 		Total:       total,
+		RangeStart:  rangeStart,
+		RangeEnd:    rangeEnd,
+		PrevStart:   prevStart,
+		NextStart:   nextStart,
 		HasPrev:     hasPrev,
 		HasNext:     hasNext,
 		PrevCursor:  prevCur,
 		NextCursor:  nextCur,
 		Rows:        rows,
-		CurrentPath: httpnav.CurrentPath(r),
 	})
 }

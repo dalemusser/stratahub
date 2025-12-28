@@ -5,13 +5,16 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/policy/reportpolicy"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -20,7 +23,7 @@ import (
 
 // ServeMembersReport renders the HTML Members Report UI.
 func (h *Handler) ServeMembersReport(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := authz.UserCtx(r)
+	_, _, _, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
@@ -42,6 +45,11 @@ func (h *Handler) ServeMembersReport(w http.ResponseWriter, r *http.Request) {
 	orgQ := query.Search(r, "org_q")
 	orgAfter := query.Get(r, "org_after")
 	orgBefore := query.Get(r, "org_before")
+	orgStart := parseStart(r, "org_start")
+
+	groupsAfter := query.Get(r, "groups_after")
+	groupsBefore := query.Get(r, "groups_before")
+	groupsStart := parseStart(r, "groups_start")
 
 	groupStatus := query.Get(r, "group_status")
 	memberStatus := query.Get(r, "member_status")
@@ -54,8 +62,10 @@ func (h *Handler) ServeMembersReport(w http.ResponseWriter, r *http.Request) {
 	ret := query.Get(r, "return")
 	showBack := ret != ""
 	returnQS := ""
+	backURL := "/"
 	if showBack {
 		returnQS = "&return=" + url.QueryEscape(ret)
+		backURL = ret
 	}
 
 	// Determine scope based on policy
@@ -90,7 +100,7 @@ func (h *Handler) ServeMembersReport(w http.ResponseWriter, r *http.Request) {
 	// Fetch groups pane data (only when an org is selected)
 	var groupsPane groupsPaneResult
 	if scopeOrg != nil {
-		groupsPane, err = h.fetchReportGroupsPane(ctx, db, *scopeOrg, memberStatus)
+		groupsPane, err = h.fetchReportGroupsPane(ctx, db, *scopeOrg, groupsAfter, groupsBefore, memberStatus)
 		if err != nil {
 			h.ErrLog.LogServerError(w, r, "database error fetching groups pane", err, "A database error occurred.", "/")
 			return
@@ -119,30 +129,43 @@ func (h *Handler) ServeMembersReport(w http.ResponseWriter, r *http.Request) {
 	safeLabel = strings.ReplaceAll(safeLabel, " ", "_")
 	downloadFilename := fmt.Sprintf("%s_%s.csv", safeLabel, time.Now().UTC().Format("2006-01-02_1504"))
 
-	data := pageData{
-		Title:      "Members Report",
-		IsLoggedIn: true,
-		Role:       role,
-		UserName:   uname,
+	// Compute ranges for pagination display
+	orgRange := paging.ComputeRange(orgStart, len(orgPane.Rows))
+	groupsRange := paging.ComputeRange(groupsStart, len(groupsPane.Rows))
 
+	data := pageData{
+		BaseVM:   viewdata.NewBaseVM(r, h.DB, "Members Report", backURL),
 		ShowBack: showBack,
-		BackURL:  ret,
 		ReturnQS: returnQS,
 
-		OrgQuery:        orgQ,
-		OrgShown:        len(orgPane.Rows),
-		OrgTotal:        orgPane.Total,
-		OrgHasPrev:      orgPane.HasPrev,
-		OrgHasNext:      orgPane.HasNext,
-		OrgPrevCur:      orgPane.PrevCursor,
-		OrgNextCur:      orgPane.NextCursor,
+		OrgQuery:      orgQ,
+		OrgShown:      len(orgPane.Rows),
+		OrgTotal:      orgPane.Total,
+		OrgRangeStart: orgRange.Start,
+		OrgRangeEnd:   orgRange.End,
+		OrgHasPrev:    orgPane.HasPrev,
+		OrgHasNext:    orgPane.HasNext,
+		OrgPrevCur:    orgPane.PrevCursor,
+		OrgNextCur:    orgPane.NextCursor,
+		OrgPrevStart:  orgRange.PrevStart,
+		OrgNextStart:  orgRange.NextStart,
 		SelectedOrg:     selectedOrg,
 		SelectedOrgName: groupsPane.OrgName,
 		OrgRows:         orgPane.Rows,
 		AllCount:        orgPane.AllCount,
 
-		SelectedGroup:        selectedGroup,
-		GroupRows:            groupsPane.Rows,
+		SelectedGroup:    selectedGroup,
+		GroupRows:        groupsPane.Rows,
+		GroupsShown:      len(groupsPane.Rows),
+		GroupsTotal:      groupsPane.Total,
+		GroupsRangeStart: groupsRange.Start,
+		GroupsRangeEnd:   groupsRange.End,
+		GroupsHasPrev:    groupsPane.HasPrev,
+		GroupsHasNext:    groupsPane.HasNext,
+		GroupsPrevCur:    groupsPane.PrevCursor,
+		GroupsNextCur:    groupsPane.NextCursor,
+		GroupsPrevStart:  groupsRange.PrevStart,
+		GroupsNextStart:  groupsRange.NextStart,
 		OrgMembersCount:      groupsPane.OrgMembersCount,
 		MembersInGroupsCount: exportCounts.MembersInGroupsCount,
 		ExportRecordCount:    exportCounts.ExportRecordCount,
@@ -150,9 +173,20 @@ func (h *Handler) ServeMembersReport(w http.ResponseWriter, r *http.Request) {
 		GroupStatus:      groupStatus,
 		MemberStatus:     memberStatus,
 		DownloadFilename: downloadFilename,
-
-		CurrentPath: r.URL.Path,
 	}
 
 	templates.RenderAutoMap(w, r, "reports_members", nil, data)
+}
+
+// parseStart extracts a start parameter from the request.
+func parseStart(r *http.Request, name string) int {
+	s := query.Get(r, name)
+	if s == "" {
+		return 1
+	}
+	n, err := strconv.Atoi(s)
+	if err != nil || n < 1 {
+		return 1
+	}
+	return n
 }

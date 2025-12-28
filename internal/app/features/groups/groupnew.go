@@ -7,6 +7,7 @@ import (
 	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	organizationstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/formutil"
@@ -50,23 +51,28 @@ func (h *Handler) ServeNewGroup(w http.ResponseWriter, r *http.Request) {
 	db := h.DB
 
 	var data newGroupData
-	formutil.SetBase(&data.Base, r, "Add Group", "/groups")
+	formutil.SetBase(&data.Base, r, h.DB, "Add Group", "/groups")
 
 	if role == "admin" {
-		orgOpts, orgIDs, err := orgutil.LoadActiveOrgOptions(ctx, db)
-		if err != nil {
-			h.Log.Warn("LoadActiveOrgOptions", zap.Error(err))
-			uierrors.RenderForbidden(w, r, "A database error occurred.", httpnav.ResolveBackURL(r, "/groups"))
-			return
+		// Admin: org can be passed via URL query param (optional - can select via picker)
+		selectedOrg := normalize.QueryParam(r.URL.Query().Get("org"))
+		if selectedOrg != "" && selectedOrg != "all" {
+			orgID, orgName, err := orgutil.ResolveActiveOrgFromHex(ctx, db, selectedOrg)
+			if err != nil {
+				if orgutil.IsExpectedOrgError(err) {
+					// Org not found - just show page without org selected
+					h.Log.Warn("org not found or inactive", zap.String("org", selectedOrg))
+				} else {
+					h.ErrLog.LogServerError(w, r, "database error loading organization", err, "A database error occurred.", "/groups")
+					return
+				}
+			} else {
+				data.LeaderOrgID = orgID.Hex()
+				data.LeaderOrgName = orgName
+				data.OrgHex = orgID.Hex()
+			}
 		}
-		leaders, err := orgutil.LoadActiveLeaders(ctx, db, orgIDs)
-		if err != nil {
-			h.Log.Warn("LoadActiveLeaders", zap.Error(err))
-			uierrors.RenderForbidden(w, r, "A database error occurred.", httpnav.ResolveBackURL(r, "/groups"))
-			return
-		}
-		data.Organizations = orgOpts
-		data.Leaders = leaders
+		// Leaders are loaded dynamically via the picker modal, not needed here
 	} else {
 		// Leader: use their org as the fixed org for the new group; auto-assign them later.
 		usrStore := userstore.New(db)
@@ -85,8 +91,9 @@ func (h *Handler) ServeNewGroup(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		var org models.Organization
-		if err := db.Collection("organizations").FindOne(ctx, bson.M{"_id": *user.OrganizationID}).Decode(&org); err != nil {
+		orgStore := organizationstore.New(db)
+		org, err := orgStore.GetByID(ctx, *user.OrganizationID)
+		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				h.Log.Warn("organization not found for leader (may have been deleted)",
 					zap.String("user_id", uid.Hex()),
@@ -259,7 +266,7 @@ func (h *Handler) HandleCreateGroup(w http.ResponseWriter, r *http.Request) {
 // reRenderNewWithError re-renders the Add Group page with a validation error
 // and previously posted values.
 func (h *Handler) reRenderNewWithError(w http.ResponseWriter, r *http.Request, data newGroupData, msg string) {
-	formutil.SetBase(&data.Base, r, "Add Group", "/groups")
+	formutil.SetBase(&data.Base, r, h.DB, "Add Group", "/groups")
 	data.SetError(msg)
 
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
@@ -267,18 +274,20 @@ func (h *Handler) reRenderNewWithError(w http.ResponseWriter, r *http.Request, d
 	db := h.DB
 
 	if data.Role == "admin" {
-		orgOpts, _, err := orgutil.LoadActiveOrgOptions(ctx, db)
-		if err == nil {
-			data.Organizations = orgOpts
-		} else {
-			h.Log.Warn("LoadActiveOrgOptions (re-render)", zap.Error(err))
+		// Admin: reload the org name if an org was selected
+		if data.OrgHex != "" {
+			orgID, err := primitive.ObjectIDFromHex(data.OrgHex)
+			if err == nil {
+				orgName, err := orgutil.GetOrgName(ctx, db, orgID)
+				if err == nil {
+					data.LeaderOrgID = data.OrgHex
+					data.LeaderOrgName = orgName
+				} else {
+					h.Log.Warn("GetOrgName (re-render)", zap.Error(err))
+				}
+			}
 		}
-		leaders, err := orgutil.LoadActiveLeaders(ctx, db, nil)
-		if err == nil {
-			data.Leaders = leaders
-		} else {
-			h.Log.Warn("LoadActiveLeaders (re-render)", zap.Error(err))
-		}
+		// Leaders are loaded dynamically via the picker modal, not needed here
 	} else {
 		_, _, uid, ok := authz.UserCtx(r)
 		if !ok {
@@ -288,8 +297,9 @@ func (h *Handler) reRenderNewWithError(w http.ResponseWriter, r *http.Request, d
 		usrStore := userstore.New(db)
 		user, err := usrStore.GetByID(ctx, uid)
 		if err == nil && user.OrganizationID != nil {
-			var org models.Organization
-			if orgErr := db.Collection("organizations").FindOne(ctx, bson.M{"_id": *user.OrganizationID}).Decode(&org); orgErr != nil {
+			orgStore := organizationstore.New(db)
+			org, orgErr := orgStore.GetByID(ctx, *user.OrganizationID)
+			if orgErr != nil {
 				if orgErr == mongo.ErrNoDocuments {
 					h.Log.Warn("organization not found for leader (may have been deleted)",
 						zap.String("user_id", uid.Hex()),

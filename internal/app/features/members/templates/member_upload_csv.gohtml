@@ -5,57 +5,82 @@
 {{ define "content" }}
 <div class="flex items-center mb-2">
   <a href="{{ .BackURL }}"
-     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 mr-2"
+     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 mr-2"
      title="Go back">
     ← Back
   </a>
-  <h1 class="text-2xl font-bold text-gray-900">⛹️ Upload CSV</h1>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">⛹️ Upload CSV</h1>
 </div>
-
-<!-- Selected organization -->
-<div class="text-sm text-gray-700 mb-3">
-  <span class="font-semibold">Organization:</span>
-  <span>{{ .OrgName }}</span>
-</div>
-
 
 {{ if .Error }}
   <div class="mb-3 text-sm text-red-800 bg-red-100 px-3 py-2 rounded">{{ .Error }}</div>
 {{ else }}
   {{ if and (eq .Created 0) (eq .Previously 0) (eq .SkippedCount 0) }}
-    <p class="mb-3 text-xs text-gray-500">
+    <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
       No CSV has been processed yet. Choose a file and click <strong>Upload</strong> to add or update members.
     </p>
   {{ end }}
 {{ end }}
 
 <form method="post" action="/members/upload_csv" enctype="multipart/form-data"
-      class="space-y-3 max-w-xl bg-white p-4 rounded border">
-  <input type="hidden" name="orgID" value="{{ .OrgHex }}" />
+      class="space-y-3 max-w-xl bg-white dark:bg-gray-800 p-4 rounded border dark:border-gray-700">
+
+  <input type="hidden" name="return" value="{{ .BackURL }}">
+
+  <!-- Organization -->
+  <div>
+    <label class="block text-sm font-medium mb-1 dark:text-gray-200">Organization</label>
+    {{ if .OrgLocked }}
+      <!-- Leader: org is locked -->
+      <input type="text" value="{{ .OrgName }}" class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm dark:text-gray-100" readonly />
+      <input type="hidden" name="orgID" value="{{ .OrgHex }}">
+    {{ else }}
+      <!-- Admin: select via picker -->
+      <div id="selected-org-display" class="min-h-[2.5rem] p-2 border dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 mb-2">
+        <div id="selected-org-name" class="text-sm text-gray-900 dark:text-gray-100 {{ if not .OrgName }}hidden{{ end }}">
+          {{ .OrgName }}
+        </div>
+        <div id="no-org-msg" class="text-gray-500 dark:text-gray-400 text-sm {{ if .OrgName }}hidden{{ end }}">
+          No organization selected
+        </div>
+      </div>
+
+      <input type="hidden" name="orgID" id="org-hidden-input" value="{{ .OrgHex }}">
+
+      <button
+        type="button"
+        id="select-org-btn"
+        class="px-3 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+        hx-get="/organizations/picker{{ if .OrgHex }}?selected={{ .OrgHex }}{{ end }}"
+        hx-target="#org-picker-root"
+        hx-swap="innerHTML"
+      >
+        {{ if .OrgName }}Change Organization...{{ else }}Select Organization...{{ end }}
+      </button>
+    {{ end }}
+  </div>
 
   <div>
-    <label class="block text-sm font-medium mb-1">CSV File</label>
-    <input type="file" name="csv" accept=".csv" class="w-full border rounded px-3 py-1" required />
+    <label class="block text-sm font-medium mb-1 dark:text-gray-200">CSV File</label>
+    <input type="file" name="csv" accept=".csv" class="w-full border rounded px-3 py-1 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100" required />
 
     <!-- Format + allowed auth methods, same visual style -->
-    <p class="text-xs text-gray-500 mt-1">
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
       Format (header row optional): <em>Full Name, Email, Auth Method</em>
     </p>
-    <p class="text-xs text-gray-500 mt-1">
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
       Allowed Auth Methods (case-insensitive): internal, google, classlink, clever, microsoft
     </p>
   </div>
 
-  <!-- round-trip the stable list URL so Back always returns to Members -->
-  <input type="hidden" name="return" value="{{ .BackURL }}">
-  <div>
+  <div class="pt-2">
     <button class="px-3 py-1 bg-purple-600 text-white rounded hover:bg-purple-700">Upload</button>
   </div>
 </form>
 
 <!-- Status summary BELOW the form -->
 {{ if or (gt .Created 0) (gt .Previously 0) (gt .SkippedCount 0) }}
-  <div class="mt-3 max-w-xl bg-white border rounded p-3 text-sm">
+  <div class="mt-3 max-w-xl bg-white dark:bg-gray-800 border dark:border-gray-700 rounded p-3 text-sm">
     <div>
       Created: <strong>{{ .Created }}</strong>
       &nbsp; Previously Added: <strong>{{ .Previously }}</strong>
@@ -65,7 +90,7 @@
     {{ if gt .SkippedCount 0 }}
       <div class="mt-2">
         <div class="font-semibold">Skipped (already in another organization):</div>
-        <ul class="list-disc list-inside text-gray-700">
+        <ul class="list-disc list-inside text-gray-700 dark:text-gray-300">
           {{ range .SkippedEmails }}
             <li>{{ . }}</li>
           {{ end }}
@@ -76,10 +101,66 @@
     <!-- Allow repeated uploads without losing org/return -->
     <div class="mt-3">
       <a href="/members/upload_csv?org={{ .OrgHex }}&return={{ urlquery .BackURL }}"
-         class="inline-flex items-center px-3 py-2 border rounded hover:bg-gray-50">
+         class="inline-flex items-center px-3 py-2 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600">
         Upload another CSV
       </a>
     </div>
   </div>
+{{ end }}
+
+{{ if not .OrgLocked }}
+<!-- Modal container (admin only) -->
+<div id="org-picker-root"></div>
+
+<script>
+(function() {
+  var selectedOrg = {
+    id: '{{ .OrgHex }}',
+    name: '{{ .OrgName }}'
+  };
+
+  window.closeOrgPicker = function() {
+    document.getElementById('org-picker-root').innerHTML = '';
+  };
+
+  window.updateOrgPickerSelection = function(radio) {
+    var hiddenField = document.getElementById('picker-selected-org');
+    if (hiddenField) hiddenField.value = radio.value;
+  };
+
+  window.confirmOrgSelection = function() {
+    var selected = document.querySelector('input[name="org-selection"]:checked');
+    if (selected) {
+      selectedOrg.id = selected.value;
+      selectedOrg.name = selected.dataset.name;
+      updateOrgDisplay();
+    }
+    closeOrgPicker();
+  };
+
+  function updateOrgDisplay() {
+    var orgNameEl = document.getElementById('selected-org-name');
+    var noOrgMsg = document.getElementById('no-org-msg');
+    var hiddenInput = document.getElementById('org-hidden-input');
+    var selectBtn = document.getElementById('select-org-btn');
+
+    hiddenInput.value = selectedOrg.id;
+
+    if (selectedOrg.id && selectedOrg.name) {
+      orgNameEl.textContent = selectedOrg.name;
+      orgNameEl.classList.remove('hidden');
+      noOrgMsg.classList.add('hidden');
+      selectBtn.textContent = 'Change Organization...';
+    } else {
+      orgNameEl.classList.add('hidden');
+      noOrgMsg.classList.remove('hidden');
+      selectBtn.textContent = 'Select Organization...';
+    }
+
+    selectBtn.setAttribute('hx-get', '/organizations/picker' + (selectedOrg.id ? '?selected=' + selectedOrg.id : ''));
+    htmx.process(selectBtn);
+  }
+})();
+</script>
 {{ end }}
 {{ end }}

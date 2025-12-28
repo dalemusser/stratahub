@@ -3,58 +3,84 @@
 {{ end }}
 
 {{ define "content" }}
-<div class="flex items-center mb-2">
+<div class="flex items-center mb-4">
   <a href="{{ .BackURL }}"
-     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 mr-2"
+     class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-3"
      title="Go back">
     ← Back
   </a>
-  <h1 class="text-2xl font-bold text-gray-900">📚 {{ .TypeDisplay }}</h1>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📚 {{ .TypeDisplay }}</h1>
 </div>
 
+<!-- Resource Title & Subject -->
 <div class="mb-4">
-  <h1 class="text-2xl font-bold text-gray-900">{{ .ResourceTitle }}</h1>
-  <p class="text-gray-500 text-sm">{{ .Subject }}</p>
+  <h2 class="text-xl font-bold text-gray-900 dark:text-gray-100">{{ .ResourceTitle }}</h2>
+  <p class="text-gray-500 dark:text-gray-400 text-sm">{{ .Subject }}</p>
 </div>
 
-<div class="bg-white shadow rounded p-4 text-gray-700 text-sm max-w-xl space-y-3">
-  {{ if .AvailableUntil }}
-  <div>
-    <label class="block font-semibold mb-1">Availability</label>
-    <p class="text-gray-800">{{ .AvailableUntil }}</p>
-    {{ if .TimeZone }}
-      <p class="text-xs text-gray-500">Times shown in {{ .TimeZone }} (group timezone)</p>
-    {{ end }}
-  </div>
-  {{ end }}
-
-  <!-- Description -->
-  <div>
-    <label class="block font-semibold mb-1">Description</label>
-    <p class="text-gray-800">{{ .Description }}</p>
-  </div>
-
-  <!-- Instructions -->
-  {{ if .DefaultInstructions }}
-  <div>
-    <label class="block font-semibold mb-1">Instructions</label>
-    <p class="text-gray-800 whitespace-pre-line">{{ .DefaultInstructions }}</p>
-  </div>
-  {{ end }}
-
-  <!-- Actions -->
-  <div class="flex items-center gap-2">
-    {{ if and .CanOpen .LaunchURL }}
-      <a
-        href="{{ .LaunchURL }}"
-        target="_blank" rel="noopener"
-        class="bg-green-600 text-white px-3 py-1.5 rounded hover:bg-green-700"
-      >
-        Open
-      </a>
+<!-- Single card with sections -->
+<div class="max-w-2xl bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow">
+  <!-- Main Action Section -->
+  <div class="p-4">
+    {{ if not .CanOpen }}
+      <div class="p-3 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-700 rounded text-sm text-yellow-800 dark:text-yellow-200">
+        This resource is not currently available. It may have expired or not yet started.
+      </div>
+    {{ else if .HasFile }}
+      <div class="flex items-center justify-between">
+        <div>
+          <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">File</p>
+          <p class="text-gray-900 dark:text-gray-100 font-medium">{{ .FileName }}</p>
+        </div>
+        <a href="/member/resources/{{ .ResourceID }}/download" target="_blank"
+           class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+          Download
+        </a>
+      </div>
+    {{ else if .LaunchURL }}
+      <div class="flex items-center justify-between gap-4">
+        <div class="min-w-0 flex-1">
+          <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Link</p>
+          <p class="text-indigo-600 dark:text-indigo-400 text-sm truncate">{{ .DisplayURL }}</p>
+        </div>
+        <a href="{{ .LaunchURL }}" target="_blank"
+           class="shrink-0 px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+          Open
+        </a>
+      </div>
     {{ else }}
-      <span class="text-gray-500 font-semibold">Not currently available.</span>
+      <p class="text-gray-500 dark:text-gray-400 text-sm">No content available.</p>
     {{ end }}
+  </div>
+
+  <!-- Instructions Section (if present) -->
+  {{ if .DefaultInstructions }}
+  <div class="border-t border-gray-200 dark:border-gray-700 p-4">
+    <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-2">Instructions</p>
+    <div class="tiptap-content text-gray-800 dark:text-gray-200">{{ .DefaultInstructions }}</div>
+  </div>
+  {{ end }}
+
+  <!-- Details Section -->
+  <div class="border-t border-gray-200 dark:border-gray-700 p-4">
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      <!-- Description -->
+      <div>
+        <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Description</p>
+        <p class="text-gray-800 dark:text-gray-200 text-sm">{{ .Description }}</p>
+      </div>
+
+      <!-- Availability -->
+      {{ if .AvailableUntil }}
+      <div>
+        <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Available Until</p>
+        <p class="text-gray-800 dark:text-gray-200 text-sm">{{ .AvailableUntil }}</p>
+        {{ if .TimeZone }}
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">{{ .TimeZone }}</p>
+        {{ end }}
+      </div>
+      {{ end }}
+    </div>
   </div>
 </div>
 {{ end }}

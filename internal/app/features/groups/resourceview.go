@@ -8,13 +8,13 @@ import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/policy/grouppolicy"
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
+	resourcestore "github.com/dalemusser/stratahub/internal/app/store/resources"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
-	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/httpnav"
+	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
@@ -23,7 +23,7 @@ import (
 // ServeGroupResourceView renders a read-only view of a resource in the
 // context of a group.
 func (h *Handler) ServeGroupResourceView(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := authz.UserCtx(r)
+	_, _, _, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
@@ -70,8 +70,9 @@ func (h *Handler) ServeGroupResourceView(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	var res models.Resource
-	if err := db.Collection("resources").FindOne(ctx, bson.M{"_id": resourceOID}).Decode(&res); err != nil {
+	resStore := resourcestore.New(db)
+	res, err := resStore.GetByID(ctx, resourceOID)
+	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			uierrors.RenderForbidden(w, r, "Resource not found.", httpnav.ResolveBackURL(r, "/groups"))
 			return
@@ -82,10 +83,7 @@ func (h *Handler) ServeGroupResourceView(w http.ResponseWriter, r *http.Request)
 	}
 
 	templates.Render(w, r, "group_resource_view", groupResourceViewData{
-		Title:         "View Resource",
-		IsLoggedIn:    true,
-		Role:          role,
-		UserName:      uname,
+		BaseVM:        viewdata.NewBaseVM(r, h.DB, "View Resource", "/groups/"+gid+"/assign_resources"),
 		GroupID:       group.ID.Hex(),
 		GroupName:     group.Name,
 		ResourceID:    res.ID.Hex(),
@@ -94,7 +92,5 @@ func (h *Handler) ServeGroupResourceView(w http.ResponseWriter, r *http.Request)
 		Description:   res.Description,
 		Status:        res.Status,
 		LaunchURL:     res.LaunchURL,
-		BackURL:       httpnav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"),
-		CurrentPath:   httpnav.CurrentPath(r),
 	})
 }

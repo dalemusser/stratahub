@@ -4,6 +4,7 @@ package organizations
 import (
 	"github.com/dalemusser/stratahub/internal/app/system/formutil"
 	"github.com/dalemusser/stratahub/internal/app/system/timezones"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -21,14 +22,10 @@ type listItem struct {
 
 // listData is the view model for the organizations list page.
 type listData struct {
-	Title      string
-	IsLoggedIn bool
-	Role       string
-	UserName   string
+	viewdata.BaseVM
 
-	Q           string
-	Items       []listItem
-	CurrentPath string
+	Q     string
+	Items []listItem
 
 	// Pagination
 	Shown      int
@@ -63,12 +60,9 @@ type newData struct {
 	TimeZoneGroups []timezones.ZoneGroup
 }
 
-// viewData is the view model for the “View Organization” page.
+// viewData is the view model for the "View Organization" page.
 type viewData struct {
-	Title      string
-	IsLoggedIn bool
-	Role       string
-	UserName   string
+	viewdata.BaseVM
 
 	ID       string
 	Name     string
@@ -76,7 +70,6 @@ type viewData struct {
 	State    string
 	TimeZone string
 	Contact  string
-	BackURL  string
 
 	TimeZoneGroups []timezones.ZoneGroup
 }

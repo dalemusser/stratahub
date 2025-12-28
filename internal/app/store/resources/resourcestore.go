@@ -15,6 +15,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Store struct {
@@ -43,17 +44,20 @@ func (s *Store) Create(ctx context.Context, r models.Resource) (models.Resource,
 	if r.Type == "" {
 		r.Type = "game"
 	}
-	r.ShowInLibrary = true
+	// ShowInLibrary is left as passed in (defaults to false if not set)
 	r.CreatedAt = now
 	r.UpdatedAt = &now
 
 	if strings.TrimSpace(r.Title) == "" {
 		return models.Resource{}, mongo.CommandError{Message: "title is required"}
 	}
-	if strings.TrimSpace(r.LaunchURL) == "" {
-		return models.Resource{}, mongo.CommandError{Message: "launch_url is required"}
+	// Must have either LaunchURL or FilePath
+	hasURL := strings.TrimSpace(r.LaunchURL) != ""
+	hasFile := strings.TrimSpace(r.FilePath) != ""
+	if !hasURL && !hasFile {
+		return models.Resource{}, mongo.CommandError{Message: "either launch_url or file is required"}
 	}
-	if !urlutil.IsValidAbsHTTPURL(r.LaunchURL) {
+	if hasURL && !urlutil.IsValidAbsHTTPURL(r.LaunchURL) {
 		return models.Resource{}, mongo.CommandError{Message: "launch_url must be a valid http(s) URL"}
 	}
 	if !status.IsValid(r.Status) {
@@ -82,20 +86,22 @@ func (s *Store) Update(ctx context.Context, id primitive.ObjectID, mut models.Re
 		set["title"] = mut.Title
 		set["title_ci"] = mut.TitleCI
 	}
-	if strings.TrimSpace(mut.Subject) != "" {
-		mut.SubjectCI = text.Fold(mut.Subject)
-		set["subject"] = mut.Subject
-		set["subject_ci"] = mut.SubjectCI
-	}
-	if mut.Description != "" {
-		set["description"] = mut.Description
-	}
+	// Subject and Description can be cleared (set to empty)
+	mut.SubjectCI = text.Fold(mut.Subject)
+	set["subject"] = mut.Subject
+	set["subject_ci"] = mut.SubjectCI
+	set["description"] = mut.Description
+	// LaunchURL can be empty if using file upload; validate only if non-empty
+	set["launch_url"] = mut.LaunchURL
 	if strings.TrimSpace(mut.LaunchURL) != "" {
 		if !urlutil.IsValidAbsHTTPURL(mut.LaunchURL) {
 			return mongo.CommandError{Message: "launch_url must be a valid http(s) URL"}
 		}
-		set["launch_url"] = mut.LaunchURL
 	}
+	// File fields
+	set["file_path"] = mut.FilePath
+	set["file_name"] = mut.FileName
+	set["file_size"] = mut.FileSize
 	if mut.Status != "" {
 		if !status.IsValid(mut.Status) {
 			return mongo.CommandError{Message: "status must be 'active' or 'disabled'"}
@@ -106,9 +112,7 @@ func (s *Store) Update(ctx context.Context, id primitive.ObjectID, mut models.Re
 		set["type"] = mut.Type
 	}
 	set["show_in_library"] = mut.ShowInLibrary
-	if mut.DefaultInstructions != "" {
-		set["default_instructions"] = mut.DefaultInstructions
-	}
+	set["default_instructions"] = mut.DefaultInstructions
 	now := time.Now().UTC()
 	mut.UpdatedAt = &now
 	set["updated_at"] = mut.UpdatedAt
@@ -117,5 +121,68 @@ func (s *Store) Update(ctx context.Context, id primitive.ObjectID, mut models.Re
 		return nil
 	}
 	_, err := s.c.UpdateByID(ctx, id, bson.M{"$set": set})
-	return err
+	if err != nil {
+		if wafflemongo.IsDup(err) {
+			return ErrDuplicateTitle
+		}
+		return err
+	}
+	return nil
+}
+
+// GetByID returns a resource by its ID.
+func (s *Store) GetByID(ctx context.Context, id primitive.ObjectID) (models.Resource, error) {
+	var r models.Resource
+	err := s.c.FindOne(ctx, bson.M{"_id": id}).Decode(&r)
+	if err != nil {
+		return models.Resource{}, err
+	}
+	return r, nil
+}
+
+// Delete removes a resource by ID. Returns the number of documents deleted (0 or 1).
+func (s *Store) Delete(ctx context.Context, id primitive.ObjectID) (int64, error) {
+	res, err := s.c.DeleteOne(ctx, bson.M{"_id": id})
+	if err != nil {
+		return 0, err
+	}
+	return res.DeletedCount, nil
+}
+
+// GetByIDs returns multiple resources by their IDs.
+func (s *Store) GetByIDs(ctx context.Context, ids []primitive.ObjectID) ([]models.Resource, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	cur, err := s.c.Find(ctx, bson.M{"_id": bson.M{"$in": ids}})
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	var out []models.Resource
+	if err := cur.All(ctx, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// Find returns resources matching the given filter with optional find options.
+// The caller is responsible for building the filter and options (pagination, sorting, projection).
+func (s *Store) Find(ctx context.Context, filter bson.M, opts ...*options.FindOptions) ([]models.Resource, error) {
+	cur, err := s.c.Find(ctx, filter, opts...)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+
+	var resources []models.Resource
+	if err := cur.All(ctx, &resources); err != nil {
+		return nil, err
+	}
+	return resources, nil
+}
+
+// Count returns the number of resources matching the given filter.
+func (s *Store) Count(ctx context.Context, filter bson.M) (int64, error) {
+	return s.c.CountDocuments(ctx, filter)
 }

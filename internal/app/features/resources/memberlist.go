@@ -10,17 +10,14 @@ import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/policy/resourcepolicy"
 	"github.com/dalemusser/stratahub/internal/app/store/queries/memberresources"
-	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/timezones"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/dalemusser/waffle/pantry/urlutil"
 )
 
 func (h *MemberHandler) ServeListResources(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := authz.UserCtx(r)
-	logged := ok
-
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
@@ -51,11 +48,8 @@ func (h *MemberHandler) ServeListResources(w http.ResponseWriter, r *http.Reques
 	if len(results) == 0 {
 		templates.Render(w, r, "member_resources_list", resourceListData{
 			common: common{
-				Title:      "My Resources",
-				IsLoggedIn: logged,
-				Role:       role,
-				UserName:   uname,
-				UserID:     member.Email,
+				BaseVM: viewdata.NewBaseVM(r, h.DB, "My Resources", "/"),
+				UserID: member.Email,
 			},
 			TimeZone: tzLabel,
 		})
@@ -94,6 +88,7 @@ func (h *MemberHandler) ServeListResources(w http.ResponseWriter, r *http.Reques
 			Subject:        row.Resource.Subject,
 			Type:           row.Resource.Type,
 			LaunchURL:      launchURL,
+			HasFile:        row.Resource.FilePath != "",
 			AvailableUntil: availableUntil,
 		})
 	}
@@ -104,11 +99,8 @@ func (h *MemberHandler) ServeListResources(w http.ResponseWriter, r *http.Reques
 
 	templates.Render(w, r, "member_resources_list", resourceListData{
 		common: common{
-			Title:      "My Resources",
-			IsLoggedIn: logged,
-			Role:       role,
-			UserName:   uname,
-			UserID:     member.Email,
+			BaseVM: viewdata.NewBaseVM(r, h.DB, "My Resources", "/"),
+			UserID: member.Email,
 		},
 		Resources: items,
 		TimeZone:  tzLabel,

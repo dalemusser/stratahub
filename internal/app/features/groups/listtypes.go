@@ -3,6 +3,7 @@ package groups
 
 import (
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -26,9 +27,8 @@ type groupListItem struct {
 
 // groupListData is the view model for the groups list page.
 type groupListData struct {
-	Title, SearchQuery string
-	IsLoggedIn         bool
-	Role, UserName     string
+	viewdata.BaseVM
+	SearchQuery string
 
 	// Left org pane (admins only)
 	ShowOrgPane   bool
@@ -59,8 +59,6 @@ type groupListData struct {
 	RangeEnd   int
 	PrevStart  int
 	NextStart  int
-
-	CurrentPath string
 }
 
 // orgPaneData holds all the data needed to render the org pane.

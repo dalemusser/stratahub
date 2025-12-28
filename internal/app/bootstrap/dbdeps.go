@@ -2,6 +2,7 @@
 package bootstrap
 
 import (
+	"github.com/dalemusser/waffle/pantry/storage"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -24,4 +25,7 @@ type DBDeps struct {
 	// MongoDB client and database for StrataHub data
 	StrataHubMongoClient   *mongo.Client
 	StrataHubMongoDatabase *mongo.Database
+
+	// FileStorage for material file uploads
+	FileStorage storage.Store
 }

@@ -5,10 +5,10 @@
 {{ define "content" }}
 <div class="flex items-center mb-4">
   <a href="{{ .BackURL }}" class="text-indigo-600 text-sm hover:underline mr-2">← Back</a>
-  <h1 class="text-2xl font-bold text-gray-900">📚 View Resource Assignment in {{ .GroupName }}</h1>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📚 View Resource Assignment in {{ .GroupName }}</h1>
 </div>
 
-<div class="mb-4 text-sm text-gray-700">
+<div class="mb-4 text-sm text-gray-700 dark:text-gray-300">
   <p class="mb-1">
     <span class="font-semibold">Title:</span>
     {{ .ResourceTitle }}
@@ -21,10 +21,10 @@
   {{ end }}
 </div>
 
-<div class="bg-white border rounded p-4 max-w-2xl space-y-4 text-sm text-gray-800">
+<div class="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded p-4 max-w-2xl space-y-4 text-sm text-gray-800 dark:text-gray-200">
   <div>
     <div class="font-semibold mb-1">Availability</div>
-    <p>{{ if .Availability }}{{ .Availability }}{{ else }}<span class="text-gray-500">—</span>{{ end }}</p>
+    <p>{{ if .Availability }}{{ .Availability }}{{ else }}<span class="text-gray-500 dark:text-gray-400">—</span>{{ end }}</p>
   </div>
 
   <div class="space-y-2">
@@ -34,7 +34,7 @@
         {{ if .VisibleFrom }}
           {{ .VisibleFrom }}
         {{ else }}
-          <span class="text-gray-500">not set</span>
+          <span class="text-gray-500 dark:text-gray-400">not set</span>
         {{ end }}
       </p>
     </div>
@@ -44,7 +44,7 @@
         {{ if .VisibleUntil }}
           {{ .VisibleUntil }}
         {{ else }}
-          <span class="text-gray-500">no end date</span>
+          <span class="text-gray-500 dark:text-gray-400">no end date</span>
         {{ end }}
       </p>
     </div>
@@ -55,14 +55,14 @@
     {{ if .Instructions }}
       <p class="whitespace-pre-line">{{ .Instructions }}</p>
     {{ else }}
-      <p class="text-gray-500">No instructions.</p>
+      <p class="text-gray-500 dark:text-gray-400">No instructions.</p>
     {{ end }}
   </div>
 
   <div>
     <div class="font-semibold mb-1">Created</div>
     <p>
-      {{ if .CreatedAt }}{{ .CreatedAt }}{{ else }}<span class="text-gray-500">unknown</span>{{ end }}
+      {{ if .CreatedAt }}{{ .CreatedAt }}{{ else }}<span class="text-gray-500 dark:text-gray-400">unknown</span>{{ end }}
       {{ if .CreatedByName }} by {{ .CreatedByName }}{{ end }}
     </p>
   </div>
@@ -77,7 +77,7 @@
   </div>
   {{ end }}
 
-  <div class="border-t pt-3 text-xs text-gray-500">
+  <div class="border-t dark:border-gray-700 pt-3 text-xs text-gray-500 dark:text-gray-400">
     <p>
       {{ if .TimeZone }}Times shown in {{ .TimeZone }} (group timezone){{ else }}Times shown in server time zone{{ end }}
     </p>
@@ -91,5 +91,51 @@
   >
     Edit Assignment
   </a>
+</div>
+
+<div class="mt-4 text-xs text-gray-600 dark:text-gray-400 space-y-2 max-w-xl">
+  <p>
+    <span class="font-semibold">Group Assignment</span> &ndash; When a resource is assigned to a group, all members of that group will have access to it (subject to availability dates and the resource's status).
+  </p>
+  <p>
+    <span class="font-semibold">Availability Dates</span> &ndash; Control when the assignment becomes visible and when it expires. The resource's Status must also be Active for members to see it.
+  </p>
+
+  <table class="mt-2 w-full border-collapse text-xs">
+    <thead>
+      <tr class="bg-gray-100 dark:bg-gray-700">
+        <th class="border dark:border-gray-600 px-2 py-1 text-left">Setting</th>
+        <th class="border dark:border-gray-600 px-2 py-1 text-left">Value</th>
+        <th class="border dark:border-gray-600 px-2 py-1 text-left">Effect</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="border dark:border-gray-600 px-2 py-1">Available from</td>
+        <td class="border dark:border-gray-600 px-2 py-1">Set to a date/time</td>
+        <td class="border dark:border-gray-600 px-2 py-1">Members can access starting from that date/time.</td>
+      </tr>
+      <tr>
+        <td class="border dark:border-gray-600 px-2 py-1">Available from</td>
+        <td class="border dark:border-gray-600 px-2 py-1">Empty</td>
+        <td class="border dark:border-gray-600 px-2 py-1">Available immediately (no start restriction).</td>
+      </tr>
+      <tr>
+        <td class="border dark:border-gray-600 px-2 py-1">Available until</td>
+        <td class="border dark:border-gray-600 px-2 py-1">Set to a date/time</td>
+        <td class="border dark:border-gray-600 px-2 py-1">Members can no longer access after that date/time.</td>
+      </tr>
+      <tr>
+        <td class="border dark:border-gray-600 px-2 py-1">Available until</td>
+        <td class="border dark:border-gray-600 px-2 py-1">Empty</td>
+        <td class="border dark:border-gray-600 px-2 py-1">No expiration; remains visible indefinitely.</td>
+      </tr>
+      <tr>
+        <td class="border dark:border-gray-600 px-2 py-1">Resource Status</td>
+        <td class="border dark:border-gray-600 px-2 py-1">Disabled</td>
+        <td class="border dark:border-gray-600 px-2 py-1">Assignment exists but members cannot see the resource.</td>
+      </tr>
+    </tbody>
+  </table>
 </div>
 {{ end }}

@@ -1,13 +1,11 @@
 // internal/app/features/groups/managetypes.go
 package groups
 
+import "github.com/dalemusser/stratahub/internal/app/system/viewdata"
+
 // ManagePageData holds the full view model for the Manage Group page.
 type ManagePageData struct {
-	// layout header
-	Title      string
-	IsLoggedIn bool
-	Role       string
-	UserName   string
+	viewdata.BaseVM
 
 	GroupID          string
 	GroupName        string
@@ -29,10 +27,6 @@ type ManagePageData struct {
 	PrevCursor    string
 	HasNext       bool
 	HasPrev       bool
-
-	// Navigation niceties
-	BackURL     string // where "Back" should go
-	CurrentPath string // this page's path + query (used to propagate ?return=)
 }
 
 // UserItem is a simple view-model for a user row.

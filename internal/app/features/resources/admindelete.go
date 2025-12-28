@@ -6,12 +6,14 @@ import (
 	"net/http"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	resourceassignstore "github.com/dalemusser/stratahub/internal/app/store/resourceassign"
+	resourcestore "github.com/dalemusser/stratahub/internal/app/store/resources"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/txn"
 	"github.com/dalemusser/waffle/pantry/urlutil"
 	"github.com/go-chi/chi/v5"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.uber.org/zap"
 )
 
 // HandleDelete deletes a resource and its assignments.
@@ -28,20 +30,39 @@ func (h *AdminHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	db := h.DB
 
+	rasStore := resourceassignstore.New(db)
+	resStore := resourcestore.New(db)
+
+	// Get resource to check for file
+	res, err := resStore.GetByID(ctx, oid)
+	if err != nil {
+		uierrors.RenderNotFound(w, r, "Resource not found.", "/resources")
+		return
+	}
+
 	// Use transaction for atomic deletion of resource and assignments.
 	if err := txn.Run(ctx, db, h.Log, func(ctx context.Context) error {
 		// 1) Clean up assignments first
-		if _, err := db.Collection("group_resource_assignments").DeleteMany(ctx, bson.M{"resource_id": oid}); err != nil {
+		if _, err := rasStore.DeleteByResource(ctx, oid); err != nil {
 			return err
 		}
 		// 2) Delete resource
-		if _, err := db.Collection("resources").DeleteOne(ctx, bson.M{"_id": oid}); err != nil {
+		if _, err := resStore.Delete(ctx, oid); err != nil {
 			return err
 		}
 		return nil
 	}); err != nil {
 		h.ErrLog.LogServerError(w, r, "delete resource failed", err, "Unable to delete resource.", "")
 		return
+	}
+
+	// Delete file from storage if exists (after successful DB deletion)
+	if res.HasFile() {
+		if err := h.Storage.Delete(ctx, res.FilePath); err != nil {
+			h.Log.Warn("failed to delete file after resource deletion",
+				zap.String("path", res.FilePath),
+				zap.Error(err))
+		}
 	}
 
 	// HTMX flow: redirect via HX-Redirect

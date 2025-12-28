@@ -6,16 +6,15 @@ import (
 	"maps"
 	"net/http"
 
-	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	organizationstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
-	"github.com/dalemusser/waffle/pantry/httpnav"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/dalemusser/waffle/pantry/text"
-
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -25,8 +24,6 @@ import (
 // It supports HTMX partial refresh of the table when HX-Target="orgs-table-wrap".
 // Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
 func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, _ := authz.UserCtx(r)
-
 	q := query.Search(r, "q")
 	after := query.Get(r, "after")
 	before := query.Get(r, "before")
@@ -53,8 +50,9 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Count total
-	total, err := db.Collection("organizations").CountDocuments(ctx, base)
+	// Count total via store
+	orgStore := organizationstore.New(db)
+	total, err := orgStore.Count(ctx, base)
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "count organizations failed", err, "Unable to load organizations.", "")
 		return
@@ -79,25 +77,10 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Fetch organizations
-	type orgRow struct {
-		ID     primitive.ObjectID `bson:"_id"`
-		Name   string             `bson:"name"`
-		NameCI string             `bson:"name_ci"`
-		City   string             `bson:"city"`
-		State  string             `bson:"state"`
-	}
-
-	cur, err := db.Collection("organizations").Find(ctx, f, find)
+	// Fetch organizations via store
+	orgs, err := orgStore.Find(ctx, f, find)
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "find organizations failed", err, "Unable to load organizations.", "")
-		return
-	}
-	defer cur.Close(ctx)
-
-	var orgs []orgRow
-	if err := cur.All(ctx, &orgs); err != nil {
-		h.ErrLog.LogServerError(w, r, "decode organizations failed", err, "Unable to load organizations.", "")
 		return
 	}
 
@@ -157,13 +140,9 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := listData{
-		Title:       "Organizations",
-		IsLoggedIn:  true,
-		Role:        role,
-		UserName:    uname,
-		Q:           q,
-		Items:       items,
-		CurrentPath: httpnav.CurrentPath(r),
+		BaseVM: viewdata.NewBaseVM(r, h.DB, "Organizations", "/organizations"),
+		Q:      q,
+		Items:  items,
 
 		Shown:      shown,
 		Total:      total,

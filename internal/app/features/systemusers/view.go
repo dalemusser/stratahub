@@ -6,14 +6,13 @@ import (
 	"net/http"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
-	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/pantry/httpnav"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/templates"
 
 	"github.com/go-chi/chi/v5"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -22,7 +21,7 @@ import (
 // This endpoint is admin-only, enforced via requireAdmin. It is
 // typically linked from the system users list and the Manage modal.
 func (h *Handler) ServeView(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := userContext(r)
+	_, _, _, ok := userContext(r)
 	if !ok {
 		return
 	}
@@ -38,25 +37,21 @@ func (h *Handler) ServeView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var u models.User
-	if err := db.Collection("users").FindOne(ctx, bson.M{"_id": uid}).Decode(&u); err != nil {
+	usrStore := userstore.New(db)
+	u, err := usrStore.GetByID(ctx, uid)
+	if err != nil {
 		uierrors.RenderNotFound(w, r, "User not found.", "/system-users")
 		return
 	}
 
 	templates.Render(w, r, "system_user_view", viewData{
-		Title:       "View User",
-		IsLoggedIn:  true,
-		Role:        role,
-		UserName:    uname,
-		ID:          idHex,
-		FullName:    u.FullName,
-		Email:       normalize.Email(u.Email),
-		URole:       normalize.Role(u.Role),
-		UserRole:    normalize.Role(u.Role),
-		Auth:        normalize.AuthMethod(u.AuthMethod),
-		Status:      normalize.Status(u.Status),
-		BackURL:     backToSystemUsersURL(r),
-		CurrentPath: httpnav.CurrentPath(r),
+		BaseVM:   viewdata.NewBaseVM(r, h.DB, "View User", backToSystemUsersURL(r)),
+		ID:       idHex,
+		FullName: u.FullName,
+		Email:    normalize.Email(u.Email),
+		URole:    normalize.Role(u.Role),
+		UserRole: normalize.Role(u.Role),
+		Auth:     normalize.AuthMethod(u.AuthMethod),
+		Status:   normalize.Status(u.Status),
 	})
 }

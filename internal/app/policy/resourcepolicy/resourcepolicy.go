@@ -30,6 +30,7 @@ type ResourceAssignment struct {
 	GroupName    string
 	VisibleFrom  *time.Time
 	VisibleUntil *time.Time
+	Instructions string
 }
 
 // VerifyMemberAccess checks that the authenticated user exists as a member in the database.
@@ -105,6 +106,7 @@ func CanViewResource(ctx context.Context, db *mongo.Database, memberID, resource
 			"group_name":    "$g.name",
 			"visible_from":  "$asg.visible_from",
 			"visible_until": "$asg.visible_until",
+			"instructions":  "$asg.instructions",
 		}}},
 		// Only need one result
 		bson.D{{Key: "$limit", Value: 1}},
@@ -125,6 +127,7 @@ func CanViewResource(ctx context.Context, db *mongo.Database, memberID, resource
 		GroupName    string     `bson:"group_name"`
 		VisibleFrom  *time.Time `bson:"visible_from"`
 		VisibleUntil *time.Time `bson:"visible_until"`
+		Instructions string     `bson:"instructions"`
 	}
 	if err := cur.Decode(&row); err != nil {
 		return nil, err
@@ -134,5 +137,6 @@ func CanViewResource(ctx context.Context, db *mongo.Database, memberID, resource
 		GroupName:    row.GroupName,
 		VisibleFrom:  row.VisibleFrom,
 		VisibleUntil: row.VisibleUntil,
+		Instructions: row.Instructions,
 	}, nil
 }

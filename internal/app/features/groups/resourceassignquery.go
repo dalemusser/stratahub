@@ -9,6 +9,7 @@ import (
 	"time"
 
 	resourceassignstore "github.com/dalemusser/stratahub/internal/app/store/resourceassign"
+	resourcestore "github.com/dalemusser/stratahub/internal/app/store/resources"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
@@ -50,22 +51,16 @@ func (h *Handler) buildAssignments(ctx context.Context, g models.Group, q, typeF
 
 	// load assigned resources
 	if len(assignedIDs) > 0 {
-		cg, findErr := db.Collection("resources").Find(ctx, bson.M{"_id": bson.M{"$in": assignedIDs}})
+		resStore := resourcestore.New(db)
+		resList, findErr := resStore.Find(ctx, bson.M{"_id": bson.M{"$in": assignedIDs}})
 		if findErr != nil {
 			h.Log.Error("database error finding assigned resources", zap.Error(findErr), zap.String("group_id", g.ID.Hex()))
 			err = findErr
 			return
 		}
-		defer cg.Close(ctx)
 
 		resByID := make(map[primitive.ObjectID]models.Resource)
-		for cg.Next(ctx) {
-			var rdoc models.Resource
-			if decErr := cg.Decode(&rdoc); decErr != nil {
-				h.Log.Error("database error decoding assigned resource", zap.Error(decErr))
-				err = decErr
-				return
-			}
+		for _, rdoc := range resList {
 			resByID[rdoc.ID] = rdoc
 		}
 
@@ -112,7 +107,7 @@ func (h *Handler) fetchAvailableResourcesPaged(
 	qRaw, typeFilter, after, before string,
 ) (resources []availableResourceItem, shown int, total int64, nextCursor, prevCursor string, hasNext, hasPrev bool, err error) {
 	db := h.DB
-	coll := db.Collection("resources")
+	resStore := resourcestore.New(db)
 
 	filter := bson.M{"status": "active"}
 	if strings.TrimSpace(typeFilter) != "" {
@@ -125,7 +120,7 @@ func (h *Handler) fetchAvailableResourcesPaged(
 		filter["title_ci"] = bson.M{"$gte": q, "$lt": high}
 	}
 
-	if cnt, cntErr := coll.CountDocuments(ctx, filter); cntErr != nil {
+	if cnt, cntErr := resStore.Count(ctx, filter); cntErr != nil {
 		h.Log.Error("database error counting available resources", zap.Error(cntErr))
 		err = cntErr
 		return
@@ -155,22 +150,9 @@ func (h *Handler) fetchAvailableResourcesPaged(
 		findOpts.SetSort(bson.D{{Key: "title_ci", Value: 1}, {Key: "_id", Value: 1}}).SetLimit(limit)
 	}
 
-	cur, e := coll.Find(ctx, filter, findOpts)
+	rows, e := resStore.Find(ctx, filter, findOpts)
 	if e != nil {
 		err = e
-		return
-	}
-	defer cur.Close(ctx)
-
-	var rows []struct {
-		ID      primitive.ObjectID `bson:"_id"`
-		Title   string             `bson:"title"`
-		TitleCI string             `bson:"title_ci"`
-		Subject string             `bson:"subject"`
-		Type    string             `bson:"type"`
-		Status  string             `bson:"status"`
-	}
-	if err = cur.All(ctx, &rows); err != nil {
 		return
 	}
 

@@ -1,0 +1,279 @@
+{{ define "material_new" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center mb-2">
+  <a href="{{ .BackURL }}"
+     class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
+     title="Go back">
+    <- Back
+  </a>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Add Material</h1>
+</div>
+
+{{ if .Error }}
+  <div class="mb-3 p-2 border border-red-300 bg-red-50 text-red-700 rounded">
+    {{ .Error }}
+  </div>
+{{ end }}
+
+<form method="post" action="/materials" enctype="multipart/form-data" class="space-y-3 max-w-2xl bg-white dark:bg-gray-800 p-4 rounded border dark:border-gray-700">
+  <input type="hidden" name="return" value="{{ .BackURL }}">
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+    <input name="title" type="text" value="{{ .MaterialTitle }}" required class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm" />
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+    <select name="type" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm">
+      {{ range .TypeOptions }}
+        <option value="{{ .ID }}" {{ if eq $.Type .ID }}selected{{ end }}>{{ .Label }}</option>
+      {{ end }}
+    </select>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subject</label>
+    <input name="subject" type="text" value="{{ .Subject }}" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm" />
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+    <textarea name="description" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm" rows="4">{{ .Description }}</textarea>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+    <select name="status" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm">
+      <option value="active" {{ if eq .Status "active" }}selected{{ end }}>Active</option>
+      <option value="disabled" {{ if eq .Status "disabled" }}selected{{ end }}>Disabled</option>
+    </select>
+  </div>
+
+  <!-- Content Section: URL or File (mutually exclusive) -->
+  <div class="border-t dark:border-gray-700 pt-3 mt-3">
+    <label class="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Content (choose one)</label>
+
+    <div class="space-y-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Launch URL</label>
+        <input id="launch_url" name="launch_url" type="text" value="{{ .LaunchURL }}"
+               placeholder="https://example.com/document"
+               class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm"
+               onchange="toggleContentInputs()" />
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">External URL for the material (e.g., Google Doc, website, video)</p>
+      </div>
+
+      <div class="text-center text-sm text-gray-500 dark:text-gray-400">- OR -</div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Upload File</label>
+        <input id="file" name="file" type="file"
+               class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm"
+               onchange="toggleContentInputs()" />
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Upload a PDF, document, or other file (max 32MB)</p>
+      </div>
+    </div>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Instructions</label>
+    <input type="hidden" name="default_instructions" id="default_instructions" value="{{ .DefaultInstructions }}">
+    <div class="tiptap-container">
+      <!-- Toolbar -->
+      <div class="tiptap-toolbar" id="editor-toolbar">
+        <button type="button" data-action="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+        <button type="button" data-action="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+        <button type="button" data-action="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+        <button type="button" data-action="strike" title="Strikethrough"><s>S</s></button>
+        <span class="tiptap-toolbar-divider"></span>
+        <button type="button" data-action="heading1" title="Heading 1">H1</button>
+        <button type="button" data-action="heading2" title="Heading 2">H2</button>
+        <button type="button" data-action="heading3" title="Heading 3">H3</button>
+        <button type="button" data-action="paragraph" title="Paragraph">P</button>
+        <span class="tiptap-toolbar-divider"></span>
+        <button type="button" data-action="bulletList" title="Bullet List">•</button>
+        <button type="button" data-action="orderedList" title="Numbered List">1.</button>
+        <button type="button" data-action="blockquote" title="Quote">"</button>
+        <button type="button" data-action="codeBlock" title="Code Block">&lt;/&gt;</button>
+        <span class="tiptap-toolbar-divider"></span>
+        <button type="button" data-action="link" title="Add Link">🔗+</button>
+        <button type="button" data-action="unlink" title="Remove Link">🔗✕</button>
+        <span class="tiptap-toolbar-break"></span>
+        <button type="button" data-action="insertTable" title="Insert Table">▦</button>
+        <button type="button" data-action="addColumnBefore" title="Add Column Before">←|</button>
+        <button type="button" data-action="addColumnAfter" title="Add Column After">|→</button>
+        <button type="button" data-action="deleteColumn" title="Delete Column">|✕</button>
+        <button type="button" data-action="addRowBefore" title="Add Row Above">↑–</button>
+        <button type="button" data-action="addRowAfter" title="Add Row Below">↓–</button>
+        <button type="button" data-action="deleteRow" title="Delete Row">–✕</button>
+        <button type="button" data-action="deleteTable" title="Delete Table">▦✕</button>
+        <span class="tiptap-toolbar-divider"></span>
+        <button type="button" data-action="undo" title="Undo (Ctrl+Z)">↶</button>
+        <button type="button" data-action="redo" title="Redo (Ctrl+Y)">↷</button>
+      </div>
+      <!-- Editor -->
+      <div id="editor"></div>
+    </div>
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">These instructions will be copied to each assignment and can be customized per assignment.</p>
+  </div>
+
+  <div class="pt-2">
+    <button class="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Add Material</button>
+  </div>
+</form>
+
+<script src="/assets/js/tiptap.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const initialContent = document.getElementById('default_instructions').value || '';
+  const editor = window.TiptapEditor.create('editor', 'default_instructions', initialContent);
+
+  if (!editor) return;
+
+  // Toolbar button handlers
+  const toolbar = document.getElementById('editor-toolbar');
+  toolbar.addEventListener('click', function(e) {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+
+    const action = btn.dataset.action;
+    switch(action) {
+      case 'bold': editor.chain().focus().toggleBold().run(); break;
+      case 'italic': editor.chain().focus().toggleItalic().run(); break;
+      case 'underline': editor.chain().focus().toggleUnderline().run(); break;
+      case 'strike': editor.chain().focus().toggleStrike().run(); break;
+      case 'heading1': editor.chain().focus().toggleHeading({ level: 1 }).run(); break;
+      case 'heading2': editor.chain().focus().toggleHeading({ level: 2 }).run(); break;
+      case 'heading3': editor.chain().focus().toggleHeading({ level: 3 }).run(); break;
+      case 'paragraph': editor.chain().focus().setParagraph().run(); break;
+      case 'bulletList': editor.chain().focus().toggleBulletList().run(); break;
+      case 'orderedList': editor.chain().focus().toggleOrderedList().run(); break;
+      case 'blockquote': editor.chain().focus().toggleBlockquote().run(); break;
+      case 'codeBlock': editor.chain().focus().toggleCodeBlock().run(); break;
+      case 'link':
+        const url = prompt('Enter URL:');
+        if (url) editor.chain().focus().setLink({ href: url }).run();
+        break;
+      case 'unlink': editor.chain().focus().unsetLink().run(); break;
+      case 'insertTable': editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); break;
+      case 'addColumnBefore': editor.chain().focus().addColumnBefore().run(); break;
+      case 'addColumnAfter': editor.chain().focus().addColumnAfter().run(); break;
+      case 'deleteColumn': editor.chain().focus().deleteColumn().run(); break;
+      case 'addRowBefore': editor.chain().focus().addRowBefore().run(); break;
+      case 'addRowAfter': editor.chain().focus().addRowAfter().run(); break;
+      case 'deleteRow': editor.chain().focus().deleteRow().run(); break;
+      case 'deleteTable': editor.chain().focus().deleteTable().run(); break;
+      case 'undo': editor.chain().focus().undo().run(); break;
+      case 'redo': editor.chain().focus().redo().run(); break;
+    }
+    updateToolbarState();
+  });
+
+  // Update toolbar button states
+  function updateToolbarState() {
+    toolbar.querySelectorAll('button[data-action]').forEach(btn => {
+      const action = btn.dataset.action;
+      let isActive = false;
+      switch(action) {
+        case 'bold': isActive = editor.isActive('bold'); break;
+        case 'italic': isActive = editor.isActive('italic'); break;
+        case 'underline': isActive = editor.isActive('underline'); break;
+        case 'strike': isActive = editor.isActive('strike'); break;
+        case 'heading1': isActive = editor.isActive('heading', { level: 1 }); break;
+        case 'heading2': isActive = editor.isActive('heading', { level: 2 }); break;
+        case 'heading3': isActive = editor.isActive('heading', { level: 3 }); break;
+        case 'paragraph': isActive = editor.isActive('paragraph'); break;
+        case 'bulletList': isActive = editor.isActive('bulletList'); break;
+        case 'orderedList': isActive = editor.isActive('orderedList'); break;
+        case 'blockquote': isActive = editor.isActive('blockquote'); break;
+        case 'codeBlock': isActive = editor.isActive('codeBlock'); break;
+        case 'link': isActive = editor.isActive('link'); break;
+      }
+      btn.classList.toggle('is-active', isActive);
+    });
+  }
+
+  editor.on('selectionUpdate', updateToolbarState);
+  editor.on('update', updateToolbarState);
+});
+
+// Disable the other content input when one has a value
+function toggleContentInputs() {
+  const urlInput = document.getElementById('launch_url');
+  const fileInput = document.getElementById('file');
+
+  if (urlInput.value) {
+    fileInput.disabled = true;
+    fileInput.classList.add('bg-gray-100');
+  } else if (fileInput.files && fileInput.files.length > 0) {
+    urlInput.disabled = true;
+    urlInput.classList.add('bg-gray-100');
+  } else {
+    urlInput.disabled = false;
+    fileInput.disabled = false;
+    urlInput.classList.remove('bg-gray-100');
+    fileInput.classList.remove('bg-gray-100');
+  }
+}
+</script>
+
+<div class="mt-4 text-xs text-gray-600 dark:text-gray-400 space-y-2 max-w-2xl">
+  <p>
+    <span class="font-semibold">Status</span> &ndash;
+    <span class="font-semibold">Active</span>: the material is available to leaders. Any leader assigned to this material (directly or via their organization) will see it in their Materials list and can open it normally.
+    <span class="font-semibold">Disabled</span>: the material is hidden from all leaders, even if assigned. Admins can still see and manage it, and assignments remain intact, but leaders cannot see or open the material until it is re-activated.
+  </p>
+  <p>
+    <span class="font-semibold">Content</span> &ndash; Materials can have either a Launch URL (external link) OR an uploaded file, but not both. Choose one.
+  </p>
+  <p>
+    <span class="font-semibold">Assignments</span> &ndash; Materials can be assigned to an entire Organization (all current and future leaders in that org) or to individual Leaders. Each assignment can have its own visibility dates (Visible From / Visible Until) and custom directions.
+  </p>
+
+  <table class="mt-2 w-full border-collapse text-xs">
+    <thead>
+      <tr class="bg-gray-100 dark:bg-gray-700">
+        <th class="border dark:border-gray-700 px-2 py-1 text-left">Setting</th>
+        <th class="border dark:border-gray-700 px-2 py-1 text-left">Value</th>
+        <th class="border dark:border-gray-700 px-2 py-1 text-left">Leaders see it?</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="border dark:border-gray-700 px-2 py-1">Status</td>
+        <td class="border dark:border-gray-700 px-2 py-1">Active</td>
+        <td class="border dark:border-gray-700 px-2 py-1">Yes, if assigned to them or their organization, and within visibility dates.</td>
+      </tr>
+      <tr>
+        <td class="border dark:border-gray-700 px-2 py-1">Status</td>
+        <td class="border dark:border-gray-700 px-2 py-1">Disabled</td>
+        <td class="border dark:border-gray-700 px-2 py-1">No, hidden from all leaders even if assigned.</td>
+      </tr>
+      <tr>
+        <td class="border dark:border-gray-700 px-2 py-1">Visible From</td>
+        <td class="border dark:border-gray-700 px-2 py-1">Set</td>
+        <td class="border dark:border-gray-700 px-2 py-1">Only after the specified date/time.</td>
+      </tr>
+      <tr>
+        <td class="border dark:border-gray-700 px-2 py-1">Visible From</td>
+        <td class="border dark:border-gray-700 px-2 py-1">Empty</td>
+        <td class="border dark:border-gray-700 px-2 py-1">No, assignment is not yet available.</td>
+      </tr>
+      <tr>
+        <td class="border dark:border-gray-700 px-2 py-1">Visible Until</td>
+        <td class="border dark:border-gray-700 px-2 py-1">Set</td>
+        <td class="border dark:border-gray-700 px-2 py-1">Only until the specified date/time.</td>
+      </tr>
+      <tr>
+        <td class="border dark:border-gray-700 px-2 py-1">Visible Until</td>
+        <td class="border dark:border-gray-700 px-2 py-1">Empty</td>
+        <td class="border dark:border-gray-700 px-2 py-1">No expiration, remains visible indefinitely.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+{{ end }}

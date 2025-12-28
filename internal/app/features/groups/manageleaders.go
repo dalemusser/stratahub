@@ -9,12 +9,11 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/policy/grouppolicy"
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
 	membershipstore "github.com/dalemusser/stratahub/internal/app/store/memberships"
+	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
-	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -61,10 +60,9 @@ func (h *Handler) HandleAddLeader(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var u models.User
-	if err := db.Collection("users").
-		FindOne(ctx, bson.M{"_id": targetOID, "role": "leader", "organization_id": group.OrganizationID}).
-		Decode(&u); err != nil {
+	// Verify leader exists and belongs to same organization
+	usrStore := userstore.New(db)
+	if _, err := usrStore.GetLeaderInOrg(ctx, targetOID, group.OrganizationID); err != nil {
 		uierrors.HTMXBadRequest(w, r, "Leader must be from the same organization.", "/groups")
 		return
 	}
@@ -131,8 +129,8 @@ func (h *Handler) HandleRemoveLeader(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	cnt, cntErr := db.Collection("group_memberships").
-		CountDocuments(ctx, bson.M{"group_id": group.ID, "role": "leader"})
+	memStore := membershipstore.New(db)
+	cnt, cntErr := memStore.CountByGroup(ctx, group.ID, "leader")
 	if cntErr != nil {
 		h.ErrLog.HTMXLogServerError(w, r, "database error counting group leaders", cntErr, "A database error occurred.", "/groups")
 		return

@@ -1,0 +1,157 @@
+{{ define "admin_materials_assignments" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center mb-4">
+  <a href="{{ .BackURL }}"
+     class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
+     title="Go back">
+    <- Back
+  </a>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Assignments</h1>
+</div>
+
+<div class="mb-4 bg-white dark:bg-gray-800 rounded shadow p-4 flex items-center justify-between">
+  <div>
+    <p class="text-sm text-gray-700 dark:text-gray-300">
+      <span class="font-semibold">Material:</span> {{ .MaterialTitle }}
+    </p>
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+      {{ .Shown }} assignment(s)
+    </p>
+  </div>
+  <a href="/materials/{{ .MaterialID }}/assign"
+     class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+    + Add Assignment
+  </a>
+</div>
+
+<div class="bg-white dark:bg-gray-800 rounded shadow overflow-x-auto">
+  <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+    <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 uppercase text-xs">
+      <tr>
+        <th class="px-4 py-2">Target</th>
+        <th class="px-4 py-2">Type</th>
+        <th class="px-4 py-2">Visible From</th>
+        <th class="px-4 py-2">Visible Until</th>
+        <th class="px-4 py-2">Created</th>
+        <th class="px-4 py-2 text-right">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+      {{ range .Items }}
+      <tr>
+        <td class="px-4 py-2">{{ .TargetName }}</td>
+        <td class="px-4 py-2">
+          {{ if eq .TargetType "organization" }}
+            <span class="px-2 py-1 text-xs bg-purple-100 text-purple-700 rounded">Organization</span>
+          {{ else }}
+            <span class="px-2 py-1 text-xs bg-blue-100 text-blue-700 rounded">Leader</span>
+          {{ end }}
+        </td>
+        <td class="px-4 py-2">{{ if .VisibleFrom }}{{ .VisibleFrom }}{{ else }}<span class="text-gray-400">-</span>{{ end }}</td>
+        <td class="px-4 py-2">{{ if .VisibleUntil }}{{ .VisibleUntil }}{{ else }}<span class="text-gray-400">-</span>{{ end }}</td>
+        <td class="px-4 py-2">{{ .CreatedAt }}</td>
+        <td class="px-4 py-2 text-right">
+          <form
+            method="get"
+            action="/materials/assignments/{{ .ID }}/manage_modal"
+            hx-get="/materials/assignments/{{ .ID }}/manage_modal?return={{ $.CurrentPath }}"
+            hx-target="#modal-root"
+            hx-swap="innerHTML"
+            aria-label="Manage assignment"
+          >
+            <button
+              type="submit"
+              class="bg-indigo-600 text-white px-2 py-1 rounded text-xs hover:bg-indigo-700"
+              title="Manage assignment"
+            >
+              Manage
+            </button>
+          </form>
+        </td>
+      </tr>
+      {{ else }}
+      <tr>
+        <td colspan="6" class="px-4 py-6 text-center text-gray-500">
+          No assignments yet.
+          <a href="/materials/{{ .MaterialID }}/assign" class="text-indigo-600 hover:underline ml-1">Add one</a>
+        </td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+</div>
+
+<div class="mt-4 text-xs text-gray-600 dark:text-gray-400 max-w-xl">
+  <p>
+    <span class="font-semibold">Organization assignments</span> grant access to all current and future leaders in that organization.
+  </p>
+  <p class="mt-1">
+    <span class="font-semibold">Leader assignments</span> grant access to a specific individual leader only.
+  </p>
+</div>
+
+<div id="modal-root"></div>
+{{ end }}
+
+{{ define "material_assignment_manage_modal" }}
+<div class="fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/40"
+       onclick="document.getElementById('modal-root').innerHTML=''"></div>
+
+  <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-300 dark:border-gray-600 max-w-md w-full p-4 space-y-4">
+    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Manage Assignment</h2>
+
+    <div class="text-sm text-gray-700 dark:text-gray-300 space-y-1">
+      <p><span class="font-semibold">Material:</span> {{ .MaterialTitle }}</p>
+      <p>
+        <span class="font-semibold">Target:</span> {{ .TargetName }}
+        <span class="text-gray-500 dark:text-gray-400">({{ if eq .TargetType "organization" }}Organization{{ else }}Leader{{ end }})</span>
+      </p>
+      {{ if .VisibleFrom }}
+      <p><span class="font-semibold">Visible From:</span> {{ .VisibleFrom }}</p>
+      {{ end }}
+      {{ if .VisibleUntil }}
+      <p><span class="font-semibold">Visible Until:</span> {{ .VisibleUntil }}</p>
+      {{ end }}
+    </div>
+
+    <div class="flex flex-col gap-3 pt-2">
+      <!-- Centered action buttons -->
+      <div class="flex flex-wrap justify-center gap-2">
+        <a
+          href="/materials/assignments/{{ .ID }}/view?return={{ .BackURL }}"
+          class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+        >View</a>
+        <a
+          href="/materials/assignments/{{ .ID }}/edit?return={{ .BackURL }}"
+          class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+        >Edit</a>
+        <button
+          type="button"
+          class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+          onclick="if(confirm('Are you sure you want to delete this assignment?')) { document.getElementById('delete-form-{{ .ID }}').submit(); }"
+        >Delete</button>
+      </div>
+
+      <!-- Hidden delete form -->
+      <form id="delete-form-{{ .ID }}" method="post" action="/materials/assignments/{{ .ID }}/delete" class="hidden">
+        <input type="hidden" name="return" value="{{ .BackURL }}">
+      </form>
+
+      <!-- Close button left-aligned -->
+      <div class="flex justify-start">
+        <button
+          type="button"
+          class="px-3 py-1 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+          onclick="document.getElementById('modal-root').innerHTML=''"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{{ end }}

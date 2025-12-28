@@ -6,12 +6,14 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/url"
+	"strconv"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/policy/grouppolicy"
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -24,7 +26,7 @@ import (
 
 // ServeAssignResources renders the full Assign Resources page for a group.
 func (h *Handler) ServeAssignResources(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := authz.UserCtx(r)
+	_, _, _, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
@@ -67,6 +69,14 @@ func (h *Handler) ServeAssignResources(w http.ResponseWriter, r *http.Request) {
 	after := r.URL.Query().Get("after")
 	before := r.URL.Query().Get("before")
 
+	// Track range start for display (defaults to 1)
+	rangeStart := 1
+	if startStr := r.URL.Query().Get("start"); startStr != "" {
+		if s, err := strconv.Atoi(startStr); err == nil && s > 0 {
+			rangeStart = s
+		}
+	}
+
 	assigned, avail, shown, total, nextCur, prevCur, hasNext, hasPrev, err := h.buildAssignments(ctx, group, q, typeFilter, after, before)
 	if err != nil {
 		h.Log.Warn("buildAssignments", zap.Error(err))
@@ -79,28 +89,40 @@ func (h *Handler) ServeAssignResources(w http.ResponseWriter, r *http.Request) {
 		back = urlutil.SafeReturn(r.URL.Query().Get("return"), "", "/groups")
 	}
 
+	// Calculate range end
+	rangeEnd := rangeStart + shown - 1
+	if rangeEnd < rangeStart {
+		rangeEnd = rangeStart
+	}
+
+	// Calculate next/prev start positions for pagination
+	nextStart := rangeStart + shown
+	prevStart := rangeStart - shown
+	if prevStart < 1 {
+		prevStart = 1
+	}
+
 	templates.RenderAutoMap(w, r, "group_manage_resources", nil, assignmentListData{
-		Title:          "Assign Resources",
-		IsLoggedIn:     true,
-		Role:           role,
-		UserName:       uname,
-		GroupID:        group.ID.Hex(),
-		GroupName:      group.Name,
-		Assigned:       assigned,
-		Available:      avail,
-		AvailableShown: shown,
-		AvailableTotal: total,
-		Query:          q,
-		TypeFilter:     typeFilter,
-		TypeOptions:    models.ResourceTypes,
-		CurrentAfter:   after,
-		CurrentBefore:  before,
-		NextCursor:     nextCur,
-		PrevCursor:     prevCur,
-		HasNext:        hasNext,
-		HasPrev:        hasPrev,
-		BackURL:        back,
-		CurrentPath:    httpnav.CurrentPath(r),
+		BaseVM:              viewdata.NewBaseVM(r, h.DB, "Assign Resources", back),
+		GroupID:             group.ID.Hex(),
+		GroupName:           group.Name,
+		Assigned:            assigned,
+		Available:           avail,
+		AvailableShown:      shown,
+		AvailableTotal:      total,
+		AvailableRangeStart: rangeStart,
+		AvailableRangeEnd:   rangeEnd,
+		NextStart:           nextStart,
+		PrevStart:           prevStart,
+		Query:               q,
+		TypeFilter:          typeFilter,
+		TypeOptions:         models.ResourceTypes,
+		CurrentAfter:        after,
+		CurrentBefore:       before,
+		NextCursor:          nextCur,
+		PrevCursor:          prevCur,
+		HasNext:             hasNext,
+		HasPrev:             hasPrev,
 	})
 }
 
@@ -143,6 +165,14 @@ func (h *Handler) ServeSearchResources(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Track range start for display (defaults to 1)
+	rangeStart := 1
+	if startStr := r.URL.Query().Get("start"); startStr != "" {
+		if s, err := strconv.Atoi(startStr); err == nil && s > 0 {
+			rangeStart = s
+		}
+	}
+
 	assigned, avail, shown, total, nextCur, prevCur, hasNext, hasPrev, err := h.buildAssignments(ctx, group, q, typeFilter, after, before)
 	if err != nil {
 		uierrors.RenderForbidden(w, r, "A database error occurred.", httpnav.ResolveBackURL(r, "/groups/"+group.ID.Hex()+"/manage"))
@@ -154,25 +184,40 @@ func (h *Handler) ServeSearchResources(w http.ResponseWriter, r *http.Request) {
 		back = urlutil.SafeReturn(r.URL.Query().Get("return"), "", "/groups")
 	}
 
+	// Calculate range end
+	rangeEnd := rangeStart + shown - 1
+	if rangeEnd < rangeStart {
+		rangeEnd = rangeStart
+	}
+
+	// Calculate next/prev start positions for pagination
+	nextStart := rangeStart + shown
+	prevStart := rangeStart - shown
+	if prevStart < 1 {
+		prevStart = 1
+	}
+
 	data := assignmentListData{
-		Title:          "Assign Resources",
-		IsLoggedIn:     true,
-		GroupID:        group.ID.Hex(),
-		GroupName:      group.Name,
-		Assigned:       assigned,
-		Available:      avail,
-		AvailableShown: shown,
-		AvailableTotal: total,
-		Query:          q,
-		TypeFilter:     typeFilter,
-		TypeOptions:    models.ResourceTypes,
-		CurrentAfter:   after,
-		CurrentBefore:  before,
-		NextCursor:     nextCur,
-		PrevCursor:     prevCur,
-		HasNext:        hasNext,
-		HasPrev:        hasPrev,
-		BackURL:        back,
+		BaseVM:              viewdata.NewBaseVM(r, h.DB, "Assign Resources", back),
+		GroupID:             group.ID.Hex(),
+		GroupName:           group.Name,
+		Assigned:            assigned,
+		Available:           avail,
+		AvailableShown:      shown,
+		AvailableTotal:      total,
+		AvailableRangeStart: rangeStart,
+		AvailableRangeEnd:   rangeEnd,
+		NextStart:           nextStart,
+		PrevStart:           prevStart,
+		Query:               q,
+		TypeFilter:          typeFilter,
+		TypeOptions:         models.ResourceTypes,
+		CurrentAfter:        after,
+		CurrentBefore:       before,
+		NextCursor:          nextCur,
+		PrevCursor:          prevCur,
+		HasNext:             hasNext,
+		HasPrev:             hasPrev,
 	}
 
 	templates.RenderSnippet(w, "group_available_resources_block", data)

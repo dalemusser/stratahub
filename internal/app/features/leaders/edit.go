@@ -81,7 +81,7 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 		Status:   usr.Status,
 		Auth:     normalize.AuthMethod(usr.AuthMethod),
 	}
-	formutil.SetBase(&data.Base, r, "Edit Leader", "/leaders")
+	formutil.SetBase(&data.Base, r, h.DB, "Edit Leader", "/leaders")
 
 	templates.Render(w, r, "admin_leader_edit", data)
 }
@@ -135,7 +135,7 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 			ID: uid.Hex(), FullName: full, Email: email, OrgID: orgHex, OrgName: orgName,
 			Status: status, Auth: authm,
 		}
-		formutil.SetBase(&data.Base, r, "Edit Leader", "/leaders")
+		formutil.SetBase(&data.Base, r, h.DB, "Edit Leader", "/leaders")
 		data.SetError(msg)
 		templates.Render(w, r, "admin_leader_edit", data)
 	}

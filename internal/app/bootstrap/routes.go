@@ -4,8 +4,6 @@ package bootstrap
 import (
 	"net/http"
 
-	aboutfeature "github.com/dalemusser/stratahub/internal/app/features/about"
-	contactfeature "github.com/dalemusser/stratahub/internal/app/features/contact"
 	dashboardfeature "github.com/dalemusser/stratahub/internal/app/features/dashboard"
 	errorsfeature "github.com/dalemusser/stratahub/internal/app/features/errors"
 	groupsfeature "github.com/dalemusser/stratahub/internal/app/features/groups"
@@ -14,14 +12,18 @@ import (
 	leadersfeature "github.com/dalemusser/stratahub/internal/app/features/leaders"
 	loginfeature "github.com/dalemusser/stratahub/internal/app/features/login"
 	logoutfeature "github.com/dalemusser/stratahub/internal/app/features/logout"
+	materialsfeature "github.com/dalemusser/stratahub/internal/app/features/materials"
 	membersfeature "github.com/dalemusser/stratahub/internal/app/features/members"
 	organizationsfeature "github.com/dalemusser/stratahub/internal/app/features/organizations"
+	pagesfeature "github.com/dalemusser/stratahub/internal/app/features/pages"
 	reportsfeature "github.com/dalemusser/stratahub/internal/app/features/reports"
 	resourcesfeature "github.com/dalemusser/stratahub/internal/app/features/resources"
+	settingsfeature "github.com/dalemusser/stratahub/internal/app/features/settings"
 	systemusersfeature "github.com/dalemusser/stratahub/internal/app/features/systemusers"
-	termsfeature "github.com/dalemusser/stratahub/internal/app/features/terms"
+	appresources "github.com/dalemusser/stratahub/internal/app/resources"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/config"
 	"github.com/dalemusser/waffle/pantry/fileserver"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -70,6 +72,9 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	}
 	templates.UseEngine(eng, logger)
 
+	// Initialize viewdata with storage for logo URLs.
+	viewdata.Init(deps.FileStorage)
+
 	// Create error logger for handlers.
 	errLog := errorsfeature.NewErrorLogger(logger)
 
@@ -84,20 +89,29 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	r.Mount("/health", healthfeature.Routes(healthHandler))
 
 	// Static assets with pre-compressed file support (gzip/brotli)
-	r.Handle("/static/*", fileserver.Handler("/static", "public"))
+	// /static/* serves files from disk (static directory)
+	r.Handle("/static/*", fileserver.Handler("/static", "static"))
+
+	// /assets/* serves embedded assets (bundled into the binary)
+	r.Handle("/assets/*", appresources.AssetsHandler("/assets"))
+
+	// Uploaded files (local storage only)
+	// When using local storage, serve files from the configured path
+	if appCfg.StorageType == "local" || appCfg.StorageType == "" {
+		r.Handle(appCfg.StorageLocalURL+"/*", fileserver.Handler(appCfg.StorageLocalURL, appCfg.StorageLocalPath))
+	}
 
 	// Public pages
-	homeHandler := homefeature.NewHandler(logger)
+	homeHandler := homefeature.NewHandler(deps.StrataHubMongoDatabase, logger)
 	r.Mount("/", homefeature.Routes(homeHandler))
 
-	aboutHandler := aboutfeature.NewHandler(logger)
-	r.Mount("/about", aboutfeature.Routes(aboutHandler))
-
-	contactHandler := contactfeature.NewHandler(logger)
-	r.Mount("/contact", contactfeature.Routes(contactHandler))
-
-	termsHandler := termsfeature.NewHandler(logger)
-	r.Mount("/terms", termsfeature.Routes(termsHandler))
+	// Dynamic content pages (about, contact, terms, privacy)
+	pagesHandler := pagesfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
+	r.Mount("/about", pagesHandler.AboutRouter())
+	r.Mount("/contact", pagesHandler.ContactRouter())
+	r.Mount("/terms", pagesHandler.TermsRouter())
+	r.Mount("/privacy", pagesHandler.PrivacyRouter())
+	r.Mount("/pages", pagesfeature.EditRoutes(pagesHandler, sessionMgr))
 
 	// Authentication
 	loginHandler := loginfeature.NewHandler(deps.StrataHubMongoDatabase, sessionMgr, errLog, logger)
@@ -134,15 +148,29 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	r.Mount("/system-users", systemusersfeature.Routes(sysUsersHandler, sessionMgr))
 
 	// Resource management (admin and member views)
-	adminResHandler := resourcesfeature.NewAdminHandler(deps.StrataHubMongoDatabase, errLog, logger)
+	adminResHandler := resourcesfeature.NewAdminHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, logger)
 	r.Mount("/resources", resourcesfeature.AdminRoutes(adminResHandler, sessionMgr))
 
-	memberResHandler := resourcesfeature.NewMemberHandler(deps.StrataHubMongoDatabase, errLog, logger)
+	memberResHandler := resourcesfeature.NewMemberHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, logger)
 	r.Mount("/member/resources", resourcesfeature.MemberRoutes(memberResHandler, sessionMgr))
+
+	// Material management (admin and leader views)
+	adminMatHandler := materialsfeature.NewAdminHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, logger)
+	r.Mount("/materials", materialsfeature.AdminRoutes(adminMatHandler, sessionMgr))
+
+	leaderMatHandler := materialsfeature.NewLeaderHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, logger)
+	r.Mount("/leader/materials", materialsfeature.LeaderRoutes(leaderMatHandler, sessionMgr))
 
 	// Reports
 	reportsHandler := reportsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
 	r.Mount("/reports", reportsfeature.Routes(reportsHandler, sessionMgr))
+
+	// Site Settings (admin only)
+	settingsHandler := settingsfeature.NewHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, logger)
+	r.Route("/settings", func(sr chi.Router) {
+		sr.Use(sessionMgr.RequireRole("admin"))
+		settingsHandler.MountRoutes(sr)
+	})
 
 	return r, nil
 }

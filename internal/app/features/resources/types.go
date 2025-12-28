@@ -5,6 +5,7 @@ import (
 	"html/template"
 
 	"github.com/dalemusser/stratahub/internal/app/system/timezones"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -29,14 +30,10 @@ type listItem struct {
 
 // listData provides template data for the admin resources list.
 type listData struct {
-	Title      string
-	IsLoggedIn bool
-	Role       string
-	UserName   string
+	viewdata.BaseVM
 
-	Q           string
-	Items       []listItem
-	CurrentPath string
+	Q     string
+	Items []listItem
 
 	// Pagination
 	Shown      int
@@ -73,12 +70,7 @@ type ResourceTypeOption struct {
 // admin flows. New and Edit handlers populate this and then render the
 // corresponding templates.
 type resourceFormVM struct {
-	Title       string
-	IsLoggedIn  bool
-	Role        string
-	UserName    string
-	BackURL     string
-	CurrentPath string
+	viewdata.BaseVM
 
 	ID            string
 	ResourceTitle string
@@ -90,6 +82,11 @@ type resourceFormVM struct {
 	Status              string
 	ShowInLibrary       bool
 	DefaultInstructions string
+
+	// File upload fields
+	HasFile  bool
+	FileName string
+	FileSize int64
 
 	// Navigation / redirects
 	SubmitReturn string
@@ -104,10 +101,8 @@ type resourceFormVM struct {
 
 // viewData is the view-only model for the admin resource detail page.
 type viewData struct {
-	Title               string
-	IsLoggedIn          bool
-	Role                string
-	UserName            string
+	viewdata.BaseVM
+
 	ID                  string
 	ResourceTitle       string
 	Subject             string
@@ -116,8 +111,12 @@ type viewData struct {
 	Type                string
 	Status              string
 	ShowInLibrary       bool
-	DefaultInstructions string
-	BackURL             string
+	DefaultInstructions template.HTML // HTML content, sanitized for safe rendering
+
+	// File fields
+	HasFile  bool
+	FileName string
+	FileSize int64
 }
 
 // ========================= MEMBER VIEW MODELS ===============================
@@ -128,11 +127,8 @@ type viewData struct {
 
 // common holds fields shared by the member list and detail pages.
 type common struct {
-	Title      string
-	IsLoggedIn bool
-	Role       string
-	UserName   string
-	UserID     string // login id used by the member (email)
+	viewdata.BaseVM
+	UserID string // login id used by the member (email)
 }
 
 // resourceListItem is a single row in the member "My Resources" list.
@@ -142,6 +138,7 @@ type resourceListItem struct {
 	Subject        string
 	Type           string
 	LaunchURL      string
+	HasFile        bool
 	AvailableUntil string
 }
 
@@ -162,8 +159,11 @@ type viewResourceData struct {
 	Type                string
 	TypeDisplay         string
 	Description         string
-	DefaultInstructions string
-	LaunchURL           string
+	DefaultInstructions template.HTML // HTML content, sanitized for safe rendering
+	DisplayURL          string        // Original URL for display (without tracking params)
+	LaunchURL           string        // URL with tracking params (group, id, org) for the Open button
+	HasFile             bool
+	FileName            string
 	Status              string
 	AvailableUntil      string
 	BackURL             string

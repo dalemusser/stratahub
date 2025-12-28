@@ -368,6 +368,12 @@ func withUser(r *http.Request, u *SessionUser) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), currentUserKey, u))
 }
 
+// WithTestUser injects a SessionUser into the request context for testing.
+// This should only be used in tests to simulate authenticated requests.
+func WithTestUser(r *http.Request, u *SessionUser) *http.Request {
+	return withUser(r, u)
+}
+
 // getString safely extracts a string from a session value.
 func getString(s *sessions.Session, key string) string {
 	if v, ok := s.Values[key].(string); ok {

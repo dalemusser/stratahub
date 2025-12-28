@@ -16,6 +16,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/txn"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
@@ -28,7 +29,7 @@ import (
 // ServeView – View Member (Back goes to /members or safe return)
 // Authorization: Admin can view any member; Leader can only view members in their org.
 func (h *Handler) ServeView(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := authz.UserCtx(r)
+	_, _, _, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
@@ -80,17 +81,13 @@ func (h *Handler) ServeView(w http.ResponseWriter, r *http.Request) {
 	}
 
 	templates.Render(w, r, "member_view", viewData{
-		Title:      "View Member",
-		IsLoggedIn: true,
-		Role:       role,
-		UserName:   uname,
-		ID:         u.ID.Hex(),
-		FullName:   u.FullName,
-		Email:      normalize.Email(u.Email),
-		OrgName:    orgName,
-		Status:     u.Status,
-		Auth:       u.AuthMethod,
-		BackURL:    httpnav.ResolveBackURL(r, "/members"),
+		BaseVM:   viewdata.NewBaseVM(r, h.DB, "View Member", "/members"),
+		ID:       u.ID.Hex(),
+		FullName: u.FullName,
+		Email:    normalize.Email(u.Email),
+		OrgName:  orgName,
+		Status:   u.Status,
+		Auth:     u.AuthMethod,
 	})
 }
 
@@ -159,7 +156,7 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 		Status:   u.Status,
 		Auth:     u.AuthMethod,
 	}
-	formutil.SetBase(&data.Base, r, "Edit Member", "/members")
+	formutil.SetBase(&data.Base, r, h.DB, "Edit Member", "/members")
 
 	templates.Render(w, r, "member_edit", data)
 }
@@ -240,7 +237,7 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 			Status:   status,
 			Auth:     authm,
 		}
-		formutil.SetBase(&data.Base, r, "Edit Member", "/members")
+		formutil.SetBase(&data.Base, r, h.DB, "Edit Member", "/members")
 		data.SetError(msg)
 		templates.Render(w, r, "member_edit", data)
 	}

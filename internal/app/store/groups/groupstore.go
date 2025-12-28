@@ -62,9 +62,8 @@ func (s *Store) UpdateInfo(ctx context.Context, id primitive.ObjectID, name, des
 		set["name"] = name
 		set["name_ci"] = text.Fold(name)
 	}
-	if desc != "" {
-		set["description"] = desc
-	}
+	// Description can be cleared (set to empty)
+	set["description"] = desc
 	if stat != "" {
 		if stat != status.Active {
 			return mongo.CommandError{Message: "status must be active"}
@@ -72,5 +71,35 @@ func (s *Store) UpdateInfo(ctx context.Context, id primitive.ObjectID, name, des
 		set["status"] = stat
 	}
 	_, err := s.c.UpdateByID(ctx, id, bson.M{"$set": set})
-	return err
+	if err != nil {
+		if wafflemongo.IsDup(err) {
+			return ErrDuplicateGroupName
+		}
+		return err
+	}
+	return nil
+}
+
+// Delete removes a group by ID. Returns the number of documents deleted (0 or 1).
+func (s *Store) Delete(ctx context.Context, id primitive.ObjectID) (int64, error) {
+	res, err := s.c.DeleteOne(ctx, bson.M{"_id": id})
+	if err != nil {
+		return 0, err
+	}
+	return res.DeletedCount, nil
+}
+
+// DeleteByOrg removes all groups belonging to an organization.
+// Returns the number of documents deleted.
+func (s *Store) DeleteByOrg(ctx context.Context, orgID primitive.ObjectID) (int64, error) {
+	res, err := s.c.DeleteMany(ctx, bson.M{"organization_id": orgID})
+	if err != nil {
+		return 0, err
+	}
+	return res.DeletedCount, nil
+}
+
+// CountByOrg returns the number of groups in an organization.
+func (s *Store) CountByOrg(ctx context.Context, orgID primitive.ObjectID) (int64, error) {
+	return s.c.CountDocuments(ctx, bson.M{"organization_id": orgID})
 }

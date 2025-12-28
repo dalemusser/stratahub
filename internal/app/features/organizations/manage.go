@@ -6,12 +6,11 @@ import (
 	"net/http"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	organizationstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
-	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -31,11 +30,9 @@ func (h *Handler) ServeManageModal(w http.ResponseWriter, r *http.Request) {
 
 	db := h.DB
 
-	var org models.Organization
-	if err := db.Collection("organizations").
-		FindOne(ctx, bson.M{"_id": oid}).
-		Decode(&org); err != nil {
-
+	orgStore := organizationstore.New(db)
+	org, err := orgStore.GetByID(ctx, oid)
+	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			uierrors.RenderNotFound(w, r, "Organization not found.", "/organizations")
 			return

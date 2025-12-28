@@ -1,0 +1,132 @@
+{{ define "admin_material_assignment_view" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center mb-4">
+  <a href="{{ .BackURL }}"
+     class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
+     title="Go back">
+    <- Back
+  </a>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">View Assignment</h1>
+</div>
+
+<div class="bg-white dark:bg-gray-800 rounded shadow p-4 max-w-xl space-y-4">
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Material</label>
+    <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm flex items-center justify-between">
+      <a href="/materials/{{ .MaterialID }}/view" class="text-indigo-600 hover:underline">{{ .MaterialTitle }}</a>
+      {{ if .HasFile }}
+        <a href="/materials/{{ .MaterialID }}/download" target="_blank"
+           class="ml-2 px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 whitespace-nowrap">
+          Download
+        </a>
+      {{ else if .LaunchURL }}
+        <a href="{{ .LaunchURL }}" target="_blank"
+           class="ml-2 px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 whitespace-nowrap">
+          Open Link
+        </a>
+      {{ end }}
+    </div>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Target</label>
+    <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm">
+      {{ .TargetName }}
+      <span class="text-gray-500 dark:text-gray-400">({{ .TargetType }})</span>
+    </div>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Visible From</label>
+    <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm">
+      {{ if .VisibleFrom }}{{ .VisibleFrom }}{{ else }}<span class="text-gray-400">Not set</span>{{ end }}
+    </div>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Visible Until</label>
+    <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm">
+      {{ if .VisibleUntil }}{{ .VisibleUntil }}{{ else }}<span class="text-gray-400">Not set (no expiration)</span>{{ end }}
+    </div>
+  </div>
+
+  <p class="text-xs text-gray-500 dark:text-gray-400">
+    {{ if .TimeZone }}Times shown in {{ .TimeZone }} (organization timezone){{ else }}Times shown in server time zone{{ end }}
+  </p>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Directions</label>
+    <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm tiptap-content min-h-[100px]">
+      {{ if .Directions }}{{ .Directions }}{{ else }}<span class="text-gray-400">No directions specified</span>{{ end }}
+    </div>
+  </div>
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Created</label>
+    <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm">
+      {{ .CreatedAt }}
+    </div>
+  </div>
+
+  <div class="pt-3 flex gap-2">
+    <a
+      href="/materials/assignments/{{ .ID }}/edit?return={{ .BackURL | urlquery }}"
+      class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+    >
+      Edit Assignment
+    </a>
+  </div>
+</div>
+
+<div class="mt-4 text-xs text-gray-600 dark:text-gray-400 space-y-2 max-w-xl">
+  <p>
+    <span class="font-semibold">Organization Assignment</span> &ndash; When assigned to an organization, all current and future leaders in that organization will have access to this material.
+  </p>
+  <p>
+    <span class="font-semibold">Leader Assignment</span> &ndash; When assigned to a specific leader, only that individual leader will have access to this material.
+  </p>
+  <p>
+    <span class="font-semibold">Visibility Dates</span> &ndash; Control when the assignment becomes visible and when it expires. The material's Status must also be Active for leaders to see it.
+  </p>
+
+  <table class="mt-2 w-full border-collapse text-xs">
+    <thead>
+      <tr class="bg-gray-100 dark:bg-gray-700">
+        <th class="border dark:border-gray-600 px-2 py-1 text-left">Setting</th>
+        <th class="border dark:border-gray-600 px-2 py-1 text-left">Value</th>
+        <th class="border dark:border-gray-600 px-2 py-1 text-left">Effect</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td class="border dark:border-gray-600 px-2 py-1">Visible From</td>
+        <td class="border dark:border-gray-600 px-2 py-1">Set to a date/time</td>
+        <td class="border dark:border-gray-600 px-2 py-1">Leaders can access starting from that date/time.</td>
+      </tr>
+      <tr>
+        <td class="border dark:border-gray-600 px-2 py-1">Visible From</td>
+        <td class="border dark:border-gray-600 px-2 py-1">Empty</td>
+        <td class="border dark:border-gray-600 px-2 py-1">Assignment is not yet available to leaders.</td>
+      </tr>
+      <tr>
+        <td class="border dark:border-gray-600 px-2 py-1">Visible Until</td>
+        <td class="border dark:border-gray-600 px-2 py-1">Set to a date/time</td>
+        <td class="border dark:border-gray-600 px-2 py-1">Leaders can no longer access after that date/time.</td>
+      </tr>
+      <tr>
+        <td class="border dark:border-gray-600 px-2 py-1">Visible Until</td>
+        <td class="border dark:border-gray-600 px-2 py-1">Empty</td>
+        <td class="border dark:border-gray-600 px-2 py-1">No expiration; remains visible indefinitely.</td>
+      </tr>
+      <tr>
+        <td class="border dark:border-gray-600 px-2 py-1">Material Status</td>
+        <td class="border dark:border-gray-600 px-2 py-1">Disabled</td>
+        <td class="border dark:border-gray-600 px-2 py-1">Assignment exists but leaders cannot see the material.</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+{{ end }}

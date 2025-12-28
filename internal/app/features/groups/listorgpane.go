@@ -5,6 +5,7 @@ import (
 	"context"
 	"maps"
 
+	organizationstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
@@ -33,7 +34,8 @@ func (h *Handler) fetchOrgPane(
 	}
 
 	// Count total orgs matching search
-	total, err := db.Collection("organizations").CountDocuments(ctx, orgBase)
+	orgStore := organizationstore.New(db)
+	total, err := orgStore.Count(ctx, orgBase)
 	if err != nil {
 		h.Log.Warn("count orgs failed", zap.Error(err))
 		return result, err
@@ -66,21 +68,10 @@ func (h *Handler) fetchOrgPane(
 		find.SetSort(bson.D{{Key: "name_ci", Value: 1}, {Key: "_id", Value: 1}}).SetLimit(limit)
 	}
 
-	// Fetch orgs
-	cur, err := db.Collection("organizations").Find(ctx, orgFilter, find)
+	// Fetch orgs via store
+	oraw, err := orgStore.Find(ctx, orgFilter, find)
 	if err != nil {
 		h.Log.Warn("find orgs failed", zap.Error(err))
-		return result, err
-	}
-	defer cur.Close(ctx)
-
-	var oraw []struct {
-		ID     primitive.ObjectID `bson:"_id"`
-		Name   string             `bson:"name"`
-		NameCI string             `bson:"name_ci"`
-	}
-	if err := cur.All(ctx, &oraw); err != nil {
-		h.Log.Warn("decode orgs failed", zap.Error(err))
 		return result, err
 	}
 

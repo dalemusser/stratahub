@@ -1,0 +1,281 @@
+{{ define "admin_materials_assign" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center mb-4">
+  <a href="{{ .BackURL }}"
+     class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
+     title="Go back">
+    <- Back
+  </a>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Assign Material</h1>
+</div>
+
+<!-- Header box with material info, selection, and assign button -->
+<div class="mb-4 bg-white dark:bg-gray-800 rounded shadow p-4">
+  <div class="flex items-start justify-between gap-4">
+    <div class="flex-1">
+      <p class="text-sm text-gray-700 dark:text-gray-300">
+        <span class="font-semibold">Material:</span> {{ .MaterialTitle }}
+      </p>
+      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+        Select an organization, then choose to assign to all leaders or a specific leader.
+      </p>
+      <!-- Selection indicator -->
+      <div class="mt-2 text-sm text-gray-700 dark:text-gray-300">
+        {{ if .SelectedAll }}
+          <span class="font-medium">Selected:</span> All leaders in {{ .SelectedOrgName }}
+          <span class="ml-2 px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded">Organization</span>
+        {{ else if .SelectedLeaderName }}
+          <span class="font-medium">Selected:</span> {{ .SelectedLeaderName }}
+          <span class="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">Leader</span>
+        {{ else if .SelectedOrg }}
+          <span class="text-gray-500 dark:text-gray-400">Select "All" or a specific leader from the list below</span>
+        {{ else }}
+          <span class="text-gray-500 dark:text-gray-400">Select an organization first</span>
+        {{ end }}
+      </div>
+    </div>
+    <div class="flex-shrink-0">
+      {{ if or .SelectedAll .SelectedLeaderID }}
+      <a href="/materials/{{ .MaterialID }}/assign/form?org={{ .SelectedOrg }}{{ if .SelectedLeaderID }}&leader={{ .SelectedLeaderID }}{{ end }}"
+         class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+        Assign
+      </a>
+      {{ end }}
+    </div>
+  </div>
+</div>
+
+{{ if .Error }}
+  <div class="mb-3 p-2 border border-red-300 bg-red-50 text-red-700 rounded">
+    {{ .Error }}
+  </div>
+{{ end }}
+
+<!-- Assignment rules -->
+<div class="mb-4 text-xs text-gray-600 dark:text-gray-400 bg-gray-50 dark:bg-gray-700 rounded p-3">
+  <p class="font-semibold mb-1">Assignment Rules:</p>
+  <ul class="list-disc list-inside space-y-1">
+    <li><span class="font-medium">Organization assignment</span> grants access to all current and future leaders in that organization.</li>
+    <li><span class="font-medium">Leader assignment</span> grants access to a specific individual leader only.</li>
+  </ul>
+</div>
+
+<!-- Two-pane picker layout -->
+<div class="grid gap-4 grid-cols-[320px_minmax(0,1fr)]">
+
+  <!-- LEFT: Organizations pane -->
+  <aside class="min-w-0">
+    <div class="bg-white dark:bg-gray-800 rounded shadow p-3 sticky top-4 max-h-[calc(100vh-12rem)] overflow-auto">
+      <label class="block text-sm font-semibold dark:text-gray-200 mb-2">Organizations</label>
+
+      <!-- Search + Clear -->
+      <form
+        hx-get="/materials/{{ .MaterialID }}/assign"
+        hx-target="#content"
+        hx-swap="innerHTML"
+        hx-push-url="true"
+        hx-trigger="submit, keyup changed delay:300ms from:#org-search"
+        class="grid grid-cols-[1fr_auto] gap-2 mb-2"
+      >
+        <input
+          id="org-search" name="org_search" type="text"
+          placeholder="Search orgs..."
+          value="{{ .OrgSearch }}"
+          class="min-w-0 w-full px-3 py-2 border dark:border-gray-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-gray-700"
+        />
+        <a
+          href="/materials/{{ .MaterialID }}/assign"
+          hx-get="/materials/{{ .MaterialID }}/assign"
+          hx-target="#content"
+          hx-swap="innerHTML"
+          hx-push-url="true"
+          class="px-3 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+        >Clear</a>
+      </form>
+
+      <!-- Top pager info and nav -->
+      <div class="text-xs text-gray-600 dark:text-gray-400 mb-2 flex justify-between items-center">
+        <span>{{ .OrgShown }} shown of {{ .OrgTotal }} total</span>
+        <span class="flex gap-2">
+          {{ if .OrgHasPrev }}
+            <a class="px-2 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+               href="/materials/{{ .MaterialID }}/assign?org_before={{ .OrgPrevCur }}{{ if .OrgSearch }}&org_search={{ .OrgSearch | urlquery }}{{ end }}{{ if .SelectedOrg }}&org={{ .SelectedOrg }}{{ end }}"
+               hx-get="/materials/{{ .MaterialID }}/assign?org_before={{ .OrgPrevCur }}{{ if .OrgSearch }}&org_search={{ .OrgSearch | urlquery }}{{ end }}{{ if .SelectedOrg }}&org={{ .SelectedOrg }}{{ end }}"
+               hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Prev</a>
+          {{ else }}
+            <span class="px-2 py-1 border dark:border-gray-600 rounded text-gray-400">Prev</span>
+          {{ end }}
+          {{ if .OrgHasNext }}
+            <a class="px-2 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+               href="/materials/{{ .MaterialID }}/assign?org_after={{ .OrgNextCur }}{{ if .OrgSearch }}&org_search={{ .OrgSearch | urlquery }}{{ end }}{{ if .SelectedOrg }}&org={{ .SelectedOrg }}{{ end }}"
+               hx-get="/materials/{{ .MaterialID }}/assign?org_after={{ .OrgNextCur }}{{ if .OrgSearch }}&org_search={{ .OrgSearch | urlquery }}{{ end }}{{ if .SelectedOrg }}&org={{ .SelectedOrg }}{{ end }}"
+               hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Next</a>
+          {{ else }}
+            <span class="px-2 py-1 border dark:border-gray-600 rounded text-gray-400">Next</span>
+          {{ end }}
+        </span>
+      </div>
+
+      <!-- Org list -->
+      <div class="border dark:border-gray-600 rounded divide-y dark:divide-gray-600 text-sm">
+        {{ range .OrgRows }}
+        <a
+          href="/materials/{{ $.MaterialID }}/assign?org={{ .ID.Hex }}{{ if $.OrgSearch }}&org_search={{ $.OrgSearch | urlquery }}{{ end }}"
+          hx-get="/materials/{{ $.MaterialID }}/assign?org={{ .ID.Hex }}{{ if $.OrgSearch }}&org_search={{ $.OrgSearch | urlquery }}{{ end }}"
+          hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
+          class="flex items-center justify-between px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-gray-700 {{ if eq $.SelectedOrg (.ID.Hex) }}bg-indigo-50 dark:bg-indigo-900/40{{ end }}"
+        >
+          <span class="truncate">{{ .Name }}</span>
+          <span class="inline-flex items-center justify-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-100">{{ .LeaderCount }}</span>
+        </a>
+        {{ else }}
+          <div class="px-2 py-2 text-gray-500 dark:text-gray-400">No organizations found.</div>
+        {{ end }}
+      </div>
+
+      <!-- Bottom pager -->
+      <div class="mt-2 text-xs text-gray-600 dark:text-gray-400 flex justify-end">
+        <span class="flex gap-2">
+          {{ if .OrgHasPrev }}
+            <a class="px-2 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+               href="/materials/{{ .MaterialID }}/assign?org_before={{ .OrgPrevCur }}{{ if .OrgSearch }}&org_search={{ .OrgSearch | urlquery }}{{ end }}{{ if .SelectedOrg }}&org={{ .SelectedOrg }}{{ end }}"
+               hx-get="/materials/{{ .MaterialID }}/assign?org_before={{ .OrgPrevCur }}{{ if .OrgSearch }}&org_search={{ .OrgSearch | urlquery }}{{ end }}{{ if .SelectedOrg }}&org={{ .SelectedOrg }}{{ end }}"
+               hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Prev</a>
+          {{ else }}
+            <span class="px-2 py-1 border dark:border-gray-600 rounded text-gray-400">Prev</span>
+          {{ end }}
+          {{ if .OrgHasNext }}
+            <a class="px-2 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+               href="/materials/{{ .MaterialID }}/assign?org_after={{ .OrgNextCur }}{{ if .OrgSearch }}&org_search={{ .OrgSearch | urlquery }}{{ end }}{{ if .SelectedOrg }}&org={{ .SelectedOrg }}{{ end }}"
+               hx-get="/materials/{{ .MaterialID }}/assign?org_after={{ .OrgNextCur }}{{ if .OrgSearch }}&org_search={{ .OrgSearch | urlquery }}{{ end }}{{ if .SelectedOrg }}&org={{ .SelectedOrg }}{{ end }}"
+               hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Next</a>
+          {{ else }}
+            <span class="px-2 py-1 border dark:border-gray-600 rounded text-gray-400">Next</span>
+          {{ end }}
+        </span>
+      </div>
+    </div>
+  </aside>
+
+  <!-- RIGHT: Leaders pane -->
+  <section class="min-w-0">
+    {{ if .SelectedOrg }}
+    <div id="leaders-pane" class="bg-white dark:bg-gray-800 rounded shadow p-3 sticky top-4 max-h-[calc(100vh-12rem)] overflow-auto">
+      <label class="block text-sm font-semibold dark:text-gray-200 mb-2">Leaders - {{ .SelectedOrgName }}</label>
+
+      <!-- Search + Clear -->
+      <form
+        hx-get="/materials/{{ .MaterialID }}/assign/leaders?org={{ .SelectedOrg }}"
+        hx-target="#leaders-pane"
+        hx-swap="innerHTML"
+        hx-trigger="submit, keyup changed delay:300ms from:#leader-search"
+        class="grid grid-cols-[1fr_auto] gap-2 mb-2"
+      >
+        <input
+          id="leader-search" name="leader_search" type="text"
+          placeholder="Search leaders..."
+          value="{{ .LeaderSearch }}"
+          class="min-w-0 w-full px-3 py-2 border dark:border-gray-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-gray-700"
+        />
+        <a
+          href="#"
+          hx-get="/materials/{{ .MaterialID }}/assign/leaders?org={{ .SelectedOrg }}"
+          hx-target="#leaders-pane"
+          hx-swap="innerHTML"
+          class="px-3 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+        >Clear</a>
+      </form>
+
+      <!-- Top pager info and nav -->
+      <div class="text-xs text-gray-600 dark:text-gray-400 mb-2 flex justify-between items-center">
+        <span>{{ .LeaderShown }} shown of {{ .LeaderTotal }} total</span>
+        <span class="flex gap-2">
+          {{ if .LeaderHasPrev }}
+            <a class="px-2 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+               href="#"
+               hx-get="/materials/{{ .MaterialID }}/assign/leaders?org={{ .SelectedOrg }}&before={{ .LeaderPrevCur }}{{ if .LeaderSearch }}&leader_search={{ .LeaderSearch | urlquery }}{{ end }}"
+               hx-target="#leaders-pane" hx-swap="innerHTML">Prev</a>
+          {{ else }}
+            <span class="px-2 py-1 border dark:border-gray-600 rounded text-gray-400">Prev</span>
+          {{ end }}
+          {{ if .LeaderHasNext }}
+            <a class="px-2 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+               href="#"
+               hx-get="/materials/{{ .MaterialID }}/assign/leaders?org={{ .SelectedOrg }}&after={{ .LeaderNextCur }}{{ if .LeaderSearch }}&leader_search={{ .LeaderSearch | urlquery }}{{ end }}"
+               hx-target="#leaders-pane" hx-swap="innerHTML">Next</a>
+          {{ else }}
+            <span class="px-2 py-1 border dark:border-gray-600 rounded text-gray-400">Next</span>
+          {{ end }}
+        </span>
+      </div>
+
+      <!-- All option -->
+      <a
+        href="/materials/{{ .MaterialID }}/assign?org={{ .SelectedOrg }}&target=org{{ if .OrgSearch }}&org_search={{ .OrgSearch | urlquery }}{{ end }}"
+        hx-get="/materials/{{ .MaterialID }}/assign?org={{ .SelectedOrg }}&target=org{{ if .OrgSearch }}&org_search={{ .OrgSearch | urlquery }}{{ end }}"
+        hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
+        class="flex items-center justify-between px-2 py-1 mb-2 rounded text-sm {{ if .SelectedAll }}bg-indigo-50 dark:bg-indigo-900/40{{ end }} hover:bg-gray-50 dark:hover:bg-gray-700"
+      >
+        <span class="font-medium">All</span>
+        <span class="inline-flex items-center justify-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-100">{{ .LeaderTotal }}</span>
+      </a>
+
+      <!-- Leaders list -->
+      <div class="border dark:border-gray-600 rounded divide-y dark:divide-gray-600 text-sm">
+        {{ range .LeaderRows }}
+        <a
+          href="/materials/{{ $.MaterialID }}/assign?org={{ $.SelectedOrg }}&target=leader:{{ .ID.Hex }}{{ if $.OrgSearch }}&org_search={{ $.OrgSearch | urlquery }}{{ end }}"
+          hx-get="/materials/{{ $.MaterialID }}/assign?org={{ $.SelectedOrg }}&target=leader:{{ .ID.Hex }}{{ if $.OrgSearch }}&org_search={{ $.OrgSearch | urlquery }}{{ end }}"
+          hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
+          class="flex items-center justify-between px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-gray-700 {{ if .Selected }}bg-indigo-50 dark:bg-indigo-900/40{{ end }}"
+        >
+          <div class="min-w-0 flex-1">
+            <span class="block truncate font-medium">{{ .FullName }}</span>
+            <span class="block truncate text-xs text-gray-500 dark:text-gray-400">{{ .Email }}</span>
+          </div>
+        </a>
+        {{ else }}
+          <div class="px-2 py-2 text-gray-500 dark:text-gray-400">No leaders found in this organization.</div>
+        {{ end }}
+      </div>
+
+      <!-- Bottom pager -->
+      <div class="mt-2 text-xs text-gray-600 dark:text-gray-400 flex justify-end">
+        <span class="flex gap-2">
+          {{ if .LeaderHasPrev }}
+            <a class="px-2 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+               href="#"
+               hx-get="/materials/{{ .MaterialID }}/assign/leaders?org={{ .SelectedOrg }}&before={{ .LeaderPrevCur }}{{ if .LeaderSearch }}&leader_search={{ .LeaderSearch | urlquery }}{{ end }}"
+               hx-target="#leaders-pane" hx-swap="innerHTML">Prev</a>
+          {{ else }}
+            <span class="px-2 py-1 border dark:border-gray-600 rounded text-gray-400">Prev</span>
+          {{ end }}
+          {{ if .LeaderHasNext }}
+            <a class="px-2 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+               href="#"
+               hx-get="/materials/{{ .MaterialID }}/assign/leaders?org={{ .SelectedOrg }}&after={{ .LeaderNextCur }}{{ if .LeaderSearch }}&leader_search={{ .LeaderSearch | urlquery }}{{ end }}"
+               hx-target="#leaders-pane" hx-swap="innerHTML">Next</a>
+          {{ else }}
+            <span class="px-2 py-1 border dark:border-gray-600 rounded text-gray-400">Next</span>
+          {{ end }}
+        </span>
+      </div>
+    </div>
+    {{ else }}
+    <div class="bg-white dark:bg-gray-800 rounded shadow p-8 text-center text-gray-500 dark:text-gray-400">
+      Select an organization to see its leaders.
+    </div>
+    {{ end }}
+  </section>
+
+</div>
+
+<div class="mt-4 flex gap-2">
+  <a href="/materials/{{ .MaterialID }}/assignments" class="text-sm text-indigo-600 hover:underline">
+    View existing assignments for this material
+  </a>
+</div>
+{{ end }}

@@ -149,3 +149,111 @@ func (s *Store) AddBatch(ctx context.Context, groupID, orgID primitive.ObjectID,
 
 	return AddBatchResult{Added: added, Duplicates: duplicates}, nil
 }
+
+// DeleteByGroup removes all memberships for a group.
+// Returns the number of documents deleted.
+func (s *Store) DeleteByGroup(ctx context.Context, groupID primitive.ObjectID) (int64, error) {
+	res, err := s.c.DeleteMany(ctx, bson.M{"group_id": groupID})
+	if err != nil {
+		return 0, err
+	}
+	return res.DeletedCount, nil
+}
+
+// DeleteByOrg removes all memberships for an organization.
+// Returns the number of documents deleted.
+func (s *Store) DeleteByOrg(ctx context.Context, orgID primitive.ObjectID) (int64, error) {
+	res, err := s.c.DeleteMany(ctx, bson.M{"org_id": orgID})
+	if err != nil {
+		return 0, err
+	}
+	return res.DeletedCount, nil
+}
+
+// DeleteByUser removes all memberships for a user.
+// Returns the number of documents deleted.
+func (s *Store) DeleteByUser(ctx context.Context, userID primitive.ObjectID) (int64, error) {
+	res, err := s.c.DeleteMany(ctx, bson.M{"user_id": userID})
+	if err != nil {
+		return 0, err
+	}
+	return res.DeletedCount, nil
+}
+
+// CountByGroup returns the count of memberships for a group, optionally filtered by role.
+// If role is empty, counts all memberships.
+func (s *Store) CountByGroup(ctx context.Context, groupID primitive.ObjectID, role string) (int64, error) {
+	filter := bson.M{"group_id": groupID}
+	if role != "" {
+		filter["role"] = role
+	}
+	return s.c.CountDocuments(ctx, filter)
+}
+
+// CountByUser returns the count of memberships for a user.
+func (s *Store) CountByUser(ctx context.Context, userID primitive.ObjectID) (int64, error) {
+	return s.c.CountDocuments(ctx, bson.M{"user_id": userID})
+}
+
+// Exists checks if a membership exists for the given group and user.
+func (s *Store) Exists(ctx context.Context, groupID, userID primitive.ObjectID) (bool, error) {
+	err := s.c.FindOne(ctx, bson.M{"group_id": groupID, "user_id": userID}).Err()
+	if err == mongo.ErrNoDocuments {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// ListByGroup returns all memberships for a group, optionally filtered by role.
+// If role is empty, returns all memberships.
+func (s *Store) ListByGroup(ctx context.Context, groupID primitive.ObjectID, role string) ([]models.GroupMembership, error) {
+	filter := bson.M{"group_id": groupID}
+	if role != "" {
+		filter["role"] = role
+	}
+	cur, err := s.c.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+
+	var memberships []models.GroupMembership
+	if err := cur.All(ctx, &memberships); err != nil {
+		return nil, err
+	}
+	return memberships, nil
+}
+
+// CountGroupsPerLeader returns a map of leader user IDs to the count of groups they lead.
+// This is a batch operation that aggregates counts for multiple leaders in one query.
+func (s *Store) CountGroupsPerLeader(ctx context.Context, leaderIDs []primitive.ObjectID) (map[primitive.ObjectID]int, error) {
+	result := make(map[primitive.ObjectID]int)
+	if len(leaderIDs) == 0 {
+		return result, nil
+	}
+
+	cur, err := s.c.Aggregate(ctx, []bson.M{
+		{"$match": bson.M{"role": "leader", "user_id": bson.M{"$in": leaderIDs}}},
+		{"$group": bson.M{"_id": "$user_id", "n": bson.M{"$sum": 1}}},
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+
+	for cur.Next(ctx) {
+		var row struct {
+			ID primitive.ObjectID `bson:"_id"`
+			N  int                `bson:"n"`
+		}
+		if err := cur.Decode(&row); err != nil {
+			return nil, err
+		}
+		result[row.ID] = row.N
+	}
+
+	return result, nil
+}

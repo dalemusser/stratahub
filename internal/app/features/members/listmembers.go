@@ -6,6 +6,7 @@ import (
 	"maps"
 	"strings"
 
+	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/search"
@@ -73,8 +74,9 @@ func (h *Handler) fetchMembersList(
 		pbase["$or"] = searchOr
 	}
 
-	// Count total
-	total, err := db.Collection("users").CountDocuments(ctx, pbase)
+	// Count total via store
+	usrStore := userstore.New(db)
+	total, err := usrStore.Count(ctx, pbase)
 	if err != nil {
 		h.Log.Error("database error counting users", zap.Error(err))
 		return result, err
@@ -103,26 +105,10 @@ func (h *Handler) fetchMembersList(
 		}
 	}
 
-	// Fetch users
-	type urow struct {
-		ID             primitive.ObjectID  `bson:"_id"`
-		FullName       string              `bson:"full_name"`
-		FullNameCI     string              `bson:"full_name_ci"`
-		Email          string              `bson:"email"`
-		Status         string              `bson:"status"`
-		OrganizationID *primitive.ObjectID `bson:"organization_id"`
-	}
-
-	ucur, err := db.Collection("users").Find(ctx, f, find)
+	// Fetch users via store
+	urows, err := usrStore.Find(ctx, f, find)
 	if err != nil {
 		h.Log.Error("database error finding users", zap.Error(err))
-		return result, err
-	}
-	defer ucur.Close(ctx)
-
-	var urows []urow
-	if err := ucur.All(ctx, &urows); err != nil {
-		h.Log.Error("database error decoding users", zap.Error(err))
 		return result, err
 	}
 

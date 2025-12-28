@@ -5,11 +5,11 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/policy/grouppolicy"
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
+	organizationstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/formutil"
 	"github.com/dalemusser/stratahub/internal/app/system/inputval"
@@ -17,12 +17,9 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
-	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/templates"
-	"github.com/dalemusser/waffle/pantry/text"
 	"github.com/dalemusser/waffle/pantry/urlutil"
 	"github.com/go-chi/chi/v5"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
@@ -76,8 +73,9 @@ func (h *Handler) ServeEditGroup(w http.ResponseWriter, r *http.Request) {
 
 	orgName := ""
 	{
-		var org models.Organization
-		if err := db.Collection("organizations").FindOne(ctx, bson.M{"_id": group.OrganizationID}).Decode(&org); err != nil {
+		orgStore := organizationstore.New(db)
+		org, err := orgStore.GetByID(ctx, group.OrganizationID)
+		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				orgName = "(Deleted)"
 			} else {
@@ -96,7 +94,7 @@ func (h *Handler) ServeEditGroup(w http.ResponseWriter, r *http.Request) {
 		OrganizationID:   group.OrganizationID.Hex(),
 		OrganizationName: orgName,
 	}
-	formutil.SetBase(&data.Base, r, "Edit Group", "/groups/"+group.ID.Hex()+"/manage")
+	formutil.SetBase(&data.Base, r, h.DB, "Edit Group", "/groups/"+group.ID.Hex()+"/manage")
 
 	templates.Render(w, r, "group_edit", data)
 }
@@ -154,8 +152,9 @@ func (h *Handler) HandleEditGroup(w http.ResponseWriter, r *http.Request) {
 	if result := inputval.Validate(input); result.HasErrors() {
 		orgName := ""
 		{
-			var org models.Organization
-			if err := db.Collection("organizations").FindOne(ctx, bson.M{"_id": group.OrganizationID}).Decode(&org); err != nil {
+			orgStore := organizationstore.New(db)
+			org, err := orgStore.GetByID(ctx, group.OrganizationID)
+			if err != nil {
 				if err == mongo.ErrNoDocuments {
 					orgName = "(Deleted)"
 				} else {
@@ -174,34 +173,26 @@ func (h *Handler) HandleEditGroup(w http.ResponseWriter, r *http.Request) {
 			OrganizationID:   group.OrganizationID.Hex(),
 			OrganizationName: orgName,
 		}
-		formutil.SetBase(&data.Base, r, "Edit Group", "/groups/"+group.ID.Hex()+"/manage")
+		formutil.SetBase(&data.Base, r, h.DB, "Edit Group", "/groups/"+group.ID.Hex()+"/manage")
 		data.SetError(result.First())
 		templates.Render(w, r, "group_edit", data)
 		return
 	}
 
-	update := bson.M{
-		"name":        name,
-		"name_ci":     text.Fold(name),
-		"description": desc,
-		"updated_at":  time.Now(),
-	}
-
-	if _, err := db.Collection("groups").UpdateOne(
-		ctx,
-		bson.M{"_id": groupOID},
-		bson.M{"$set": update},
-	); err != nil {
-		var org models.Organization
-		if orgErr := db.Collection("organizations").FindOne(ctx, bson.M{"_id": group.OrganizationID}).Decode(&org); orgErr != nil {
+	// Update group via store (handles name_ci, timestamps, and duplicate detection)
+	if err := grpStore.UpdateInfo(ctx, groupOID, name, desc, ""); err != nil {
+		orgStore := organizationstore.New(db)
+		org, orgErr := orgStore.GetByID(ctx, group.OrganizationID)
+		if orgErr != nil {
 			if orgErr != mongo.ErrNoDocuments {
 				h.ErrLog.LogServerError(w, r, "database error loading organization for group", orgErr, "A database error occurred.", "/groups")
 				return
 			}
+			org = models.Organization{} // fallback to empty org if deleted
 		}
 
 		msg := "Database error while updating the group."
-		if wafflemongo.IsDup(err) {
+		if err == groupstore.ErrDuplicateGroupName {
 			msg = "A group with that name already exists in this organization."
 		}
 
@@ -212,7 +203,7 @@ func (h *Handler) HandleEditGroup(w http.ResponseWriter, r *http.Request) {
 			OrganizationID:   group.OrganizationID.Hex(),
 			OrganizationName: org.Name,
 		}
-		formutil.SetBase(&data.Base, r, "Edit Group", "/groups/"+group.ID.Hex()+"/manage")
+		formutil.SetBase(&data.Base, r, h.DB, "Edit Group", "/groups/"+group.ID.Hex()+"/manage")
 		data.SetError(msg)
 		templates.Render(w, r, "group_edit", data)
 		return

@@ -6,20 +6,16 @@ import (
 	"net/http"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
-	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
-	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
-	"github.com/dalemusser/waffle/pantry/httpnav"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // ServeList renders the main Leaders screen with org pane + leaders table.
 func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
-	_, userName, _, _ := authz.UserCtx(r)
-	role := "admin"
-
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 	db := h.DB
@@ -65,10 +61,7 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := listData{
-		Title:      "Leaders",
-		IsLoggedIn: true,
-		Role:       role,
-		UserName:   userName,
+		BaseVM: viewdata.NewBaseVM(r, h.DB, "Leaders", "/leaders"),
 
 		OrgQuery:      orgQ,
 		OrgShown:      len(orgPane.Rows),
@@ -96,9 +89,6 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		PrevStart:   leaders.PrevStart,
 		NextStart:   leaders.NextStart,
 		Rows:        leaders.Rows,
-
-		BackURL:     httpnav.ResolveBackURL(r, "/leaders"),
-		CurrentPath: httpnav.CurrentPath(r),
 	}
 
 	templates.RenderAutoMap(w, r, "admin_leaders_list", nil, data)
