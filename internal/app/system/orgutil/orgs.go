@@ -6,11 +6,14 @@ import (
 	"errors"
 	"sort"
 	"strings"
+	"time"
 
+	"github.com/dalemusser/stratahub/internal/app/system/timezones"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.uber.org/zap"
 )
 
 // Common errors returned by org resolution functions.
@@ -257,4 +260,51 @@ func LoadActiveLeaders(ctx context.Context, db *mongo.Database, orgIDs []primiti
 	})
 
 	return out, nil
+}
+
+// ResolveOrgLocation resolves the time.Location and timezone label for an
+// organization by ID.
+//
+// It looks up the organization, reads org.TimeZone, and:
+//
+//   - returns loc = time.Local and label = "" if the org has no timezone set
+//   - otherwise, tries time.LoadLocation(tzID) and returns that loc + friendly label
+//
+// Callers are expected to:
+//
+//   - use loc for all time calculations (parsing, formatting)
+//   - use label to display the timezone to the user
+func ResolveOrgLocation(ctx context.Context, db *mongo.Database, orgID primitive.ObjectID) (*time.Location, string) {
+	loc := time.Local
+	label := ""
+
+	if orgID.IsZero() {
+		return loc, label
+	}
+
+	var org models.Organization
+	err := db.Collection("organizations").FindOne(ctx, bson.M{"_id": orgID}).Decode(&org)
+	if err != nil {
+		if err != mongo.ErrNoDocuments {
+			zap.L().Warn("ResolveOrgLocation: org lookup failed", zap.Error(err))
+		}
+		return loc, label
+	}
+
+	tzID := strings.TrimSpace(org.TimeZone)
+	if tzID == "" {
+		return loc, label
+	}
+
+	// Get friendly label from timezones module
+	label = timezones.Label(tzID)
+
+	// Load the location
+	if l, err := time.LoadLocation(tzID); err == nil {
+		loc = l
+	} else {
+		zap.L().Warn("ResolveOrgLocation: LoadLocation failed", zap.Error(err), zap.String("tz", tzID))
+	}
+
+	return loc, label
 }

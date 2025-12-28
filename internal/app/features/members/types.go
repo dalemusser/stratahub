@@ -6,6 +6,7 @@ import (
 
 	"github.com/dalemusser/stratahub/internal/app/system/formutil"
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -26,8 +27,7 @@ type memberRow struct {
 
 // List page VM
 type listData struct {
-	Title, Role, UserName string
-	IsLoggedIn            bool
+	viewdata.BaseVM
 
 	// org pane (admin only)
 	ShowOrgPane   bool
@@ -61,9 +61,6 @@ type listData struct {
 
 	AllowUpload bool
 	AllowAdd    bool
-
-	BackURL     string
-	CurrentPath string
 }
 
 // Common aux types for forms
@@ -97,11 +94,9 @@ type editData struct {
 }
 
 type viewData struct {
-	Title, Role, UserName string
-	IsLoggedIn            bool
+	viewdata.BaseVM
 	ID, FullName, Email   string
 	OrgName, Status, Auth string
-	BackURL               string
 }
 
 type uploadData struct {

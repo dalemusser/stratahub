@@ -7,16 +7,17 @@ import (
 	"net/http"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/store/queries/groupqueries"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/templates"
-	"github.com/dalemusser/waffle/pantry/text"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -53,7 +54,7 @@ func dedupObjectIDs(in []primitive.ObjectID) []primitive.ObjectID {
 // ServeGroupsList handles GET /groups (relative to mount) with admin org
 // filtering and leader scoping.
 func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
-	role, uname, uid, ok := authz.UserCtx(r)
+	_, _, uid, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
@@ -122,10 +123,7 @@ func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
 	rng := paging.ComputeRange(start, shown)
 
 	data := groupListData{
-		Title:      "Groups",
-		IsLoggedIn: true,
-		Role:       role,
-		UserName:   uname,
+		BaseVM: viewdata.NewBaseVM(r, h.DB, "Groups", "/groups"),
 
 		ShowOrgPane:   showOrgPane,
 		OrgQuery:      orgQ,
@@ -154,83 +152,36 @@ func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
 		RangeEnd:   rng.End,
 		PrevStart:  rng.PrevStart,
 		NextStart:  rng.NextStart,
-
-		CurrentPath: httpnav.CurrentPath(r),
 	}
 
 	templates.RenderAutoMap(w, r, "groups_list", nil, data)
 }
 
-// fetchGroupsList fetches the paginated groups list with counts using a single
-// aggregation pipeline for optimal performance. Combines org name lookup,
-// membership counts, and assignment counts into one database round-trip.
+// fetchGroupsList fetches the paginated groups list with counts using groupqueries.
 func (h *Handler) fetchGroupsList(
 	ctx context.Context,
 	db *mongo.Database,
 	selectedOrg, search, after, before string,
 ) ([]groupListItem, int, int64, string, string, bool, bool, error) {
-	// Build base filter (without keyset window for total count)
-	var baseClauses []bson.M
+	// Build filter
+	var filter groupqueries.ListFilter
 	if selectedOrg != "" && selectedOrg != "all" {
 		if oid, err := primitive.ObjectIDFromHex(selectedOrg); err == nil {
-			baseClauses = append(baseClauses, bson.M{"organization_id": oid})
+			filter.OrgID = &oid
 		}
 	}
-	if search != "" {
-		q := text.Fold(search)
-		hi := q + "\uffff"
-		baseClauses = append(baseClauses, bson.M{"name_ci": bson.M{"$gte": q, "$lt": hi}})
-	}
-	baseFilter := andify(baseClauses)
+	filter.SearchQuery = search
 
 	// Configure keyset pagination
 	cfg := paging.ConfigureKeyset(before, after)
 
-	// Build full filter including keyset window
-	fullClauses := append([]bson.M{}, baseClauses...)
-	if ks := cfg.KeysetWindow("name_ci"); ks != nil {
-		fullClauses = append(fullClauses, ks)
-	}
-	fullFilter := andify(fullClauses)
-
-	// Build aggregation pipeline with $facet to get data and count in one query
-	pipe := mongo.Pipeline{
-		// Match base filter first (for accurate total count)
-		bson.D{{Key: "$match", Value: baseFilter}},
-		// Use $facet to run count and data queries in parallel
-		bson.D{{Key: "$facet", Value: bson.M{
-			"totalCount": []bson.M{
-				{"$count": "count"},
-			},
-			"data": h.buildGroupsDataPipeline(fullFilter, baseFilter, cfg),
-		}}},
-	}
-
-	cur, err := db.Collection("groups").Aggregate(ctx, pipe)
+	// Fetch groups with counts using query module
+	result, err := groupqueries.ListGroupsWithCounts(ctx, db, filter, cfg)
 	if err != nil {
 		return nil, 0, 0, "", "", false, false, err
 	}
-	defer cur.Close(ctx)
 
-	// Parse aggregation result
-	var result struct {
-		TotalCount []struct {
-			Count int64 `bson:"count"`
-		} `bson:"totalCount"`
-		Data []groupAggRow `bson:"data"`
-	}
-	if cur.Next(ctx) {
-		if err := cur.Decode(&result); err != nil {
-			return nil, 0, 0, "", "", false, false, err
-		}
-	}
-
-	total := int64(0)
-	if len(result.TotalCount) > 0 {
-		total = result.TotalCount[0].Count
-	}
-
-	graw := result.Data
+	graw := result.Items
 
 	// Reverse if paging backwards
 	if cfg.Direction == paging.Backward {
@@ -261,123 +212,7 @@ func (h *Handler) fetchGroupsList(
 		nextCur = wafflemongo.EncodeCursor(graw[shown-1].NameCI, graw[shown-1].ID)
 	}
 
-	return rows, shown, total, prevCur, nextCur, hasPrev, hasNext, nil
-}
-
-// groupAggRow holds the result of the combined aggregation query.
-type groupAggRow struct {
-	ID              primitive.ObjectID `bson:"_id"`
-	Name            string             `bson:"name"`
-	NameCI          string             `bson:"name_ci"`
-	OrgName         string             `bson:"org_name"`
-	LeadersCount    int                `bson:"leaders_count"`
-	MembersCount    int                `bson:"members_count"`
-	AssignmentCount int                `bson:"assignment_count"`
-}
-
-// buildGroupsDataPipeline constructs the data portion of the $facet pipeline.
-// It applies keyset pagination, joins org names, and computes membership/assignment counts.
-func (h *Handler) buildGroupsDataPipeline(fullFilter, baseFilter bson.M, cfg paging.KeysetConfig) []bson.M {
-	pipeline := []bson.M{}
-
-	// Apply keyset window filter if present (re-match after facet's base match)
-	if ks := cfg.KeysetWindow("name_ci"); ks != nil {
-		pipeline = append(pipeline, bson.M{"$match": ks})
-	}
-
-	// Sort and limit for pagination
-	pipeline = append(pipeline,
-		bson.M{"$sort": bson.D{
-			{Key: "name_ci", Value: cfg.SortOrder},
-			{Key: "_id", Value: cfg.SortOrder},
-		}},
-		bson.M{"$limit": paging.LimitPlusOne()},
-	)
-
-	// Lookup organization name
-	pipeline = append(pipeline,
-		bson.M{"$lookup": bson.M{
-			"from":         "organizations",
-			"localField":   "organization_id",
-			"foreignField": "_id",
-			"as":           "org",
-		}},
-	)
-
-	// Lookup and aggregate membership counts (leaders and members)
-	pipeline = append(pipeline,
-		bson.M{"$lookup": bson.M{
-			"from": "group_memberships",
-			"let":  bson.M{"gid": "$_id"},
-			"pipeline": []bson.M{
-				{"$match": bson.M{"$expr": bson.M{"$eq": []string{"$group_id", "$$gid"}}}},
-				{"$group": bson.M{"_id": "$role", "count": bson.M{"$sum": 1}}},
-			},
-			"as": "memberships",
-		}},
-	)
-
-	// Lookup and count resource assignments
-	pipeline = append(pipeline,
-		bson.M{"$lookup": bson.M{
-			"from": "group_resource_assignments",
-			"let":  bson.M{"gid": "$_id"},
-			"pipeline": []bson.M{
-				{"$match": bson.M{"$expr": bson.M{"$eq": []string{"$group_id", "$$gid"}}}},
-				{"$count": "count"},
-			},
-			"as": "assignments",
-		}},
-	)
-
-	// Project final fields with computed counts
-	pipeline = append(pipeline,
-		bson.M{"$project": bson.M{
-			"_id":     1,
-			"name":    1,
-			"name_ci": 1,
-			"org_name": bson.M{"$ifNull": []interface{}{
-				bson.M{"$arrayElemAt": []interface{}{"$org.name", 0}},
-				"",
-			}},
-			"leaders_count": bson.M{"$ifNull": []interface{}{
-				bson.M{"$arrayElemAt": []interface{}{
-					bson.M{"$map": bson.M{
-						"input": bson.M{"$filter": bson.M{
-							"input": "$memberships",
-							"as":    "m",
-							"cond":  bson.M{"$eq": []interface{}{"$$m._id", "leader"}},
-						}},
-						"as": "m",
-						"in": "$$m.count",
-					}},
-					0,
-				}},
-				0,
-			}},
-			"members_count": bson.M{"$ifNull": []interface{}{
-				bson.M{"$arrayElemAt": []interface{}{
-					bson.M{"$map": bson.M{
-						"input": bson.M{"$filter": bson.M{
-							"input": "$memberships",
-							"as":    "m",
-							"cond":  bson.M{"$eq": []interface{}{"$$m._id", "member"}},
-						}},
-						"as": "m",
-						"in": "$$m.count",
-					}},
-					0,
-				}},
-				0,
-			}},
-			"assignment_count": bson.M{"$ifNull": []interface{}{
-				bson.M{"$arrayElemAt": []interface{}{"$assignments.count", 0}},
-				0,
-			}},
-		}},
-	)
-
-	return pipeline
+	return rows, shown, result.Total, prevCur, nextCur, hasPrev, hasNext, nil
 }
 
 // ServeGroupManageModal handles GET /groups/{id}/manage_modal and returns

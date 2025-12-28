@@ -6,28 +6,22 @@ import (
 	"net/http"
 
 	metricsstore "github.com/dalemusser/stratahub/internal/app/store/metrics"
-	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/templates"
-	"github.com/dalemusser/waffle/pantry/httpnav"
 	"go.uber.org/zap"
 )
 
 func (h *Handler) ServeAnalyst(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, signedIn := authz.UserCtx(r)
-
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 
 	counts := metricsstore.FetchDashboardCounts(ctx, h.DB)
 
+	base := viewdata.NewBaseVM(r, h.DB, "Analyst Dashboard", "/")
 	data := dashboardWithCounts{
 		baseDashboardData: baseDashboardData{
-			Title:       "Analyst Dashboard",
-			IsLoggedIn:  signedIn,
-			Role:        role,
-			UserName:    uname,
-			CurrentPath: httpnav.CurrentPath(r),
+			BaseVM: base,
 		},
 		OrganizationsCount: counts.Organizations,
 		LeadersCount:       counts.Leaders,
@@ -36,7 +30,7 @@ func (h *Handler) ServeAnalyst(w http.ResponseWriter, r *http.Request) {
 		ResourcesCount:     counts.Resources,
 	}
 
-	h.Log.Debug("analyst dashboard served", zap.String("user", uname))
+	h.Log.Debug("analyst dashboard served", zap.String("user", base.UserName))
 
 	templates.Render(w, r, "analyst_dashboard", data)
 }

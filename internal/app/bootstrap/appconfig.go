@@ -33,4 +33,17 @@ type AppConfig struct {
 	SessionKey    string // Secret key for signing session cookies (must be strong in production)
 	SessionName   string // Cookie name for sessions (default: stratahub-session)
 	SessionDomain string // Cookie domain (blank means current host)
+
+	// File storage configuration
+	StorageType      string // Storage backend: "local" or "s3"
+	StorageLocalPath string // Local storage path (e.g., "./uploads/materials")
+	StorageLocalURL  string // URL prefix for serving local files (e.g., "/files/materials")
+
+	// S3/CloudFront configuration (only used if StorageType is "s3")
+	StorageS3Region    string // AWS region
+	StorageS3Bucket    string // S3 bucket name
+	StorageS3Prefix    string // Key prefix (e.g., "materials/")
+	StorageCFURL       string // CloudFront distribution URL
+	StorageCFKeyPairID string // CloudFront key pair ID
+	StorageCFKeyPath   string // Path to CloudFront private key file
 }

@@ -35,3 +35,21 @@ config.json
 # Editor/IDE
 # .idea/
 # .vscode/
+
+# macOS
+.DS_Store
+
+# Build output
+bin/
+
+# Tailwind standalone CLI (platform-specific binary)
+tailwindcss
+
+# E2E test environment
+tests/e2e/venv/
+tests/e2e/__pycache__/
+.pytest_cache/
+__pycache__/
+
+# User uploads (runtime data, not source)
+uploads/

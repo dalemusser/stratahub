@@ -304,6 +304,16 @@ func IsValidResourceType(t string) bool {
 	return false
 }
 
+// IsValidMaterialType checks if the given type is a valid material type.
+func IsValidMaterialType(t string) bool {
+	for _, id := range models.MaterialTypes {
+		if t == id {
+			return true
+		}
+	}
+	return false
+}
+
 // IsValidHTTPURL checks if the given string is a valid http:// or https:// URL.
 func IsValidHTTPURL(s string) bool {
 	s = strings.TrimSpace(s)

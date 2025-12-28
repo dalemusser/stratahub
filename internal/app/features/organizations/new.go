@@ -5,21 +5,15 @@ import (
 	"context"
 	"net/http"
 	"strings"
-	"time"
 
+	organizationstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
 	"github.com/dalemusser/stratahub/internal/app/system/formutil"
 	"github.com/dalemusser/stratahub/internal/app/system/inputval"
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/timezones"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/templates"
-	"github.com/dalemusser/waffle/pantry/text"
-
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // createOrgInput defines validation rules for creating an organization.
@@ -41,7 +35,7 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := newData{TimeZoneGroups: tzGroups}
-	formutil.SetBase(&data.Base, r, "New Organization", "/organizations")
+	formutil.SetBase(&data.Base, r, h.DB, "New Organization", "/organizations")
 
 	// Template name updated to "organization_new" (no admin_ prefix).
 	templates.Render(w, r, "organization_new", data)
@@ -60,7 +54,6 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	state := strings.TrimSpace(r.FormValue("state"))
 	contact := strings.TrimSpace(r.FormValue("contact"))
 	tz := strings.TrimSpace(r.FormValue("timezone"))
-	status := "active"
 
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
@@ -81,7 +74,7 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 			Contact:        contact,
 			TimeZoneGroups: tzGroups,
 		}
-		formutil.SetBase(&data.Base, r, "New Organization", "/organizations")
+		formutil.SetBase(&data.Base, r, h.DB, "New Organization", "/organizations")
 		data.SetError(msg)
 		templates.Render(w, r, "organization_new", data)
 	}
@@ -99,37 +92,19 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Preflight duplicate by name_ci
-	ci := text.Fold(name)
-	err = db.Collection("organizations").FindOne(ctx, bson.M{"name_ci": ci}).Err()
-	if err == nil {
-		renderWithError("An organization with that name already exists.")
-		return
-	}
-	if err != mongo.ErrNoDocuments {
-		h.ErrLog.LogServerError(w, r, "database error checking duplicate organization", err, "A database error occurred.", "/organizations")
-		return
-	}
-
-	now := time.Now()
-	doc := models.Organization{
-		ID:          primitive.NewObjectID(),
+	// Create organization via store (handles ID, CI fields, timestamps, and duplicate detection)
+	orgStore := organizationstore.New(db)
+	org := models.Organization{
 		Name:        name,
-		NameCI:      ci,
 		City:        city,
-		CityCI:      text.Fold(city),
 		State:       state,
-		StateCI:     text.Fold(state),
 		ContactInfo: contact,
 		TimeZone:    tz,
-		Status:      status,
-		CreatedAt:   now,
-		UpdatedAt:   now,
 	}
 
-	if _, err := db.Collection("organizations").InsertOne(ctx, doc); err != nil {
+	if _, err := orgStore.Create(ctx, org); err != nil {
 		msg := "Database error while creating organization."
-		if wafflemongo.IsDup(err) {
+		if err == organizationstore.ErrDuplicateOrganization {
 			msg = "An organization with that name already exists."
 		}
 		renderWithError(msg)

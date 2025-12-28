@@ -13,6 +13,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 type Store struct {
@@ -169,4 +170,120 @@ func (s *Store) EmailExistsForOther(ctx context.Context, email string, excludeID
 		return false, nil // no duplicate
 	}
 	return false, err // actual error
+}
+
+// DeleteByOrg deletes all users belonging to an organization.
+// This only deletes users with organization_id set (leaders and members).
+// Returns the number of documents deleted.
+func (s *Store) DeleteByOrg(ctx context.Context, orgID primitive.ObjectID) (int64, error) {
+	res, err := s.c.DeleteMany(ctx, bson.M{"organization_id": orgID})
+	if err != nil {
+		return 0, err
+	}
+	return res.DeletedCount, nil
+}
+
+// CountByOrg returns the count of users in an organization.
+func (s *Store) CountByOrg(ctx context.Context, orgID primitive.ObjectID) (int64, error) {
+	return s.c.CountDocuments(ctx, bson.M{"organization_id": orgID})
+}
+
+// SystemUserUpdate holds the fields that can be updated for a system user (admin/analyst).
+type SystemUserUpdate struct {
+	FullName   string
+	Email      string
+	AuthMethod string
+	Role       string
+	Status     string
+}
+
+// UpdateSystemUser updates a system user's fields. Only updates users with role="admin" or "analyst".
+// Returns ErrDuplicateEmail if the email already exists for another user.
+func (s *Store) UpdateSystemUser(ctx context.Context, id primitive.ObjectID, upd SystemUserUpdate) error {
+	set := bson.M{
+		"full_name":    upd.FullName,
+		"full_name_ci": text.Fold(upd.FullName),
+		"email":        normalize.Email(upd.Email),
+		"auth_method":  upd.AuthMethod,
+		"role":         upd.Role,
+		"status":       upd.Status,
+		"updated_at":   time.Now(),
+	}
+
+	_, err := s.c.UpdateOne(ctx, bson.M{"_id": id, "role": bson.M{"$in": []string{"admin", "analyst"}}}, bson.M{"$set": set})
+	if err != nil {
+		if wafflemongo.IsDup(err) {
+			return ErrDuplicateEmail
+		}
+		return err
+	}
+	return nil
+}
+
+// DeleteSystemUser deletes a user by ID, but only if they have role="admin" or "analyst".
+// Returns the number of documents deleted (0 or 1).
+func (s *Store) DeleteSystemUser(ctx context.Context, id primitive.ObjectID) (int64, error) {
+	res, err := s.c.DeleteOne(ctx, bson.M{"_id": id, "role": bson.M{"$in": []string{"admin", "analyst"}}})
+	if err != nil {
+		return 0, err
+	}
+	return res.DeletedCount, nil
+}
+
+// GetActiveMemberInOrg loads a user by ObjectID, returning an error if the user
+// does not exist, is not a member, is not active, or does not belong to the given organization.
+func (s *Store) GetActiveMemberInOrg(ctx context.Context, id, orgID primitive.ObjectID) (*models.User, error) {
+	var u models.User
+	if err := s.c.FindOne(ctx, bson.M{
+		"_id":             id,
+		"role":            "member",
+		"status":          "active",
+		"organization_id": orgID,
+	}).Decode(&u); err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+// GetLeaderInOrg loads a user by ObjectID, returning an error if the user
+// does not exist, is not a leader, or does not belong to the given organization.
+func (s *Store) GetLeaderInOrg(ctx context.Context, id, orgID primitive.ObjectID) (*models.User, error) {
+	var u models.User
+	if err := s.c.FindOne(ctx, bson.M{
+		"_id":             id,
+		"role":            "leader",
+		"organization_id": orgID,
+	}).Decode(&u); err != nil {
+		return nil, err
+	}
+	return &u, nil
+}
+
+// CountActiveAdmins returns the number of users with role=admin and status=active.
+func (s *Store) CountActiveAdmins(ctx context.Context) (int64, error) {
+	return s.c.CountDocuments(ctx, bson.M{
+		"role":   "admin",
+		"status": "active",
+	})
+}
+
+// Find returns users matching the given filter with optional find options.
+// The caller is responsible for building the filter and options (pagination, sorting, projection).
+func (s *Store) Find(ctx context.Context, filter bson.M, opts ...*options.FindOptions) ([]models.User, error) {
+	cur, err := s.c.Find(ctx, filter, opts...)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+
+	var users []models.User
+	if err := cur.All(ctx, &users); err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
+// Count returns the number of users matching the given filter.
+func (s *Store) Count(ctx context.Context, filter bson.M) (int64, error) {
+	return s.c.CountDocuments(ctx, filter)
 }

@@ -20,6 +20,7 @@ import (
 	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.uber.org/zap"
 )
 
 // ServeUploadCSV handles GET /members/upload_csv.
@@ -42,7 +43,7 @@ func (h *Handler) ServeUploadCSV(w http.ResponseWriter, r *http.Request) {
 	db := h.DB
 
 	var data uploadData
-	formutil.SetBase(&data.Base, r, "Upload CSV", "/members")
+	formutil.SetBase(&data.Base, r, db, "Upload CSV", "/members")
 
 	var orgID primitive.ObjectID
 	var orgName string
@@ -59,28 +60,31 @@ func (h *Handler) ServeUploadCSV(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 	} else {
+		// Admin: org can be passed via URL param (optional - can select via picker)
 		orgHex := normalize.OrgID(query.Get(r, "org"))
-		if orgHex == "" {
-			uierrors.RenderForbidden(w, r, "Select a specific organization first.", httpnav.ResolveBackURL(r, "/members"))
-			return
+		if orgHex != "" && orgHex != "all" {
+			orgID, orgName, err = orgutil.ResolveActiveOrgFromHex(ctx, db, orgHex)
+			if err != nil {
+				if orgutil.IsExpectedOrgError(err) {
+					// Org not found - just show page without org selected
+					h.Log.Warn("org not found or inactive", zap.String("org", orgHex))
+				} else {
+					h.ErrLog.LogServerError(w, r, "database error loading organization", err, "A database error occurred.", "/members")
+					return
+				}
+			} else {
+				data.OrgHex = orgID.Hex()
+				data.OrgName = orgName
+			}
 		}
-		orgID, orgName, err = orgutil.ResolveOrgFromHex(ctx, db, orgHex)
-		if errors.Is(err, orgutil.ErrBadOrgID) {
-			uierrors.RenderForbidden(w, r, "Bad organization id.", httpnav.ResolveBackURL(r, "/members"))
-			return
-		}
-		if errors.Is(err, orgutil.ErrOrgNotFound) {
-			uierrors.RenderForbidden(w, r, "Organization not found.", httpnav.ResolveBackURL(r, "/members"))
-			return
-		}
-		if err != nil {
-			h.ErrLog.LogServerError(w, r, "database error loading organization", err, "A database error occurred.", "/members")
-			return
-		}
+		// OrgLocked stays false for admin - they can change via picker
 	}
-	data.OrgLocked = true
-	data.OrgHex = orgID.Hex()
-	data.OrgName = orgName
+
+	if role == "leader" {
+		data.OrgLocked = true
+		data.OrgHex = orgID.Hex()
+		data.OrgName = orgName
+	}
 
 	templates.Render(w, r, "member_upload_csv", data)
 }
@@ -167,7 +171,7 @@ func (h *Handler) HandleUploadCSV(w http.ResponseWriter, r *http.Request) {
 			OrgHex:    orgID.Hex(),
 			OrgName:   orgName,
 		}
-		formutil.SetBase(&data.Base, r, "Upload CSV", "/members")
+		formutil.SetBase(&data.Base, r, db, "Upload CSV", "/members")
 		data.Error = parsed.FormatErrorsHTML(5)
 		templates.Render(w, r, "member_upload_csv", data)
 		return
@@ -201,6 +205,6 @@ func (h *Handler) HandleUploadCSV(w http.ResponseWriter, r *http.Request) {
 		SkippedCount:  result.Skipped,
 		SkippedEmails: result.SkippedEmails,
 	}
-	formutil.SetBase(&summaryData.Base, r, "Upload CSV", "/members")
+	formutil.SetBase(&summaryData.Base, r, db, "Upload CSV", "/members")
 	templates.Render(w, r, "member_upload_csv", summaryData)
 }

@@ -8,18 +8,19 @@ import (
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/policy/resourcepolicy"
-	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	resourcestore "github.com/dalemusser/stratahub/internal/app/store/resources"
+	"github.com/dalemusser/stratahub/internal/app/system/htmlsanitize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/timezones"
-	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/pantry/httpnav"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/waffle/pantry/storage"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/dalemusser/waffle/pantry/urlutil"
 
 	"github.com/go-chi/chi/v5"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.uber.org/zap"
 )
 
 // ServeViewResource handles GET /member/resources/{resourceID} for members.
@@ -27,12 +28,6 @@ import (
 // currently available based on the group assignment visibility window, and
 // then renders the member_resource_view template.
 func (h *MemberHandler) ServeViewResource(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := authz.UserCtx(r)
-	if !ok {
-		uierrors.RenderUnauthorized(w, r, "/login")
-		return
-	}
-
 	resourceID := chi.URLParam(r, "resourceID")
 	oid, err := primitive.ObjectIDFromHex(resourceID)
 	if err != nil {
@@ -65,14 +60,13 @@ func (h *MemberHandler) ServeViewResource(w http.ResponseWriter, r *http.Request
 	nowLocal := time.Now().In(loc)
 
 	// Fetch the resource
-	var res models.Resource
-	switch err := db.Collection("resources").FindOne(ctx, bson.M{"_id": oid}).Decode(&res); err {
-	case nil:
-		// ok
-	case mongo.ErrNoDocuments:
-		uierrors.RenderNotFound(w, r, "Resource not found.", "/member/resources")
-		return
-	default:
+	resStore := resourcestore.New(db)
+	res, err := resStore.GetByID(ctx, oid)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			uierrors.RenderNotFound(w, r, "Resource not found.", "/member/resources")
+			return
+		}
 		h.ErrLog.LogServerError(w, r, "find resource failed", err, "A database error occurred.", "/member/resources")
 		return
 	}
@@ -85,11 +79,17 @@ func (h *MemberHandler) ServeViewResource(w http.ResponseWriter, r *http.Request
 	}
 
 	groupName := ""
+	instructions := ""
 	var visibleFrom, visibleUntil *time.Time
 	if assignment != nil {
 		groupName = assignment.GroupName
 		visibleFrom = assignment.VisibleFrom
 		visibleUntil = assignment.VisibleUntil
+		instructions = assignment.Instructions
+	}
+	// Fall back to resource's default instructions if assignment has none
+	if instructions == "" {
+		instructions = res.DefaultInstructions
 	}
 
 	// Build launch URL with id (email), group (name), org (name)
@@ -141,11 +141,8 @@ func (h *MemberHandler) ServeViewResource(w http.ResponseWriter, r *http.Request
 
 	data := viewResourceData{
 		common: common{
-			Title:      "View Resource",
-			IsLoggedIn: true,
-			Role:       role,
-			UserName:   uname,
-			UserID:     member.Email,
+			BaseVM: viewdata.NewBaseVM(r, h.DB, "View Resource", "/member/resources"),
+			UserID: member.Email,
 		},
 		ResourceID:          res.ID.Hex(),
 		ResourceTitle:       res.Title,
@@ -153,14 +150,154 @@ func (h *MemberHandler) ServeViewResource(w http.ResponseWriter, r *http.Request
 		Type:                res.Type,
 		TypeDisplay:         typeLabel,
 		Description:         res.Description,
-		DefaultInstructions: res.DefaultInstructions,
+		DefaultInstructions: htmlsanitize.PrepareForDisplay(instructions),
+		DisplayURL:          res.LaunchURL,
 		LaunchURL:           launch,
+		HasFile:             res.HasFile(),
+		FileName:            res.FileName,
 		Status:              res.Status,
 		AvailableUntil:      availableUntil,
-		BackURL:             httpnav.ResolveBackURL(r, "/member/resources"),
 		CanOpen:             canOpen,
 		TimeZone:            tzLabel,
 	}
 
 	templates.Render(w, r, "member_resource_view", data)
+}
+
+// HandleDownload generates a signed URL and redirects to the file.
+// For members, it verifies access before allowing download.
+func (h *MemberHandler) HandleDownload(w http.ResponseWriter, r *http.Request) {
+	resourceID := chi.URLParam(r, "resourceID")
+	oid, err := primitive.ObjectIDFromHex(resourceID)
+	if err != nil {
+		uierrors.RenderBadRequest(w, r, "Invalid resource ID.", "/member/resources")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
+	defer cancel()
+	db := h.DB
+
+	// Verify member access using policy layer
+	member, err := resourcepolicy.VerifyMemberAccess(ctx, db, r)
+	if err != nil {
+		h.ErrLog.LogServerError(w, r, "database error verifying member access", err, "A database error occurred.", "/member/resources")
+		return
+	}
+	if member == nil {
+		uierrors.RenderNotFound(w, r, "Member not found.", "/login")
+		return
+	}
+
+	_, loc, _ := resolveMemberOrgLocation(ctx, db, member.OrganizationID)
+	nowLocal := time.Now().In(loc)
+
+	// Fetch the resource
+	resStore := resourcestore.New(db)
+	res, err := resStore.GetByID(ctx, oid)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			uierrors.RenderNotFound(w, r, "Resource not found.", "/member/resources")
+			return
+		}
+		h.ErrLog.LogServerError(w, r, "find resource failed", err, "A database error occurred.", "/member/resources")
+		return
+	}
+
+	// Check if member has access to this resource via group assignment
+	assignment, err := resourcepolicy.CanViewResource(ctx, db, member.ID, oid)
+	if err != nil {
+		h.ErrLog.LogServerError(w, r, "policy check failed", err, "A database error occurred.", "/member/resources")
+		return
+	}
+	if assignment == nil {
+		uierrors.RenderForbidden(w, r, "You do not have access to this resource.", "/member/resources")
+		return
+	}
+
+	// Check visibility window
+	if assignment.VisibleFrom != nil && !assignment.VisibleFrom.IsZero() {
+		fromLocal := assignment.VisibleFrom.In(loc)
+		if nowLocal.Before(fromLocal) {
+			uierrors.RenderForbidden(w, r, "This resource is not yet available.", "/member/resources")
+			return
+		}
+	} else {
+		// No visible_from means not available
+		uierrors.RenderForbidden(w, r, "This resource is not available.", "/member/resources")
+		return
+	}
+
+	if assignment.VisibleUntil != nil && !assignment.VisibleUntil.IsZero() {
+		untilLocal := assignment.VisibleUntil.In(loc)
+		if nowLocal.After(untilLocal) {
+			uierrors.RenderForbidden(w, r, "This resource is no longer available.", "/member/resources")
+			return
+		}
+	}
+
+	// Check if resource is active
+	if res.Status != "active" {
+		uierrors.RenderForbidden(w, r, "This resource is not currently active.", "/member/resources")
+		return
+	}
+
+	// If resource has a file, serve it
+	if res.HasFile() {
+		// Build Content-Disposition header for proper filename
+		filename := res.FileName
+		if filename == "" {
+			filename = "download"
+		}
+		contentDisposition := "attachment; filename=\"" + filename + "\""
+
+		// Prevent browser caching of downloads (important when files are replaced)
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+
+		// Check if local storage - serve file directly
+		if localStorage, ok := h.Storage.(*storage.Local); ok {
+			fullPath, err := localStorage.GetFullPath(res.FilePath)
+			if err != nil {
+				h.Log.Error("error getting file path",
+					zap.Error(err),
+					zap.String("path", res.FilePath))
+				uierrors.RenderServerError(w, r, "Failed to locate file.", "/member/resources")
+				return
+			}
+			w.Header().Set("Content-Disposition", contentDisposition)
+			http.ServeFile(w, r, fullPath)
+			return
+		}
+
+		// For S3/other storage, generate signed URL and redirect
+		signedURL, err := h.Storage.PresignedURL(ctx, res.FilePath, &storage.PresignOptions{
+			Expires:            15 * time.Minute,
+			ContentDisposition: contentDisposition,
+		})
+		if err != nil {
+			h.Log.Error("error generating signed URL",
+				zap.Error(err),
+				zap.String("path", res.FilePath))
+			uierrors.RenderServerError(w, r, "Failed to generate download link.", "/member/resources")
+			return
+		}
+		http.Redirect(w, r, signedURL, http.StatusSeeOther)
+		return
+	}
+
+	// If resource has a URL, redirect to it (with member info in query params)
+	if res.LaunchURL != "" {
+		orgName, _, _ := resolveMemberOrgLocation(ctx, db, member.OrganizationID)
+		launch := urlutil.AddOrSetQueryParams(res.LaunchURL, map[string]string{
+			"id":    member.Email,
+			"group": assignment.GroupName,
+			"org":   orgName,
+		})
+		http.Redirect(w, r, launch, http.StatusSeeOther)
+		return
+	}
+
+	uierrors.RenderNotFound(w, r, "No file or URL available for this resource.", "/member/resources")
 }

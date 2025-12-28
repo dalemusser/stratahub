@@ -5,14 +5,14 @@
 {{ define "content" }}
 <div class="flex items-center mb-2">
   <a href="{{ .BackURL }}"
-     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 mr-2"
+     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 mr-2"
      title="Go back">
     ← Back
   </a>
-  <h1 class="text-2xl font-bold text-gray-900">👥 Manage Users in {{ .GroupName }}</h1>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">👥 Manage Users in {{ .GroupName }}</h1>
 </div>
 
-<div class="mb-4 text-sm text-gray-700">
+<div class="mb-4 text-sm text-gray-700 dark:text-gray-300">
   <p>Organization: {{ .OrganizationName }}</p>
   <p>Description: {{ .GroupDescription }}</p>
 </div>
@@ -35,10 +35,10 @@
 {{ define "group_leaders_contents" }}
 <div id="leaders-contents" class="text-sm">
   <!-- Fixed header table -->
-  <table class="min-w-full border bg-white table-fixed border-separate border-spacing-0">
+  <table class="min-w-full border bg-white dark:bg-gray-800 dark:border-gray-700 table-fixed border-separate border-spacing-0">
     <colgroup><col class="w-1/3" /><col class="w-1/3" /><col class="w-1/3" /></colgroup>
-    <thead class="bg-white">
-      <tr class="border-b">
+    <thead class="bg-white dark:bg-gray-800">
+      <tr class="border-b dark:border-gray-700">
         <th class="px-2 py-1 text-left">Name</th>
         <th class="px-2 py-1 text-left">Email</th>
         <th class="px-2 py-1 text-left">Action</th>
@@ -48,12 +48,12 @@
 
   <!-- Body in scroll container -->
   <div class="relative max-h-96 overflow-y-auto mb-4" style="scrollbar-gutter: stable;">
-    <table class="min-w-full border bg-white table-fixed border-separate border-spacing-0">
+    <table class="min-w-full border bg-white dark:bg-gray-800 dark:border-gray-700 table-fixed border-separate border-spacing-0">
       <colgroup><col class="w-1/3" /><col class="w-1/3" /><col class="w-1/3" /></colgroup>
       <tbody>
         {{ if .CurrentLeaders }}
           {{ range .CurrentLeaders }}
-          <tr class="border-b">
+          <tr class="border-b dark:border-gray-700">
             <td class="px-2 py-1">{{ .FullName }}</td>
             <td class="px-2 py-1">{{ .Email }}</td>
             <td class="px-2 py-1">
@@ -85,7 +85,7 @@
     class="flex items-center space-x-2 mb-4"
   >
     <label for="leaderSelect" class="mr-2">Add Leader:</label>
-    <select id="leaderSelect" name="userID" class="border p-1 text-sm">
+    <select id="leaderSelect" name="userID" class="border p-1 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
       <option value="">-- Select Leader --</option>
       {{ range .PossibleLeaders }}
         <option value="{{ .ID }}">{{ .FullName }} ({{ .Email }})</option>
@@ -102,14 +102,14 @@
 <div id="members-header-block">
   <div class="flex items-baseline gap-2 mb-1">
     <h3 class="font-semibold">In Group</h3>
-    <span class="text-xs text-gray-600">({{ len .CurrentMembers }} total)</span>
+    <span class="text-xs text-gray-600 dark:text-gray-400">({{ len .CurrentMembers }} total)</span>
   </div>
 
   <!-- Fixed header table -->
-  <table class="min-w-full border bg-white table-fixed border-separate border-spacing-0">
+  <table class="min-w-full border bg-white dark:bg-gray-800 dark:border-gray-700 table-fixed border-separate border-spacing-0">
     <colgroup><col class="w-1/3" /><col class="w-1/3" /><col class="w-1/3" /></colgroup>
-    <thead class="bg-white">
-      <tr class="border-b">
+    <thead class="bg-white dark:bg-gray-800">
+      <tr class="border-b dark:border-gray-700">
         <th class="px-2 py-1 text-left">Name</th>
         <th class="px-2 py-1 text-left">Email</th>
         <th class="px-2 py-1 text-left">Action</th>
@@ -128,12 +128,12 @@
 {{ define "group_members_list_inner" }}
 <!-- Only the scrollable BODY gets swapped -->
 <div id="members-list-body" class="relative max-h-96 overflow-y-auto mb-6" style="scrollbar-gutter: stable;">
-  <table class="min-w-full border bg-white table-fixed border-separate border-spacing-0">
+  <table class="min-w-full border bg-white dark:bg-gray-800 dark:border-gray-700 table-fixed border-separate border-spacing-0">
     <colgroup><col class="w-1/3" /><col class="w-1/3" /><col class="w-1/3" /></colgroup>
     <tbody>
       {{ if .CurrentMembers }}
         {{ range .CurrentMembers }}
-        <tr class="border-b">
+        <tr class="border-b dark:border-gray-700">
           <td class="px-2 py-1">{{ .FullName }}</td>
           <td class="px-2 py-1">{{ .Email }}</td>
           <td class="px-2 py-1">
@@ -165,7 +165,7 @@
   <!-- Heading with counts, one line -->
   <div class="flex items-baseline gap-2">
     <h3 class="font-semibold">Available to Add</h3>
-    <span class="text-xs text-gray-600">({{ .AvailableShown }} shown of {{ .AvailableTotal }} total)</span>
+    <span class="text-xs text-gray-600 dark:text-gray-400">({{ .AvailableShown }} shown of {{ .AvailableTotal }} total)</span>
   </div>
 
   <!-- Controls row: search left, pager right -->
@@ -181,7 +181,7 @@
     >
       <label for="memberSearch">Search Members to Add:</label>
       <input
-        id="memberSearch" name="q" type="text" value="{{ .Query }}" class="border p-1 text-sm"
+        id="memberSearch" name="q" type="text" value="{{ .Query }}" class="border p-1 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
         hx-on="input: (function(){
           const f=document.getElementById('member-search-form');
           f.querySelector('input[name=after]').value='';
@@ -193,7 +193,7 @@
       <input type="hidden" name="return" value="{{ .BackURL }}">
       <button
         type="button"
-        class="bg-gray-200 text-gray-800 px-2 py-1 text-xs rounded hover:bg-gray-300"
+        class="bg-gray-200 text-gray-800 px-2 py-1 text-xs rounded hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500"
         hx-get="/groups/{{ .GroupID }}/manage/search-members?q=&return={{ .BackURL | urlquery }}"
         hx-target="#available-block"
         hx-swap="outerHTML"
@@ -206,26 +206,26 @@
         <a href="/groups/{{ .GroupID }}/manage/search-members?before={{ .PrevCursor }}&q={{ .Query }}&return={{ .BackURL | urlquery }}"
            hx-get="/groups/{{ .GroupID }}/manage/search-members?before={{ .PrevCursor }}&q={{ .Query }}&return={{ .BackURL | urlquery }}"
            hx-target="#available-block" hx-swap="outerHTML" hx-push-url="true"
-           class="px-2 py-1 text-xs border rounded hover:bg-gray-50">Prev</a>
+           class="px-2 py-1 text-xs border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600">Prev</a>
       {{ else }}
-        <span class="px-2 py-1 text-xs text-gray-400 border rounded cursor-not-allowed">Prev</span>
+        <span class="px-2 py-1 text-xs text-gray-400 border rounded cursor-not-allowed dark:border-gray-600">Prev</span>
       {{ end }}
       {{ if .HasNext }}
         <a href="/groups/{{ .GroupID }}/manage/search-members?after={{ .NextCursor }}&q={{ .Query }}&return={{ .BackURL | urlquery }}"
            hx-get="/groups/{{ .GroupID }}/manage/search-members?after={{ .NextCursor }}&q={{ .Query }}&return={{ .BackURL | urlquery }}"
            hx-target="#available-block" hx-swap="outerHTML" hx-push-url="true"
-           class="px-2 py-1 text-xs border rounded hover:bg-gray-50">Next</a>
+           class="px-2 py-1 text-xs border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600">Next</a>
       {{ else }}
-        <span class="px-2 py-1 text-xs text-gray-400 border rounded cursor-not-allowed">Next</span>
+        <span class="px-2 py-1 text-xs text-gray-400 border rounded cursor-not-allowed dark:border-gray-600">Next</span>
       {{ end }}
     </div>
   </div>
 
   <!-- Fixed header table -->
-  <table class="min-w-full border bg-white table-fixed border-separate border-spacing-0">
+  <table class="min-w-full border bg-white dark:bg-gray-800 dark:border-gray-700 table-fixed border-separate border-spacing-0">
     <colgroup><col class="w-1/3" /><col class="w-1/3" /><col class="w-1/3" /></colgroup>
-    <thead class="bg-white">
-      <tr class="border-b">
+    <thead class="bg-white dark:bg-gray-800">
+      <tr class="border-b dark:border-gray-700">
         <th class="px-2 py-1 text-left">Name</th>
         <th class="px-2 py-1 text-left">Email</th>
         <th class="px-2 py-1 text-left">Action</th>
@@ -235,12 +235,12 @@
 
   <!-- Body in scroll container -->
   <div id="member-search-results" class="relative max-h-96 overflow-y-auto" style="scrollbar-gutter: stable;">
-    <table class="min-w-full border bg-white table-fixed border-separate border-spacing-0">
+    <table class="min-w-full border bg-white dark:bg-gray-800 dark:border-gray-700 table-fixed border-separate border-spacing-0">
       <colgroup><col class="w-1/3" /><col class="w-1/3" /><col class="w-1/3" /></colgroup>
       <tbody id="member-search-results-body">
         {{ if .AvailableMembers }}
           {{ range .AvailableMembers }}
-          <tr class="border-b">
+          <tr class="border-b dark:border-gray-700">
             <td class="px-2 py-1">{{ .FullName }}</td>
             <td class="px-2 py-1">{{ .Email }}</td>
             <td class="px-2 py-1">
@@ -260,7 +260,7 @@
           {{ end }}
         {{ else }}
           <tr id="no-candidates-row">
-            <td colspan="3" class="px-2 py-2 text-gray-500">No members match the current search.</td>
+            <td colspan="3" class="px-2 py-2 text-gray-500 dark:text-gray-400">No members match the current search.</td>
           </tr>
         {{ end }}
       </tbody>
@@ -273,17 +273,17 @@
       <a href="/groups/{{ .GroupID }}/manage/search-members?before={{ .PrevCursor }}&q={{ .Query }}&return={{ .BackURL | urlquery }}"
          hx-get="/groups/{{ .GroupID }}/manage/search-members?before={{ .PrevCursor }}&q={{ .Query }}&return={{ .BackURL | urlquery }}"
          hx-target="#available-block" hx-swap="outerHTML" hx-push-url="true"
-         class="px-2 py-1 text-xs border rounded hover:bg-gray-50">Prev</a>
+         class="px-2 py-1 text-xs border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600">Prev</a>
     {{ else }}
-      <span class="px-2 py-1 text-xs text-gray-400 border rounded cursor-not-allowed">Prev</span>
+      <span class="px-2 py-1 text-xs text-gray-400 border rounded cursor-not-allowed dark:border-gray-600">Prev</span>
     {{ end }}
     {{ if .HasNext }}
       <a href="/groups/{{ .GroupID }}/manage/search-members?after={{ .NextCursor }}&q={{ .Query }}&return={{ .BackURL | urlquery }}"
          hx-get="/groups/{{ .GroupID }}/manage/search-members?after={{ .NextCursor }}&q={{ .Query }}&return={{ .BackURL | urlquery }}"
          hx-target="#available-block" hx-swap="outerHTML" hx-push-url="true"
-         class="px-2 py-1 text-xs border rounded hover:bg-gray-50">Next</a>
+         class="px-2 py-1 text-xs border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600">Next</a>
     {{ else }}
-      <span class="px-2 py-1 text-xs text-gray-400 border rounded cursor-not-allowed">Next</span>
+      <span class="px-2 py-1 text-xs text-gray-400 border rounded cursor-not-allowed dark:border-gray-600">Next</span>
     {{ end }}
   </div>
 </div>

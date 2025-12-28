@@ -1,0 +1,73 @@
+{{ define "admin_materials_assign_leaders_pane" }}
+<label class="block text-sm font-semibold dark:text-gray-200 mb-2">
+  Leaders in {{ .OrgName }}
+</label>
+
+<!-- "All Leaders" option -->
+<div class="mb-3 p-3 border dark:border-gray-600 rounded {{ if .SelectedAll }}bg-indigo-50 dark:bg-indigo-900/40 border-indigo-300 dark:border-indigo-700{{ else }}bg-gray-50 dark:bg-gray-700{{ end }}">
+  <label class="flex items-center cursor-pointer">
+    <input type="radio" name="target" value="org:{{ .SelectedOrg }}"
+           class="mr-3" {{ if .SelectedAll }}checked{{ end }} />
+    <div>
+      <span class="font-medium">All Leaders in Organization</span>
+      <p class="text-xs text-gray-500 dark:text-gray-400">Assign to the entire organization. All current and future leaders will have access.</p>
+    </div>
+  </label>
+</div>
+
+<!-- Leader search -->
+<div class="flex items-center gap-2 mb-2">
+  <input
+    id="leader-search" name="leader_search" type="text"
+    placeholder="Search leaders..."
+    value="{{ .LeaderSearch }}"
+    class="flex-1 px-3 py-2 border dark:border-gray-600 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-gray-700"
+    hx-get="/materials/{{ .MaterialID }}/assign/leaders?org={{ .SelectedOrg }}"
+    hx-target="#leaders-pane"
+    hx-swap="innerHTML"
+    hx-trigger="keyup changed delay:300ms"
+    hx-include="[name='leader_search']"
+  />
+</div>
+
+<!-- Leader pager -->
+<div class="px-2 py-2 text-xs text-gray-600 dark:text-gray-400 flex justify-between">
+  <span>{{ if .LeaderTotal }}{{ .LeaderShown }} of {{ .LeaderTotal }}{{ else }}0 of 0{{ end }}</span>
+  <span class="flex gap-2">
+    {{ if .LeaderHasPrev }}
+      <a class="px-2 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+         href="#"
+         hx-get="/materials/{{ .MaterialID }}/assign/leaders?org={{ .SelectedOrg }}&before={{ .LeaderPrevCur }}{{ if .LeaderSearch }}&leader_search={{ .LeaderSearch | urlquery }}{{ end }}"
+         hx-target="#leaders-pane" hx-swap="innerHTML">Prev</a>
+    {{ else }}
+      <span class="px-2 py-1 border dark:border-gray-600 rounded text-gray-400">Prev</span>
+    {{ end }}
+    {{ if .LeaderHasNext }}
+      <a class="px-2 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+         href="#"
+         hx-get="/materials/{{ .MaterialID }}/assign/leaders?org={{ .SelectedOrg }}&after={{ .LeaderNextCur }}{{ if .LeaderSearch }}&leader_search={{ .LeaderSearch | urlquery }}{{ end }}"
+         hx-target="#leaders-pane" hx-swap="innerHTML">Next</a>
+    {{ else }}
+      <span class="px-2 py-1 border dark:border-gray-600 rounded text-gray-400">Next</span>
+    {{ end }}
+  </span>
+</div>
+
+<!-- Leaders list -->
+<ul class="max-h-64 overflow-y-auto divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+  {{ range .LeaderRows }}
+    <li class="px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700">
+      <label class="flex items-center cursor-pointer">
+        <input type="radio" name="target" value="leader:{{ .ID.Hex }}"
+               class="mr-3" {{ if .Selected }}checked{{ end }} />
+        <div class="flex-1 min-w-0">
+          <span class="block truncate font-medium">{{ .FullName }}</span>
+          <span class="block truncate text-xs text-gray-500 dark:text-gray-400">{{ .Email }}</span>
+        </div>
+      </label>
+    </li>
+  {{ else }}
+    <li class="px-3 py-2 text-sm text-gray-500 dark:text-gray-400">No leaders found in this organization.</li>
+  {{ end }}
+</ul>
+{{ end }}

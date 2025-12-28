@@ -8,13 +8,14 @@ import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/policy/grouppolicy"
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
+	membershipstore "github.com/dalemusser/stratahub/internal/app/store/memberships"
+	resourceassignstore "github.com/dalemusser/stratahub/internal/app/store/resourceassign"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/txn"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/go-chi/chi/v5"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
@@ -68,17 +69,19 @@ func (h *Handler) HandleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Use transaction for atomic deletion of group and related data.
+	memStore := membershipstore.New(db)
+	rasStore := resourceassignstore.New(db)
 	if err := txn.Run(ctx, db, h.Log, func(ctx context.Context) error {
 		// 1) Remove all memberships for this group.
-		if _, err := db.Collection("group_memberships").DeleteMany(ctx, bson.M{"group_id": groupOID}); err != nil {
+		if _, err := memStore.DeleteByGroup(ctx, groupOID); err != nil {
 			return err
 		}
 		// 2) Remove all resource assignments for this group.
-		if _, err := db.Collection("group_resource_assignments").DeleteMany(ctx, bson.M{"group_id": groupOID}); err != nil {
+		if _, err := rasStore.DeleteByGroup(ctx, groupOID); err != nil {
 			return err
 		}
 		// 3) Delete the group itself.
-		if _, err := db.Collection("groups").DeleteOne(ctx, bson.M{"_id": groupOID}); err != nil {
+		if _, err := grpStore.Delete(ctx, groupOID); err != nil {
 			return err
 		}
 		return nil

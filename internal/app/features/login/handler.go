@@ -8,9 +8,9 @@ import (
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
-	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -34,13 +34,10 @@ type Handler struct {
 *─────────────────────────────────────────────────────────────────────────────*/
 
 type loginFormData struct {
-	Title      string
-	Error      string
-	IsLoggedIn bool
-	Role       string
-	UserName   string
-	Email      string
-	ReturnURL  string
+	viewdata.BaseVM
+	Error     string
+	Email     string
+	ReturnURL string
 }
 
 func NewHandler(db *mongo.Database, sessionMgr *auth.SessionManager, errLog *uierrors.ErrorLogger, logger *zap.Logger) *Handler {
@@ -57,16 +54,11 @@ func NewHandler(db *mongo.Database, sessionMgr *auth.SessionManager, errLog *uie
 *─────────────────────────────────────────────────────────────────────────────*/
 
 func (h *Handler) ServeLogin(w http.ResponseWriter, r *http.Request) {
-	role, userName, _, logged := authz.UserCtx(r)
-
 	ret := query.Get(r, "return")
 
 	templates.Render(w, r, "login", loginFormData{
-		Title:      "Login to Adroit Games",
-		IsLoggedIn: logged,
-		Role:       role,
-		UserName:   userName,
-		ReturnURL:  ret,
+		BaseVM:    viewdata.NewBaseVM(r, h.DB, "Login", "/"),
+		ReturnURL: ret,
 	})
 }
 
@@ -180,8 +172,6 @@ func (h *Handler) HandleLoginPost(w http.ResponseWriter, r *http.Request) {
 *─────────────────────────────────────────────────────────────────────────────*/
 
 func (h *Handler) renderFormWithError(w http.ResponseWriter, r *http.Request, msg, email string) {
-	role, userName, _, logged := authz.UserCtx(r)
-
 	// From POST, "return" will be in the form; from GET, we might rely on the query.
 	ret := strings.TrimSpace(r.FormValue("return"))
 	if ret == "" {
@@ -189,12 +179,9 @@ func (h *Handler) renderFormWithError(w http.ResponseWriter, r *http.Request, ms
 	}
 
 	templates.Render(w, r, "login", loginFormData{
-		Title:      "Login to Adroit Games",
-		IsLoggedIn: logged,
-		Role:       role,
-		UserName:   userName,
-		Error:      msg,
-		Email:      email,
-		ReturnURL:  ret,
+		BaseVM:    viewdata.NewBaseVM(r, h.DB, "Login", "/"),
+		Error:     msg,
+		Email:     email,
+		ReturnURL: ret,
 	})
 }

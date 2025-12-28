@@ -10,8 +10,11 @@ import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/policy/grouppolicy"
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
+	membershipstore "github.com/dalemusser/stratahub/internal/app/store/memberships"
+	organizationstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -23,7 +26,7 @@ import (
 
 // ServeGroupView renders a read-only view of a group.
 func (h *Handler) ServeGroupView(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := authz.UserCtx(r)
+	_, _, _, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
@@ -63,8 +66,9 @@ func (h *Handler) ServeGroupView(w http.ResponseWriter, r *http.Request) {
 
 	orgName := ""
 	{
-		var org models.Organization
-		if err := db.Collection("organizations").FindOne(ctx, bson.M{"_id": group.OrganizationID}).Decode(&org); err != nil {
+		orgStore := organizationstore.New(db)
+		org, err := orgStore.GetByID(ctx, group.OrganizationID)
+		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				orgName = "(Deleted)"
 			} else {
@@ -82,28 +86,20 @@ func (h *Handler) ServeGroupView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	leadersCount, lcErr := db.Collection("group_memberships").CountDocuments(ctx, bson.M{
-		"group_id": group.ID,
-		"role":     "leader",
-	})
+	memStore := membershipstore.New(db)
+	leadersCount, lcErr := memStore.CountByGroup(ctx, group.ID, "leader")
 	if lcErr != nil {
 		h.ErrLog.LogServerError(w, r, "database error counting group leaders", lcErr, "A database error occurred.", "/groups")
 		return
 	}
-	membersCount, mcErr := db.Collection("group_memberships").CountDocuments(ctx, bson.M{
-		"group_id": group.ID,
-		"role":     "member",
-	})
+	membersCount, mcErr := memStore.CountByGroup(ctx, group.ID, "member")
 	if mcErr != nil {
 		h.ErrLog.LogServerError(w, r, "database error counting group members", mcErr, "A database error occurred.", "/groups")
 		return
 	}
 
 	templates.Render(w, r, "group_view", groupViewData{
-		Title:             "View Group",
-		IsLoggedIn:        true,
-		Role:              role,
-		UserName:          uname,
+		BaseVM:            viewdata.NewBaseVM(r, h.DB, "View Group", "/groups"),
 		GroupID:           group.ID.Hex(),
 		Name:              group.Name,
 		Description:       group.Description,
@@ -113,8 +109,6 @@ func (h *Handler) ServeGroupView(w http.ResponseWriter, r *http.Request) {
 		CreatedAt:         group.CreatedAt,
 		UpdatedAt:         group.UpdatedAt,
 		AssignedResources: assigned,
-		BackURL:           httpnav.ResolveBackURL(r, "/groups"),
-		CurrentPath:       httpnav.CurrentPath(r),
 	})
 }
 

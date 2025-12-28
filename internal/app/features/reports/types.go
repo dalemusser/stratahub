@@ -2,6 +2,7 @@ package reports
 
 import (
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -28,6 +29,11 @@ type orgPaneResult struct {
 // groupsPaneResult holds the data for the groups pane in the members report.
 type groupsPaneResult struct {
 	Rows            []groupRow
+	Total           int64
+	HasPrev         bool
+	HasNext         bool
+	PrevCursor      string
+	NextCursor      string
 	OrgMembersCount int64 // total members in selected org
 	OrgName         string
 }
@@ -43,25 +49,25 @@ type exportCountsResult struct {
 // into this types file so the handler logic files stay focused on
 // query / CSV logic.
 type pageData struct {
-	Title      string
-	IsLoggedIn bool
-	Role       string
-	UserName   string
+	viewdata.BaseVM
 
 	// Optional back link
 	ShowBack bool
-	BackURL  string
 	// URL-encoded return query-string fragment (e.g. "&return=/foo")
 	ReturnQS string
 
 	// Left org pane
-	OrgQuery        string
-	OrgShown        int
-	OrgTotal        int64
-	OrgHasPrev      bool
-	OrgHasNext      bool
-	OrgPrevCur      string
-	OrgNextCur      string
+	OrgQuery      string
+	OrgShown      int
+	OrgTotal      int64
+	OrgRangeStart int
+	OrgRangeEnd   int
+	OrgHasPrev    bool
+	OrgHasNext    bool
+	OrgPrevCur    string
+	OrgNextCur    string
+	OrgPrevStart  int
+	OrgNextStart  int
 	SelectedOrg     string // "all" or hex string
 	SelectedOrgName string
 	OrgRows         []orgutil.OrgRow
@@ -70,6 +76,16 @@ type pageData struct {
 	// Middle groups pane (only when an org is selected)
 	SelectedGroup        string
 	GroupRows            []groupRow
+	GroupsShown          int
+	GroupsTotal          int64
+	GroupsRangeStart     int
+	GroupsRangeEnd       int
+	GroupsHasPrev        bool
+	GroupsHasNext        bool
+	GroupsPrevCur        string
+	GroupsNextCur        string
+	GroupsPrevStart      int
+	GroupsNextStart      int
 	OrgMembersCount      int64 // total members in selected org (respecting member_status)
 	MembersInGroupsCount int64 // members that belong to at least one group in scope
 	ExportRecordCount    int64 // number of CSV rows in export
@@ -78,7 +94,4 @@ type pageData struct {
 	GroupStatus      string // kept for UI parity with template
 	MemberStatus     string
 	DownloadFilename string
-
-	// Used by templates to build links and preserve filters
-	CurrentPath string
 }

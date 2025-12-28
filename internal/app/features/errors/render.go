@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"go.uber.org/zap"
@@ -19,6 +20,11 @@ type pageData struct {
 	UserName   string
 	Message    string
 	BackURL    string
+
+	// Layout fields (required by layout/menu templates)
+	SiteName   string
+	LogoURL    string
+	FooterHTML string
 }
 
 // ErrorLogger provides error logging with context for HTTP handlers.
@@ -58,6 +64,7 @@ func RenderUnauthorized(w http.ResponseWriter, r *http.Request, backURL string) 
 		UserName:   name,
 		Message:    "Please sign in to continue.",
 		BackURL:    backURL,
+		SiteName:   models.DefaultSiteName,
 	}
 
 	w.WriteHeader(http.StatusUnauthorized)
@@ -79,6 +86,7 @@ func RenderForbidden(w http.ResponseWriter, r *http.Request, msg, backURL string
 		UserName:   name,
 		Message:    msg,
 		BackURL:    backURL,
+		SiteName:   models.DefaultSiteName,
 	}
 
 	w.WriteHeader(http.StatusForbidden)
@@ -103,6 +111,7 @@ func RenderServerError(w http.ResponseWriter, r *http.Request, msg, backURL stri
 		UserName:   name,
 		Message:    msg,
 		BackURL:    backURL,
+		SiteName:   models.DefaultSiteName,
 	}
 
 	w.WriteHeader(http.StatusInternalServerError)
@@ -127,6 +136,7 @@ func RenderBadRequest(w http.ResponseWriter, r *http.Request, msg, backURL strin
 		UserName:   name,
 		Message:    msg,
 		BackURL:    backURL,
+		SiteName:   models.DefaultSiteName,
 	}
 
 	w.WriteHeader(http.StatusBadRequest)
@@ -151,6 +161,7 @@ func RenderNotFound(w http.ResponseWriter, r *http.Request, msg, backURL string)
 		UserName:   name,
 		Message:    msg,
 		BackURL:    backURL,
+		SiteName:   models.DefaultSiteName,
 	}
 
 	w.WriteHeader(http.StatusNotFound)

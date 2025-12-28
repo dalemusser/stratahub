@@ -5,11 +5,11 @@
 {{ define "content" }}
 <div class="flex items-center mb-2">
   <a href="{{ .BackURL }}"
-     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 mr-2"
+     class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
      title="Go back">
     ← Back
   </a>
-  <h1 class="text-2xl font-bold text-gray-900">👑 Edit Leader</h1>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">👑 Edit Leader</h1>
 </div>
 
 {{ if .Error }}
@@ -19,7 +19,7 @@
 {{ end }}
 
 <!-- Edit form -->
-<form action="/leaders/{{ .ID }}/edit" method="POST" class="bg-white rounded shadow p-4 mb-6">
+<form action="/leaders/{{ .ID }}/edit" method="POST" class="bg-white dark:bg-gray-800 rounded shadow p-4 mb-6">
   <input type="hidden" name="return" value="{{ .BackURL }}">
   <!-- keep org but do not allow changes -->
   <input type="hidden" name="orgID" value="{{ .OrgID }}">
@@ -28,40 +28,40 @@
 
     <!-- Full name -->
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
       <input
         name="full_name"
         type="text"
         value="{{ .FullName }}"
         required
-        class="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
       />
     </div>
 
     <!-- Email -->
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
       <input
         name="email"
         type="text"
         value="{{ .Email }}"
         required
-        class="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
       />
     </div>
 
     <!-- Organization (read-only) -->
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Organization</label>
-      <div class="w-full border rounded px-3 py-2 bg-gray-50 text-gray-800">{{ .OrgName }}</div>
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Organization</label>
+      <div class="w-full border dark:border-gray-600 rounded px-3 py-2 bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm">{{ .OrgName }}</div>
     </div>
 
     <!-- Auth Method -->
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Auth Method</label>
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Auth Method</label>
       <select
         name="auth_method"
-        class="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
       >
         <option value="internal"  {{ if eq .Auth "internal" }}selected{{ end }}>internal</option>
         <option value="google"    {{ if eq .Auth "google" }}selected{{ end }}>google</option>
@@ -73,10 +73,10 @@
 
     <!-- Status -->
     <div>
-      <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
       <select
         name="status"
-        class="w-full border rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
       >
         <option value="active"   {{ if eq .Status "active" }}selected{{ end }}>Active</option>
         <option value="disabled" {{ if eq .Status "disabled" }}selected{{ end }}>Disabled</option>

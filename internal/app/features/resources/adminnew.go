@@ -4,25 +4,22 @@ import (
 	"context"
 	"net/http"
 	"strings"
-	"time"
 
+	resourcestore "github.com/dalemusser/stratahub/internal/app/store/resources"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/htmlsanitize"
 	"github.com/dalemusser/stratahub/internal/app/system/inputval"
+	"github.com/dalemusser/stratahub/internal/app/system/navigation"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
-	"github.com/dalemusser/stratahub/internal/app/system/navigation"
-	"github.com/dalemusser/waffle/pantry/text"
 	"github.com/dalemusser/waffle/pantry/urlutil"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.uber.org/zap"
 )
 
 // createResourceInput defines validation rules for creating a resource.
 type createResourceInput struct {
-	Title     string `validate:"required,max=200" label:"Title"`
-	LaunchURL string `validate:"required,url" label:"Launch URL"`
-	Status    string `validate:"required,oneof=active disabled" label:"Status"`
+	Title  string `validate:"required,max=200" label:"Title"`
+	Status string `validate:"required,oneof=active disabled" label:"Status"`
 }
 
 func (h *AdminHandler) ServeNew(w http.ResponseWriter, r *http.Request) {
@@ -31,7 +28,8 @@ func (h *AdminHandler) ServeNew(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
+	// Parse multipart form for file uploads (32MB max)
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		h.ErrLog.LogBadRequest(w, r, "parse form failed", err, "Invalid form data.", "/resources")
 		return
 	}
@@ -43,7 +41,8 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	typeValue := strings.TrimSpace(r.FormValue("type"))
 	status := strings.TrimSpace(r.FormValue("status"))
 	showInLibrary := r.FormValue("show_in_library") != ""
-	defaultInstructions := strings.TrimSpace(r.FormValue("default_instructions"))
+	// Sanitize HTML content from rich text editor
+	defaultInstructions := htmlsanitize.Sanitize(strings.TrimSpace(r.FormValue("default_instructions")))
 
 	if typeValue == "" {
 		typeValue = models.DefaultResourceType
@@ -51,6 +50,12 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	if status == "" {
 		status = "active"
 	}
+
+	// Check for file upload
+	var filePath, fileName, contentType string
+	var fileSize int64
+	file, header, fileErr := r.FormFile("file")
+	hasFile := fileErr == nil && header != nil && header.Size > 0
 
 	// Helper to re-render the form with a message
 	reRender := func(msg string) {
@@ -68,7 +73,7 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate required fields using struct tags
-	input := createResourceInput{Title: title, LaunchURL: launchURL, Status: status}
+	input := createResourceInput{Title: title, Status: status}
 	if result := inputval.Validate(input); result.HasErrors() {
 		reRender(result.First())
 		return
@@ -80,48 +85,87 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate launch URL is an absolute HTTP/HTTPS URL
-	if !urlutil.IsValidAbsHTTPURL(launchURL) {
+	// Must have either URL or file
+	hasURL := launchURL != ""
+	if !hasURL && !hasFile {
+		reRender("Either Launch URL or File is required.")
+		return
+	}
+	if hasURL && hasFile {
+		reRender("Cannot have both Launch URL and File. Choose one.")
+		return
+	}
+
+	// Validate launch URL if provided
+	if hasURL && !urlutil.IsValidAbsHTTPURL(launchURL) {
 		reRender("Launch URL must be a valid absolute URL (e.g., https://example.com).")
 		return
 	}
 
-	_, uname, memberID, ok := authz.UserCtx(r)
-	var createdByID primitive.ObjectID
-	var createdByName string
-	if ok {
-		createdByID = memberID
-		createdByName = uname
+	// Handle file upload
+	if hasFile {
+		defer file.Close()
+
+		fileName = header.Filename
+		contentType = header.Header.Get("Content-Type")
+		if contentType == "" {
+			contentType = "application/octet-stream"
+		}
+
+		ctx, cancel := context.WithTimeout(r.Context(), timeouts.Long())
+		defer cancel()
+
+		// Upload file to storage
+		info, err := uploadFile(ctx, h.Storage, fileName, file, header.Size, contentType)
+		if err != nil {
+			h.Log.Error("file upload failed", zap.Error(err))
+			reRender("Failed to upload file. Please try again.")
+			return
+		}
+		filePath = info.Path
+		fileSize = info.Size
 	}
+
+	_, uname, memberID, ok := authz.UserCtx(r)
 
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 	db := h.DB
 
-	now := time.Now()
-	doc := bson.M{
-		"_id":                  primitive.NewObjectID(),
-		"title":                title,
-		"title_ci":             text.Fold(title),
-		"subject":              subject,
-		"subject_ci":           text.Fold(subject),
-		"description":          description,
-		"launch_url":           launchURL,
-		"status":               status,
-		"type":                 typeValue,
-		"show_in_library":      showInLibrary,
-		"default_instructions": defaultInstructions,
-		"created_at":           now,
-		"updated_at":           now,
-		"created_by_id":        createdByID,
-		"created_by_name":      createdByName,
+	// Create resource via store (handles ID, CI fields, timestamps)
+	resStore := resourcestore.New(db)
+	res := models.Resource{
+		Title:               title,
+		Subject:             subject,
+		Description:         description,
+		LaunchURL:           launchURL,
+		Status:              status,
+		Type:                typeValue,
+		ShowInLibrary:       showInLibrary,
+		FilePath:            filePath,
+		FileName:            fileName,
+		FileSize:            fileSize,
+		DefaultInstructions: defaultInstructions,
+	}
+	if ok {
+		res.CreatedByID = &memberID
+		res.CreatedByName = uname
 	}
 
-	_, err := db.Collection("resources").InsertOne(ctx, doc)
-	if err != nil {
+	if _, err := resStore.Create(ctx, res); err != nil {
 		msg := "Database error while creating resource."
-		if wafflemongo.IsDup(err) {
+		if err == resourcestore.ErrDuplicateTitle {
 			msg = "A resource with that title already exists."
+		} else {
+			h.Log.Error("failed to create resource", zap.Error(err))
+		}
+		// Clean up uploaded file on error
+		if filePath != "" {
+			if delErr := h.Storage.Delete(ctx, filePath); delErr != nil {
+				h.Log.Warn("failed to clean up uploaded file after create error",
+					zap.String("path", filePath),
+					zap.Error(delErr))
+			}
 		}
 		reRender(msg)
 		return

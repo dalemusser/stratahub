@@ -1,7 +1,11 @@
 // internal/app/features/groups/resourceassigntypes.go
 package groups
 
-import "html/template"
+import (
+	"html/template"
+
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+)
 
 // assignedResourceItem represents a single assigned resource in the list view.
 type assignedResourceItem struct {
@@ -26,10 +30,7 @@ type availableResourceItem struct {
 
 // assignmentListData is the view model for the Assign Resources page.
 type assignmentListData struct {
-	Title      string
-	IsLoggedIn bool
-	Role       string
-	UserName   string
+	viewdata.BaseVM
 
 	GroupID   string
 	GroupName string
@@ -37,8 +38,12 @@ type assignmentListData struct {
 	Assigned  []assignedResourceItem
 	Available []availableResourceItem
 
-	AvailableShown int
-	AvailableTotal int64
+	AvailableShown      int
+	AvailableTotal      int64
+	AvailableRangeStart int
+	AvailableRangeEnd   int
+	NextStart           int
+	PrevStart           int
 
 	Query       string
 	TypeFilter  string
@@ -51,9 +56,7 @@ type assignmentListData struct {
 	HasNext       bool
 	HasPrev       bool
 
-	Flash       template.HTML
-	BackURL     string
-	CurrentPath string
+	Flash template.HTML
 }
 
 // manageAssignmentModalVM is used to render the modal for managing an existing assignment.

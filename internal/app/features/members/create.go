@@ -22,6 +22,7 @@ import (
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.uber.org/zap"
 )
 
 // ServeNew renders the "Add Member" form.
@@ -48,9 +49,10 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 		Auth:   "internal",
 		Status: status.Active,
 	}
-	formutil.SetBase(&data.Base, r, "Add Member", "/members")
+	formutil.SetBase(&data.Base, r, db, "Add Member", "/members")
 
 	if role == "leader" {
+		// Leader: org is always locked to their org
 		orgID, orgName, err := orgutil.ResolveLeaderOrg(ctx, db, uid)
 		if errors.Is(err, orgutil.ErrUserNotFound) {
 			uierrors.RenderForbidden(w, r, "User not found.", httpnav.ResolveBackURL(r, "/members"))
@@ -68,31 +70,23 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 		data.OrgHex = orgID.Hex()
 		data.OrgName = orgName
 	} else {
-		// Admin: either locked to selected org (if valid and active) or show org picker
+		// Admin: org can be passed via URL param (optional - can select via picker)
 		if selectedOrg != "" && selectedOrg != "all" {
 			orgID, orgName, err := orgutil.ResolveActiveOrgFromHex(ctx, db, selectedOrg)
-			switch {
-			case err == nil:
-				data.OrgLocked = true
+			if err != nil {
+				if orgutil.IsExpectedOrgError(err) {
+					// Org not found - just show page without org selected
+					h.Log.Warn("org not found or inactive", zap.String("org", selectedOrg))
+				} else {
+					h.ErrLog.LogServerError(w, r, "database error loading organization", err, "A database error occurred.", "/members")
+					return
+				}
+			} else {
 				data.OrgHex = orgID.Hex()
 				data.OrgName = orgName
-			case orgutil.IsExpectedOrgError(err):
-				// Bad ID, not found, or not active - fall through to show org picker
-			default:
-				h.ErrLog.LogServerError(w, r, "database error loading organization", err, "A database error occurred.", "/members")
-				return
 			}
 		}
-		if !data.OrgLocked {
-			orgs, err := orgutil.ListActiveOrgs(ctx, db)
-			if err != nil {
-				h.ErrLog.LogServerError(w, r, "database error listing active organizations", err, "A database error occurred.", "/members")
-				return
-			}
-			for _, o := range orgs {
-				data.Orgs = append(data.Orgs, orgOption{ID: o.ID, Name: o.Name})
-			}
-		}
+		// OrgLocked stays false for admin - they can change via picker
 	}
 
 	templates.Render(w, r, "member_new", data)
@@ -213,16 +207,15 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 
 // Helper to re-render form with an inline error message and keep org options for admins.
 func (h *Handler) reRenderNewWithError(w http.ResponseWriter, r *http.Request, data newData, msg string) {
-	formutil.SetBase(&data.Base, r, "Add Member", "/members")
+	formutil.SetBase(&data.Base, r, h.DB, "Add Member", "/members")
 	data.SetError(msg)
 
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
 
-	// If OrgLocked and we know the org hex, populate OrgName so the template
-	// can show a friendly label when re-rendering.
-	if data.OrgLocked && data.OrgHex != "" {
+	// Org is always locked now, populate OrgName so the template shows the name
+	if data.OrgHex != "" {
 		if oid, err := primitive.ObjectIDFromHex(data.OrgHex); err == nil {
 			name, err := orgutil.GetOrgName(ctx, db, oid)
 			if err != nil {
@@ -230,19 +223,7 @@ func (h *Handler) reRenderNewWithError(w http.ResponseWriter, r *http.Request, d
 				return
 			}
 			data.OrgName = name
-		}
-	}
-
-	// Load org choices for admins whenever the org is NOT locked,
-	// regardless of whether OrgHex is currently set to something.
-	if data.Role == "admin" && !data.OrgLocked {
-		orgs, err := orgutil.ListActiveOrgs(ctx, db)
-		if err != nil {
-			h.ErrLog.LogServerError(w, r, "database error listing active organizations (re-render)", err, "A database error occurred.", "/members")
-			return
-		}
-		for _, o := range orgs {
-			data.Orgs = append(data.Orgs, orgOption{ID: o.ID, Name: o.Name})
+			data.OrgLocked = true
 		}
 	}
 

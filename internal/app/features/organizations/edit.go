@@ -5,21 +5,19 @@ import (
 	"context"
 	"net/http"
 	"strings"
-	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	organizationstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
 	"github.com/dalemusser/stratahub/internal/app/system/formutil"
 	"github.com/dalemusser/stratahub/internal/app/system/inputval"
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/timezones"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/dalemusser/waffle/pantry/text"
 
 	"github.com/go-chi/chi/v5"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -46,11 +44,9 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	db := h.DB
 
-	var org models.Organization
-	if err := db.Collection("organizations").
-		FindOne(ctx, bson.M{"_id": oid}).
-		Decode(&org); err != nil {
-
+	orgStore := organizationstore.New(db)
+	org, err := orgStore.GetByID(ctx, oid)
+	if err != nil {
 		uierrors.RenderNotFound(w, r, "Organization not found.", "/organizations")
 		return
 	}
@@ -70,7 +66,7 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 		Contact:        org.ContactInfo,
 		TimeZoneGroups: tzGroups,
 	}
-	formutil.SetBase(&data.Base, r, "Edit Organization", "/organizations")
+	formutil.SetBase(&data.Base, r, h.DB, "Edit Organization", "/organizations")
 
 	templates.Render(w, r, "organization_edit", data)
 }
@@ -106,12 +102,10 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	db := h.DB
 
-	// Ensure the organization exists
-	var cur models.Organization
-	if err := db.Collection("organizations").
-		FindOne(ctx, bson.M{"_id": oid}).
-		Decode(&cur); err != nil {
+	orgStore := organizationstore.New(db)
 
+	// Ensure the organization exists
+	if _, err := orgStore.GetByID(ctx, oid); err != nil {
 		uierrors.RenderNotFound(w, r, "Organization not found.", "/organizations")
 		return
 	}
@@ -127,7 +121,7 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 			Contact:        contact,
 			TimeZoneGroups: tzGroups,
 		}
-		formutil.SetBase(&data.Base, r, "Edit Organization", "/organizations")
+		formutil.SetBase(&data.Base, r, h.DB, "Edit Organization", "/organizations")
 		data.SetError(msg)
 		templates.Render(w, r, "organization_edit", data)
 	}
@@ -147,34 +141,27 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 
 	// Preflight duplicate by name_ci excluding self
 	ci := text.Fold(name)
-	if err := db.Collection("organizations").
-		FindOne(ctx, bson.M{
-			"name_ci": ci,
-			"_id":     bson.M{"$ne": oid},
-		}).Err(); err == nil {
-
+	exists, err := orgStore.NameExistsForOther(ctx, ci, oid)
+	if err != nil {
+		reRender("Database error checking organization name.")
+		return
+	}
+	if exists {
 		reRender("Another organization already uses that name.")
 		return
 	}
 
-	// Build update doc
-	up := bson.M{
-		"name":         name,
-		"name_ci":      ci,
-		"city":         city,
-		"city_ci":      text.Fold(city),
-		"state":        state,
-		"state_ci":     text.Fold(state),
-		"contact_info": contact,
-		"time_zone":    tz,
-		"updated_at":   time.Now(),
+	// Update via store
+	updateOrg := models.Organization{
+		Name:        name,
+		City:        city,
+		State:       state,
+		ContactInfo: contact,
+		TimeZone:    tz,
 	}
-
-	if _, err := db.Collection("organizations").
-		UpdateOne(ctx, bson.M{"_id": oid}, bson.M{"$set": up}); err != nil {
-
+	if err := orgStore.Update(ctx, oid, updateOrg); err != nil {
 		msg := "Database error while updating organization."
-		if wafflemongo.IsDup(err) {
+		if err == organizationstore.ErrDuplicateOrganization {
 			msg = "Another organization already uses that name."
 		}
 		reRender(msg)

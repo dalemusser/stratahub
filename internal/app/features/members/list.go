@@ -8,16 +8,16 @@ import (
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/policy/memberpolicy"
+	organizationstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
+	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
-	"github.com/dalemusser/stratahub/internal/domain/models"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/templates"
-
 	"github.com/go-chi/chi/v5"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
@@ -26,7 +26,7 @@ import (
 // ServeList renders the main Members screen with org pane + members table.
 // Authorization: Admin can list all members; Leader can only list members in their org.
 func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := authz.UserCtx(r)
+	_, _, _, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
@@ -100,11 +100,10 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	base := viewdata.NewBaseVM(r, db, "Members", "/members")
+
 	templates.RenderAutoMap(w, r, "members_list", nil, listData{
-		Title:      "Members",
-		IsLoggedIn: true,
-		Role:       role,
-		UserName:   uname,
+		BaseVM: base,
 
 		// Orgs pane
 		ShowOrgPane:   showOrgPane,
@@ -141,11 +140,8 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 
 		MemberRows: members.Rows,
 
-		AllowUpload: (role == "admin" && selectedOrg != "all") || role == "leader",
+		AllowUpload: (base.Role == "admin" && selectedOrg != "all") || base.Role == "leader",
 		AllowAdd:    true,
-
-		BackURL:     httpnav.ResolveBackURL(r, "/members"),
-		CurrentPath: httpnav.CurrentPath(r),
 	})
 }
 
@@ -170,11 +166,10 @@ func (h *Handler) ServeManageMemberModal(w http.ResponseWriter, r *http.Request)
 	defer cancel()
 	db := h.DB
 
-	// Load the member
-	var u models.User
-	if err := db.Collection("users").
-		FindOne(ctx, bson.M{"_id": memberID, "role": "member"}).
-		Decode(&u); err != nil {
+	// Load the member via store
+	usrStore := userstore.New(db)
+	uptr, err := usrStore.GetMemberByID(ctx, memberID)
+	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			uierrors.HTMXNotFound(w, r, "Member not found.", "/members")
 		} else {
@@ -182,6 +177,7 @@ func (h *Handler) ServeManageMemberModal(w http.ResponseWriter, r *http.Request)
 		}
 		return
 	}
+	u := *uptr
 
 	// Check authorization: can this user manage this member?
 	canManage, policyErr := memberpolicy.CanManageMember(ctx, db, r, u.OrganizationID)
@@ -197,10 +193,9 @@ func (h *Handler) ServeManageMemberModal(w http.ResponseWriter, r *http.Request)
 	// Resolve organization name if present
 	orgName := ""
 	if u.OrganizationID != nil {
-		var org models.Organization
-		if err := db.Collection("organizations").
-			FindOne(ctx, bson.M{"_id": *u.OrganizationID}).
-			Decode(&org); err != nil {
+		orgStore := organizationstore.New(db)
+		org, err := orgStore.GetByID(ctx, *u.OrganizationID)
+		if err != nil {
 			if err == mongo.ErrNoDocuments {
 				h.Log.Warn("organization not found for member (may have been deleted)",
 					zap.String("user_id", u.ID.Hex()),

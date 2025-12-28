@@ -9,14 +9,13 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/policy/grouppolicy"
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
 	resourceassignstore "github.com/dalemusser/stratahub/internal/app/store/resourceassign"
+	resourcestore "github.com/dalemusser/stratahub/internal/app/store/resources"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
-	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/dalemusser/waffle/pantry/urlutil"
 	"github.com/go-chi/chi/v5"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
@@ -94,8 +93,9 @@ func (h *Handler) ServeAssignResourceModal(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	var res models.Resource
-	if err := db.Collection("resources").FindOne(ctx, bson.M{"_id": asn.ResourceID}).Decode(&res); err != nil {
+	resStore := resourcestore.New(db)
+	res, err := resStore.GetByID(ctx, asn.ResourceID)
+	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			uierrors.RenderForbidden(w, r, "Resource not found.", back)
 			return

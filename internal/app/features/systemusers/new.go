@@ -5,20 +5,17 @@ import (
 	"context"
 	"html/template"
 	"net/http"
-	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/inputval"
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
-	"github.com/dalemusser/waffle/pantry/httpnav"
-	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
-	"github.com/dalemusser/waffle/pantry/text"
-	"go.mongodb.org/mongo-driver/bson"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 // createSystemUserInput defines validation rules for creating a system user.
@@ -35,19 +32,14 @@ type createSystemUserInput struct {
 // but does NOT itself enforce admin-only access. The list entry point and
 // modal actions are admin-gated via requireAdmin().
 func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := authz.UserCtx(r)
+	_, _, _, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
 
 	data := formData{
-		Title:       "Add System User",
-		IsLoggedIn:  true,
-		Role:        role,
-		UserName:    uname,
-		BackURL:     httpnav.ResolveBackURL(r, "/system-users"),
-		CurrentPath: httpnav.CurrentPath(r),
+		BaseVM: viewdata.NewBaseVM(r, h.DB, "Add System User", "/system-users"),
 		// Field values start empty; template will show sensible defaults.
 	}
 
@@ -56,11 +48,12 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 
 // HandleCreate processes the Add System User form POST.
 func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := authz.UserCtx(r)
+	_, _, _, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
+
 	if err := r.ParseForm(); err != nil {
 		h.ErrLog.LogBadRequest(w, r, "parse form failed", err, "Invalid form data.", "/system-users")
 		return
@@ -73,19 +66,14 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 
 	reRender := func(msg string) {
 		templates.Render(w, r, "system_user_new", formData{
-			Title:       "Add System User",
-			IsLoggedIn:  true,
-			Role:        role,
-			UserName:    uname,
-			FullName:    full,
-			Email:       email,
-			URole:       userRole,
-			UserRole:    userRole,
-			Auth:        authm,
-			Status:      "active",
-			Error:       template.HTML(msg),
-			BackURL:     httpnav.ResolveBackURL(r, "/system-users"),
-			CurrentPath: httpnav.CurrentPath(r),
+			BaseVM:   viewdata.NewBaseVM(r, h.DB, "Add System User", "/system-users"),
+			FullName: full,
+			Email:    email,
+			URole:    userRole,
+			UserRole: userRole,
+			Auth:     authm,
+			Status:   "active",
+			Error:    template.HTML(msg),
 		})
 	}
 
@@ -105,27 +93,22 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	db := h.DB
 
-	// Insert (duplicate email is caught by unique index)
-	now := time.Now()
-
-	doc := bson.M{
-		"_id":          primitive.NewObjectID(),
-		"full_name":    full,
-		"full_name_ci": text.Fold(full),
-		"email":        email,
-		"auth_method":  authm,
-		"role":         userRole,
-		"status":       "active",
-		"created_at":   now,
-		"updated_at":   now,
+	// Create user via store (handles ID, CI fields, timestamps, and duplicate detection)
+	usrStore := userstore.New(db)
+	user := models.User{
+		FullName:   full,
+		Email:      email,
+		Role:       userRole,
+		AuthMethod: authm,
+		Status:     "active",
 	}
 
-	if _, err := db.Collection("users").InsertOne(ctx, doc); err != nil {
-		if wafflemongo.IsDup(err) {
-			reRender("A user with that email already exists.")
-			return
+	if _, err := usrStore.Create(ctx, user); err != nil {
+		msg := "Database error while creating system user."
+		if err == userstore.ErrDuplicateEmail {
+			msg = "A user with that email already exists."
 		}
-		reRender("Database error while creating system user.")
+		reRender(msg)
 		return
 	}
 

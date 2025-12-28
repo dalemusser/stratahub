@@ -1,13 +1,11 @@
 // internal/app/features/dashboard/common.go
 package dashboard
 
+import "github.com/dalemusser/stratahub/internal/app/system/viewdata"
+
 // baseDashboardData contains fields common to all dashboard views.
 type baseDashboardData struct {
-	Title       string
-	IsLoggedIn  bool
-	Role        string
-	UserName    string
-	CurrentPath string
+	viewdata.BaseVM
 }
 
 // dashboardWithCounts extends baseDashboardData with entity counts

@@ -20,6 +20,19 @@ var appConfigKeys = []config.AppKey{
 	{Name: "session_key", Default: "dev-only-change-me-please-0123456789ABCDEF", Desc: "Session signing key (must be strong in production)"},
 	{Name: "session_name", Default: "stratahub-session", Desc: "Session cookie name"},
 	{Name: "session_domain", Default: "", Desc: "Session cookie domain (blank means current host)"},
+
+	// File storage configuration
+	{Name: "storage_type", Default: "local", Desc: "Storage backend: 'local' or 's3'"},
+	{Name: "storage_local_path", Default: "./uploads/materials", Desc: "Local storage path for uploaded files"},
+	{Name: "storage_local_url", Default: "/files/materials", Desc: "URL prefix for serving local files"},
+
+	// S3/CloudFront configuration
+	{Name: "storage_s3_region", Default: "", Desc: "AWS region for S3"},
+	{Name: "storage_s3_bucket", Default: "", Desc: "S3 bucket name"},
+	{Name: "storage_s3_prefix", Default: "materials/", Desc: "S3 key prefix"},
+	{Name: "storage_cf_url", Default: "", Desc: "CloudFront distribution URL"},
+	{Name: "storage_cf_keypair_id", Default: "", Desc: "CloudFront key pair ID"},
+	{Name: "storage_cf_key_path", Default: "", Desc: "Path to CloudFront private key file"},
 }
 
 // LoadConfig loads WAFFLE core config and app-specific config.
@@ -47,6 +60,19 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 		SessionKey:    appValues.String("session_key"),
 		SessionName:   appValues.String("session_name"),
 		SessionDomain: appValues.String("session_domain"),
+
+		// File storage
+		StorageType:      appValues.String("storage_type"),
+		StorageLocalPath: appValues.String("storage_local_path"),
+		StorageLocalURL:  appValues.String("storage_local_url"),
+
+		// S3/CloudFront
+		StorageS3Region:    appValues.String("storage_s3_region"),
+		StorageS3Bucket:    appValues.String("storage_s3_bucket"),
+		StorageS3Prefix:    appValues.String("storage_s3_prefix"),
+		StorageCFURL:       appValues.String("storage_cf_url"),
+		StorageCFKeyPairID: appValues.String("storage_cf_keypair_id"),
+		StorageCFKeyPath:   appValues.String("storage_cf_key_path"),
 	}
 
 	return coreCfg, appCfg, nil

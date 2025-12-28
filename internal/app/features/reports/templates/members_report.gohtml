@@ -6,18 +6,18 @@
 <div class="flex items-center mb-2">
   {{ if .ShowBack }}
   <a href="{{ .BackURL }}"
-     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 mr-2"
+     class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2 dark:text-gray-300"
      title="Go back">← Back</a>
   {{ end }}
-  <h1 class="text-2xl font-bold text-gray-900">📈 Members Report</h1>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📈 Members Report</h1>
 </div>
 
-<!-- Option A: Two–tier grid (always side-by-side; page can scroll horizontally if needed) -->
-<div class="grid gap-4 grid-cols-[280px_minmax(0,1fr)]">
-  <!-- LEFT RAIL: Organizations (sticky, scrolls internally) -->
-  <aside class="min-w-0">
-    <div class="bg-white rounded shadow p-3 sticky top-4 max-h-[calc(100vh-6rem)] overflow-auto">
-      <label class="block text-sm font-semibold mb-2">Organizations</label>
+<!-- Two–tier grid (always side-by-side; page can scroll horizontally if needed) -->
+<div class="grid gap-4 grid-cols-[280px_minmax(0,1fr)]" style="height: calc(100vh - 7rem);">
+  <!-- LEFT RAIL: Organizations (scrolls internally) -->
+  <aside class="min-w-0 overflow-hidden">
+    <div class="bg-white dark:bg-gray-800 rounded shadow p-3 h-full overflow-auto">
+      <label class="block text-sm font-semibold mb-2 dark:text-gray-200">Organizations</label>
 
       <!-- Search + Clear -->
       <form
@@ -32,7 +32,7 @@
         <input
           id="orgs-q" name="org_q" type="text" placeholder="Search orgs..."
           value="{{ .OrgQuery }}"
-          class="min-w-0 w-full px-3 py-2 border rounded focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          class="min-w-0 w-full px-3 py-2 border dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-gray-700 dark:text-gray-100" />
         <a
           href="/reports/members?org={{ .SelectedOrg }}&group={{ .SelectedGroup }}&member_status={{ .MemberStatus }}&org_q={{ "" }}{{ .ReturnQS }}"
           hx-get="/reports/members"
@@ -40,48 +40,69 @@
           hx-target="#content"
           hx-swap="innerHTML"
           hx-push-url="true"
-          class="px-3 py-2 border rounded text-gray-700 hover:bg-gray-50 whitespace-nowrap"
+          class="px-3 py-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
         >Clear</a>
       </form>
 
-      <div class="text-xs text-gray-600 mb-2">{{ .OrgShown }} shown of {{ .OrgTotal }} total</div>
+      <!-- Org pager info -->
+      <div class="flex items-center justify-between mb-2 text-sm text-gray-600 dark:text-gray-400">
+        <span>{{ if .OrgTotal }}{{ .OrgRangeStart }}–{{ .OrgRangeEnd }} of {{ .OrgTotal }} shown{{ else }}0 of 0 shown{{ end }}</span>
+        <span class="flex gap-2">
+          {{ if .OrgHasPrev }}
+            <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+               href="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}&org_before={{ .OrgPrevCur }}&org_start={{ .OrgPrevStart }}{{ .ReturnQS }}"
+               hx-get="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}&org_before={{ .OrgPrevCur }}&org_start={{ .OrgPrevStart }}{{ .ReturnQS }}"
+               hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Prev</a>
+          {{ else }}
+            <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
+          {{ end }}
+          {{ if .OrgHasNext }}
+            <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+               href="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}&org_after={{ .OrgNextCur }}&org_start={{ .OrgNextStart }}{{ .ReturnQS }}"
+               hx-get="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}&org_after={{ .OrgNextCur }}&org_start={{ .OrgNextStart }}{{ .ReturnQS }}"
+               hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Next</a>
+          {{ else }}
+            <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
+          {{ end }}
+        </span>
+      </div>
 
       <!-- All orgs -->
-      <div class="mb-2">
+      <div class="mb-2 text-sm">
         <a
           href="/reports/members?org=all{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}{{ .ReturnQS }}"
           hx-get="/reports/members?org=all{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}{{ .ReturnQS }}"
           hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
-          class="flex items-center justify-between px-2 py-1 rounded {{ if eq .SelectedOrg "all" }}bg-indigo-50{{ end }} hover:bg-gray-50"
+          class="flex items-center justify-between px-2 py-1 rounded {{ if eq .SelectedOrg "all" }}bg-indigo-50 dark:bg-indigo-900/40{{ end }} hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-300"
         >
           <span>All</span>
-          <span class="inline-flex items-center justify-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{{ .AllCount }}</span>
+          <span class="inline-flex items-center justify-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-100">{{ .AllCount }}</span>
         </a>
       </div>
 
       <!-- org rows -->
-      <div class="border rounded divide-y">
+      <div class="border dark:border-gray-700 rounded divide-y dark:divide-gray-700 text-sm">
         {{ range .OrgRows }}
         <a
           href="/reports/members?org={{ .ID.Hex }}{{ if $.OrgQuery }}&org_q={{ $.OrgQuery | urlquery }}{{ end }}&member_status={{ $.MemberStatus }}{{ $.ReturnQS }}"
           hx-get="/reports/members?org={{ .ID.Hex }}{{ if $.OrgQuery }}&org_q={{ $.OrgQuery | urlquery }}{{ end }}&member_status={{ $.MemberStatus }}{{ $.ReturnQS }}"
           hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
-          class="flex items-center justify-between px-2 py-1 rounded hover:bg-gray-50 {{ if eq $.SelectedOrg .ID.Hex }}bg-indigo-50{{ end }}"
+          class="flex items-center justify-between px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-gray-700 {{ if eq $.SelectedOrg .ID.Hex }}bg-indigo-50 dark:bg-indigo-900/40{{ end }} dark:text-gray-300"
         >
           <span class="truncate">{{ .Name }}</span>
-          <span class="inline-flex items-center justify-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{{ .Count }}</span>
+          <span class="inline-flex items-center justify-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-100">{{ .Count }}</span>
         </a>
         {{ else }}
-          <div class="px-2 py-2 text-sm text-gray-500">No organizations.</div>
+          <div class="px-2 py-2 text-gray-500 dark:text-gray-400">No organizations.</div>
         {{ end }}
       </div>
     </div>
   </aside>
 
   <!-- RIGHT PANE: Toolbar (filters + download) + inner grid -->
-  <section class="min-w-0">
+  <section class="min-w-0 flex flex-col overflow-hidden">
     <!-- Toolbar card: compact, wraps on small screens -->
-    <div class="bg-white rounded shadow p-3">
+    <div class="bg-white dark:bg-gray-800 rounded shadow p-3">
       <div class="grid gap-y-3 gap-x-0 sm:grid-cols-2 lg:grid-cols-[max-content_max-content_1fr_max-content] lg:items-end">
         <!-- Filters form -->
         <form
@@ -98,9 +119,9 @@
           {{ if .ShowBack }}<input type="hidden" name="return" value="{{ .BackURL }}">{{ end }}
 
           <div>
-            <label for="member-status" class="block text-sm text-gray-600 mb-1">Member status</label>
+            <label for="member-status" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Member status</label>
             <select id="member-status" name="member_status"
-                    class="px-2 py-2 border rounded w-auto">
+                    class="px-2 py-2 border dark:border-gray-600 rounded w-auto dark:bg-gray-700 dark:text-gray-100">
               <option value="" {{ if eq .MemberStatus "" }}selected{{ end }}>All</option>
               <option value="active" {{ if eq .MemberStatus "active" }}selected{{ end }}>Active</option>
               <option value="disabled" {{ if eq .MemberStatus "disabled" }}selected{{ end }}>Disabled</option>
@@ -117,16 +138,16 @@
           <input type="hidden" name="group" value="{{ .SelectedGroup }}">
           <input type="hidden" name="member_status" value="{{ .MemberStatus }}">
 
-          <label class="text-sm text-gray-700">
+          <label class="text-sm text-gray-700 dark:text-gray-300">
             <div class="flex items-baseline justify-between mb-1 gap-2">
               <span>CSV filename</span>
-              <span class="text-xs text-gray-500">csv is added if omitted</span>
+              <span class="text-xs text-gray-500 dark:text-gray-400">csv is added if omitted</span>
             </div>
             <input
               type="text"
               name="filename"
               value="{{ .DownloadFilename }}"
-              class="w-full px-3 py-2 border rounded focus:ring-2 focus:ring-indigo-400"
+              class="w-full px-3 py-2 border dark:border-gray-600 rounded focus:ring-2 focus:ring-indigo-400 dark:bg-gray-700 dark:text-gray-100"
               placeholder="e.g., All_2025-01-01_1130.csv"
             />
           </label>
@@ -142,68 +163,91 @@
     </div>
 
     <!-- INNER GRID: Groups (left) + Info (right) (always side-by-side) -->
-    <div class="mt-3 grid gap-3 grid-cols-[320px_minmax(0,1fr)]">
+    <div class="mt-3 grid gap-3 grid-cols-[320px_minmax(0,1fr)] flex-1 overflow-hidden">
       <!-- Groups card (only when a specific org is selected) -->
-      <div class="min-w-0">
+      <div class="min-w-0 h-full overflow-hidden">
         {{ if and (ne .SelectedOrg "") (ne .SelectedOrg "all") }}
-        <div class="bg-white rounded shadow p-3 sticky top-[7.5rem] self-start max-h-[calc(100vh-10rem)] overflow-auto">
-          <label class="block text-sm font-semibold mb-2">Groups — {{ .SelectedOrgName }}</label>
+        <div class="bg-white dark:bg-gray-800 rounded shadow p-3 h-full overflow-y-auto">
+          <label class="block text-sm font-semibold mb-2 dark:text-gray-200">Groups — {{ .SelectedOrgName }}</label>
+
+          <!-- Groups pager info -->
+          <div class="flex items-center justify-between mb-2 text-sm text-gray-600 dark:text-gray-400">
+            <span>{{ if .GroupsTotal }}{{ .GroupsRangeStart }}–{{ .GroupsRangeEnd }} of {{ .GroupsTotal }} shown{{ else }}0 of 0 shown{{ end }}</span>
+            <span class="flex gap-2">
+              {{ if .GroupsHasPrev }}
+                <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+                   href="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&group={{ .SelectedGroup }}&member_status={{ .MemberStatus }}&groups_before={{ .GroupsPrevCur }}&groups_start={{ .GroupsPrevStart }}{{ .ReturnQS }}"
+                   hx-get="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&group={{ .SelectedGroup }}&member_status={{ .MemberStatus }}&groups_before={{ .GroupsPrevCur }}&groups_start={{ .GroupsPrevStart }}{{ .ReturnQS }}"
+                   hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Prev</a>
+              {{ else }}
+                <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
+              {{ end }}
+              {{ if .GroupsHasNext }}
+                <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+                   href="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&group={{ .SelectedGroup }}&member_status={{ .MemberStatus }}&groups_after={{ .GroupsNextCur }}&groups_start={{ .GroupsNextStart }}{{ .ReturnQS }}"
+                   hx-get="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&group={{ .SelectedGroup }}&member_status={{ .MemberStatus }}&groups_after={{ .GroupsNextCur }}&groups_start={{ .GroupsNextStart }}{{ .ReturnQS }}"
+                   hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Next</a>
+              {{ else }}
+                <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
+              {{ end }}
+            </span>
+          </div>
 
           <!-- All groups for org -->
-          <div class="mb-2">
+          <div class="mb-2 text-sm">
             <a
               href="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}{{ .ReturnQS }}"
               hx-get="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}{{ .ReturnQS }}"
               hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
-              class="flex items-center justify-between px-2 py-1 rounded {{ if eq .SelectedGroup "" }}bg-indigo-50{{ end }} hover:bg-gray-50"
+              class="flex items-center justify-between px-2 py-1 rounded {{ if eq .SelectedGroup "" }}bg-indigo-50 dark:bg-indigo-900/40{{ end }} hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-300"
             >
               <span>All</span>
-              <span class="inline-flex items-center justify-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{{ .OrgMembersCount }}</span>
+              <span class="inline-flex items-center justify-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-100">{{ .OrgMembersCount }}</span>
             </a>
           </div>
 
           <!-- group rows -->
-          <div class="border rounded divide-y">
+          <div class="border dark:border-gray-700 rounded divide-y dark:divide-gray-700 text-sm">
             {{ range .GroupRows }}
               <a
                 href="/reports/members?org={{ $.SelectedOrg }}&group={{ .ID.Hex }}{{ if $.OrgQuery }}&org_q={{ $.OrgQuery | urlquery }}{{ end }}&member_status={{ $.MemberStatus }}{{ $.ReturnQS }}"
                 hx-get="/reports/members?org={{ $.SelectedOrg }}&group={{ .ID.Hex }}{{ if $.OrgQuery }}&org_q={{ $.OrgQuery | urlquery }}{{ end }}&member_status={{ $.MemberStatus }}{{ $.ReturnQS }}"
                 hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
-                class="flex items-center justify-between px-2 py-1 rounded hover:bg-gray-50 {{ if eq $.SelectedGroup .ID.Hex }}bg-indigo-50{{ end }}"
+                class="flex items-center justify-between px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-gray-700 {{ if eq $.SelectedGroup .ID.Hex }}bg-indigo-50 dark:bg-indigo-900/40{{ end }} dark:text-gray-300"
               >
                 <span class="truncate">{{ .Name }}</span>
-                <span class="inline-flex items-center justify-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{{ .Count }}</span>
+                <span class="inline-flex items-center justify-center text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-100">{{ .Count }}</span>
               </a>
             {{ else }}
-              <div class="px-2 py-2 text-sm text-gray-500">No groups for this organization.</div>
+              <div class="px-2 py-2 text-gray-500 dark:text-gray-400">No groups for this organization.</div>
             {{ end }}
           </div>
         </div>
         {{ else }}
-        <div class="bg-white rounded shadow p-3 text-sm text-gray-600">
+        <div class="bg-white dark:bg-gray-800 rounded shadow p-3 text-sm text-gray-600 dark:text-gray-400">
           Select an organization to view its groups.
         </div>
         {{ end }}
       </div>
 
       <!-- Info / helper card -->
-      <div class="bg-white rounded shadow p-3 text-sm text-gray-600">
-        <div class="mb-3 text-gray-700 space-y-1">
+      <div class="bg-white dark:bg-gray-800 rounded shadow p-3 text-sm text-gray-600 dark:text-gray-400 h-full overflow-y-auto">
+        <div class="mb-3 text-gray-700 dark:text-gray-300 space-y-1">
           {{/* Case 1: All organizations selected (or nothing explicitly selected) */}}
           {{ if or (eq .SelectedOrg "all") (eq .SelectedOrg "") }}
             <div>
               <span class="font-medium">Organization:</span>
               <span>All</span>
             </div>
-            <div class="text-gray-600">
+            <div class="text-gray-600 dark:text-gray-400">
               Members in org:
               <span class="font-medium">{{ .AllCount }}</span>
             </div>
-            <div class="text-gray-600">
+            <div class="text-gray-600 dark:text-gray-400">
               Members in export:
               <span class="font-medium">{{ .AllCount }}</span>
             </div>
-            <div class="text-gray-600">
+            <div class="text-gray-600 dark:text-gray-400">
               Records in export:
               <span class="font-medium">{{ .ExportRecordCount }}</span>
             </div>
@@ -213,13 +257,13 @@
               <span class="font-medium">Organization:</span>
               <span>{{ .SelectedOrgName }}</span>
             </div>
-            <div class="text-gray-600">
+            <div class="text-gray-600 dark:text-gray-400">
               Members in org:
               <span class="font-medium">{{ .OrgMembersCount }}</span>
             </div>
             {{ if .SelectedGroup }}
               {{/* Case 3: Org + Group selected */}}
-              <div class="text-gray-600">
+              <div class="text-gray-600 dark:text-gray-400">
                 <span class="font-medium">Group:</span>
                 <span>
                   {{ range .GroupRows }}
@@ -227,7 +271,7 @@
                   {{ end }}
                 </span>
               </div>
-              <div class="text-gray-600">
+              <div class="text-gray-600 dark:text-gray-400">
                 Members in group:
                 <span class="font-medium">
                   {{ range .GroupRows }}
@@ -235,7 +279,7 @@
                   {{ end }}
                 </span>
               </div>
-              <div class="text-gray-600">
+              <div class="text-gray-600 dark:text-gray-400">
                 Members in export:
                 <span class="font-medium">
                   {{ range .GroupRows }}
@@ -243,11 +287,11 @@
                   {{ end }}
                 </span>
               </div>
-              <div class="text-gray-600">
+              <div class="text-gray-600 dark:text-gray-400">
                 Records in export:
                 <span class="font-medium">{{ .ExportRecordCount }}</span>
               </div>
-              <div class="text-gray-600">
+              <div class="text-gray-600 dark:text-gray-400">
                 Member status:
                 <span class="font-medium">
                   {{ if eq .MemberStatus "" }}All{{ else if eq .MemberStatus "active" }}Active{{ else if eq .MemberStatus "disabled" }}Disabled{{ else }}{{ .MemberStatus }}{{ end }}
@@ -255,15 +299,15 @@
               </div>
             {{ else }}
               {{/* Case 2: Just an organization selected (All groups within org) */}}
-              <div class="text-gray-600">
+              <div class="text-gray-600 dark:text-gray-400">
                 Members in all groups:
                 <span class="font-medium">{{ .MembersInGroupsCount }}</span>
               </div>
-              <div class="text-gray-600">
+              <div class="text-gray-600 dark:text-gray-400">
                 Members in export:
                 <span class="font-medium">{{ .OrgMembersCount }}</span>
               </div>
-              <div class="text-gray-600">
+              <div class="text-gray-600 dark:text-gray-400">
                 Records in export:
                 <span class="font-medium">{{ .ExportRecordCount }}</span>
               </div>

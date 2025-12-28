@@ -18,8 +18,11 @@
 //	}
 //
 //	// In your handler:
-//	data := newMemberData{FullName: full, Email: email}
-//	formutil.SetBase(&data.Base, r, "Add Member", "/members")
+//	data := newMemberData{
+//		Base: formutil.NewBase(r, db, "Add Member", "/members"),
+//		FullName: full,
+//		Email: email,
+//	}
 //	data.Error = template.HTML("Email is required.")
 //	templates.Render(w, r, "member_new", data)
 package formutil
@@ -28,37 +31,32 @@ import (
 	"html/template"
 	"net/http"
 
-	"github.com/dalemusser/stratahub/internal/app/system/authz"
-	"github.com/dalemusser/waffle/pantry/httpnav"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // Base contains common fields for form pages that can be embedded in form data structs.
+// It embeds viewdata.BaseVM for site settings and user context, and adds Error for form validation.
 type Base struct {
-	Title       string
-	IsLoggedIn  bool
-	Role        string
-	UserName    string
-	BackURL     string
-	CurrentPath string
-	Error       template.HTML
+	viewdata.BaseVM
+	Error template.HTML
+}
+
+// NewBase creates a fully populated Base for a form page.
+// This is the preferred way to create a Base for embedding in form view models.
+func NewBase(r *http.Request, db *mongo.Database, title, backDefault string) Base {
+	return Base{
+		BaseVM: viewdata.NewBaseVM(r, db, title, backDefault),
+	}
 }
 
 // SetBase populates the common Base fields from the request context.
-// It extracts user info from authz.UserCtx and sets navigation fields.
 //
-// Parameters:
-//   - b: pointer to the Base struct to populate
-//   - r: the HTTP request
-//   - title: the page title
-//   - backDefault: default URL for the back button if none in request
-func SetBase(b *Base, r *http.Request, title, backDefault string) {
-	role, uname, _, _ := authz.UserCtx(r)
-	b.Title = title
-	b.IsLoggedIn = true
-	b.Role = role
-	b.UserName = uname
-	b.BackURL = httpnav.ResolveBackURL(r, backDefault)
-	b.CurrentPath = httpnav.CurrentPath(r)
+// Deprecated: Use NewBase instead:
+//
+//	data := myFormData{Base: formutil.NewBase(r, db, "Title", "/back")}
+func SetBase(b *Base, r *http.Request, db *mongo.Database, title, backDefault string) {
+	b.BaseVM = viewdata.NewBaseVM(r, db, title, backDefault)
 }
 
 // SetError sets the error message on a Base struct.

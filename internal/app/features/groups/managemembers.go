@@ -10,11 +10,10 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/policy/grouppolicy"
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
 	membershipstore "github.com/dalemusser/stratahub/internal/app/store/memberships"
+	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
-	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
@@ -64,18 +63,9 @@ func (h *Handler) HandleAddMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var u struct {
-		ID             primitive.ObjectID `bson:"_id"`
-		OrganizationID primitive.ObjectID `bson:"organization_id"`
-		Role           string             `bson:"role"`
-		Status         string             `bson:"status"`
-	}
-	if err := db.Collection("users").FindOne(ctx, bson.M{
-		"_id":             targetOID,
-		"organization_id": group.OrganizationID,
-		"role":            "member",
-		"status":          "active",
-	}).Decode(&u); err != nil {
+	// Verify member exists, is active, and belongs to same organization
+	usrStore := userstore.New(db)
+	if _, err := usrStore.GetActiveMemberInOrg(ctx, targetOID, group.OrganizationID); err != nil {
 		uierrors.HTMXBadRequest(w, r, "Member must exist in same organization and be active.", "/groups")
 		return
 	}
@@ -187,8 +177,9 @@ func (h *Handler) HandleRemoveMember(w http.ResponseWriter, r *http.Request) {
 	templates.RenderSnippet(w, "group_available_members_block_oob", data)
 
 	// Also emit a "recently removed" chip snippet if we can load the user.
-	var usr models.User
-	if err := db.Collection("users").FindOne(ctx, bson.M{"_id": targetOID}).Decode(&usr); err != nil {
+	usrStore := userstore.New(db)
+	usr, err := usrStore.GetByID(ctx, targetOID)
+	if err != nil {
 		if err != mongo.ErrNoDocuments {
 			h.Log.Warn("failed to load user for recently removed chip",
 				zap.Error(err),

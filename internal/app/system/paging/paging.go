@@ -17,9 +17,17 @@ import (
 // cast to int64 for Mongo Find().SetLimit().
 const PageSize = 50
 
+// ModalPageSize is a smaller page size for modal pickers where less
+// vertical space is available.
+const ModalPageSize = 10
+
 // LimitPlusOne returns PageSize+1 as int64 for look‑ahead pagination
 // (fetch one extra document to detect hasNext).
 func LimitPlusOne() int64 { return int64(PageSize + 1) }
+
+// ModalLimitPlusOne returns ModalPageSize+1 as int64 for look‑ahead pagination
+// in modal pickers.
+func ModalLimitPlusOne() int64 { return int64(ModalPageSize + 1) }
 
 // ParseStart extracts the human-friendly "start" query parameter (1-based index).
 // Returns 1 if not present or invalid.
@@ -53,18 +61,28 @@ type Result struct {
 //   - If len > PageSize, trim to PageSize (next page exists)
 //   - HasPrev is true only if after != ""
 func TrimPage[T any](rows *[]T, before, after string) Result {
+	return trimPageWithSize(rows, before, after, PageSize)
+}
+
+// TrimPageModal is like TrimPage but uses ModalPageSize.
+func TrimPageModal[T any](rows *[]T, before, after string) Result {
+	return trimPageWithSize(rows, before, after, ModalPageSize)
+}
+
+// trimPageWithSize is the internal implementation that accepts a custom page size.
+func trimPageWithSize[T any](rows *[]T, before, after string, pageSize int) Result {
 	orig := len(*rows)
 	var hasPrev, hasNext bool
 
 	if before != "" {
-		if orig > PageSize {
+		if orig > pageSize {
 			*rows = (*rows)[1:]
 			hasPrev = true
 		}
 		hasNext = true
 	} else {
-		if orig > PageSize {
-			*rows = (*rows)[:PageSize]
+		if orig > pageSize {
+			*rows = (*rows)[:pageSize]
 			hasNext = true
 		}
 		hasPrev = after != ""
@@ -84,11 +102,21 @@ type Range struct {
 // ComputeRange calculates display range values given the current start index
 // and number of items shown.
 func ComputeRange(start, shown int) Range {
+	return computeRangeWithSize(start, shown, PageSize)
+}
+
+// ComputeRangeModal is like ComputeRange but uses ModalPageSize.
+func ComputeRangeModal(start, shown int) Range {
+	return computeRangeWithSize(start, shown, ModalPageSize)
+}
+
+// computeRangeWithSize is the internal implementation that accepts a custom page size.
+func computeRangeWithSize(start, shown, pageSize int) Range {
 	if shown == 0 {
 		return Range{Start: 0, End: 0, PrevStart: 1, NextStart: 1}
 	}
 
-	prevStart := start - PageSize
+	prevStart := start - pageSize
 	if prevStart < 1 {
 		prevStart = 1
 	}
@@ -145,6 +173,14 @@ func (cfg KeysetConfig) ApplyToFind(find *options.FindOptions, sortField string)
 		{Key: sortField, Value: cfg.SortOrder},
 		{Key: "_id", Value: cfg.SortOrder},
 	}).SetLimit(LimitPlusOne())
+}
+
+// ApplyToFindModal is like ApplyToFind but uses ModalPageSize.
+func (cfg KeysetConfig) ApplyToFindModal(find *options.FindOptions, sortField string) {
+	find.SetSort(bson.D{
+		{Key: sortField, Value: cfg.SortOrder},
+		{Key: "_id", Value: cfg.SortOrder},
+	}).SetLimit(ModalLimitPlusOne())
 }
 
 // KeysetWindow returns the cursor condition for the query filter.

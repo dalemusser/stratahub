@@ -17,6 +17,7 @@ import (
 	"github.com/dalemusser/waffle/pantry/text"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.uber.org/zap"
 )
 
 // createLeaderInput defines validation rules for creating a new leader.
@@ -35,9 +36,12 @@ type newData struct {
 
 	Organizations []orgOption
 
+	// Org is now always locked (passed via URL)
+	OrgHex  string
+	OrgName string
+
 	FullName string
 	Email    string
-	OrgHex   string
 	Auth     string
 	Status   string
 }
@@ -46,14 +50,26 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 
-	orgs, _, err := orgutil.LoadActiveOrgOptions(ctx, h.DB)
-	if err != nil {
-		h.ErrLog.LogServerError(w, r, "database error loading organizations", err, "A database error occurred.", "/leaders")
-		return
-	}
+	var data newData
+	formutil.SetBase(&data.Base, r, h.DB, "New Leader", "/leaders")
 
-	data := newData{Organizations: orgs}
-	formutil.SetBase(&data.Base, r, "New Leader", "/leaders")
+	// Org can be passed via URL param (optional - can select via picker)
+	selectedOrg := normalize.QueryParam(r.URL.Query().Get("org"))
+	if selectedOrg != "" && selectedOrg != "all" {
+		orgID, orgName, err := orgutil.ResolveActiveOrgFromHex(ctx, h.DB, selectedOrg)
+		if err != nil {
+			if orgutil.IsExpectedOrgError(err) {
+				// Org not found - just show page without org selected
+				h.Log.Warn("org not found or inactive", zap.String("org", selectedOrg))
+			} else {
+				h.ErrLog.LogServerError(w, r, "database error loading organization", err, "A database error occurred.", "/leaders")
+				return
+			}
+		} else {
+			data.OrgHex = orgID.Hex()
+			data.OrgName = orgName
+		}
+	}
 
 	templates.Render(w, r, "admin_leader_new", data)
 }
@@ -127,14 +143,8 @@ func (h *Handler) renderNewWithError(w http.ResponseWriter, r *http.Request, msg
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 
-	orgs, _, err := orgutil.LoadActiveOrgOptions(ctx, h.DB)
-	if err != nil {
-		h.ErrLog.LogServerError(w, r, "database error loading organizations", err, "A database error occurred.", "/leaders")
-		return
-	}
-
-	data := newData{Organizations: orgs}
-	formutil.SetBase(&data.Base, r, "New Leader", "/leaders")
+	var data newData
+	formutil.SetBase(&data.Base, r, h.DB, "New Leader", "/leaders")
 	data.SetError(msg)
 
 	if len(echo) > 0 {
@@ -144,6 +154,19 @@ func (h *Handler) renderNewWithError(w http.ResponseWriter, r *http.Request, msg
 		data.OrgHex = e.OrgHex
 		data.Auth = e.Auth
 		data.Status = e.Status
+	}
+
+	// Reload org name if we have the hex
+	if data.OrgHex != "" {
+		orgID, err := primitive.ObjectIDFromHex(data.OrgHex)
+		if err == nil {
+			orgName, err := orgutil.GetOrgName(ctx, h.DB, orgID)
+			if err == nil {
+				data.OrgName = orgName
+			} else {
+				h.Log.Warn("GetOrgName (re-render)", zap.Error(err))
+			}
+		}
 	}
 
 	templates.Render(w, r, "admin_leader_new", data)

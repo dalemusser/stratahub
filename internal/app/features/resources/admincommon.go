@@ -5,10 +5,9 @@ import (
 	"html/template"
 	"net/http"
 
-	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
-	"github.com/dalemusser/waffle/pantry/httpnav"
 )
 
 // renderNewForm populates the common chrome for the New Resource page and
@@ -16,19 +15,7 @@ import (
 // (for example, to echo back user input on validation errors) and an
 // optional error message.
 func (h *AdminHandler) renderNewForm(w http.ResponseWriter, r *http.Request, vm resourceFormVM, errMsg string) {
-	role, uname, _, signedIn := authz.UserCtx(r)
-
-	vm.Title = "New Resource"
-	vm.IsLoggedIn = signedIn
-	vm.Role = role
-	vm.UserName = uname
-
-	// Back link returns to the admin resources list (with safe fallback).
-	// For stratahub we’re mounting admin resources at /resources.
-	vm.BackURL = httpnav.ResolveBackURL(r, "/resources")
-
-	// CurrentPath is useful for building return= links in templates.
-	vm.CurrentPath = httpnav.CurrentPath(r)
+	vm.BaseVM = viewdata.NewBaseVM(r, h.DB, "New Resource", "/resources")
 
 	// Populate resource type options for the select menu.
 	vm.TypeOptions = resourceTypeOptions()
@@ -56,17 +43,7 @@ func (h *AdminHandler) renderNewForm(w http.ResponseWriter, r *http.Request, vm 
 // renders the edit form. Callers supply the current form VM plus an optional
 // error message to display above the form.
 func (h *AdminHandler) renderEditForm(w http.ResponseWriter, r *http.Request, vm resourceFormVM, errMsg string) {
-	role, uname, _, signedIn := authz.UserCtx(r)
-
-	vm.Title = "Edit Resource"
-	vm.IsLoggedIn = signedIn
-	vm.Role = role
-	vm.UserName = uname
-
-	// BackURL is where the simple "Back" link should go.
-	if vm.BackURL == "" {
-		vm.BackURL = httpnav.ResolveBackURL(r, "/resources")
-	}
+	vm.BaseVM = viewdata.NewBaseVM(r, h.DB, "Edit Resource", "/resources")
 
 	// SubmitReturn is the post-edit redirect target; DeleteReturn is used
 	// by the delete button. If either is empty, default them to the
@@ -77,8 +54,6 @@ func (h *AdminHandler) renderEditForm(w http.ResponseWriter, r *http.Request, vm
 	if vm.DeleteReturn == "" {
 		vm.DeleteReturn = "/resources"
 	}
-
-	vm.CurrentPath = httpnav.CurrentPath(r)
 
 	// Populate resource type options for the select menu.
 	vm.TypeOptions = resourceTypeOptions()

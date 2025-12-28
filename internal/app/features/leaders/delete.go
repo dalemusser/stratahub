@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	materialassignstore "github.com/dalemusser/stratahub/internal/app/store/materialassign"
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/txn"
@@ -13,8 +14,8 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// HandleDelete removes a leader and all of their group memberships.
-// It is mounted on POST /leaders/{id}/delete.
+// HandleDelete removes a leader and all of their group memberships and
+// material assignments. It is mounted on POST /leaders/{id}/delete.
 func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	uidHex := chi.URLParam(r, "id")
 	uid, err := primitive.ObjectIDFromHex(uidHex)
@@ -26,13 +27,19 @@ func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 
-	// Use transaction for atomic deletion of memberships and leader.
+	masStore := materialassignstore.New(h.DB)
+
+	// Use transaction for atomic deletion of memberships, material assignments, and leader.
 	if err := txn.Run(ctx, h.DB, h.Log, func(ctx context.Context) error {
 		// 1) Remove ALL memberships for this user (defensive: leader/member)
 		if _, err := h.DB.Collection("group_memberships").DeleteMany(ctx, bson.M{"user_id": uid}); err != nil {
 			return err
 		}
-		// 2) Delete the user (role: leader)
+		// 2) Remove material assignments for this leader
+		if _, err := masStore.DeleteByLeader(ctx, uid); err != nil {
+			return err
+		}
+		// 3) Delete the user (role: leader)
 		if _, err := h.DB.Collection("users").DeleteOne(ctx, bson.M{"_id": uid, "role": "leader"}); err != nil {
 			return err
 		}

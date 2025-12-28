@@ -3,15 +3,15 @@
 {{ end }}
 
 {{ define "content" }}
-<div class="mb-4">
-  <h1 class="text-2xl font-bold text-gray-800 mb-1">🏢 Organizations</h1>
+<div class="flex items-center justify-between mb-2">
+  <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200">🏢 Organizations</h1>
 </div>
 
 <form
   id="orgs-search-form"
   action="/organizations"
   method="GET"
-  class="bg-white rounded shadow p-4 mb-4 flex flex-col md:flex-row gap-3 md:items-center"
+  class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-1 flex flex-col md:flex-row gap-2 md:items-center"
   hx-get="/organizations"
   hx-target="#orgs-table-wrap"
   hx-swap="outerHTML"
@@ -24,7 +24,7 @@
     type="text"
     placeholder="Search by name, city, or state..."
     value="{{ .Q }}"
-    class="flex-1 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-400"
+    class="flex-1 px-4 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
   />
 
 
@@ -36,13 +36,13 @@
       hx-target="#content"
       hx-swap="innerHTML"
       hx-push-url="true"
-      class="px-4 py-2 border rounded hover:bg-gray-50 mr-6"
+      class="px-4 py-2 border rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700 mr-6"
     >
       Clear
     </a>
 
     <a href="/organizations/new"
-       class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+       class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
       + Add Organization
     </a>
   </div>
@@ -56,32 +56,32 @@
 {{ define "organizations_table" }}
 <!-- Top pager -->
 <div id="orgs-table-wrap">
-<div class="flex items-center justify-between mb-2">
-  <div class="text-gray-600 text-sm">
+<div class="flex items-center justify-between mb-1">
+  <div class="text-gray-600 dark:text-gray-400 text-sm">
     {{ if .Total }}{{ .RangeStart }}–{{ .RangeEnd }} of {{ .Total }} shown{{ else }}0 of 0 shown{{ end }}
   </div>
   <div class="flex items-center gap-2">
     {{ if .HasPrev }}
-      <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded hover:bg-gray-50 whitespace-nowrap"
+      <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
          href="/organizations?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}before={{ .PrevCursor }}&start={{ .PrevStart }}"
          hx-get="/organizations?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}before={{ .PrevCursor }}&start={{ .PrevStart }}"
          hx-target="#orgs-table-wrap" hx-swap="outerHTML" hx-push-url="true">Prev</a>
     {{ else }}
-      <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 whitespace-nowrap">Prev</span>
+      <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
     {{ end }}
     {{ if .HasNext }}
-      <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded hover:bg-gray-50 whitespace-nowrap"
+      <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
          href="/organizations?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}after={{ .NextCursor }}&start={{ .NextStart }}"
          hx-get="/organizations?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}after={{ .NextCursor }}&start={{ .NextStart }}"
          hx-target="#orgs-table-wrap" hx-swap="outerHTML" hx-push-url="true">Next</a>
     {{ else }}
-      <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 whitespace-nowrap">Next</span>
+      <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
     {{ end }}
   </div>
 </div>
 
-<div class="bg-white rounded shadow overflow-x-auto">
-  <table class="min-w-full text-sm text-left text-gray-700">
+<div class="bg-white dark:bg-gray-800 rounded shadow overflow-auto" style="max-height: calc(100vh - 13.5rem); min-height: 10rem;">
+  <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
     <!-- set consistent column widths so header & rows line up -->
     <colgroup>
       <col class="w-2/5" />  <!-- Organization -->
@@ -92,7 +92,7 @@
       <col class="w-36"  />  <!-- Actions -->
     </colgroup>
 
-    <thead class="bg-gray-100 text-gray-600 uppercase text-xs">
+    <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs sticky top-0 z-10">
       <tr>
         <th class="px-2 py-2">Organization</th>
         <th class="px-2 py-2">City</th>
@@ -103,7 +103,7 @@
       </tr>
     </thead>
 
-    <tbody class="divide-y divide-gray-200">
+    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
       {{ range .Items }}
       <tr>
         <td class="px-2 py-2">{{ .Name }}</td>
@@ -135,38 +135,14 @@
       </tr>
       {{ else }}
       <tr>
-        <td colspan="6" class="px-2 py-6 text-center text-gray-500">
+        <td colspan="6" class="px-2 py-6 text-center text-gray-500 dark:text-gray-400">
           No organizations found.
         </td>
       </tr>
       {{ end }}
     </tbody>
   </table>
-</div>
-
-<!-- Bottom pager -->
-<div class="flex items-center justify-between mt-2">
-  <div class="text-xs text-gray-600">
-    {{ if .Total }}{{ .RangeStart }}–{{ .RangeEnd }} of {{ .Total }} shown{{ else }}0 of 0 shown{{ end }}
-  </div>
-  <div class="flex gap-2 items-center">
-    {{ if .HasPrev }}
-      <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded hover:bg-gray-50 whitespace-nowrap"
-         href="/organizations?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}before={{ .PrevCursor }}&start={{ .PrevStart }}"
-         hx-get="/organizations?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}before={{ .PrevCursor }}&start={{ .PrevStart }}"
-         hx-target="#orgs-table-wrap" hx-swap="outerHTML" hx-push-url="true">Prev</a>
-    {{ else }}
-      <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 whitespace-nowrap">Prev</span>
-    {{ end }}
-    {{ if .HasNext }}
-      <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded hover:bg-gray-50 whitespace-nowrap"
-         href="/organizations?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}after={{ .NextCursor }}&start={{ .NextStart }}"
-         hx-get="/organizations?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}after={{ .NextCursor }}&start={{ .NextStart }}"
-         hx-target="#orgs-table-wrap" hx-swap="outerHTML" hx-push-url="true">Next</a>
-    {{ else }}
-      <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 whitespace-nowrap">Next</span>
-    {{ end }}
-  </div>
+  <div class="w-full border-t border-gray-300 dark:border-gray-600"></div>
 </div>
 </div>
 {{ end }}
@@ -174,9 +150,9 @@
 {{ define "organization_manage_modal" }}
 <div class="fixed inset-0 z-50 flex items-center justify-center">
   <div class="absolute inset-0 bg-black/40" onclick="document.getElementById('modal-root').innerHTML=''"></div>
-  <div class="relative bg-white rounded-xl shadow max-w-md w-full p-4 space-y-4">
-    <h2 class="text-lg font-semibold text-gray-900">Manage Organization</h2>
-    <p class="text-sm text-gray-700">{{ .Name }}</p>
+  <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-300 dark:border-gray-600 max-w-md w-full p-4 space-y-4">
+    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Manage Organization</h2>
+    <p class="text-sm text-gray-700 dark:text-gray-300">{{ .Name }}</p>
 
     <div class="flex flex-col gap-3 pt-2">
       <div class="flex justify-center gap-2">
@@ -207,7 +183,7 @@
       <div class="flex justify-start">
         <button
           type="button"
-          class="px-3 py-1 border rounded text-sm text-gray-700 hover:bg-gray-50"
+          class="px-3 py-1 border rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
           onclick="document.getElementById('modal-root').innerHTML=''"
         >
           Close

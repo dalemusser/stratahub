@@ -3,11 +3,14 @@ package bootstrap
 
 import (
 	"context"
+	"fmt"
 
 	"github.com/dalemusser/stratahub/internal/app/system/indexes"
+	"github.com/dalemusser/stratahub/internal/app/system/seeding"
 	"github.com/dalemusser/stratahub/internal/app/system/validators"
 	"github.com/dalemusser/waffle/config"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
+	"github.com/dalemusser/waffle/pantry/storage"
 	"go.uber.org/zap"
 )
 
@@ -40,9 +43,45 @@ func ConnectDB(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig
 		zap.String("database", appCfg.MongoDatabase),
 	)
 
+	// Initialize file storage
+	var store storage.Store
+	switch appCfg.StorageType {
+	case "s3":
+		store, err = storage.NewS3(ctx, storage.S3Config{
+			Region:                   appCfg.StorageS3Region,
+			Bucket:                   appCfg.StorageS3Bucket,
+			Prefix:                   appCfg.StorageS3Prefix,
+			CloudFrontURL:            appCfg.StorageCFURL,
+			CloudFrontKeyPairID:      appCfg.StorageCFKeyPairID,
+			CloudFrontPrivateKeyPath: appCfg.StorageCFKeyPath,
+		})
+		if err != nil {
+			return DBDeps{}, fmt.Errorf("failed to initialize S3 storage: %w", err)
+		}
+		logger.Info("initialized S3/CloudFront file storage",
+			zap.String("bucket", appCfg.StorageS3Bucket),
+			zap.String("prefix", appCfg.StorageS3Prefix),
+		)
+	case "local", "":
+		store, err = storage.NewLocal(storage.LocalConfig{
+			BasePath: appCfg.StorageLocalPath,
+			BaseURL:  appCfg.StorageLocalURL,
+		})
+		if err != nil {
+			return DBDeps{}, fmt.Errorf("failed to initialize local storage: %w", err)
+		}
+		logger.Info("initialized local file storage",
+			zap.String("path", appCfg.StorageLocalPath),
+			zap.String("url", appCfg.StorageLocalURL),
+		)
+	default:
+		return DBDeps{}, fmt.Errorf("unknown storage type: %s", appCfg.StorageType)
+	}
+
 	return DBDeps{
 		StrataHubMongoClient:   client,
 		StrataHubMongoDatabase: db,
+		FileStorage:            store,
 	}, nil
 }
 
@@ -75,6 +114,13 @@ func EnsureSchema(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppCon
 	logger.Info("ensuring database indexes")
 	if err := indexes.EnsureAll(ctx, db); err != nil {
 		logger.Error("failed to ensure indexes", zap.Error(err))
+		return err
+	}
+
+	// Seed default data (pages, settings)
+	logger.Info("seeding default data")
+	if err := seeding.SeedAll(ctx, db, logger); err != nil {
+		logger.Error("failed to seed default data", zap.Error(err))
 		return err
 	}
 

@@ -1,0 +1,99 @@
+{{ define "leader_materials_view" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center mb-4">
+  <a href="{{ .BackURL }}"
+     class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
+     title="Go back">
+    <- Back
+  </a>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">View Material</h1>
+</div>
+
+<div class="bg-white dark:bg-gray-800 rounded shadow p-4 max-w-2xl space-y-4">
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+    <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm">{{ .MaterialTitle }}</div>
+  </div>
+
+  {{ if .Subject }}
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subject</label>
+    <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm">{{ .Subject }}</div>
+  </div>
+  {{ end }}
+
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+    <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm">{{ .TypeDisplay }}</div>
+  </div>
+
+  {{ if .Description }}
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+    <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm whitespace-pre-wrap">{{ .Description }}</div>
+  </div>
+  {{ end }}
+
+  {{ if .AvailableUntil }}
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Available Until</label>
+    <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm">{{ .AvailableUntil }}</div>
+  </div>
+  {{ end }}
+
+  {{ if .Directions }}
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Directions</label>
+    <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm tiptap-content">{{ .Directions }}</div>
+  </div>
+  {{ end }}
+
+  <div class="border-t dark:border-gray-700 pt-4">
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Content</label>
+
+    {{ if not .CanOpen }}
+      <div class="p-4 bg-yellow-50 border border-yellow-200 rounded text-sm text-yellow-800">
+        This material is not currently available. It may have expired or not yet started.
+      </div>
+    {{ else if .HasFile }}
+      <div class="flex items-center gap-4">
+        <div class="flex-1">
+          <p class="text-sm text-gray-700 dark:text-gray-300">
+            <span class="font-medium">File:</span> {{ .FileName }}
+          </p>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Click to download the file.</p>
+        </div>
+        <a href="/leader/materials/{{ .MaterialID }}/download" target="_blank"
+           class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+          Download
+        </a>
+      </div>
+    {{ else if .LaunchURL }}
+      <div class="flex items-center gap-4">
+        <div class="flex-1">
+          <p class="text-sm text-gray-700 dark:text-gray-300 break-all">
+            <span class="font-medium">URL:</span>
+            <span class="text-indigo-600 dark:text-indigo-400">{{ .DisplayURL }}</span>
+          </p>
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Opens in a new tab.</p>
+        </div>
+        <a href="{{ .LaunchURL }}" target="_blank"
+           class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+          Open
+        </a>
+      </div>
+    {{ else }}
+      <div class="text-sm text-gray-500 dark:text-gray-400">No content available.</div>
+    {{ end }}
+  </div>
+</div>
+
+<div class="mt-4">
+  <a href="/leader/materials" class="text-sm text-indigo-600 hover:underline">
+    <- Back to My Materials
+  </a>
+</div>
+{{ end }}

@@ -10,13 +10,13 @@ import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/policy/grouppolicy"
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
+	resourcestore "github.com/dalemusser/stratahub/internal/app/store/resources"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
-	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/httpnav"
+	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
@@ -24,11 +24,7 @@ import (
 
 // assignResourcePageVM is the view model for the page-based Assign Resource flow.
 type assignResourcePageVM struct {
-	Title       string
-	IsLoggedIn  bool
-	Role        string
-	UserName    string
-	CurrentPath string
+	viewdata.BaseVM
 
 	GroupID   string
 	GroupName string
@@ -43,14 +39,13 @@ type assignResourcePageVM struct {
 	Instructions string
 
 	TimeZone string
-	BackURL  string
 }
 
 // ServeAssignResourcePage renders the full page used to configure a new
 // resource assignment (available_from / available_until / instructions) after
 // a resource has been selected from the Available list.
 func (h *Handler) ServeAssignResourcePage(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := authz.UserCtx(r)
+	_, _, _, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
@@ -104,8 +99,9 @@ func (h *Handler) ServeAssignResourcePage(w http.ResponseWriter, r *http.Request
 	now := time.Now().In(loc)
 	visibleFromStr := now.Format("2006-01-02T15:04")
 
-	var res models.Resource
-	if err := db.Collection("resources").FindOne(ctx, bson.M{"_id": resourceOID}).Decode(&res); err != nil {
+	resStore := resourcestore.New(db)
+	res, err := resStore.GetByID(ctx, resourceOID)
+	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			uierrors.RenderForbidden(w, r, "Resource not found.", httpnav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
 			return
@@ -121,11 +117,7 @@ func (h *Handler) ServeAssignResourcePage(w http.ResponseWriter, r *http.Request
 	}
 
 	vm := assignResourcePageVM{
-		Title:         "📚 Assign Resource",
-		IsLoggedIn:    true,
-		Role:          role,
-		UserName:      uname,
-		CurrentPath:   httpnav.CurrentPath(r),
+		BaseVM:        viewdata.NewBaseVM(r, h.DB, "📚 Assign Resource", back),
 		GroupID:       group.ID.Hex(),
 		GroupName:     group.Name,
 		ResourceID:    res.ID.Hex(),
@@ -136,7 +128,6 @@ func (h *Handler) ServeAssignResourcePage(w http.ResponseWriter, r *http.Request
 		VisibleUntil:  "",
 		Instructions:  res.DefaultInstructions,
 		TimeZone:      tzLabel,
-		BackURL:       back,
 	}
 
 	templates.RenderAutoMap(w, r, "resource_assignment_create", nil, vm)

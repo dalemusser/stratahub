@@ -6,6 +6,7 @@ import (
 	"maps"
 	"strings"
 
+	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/search"
 	"github.com/dalemusser/stratahub/internal/domain/models"
@@ -26,7 +27,7 @@ func (h *Handler) fetchAvailablePaged(
 ) (members []UserItem, shown int, total int64, nextCursor, prevCursor string, hasNext, hasPrev bool, err error) {
 
 	db := h.DB
-	users := db.Collection("users")
+	usrStore := userstore.New(db)
 
 	memberIDs, memberErr := h.fetchMemberIDs(ctx, db, groupOID, "member")
 	if memberErr != nil {
@@ -66,11 +67,11 @@ func (h *Handler) fetchAvailablePaged(
 		}
 	}
 
-	if cnt, cntErr := users.CountDocuments(ctx, filter); cntErr != nil {
-		h.Log.Error("database error counting available members", zap.Error(cntErr))
-		return nil, 0, 0, "", "", false, false, cntErr
-	} else {
-		total = cnt
+	// Count via store
+	total, err = usrStore.Count(ctx, filter)
+	if err != nil {
+		h.Log.Error("database error counting available members", zap.Error(err))
+		return nil, 0, 0, "", "", false, false, err
 	}
 
 	sortField := "full_name_ci"
@@ -93,22 +94,10 @@ func (h *Handler) fetchAvailablePaged(
 		}
 	}
 
-	cur, e := users.Find(ctx, filter, findOpts)
-	if e != nil {
-		err = e
-		return
-	}
-	defer cur.Close(ctx)
-
-	var rows []struct {
-		ID         primitive.ObjectID `bson:"_id"`
-		FullName   string             `bson:"full_name"`
-		Email      string             `bson:"email"`
-		FullNameCI string             `bson:"full_name_ci"`
-		OrgID      primitive.ObjectID `bson:"organization_id"`
-	}
-	if err = cur.All(ctx, &rows); err != nil {
-		return
+	// Find via store
+	rows, err := usrStore.Find(ctx, filter, findOpts)
+	if err != nil {
+		return nil, 0, 0, "", "", false, false, err
 	}
 
 	// Reverse if paging backwards

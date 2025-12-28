@@ -6,12 +6,11 @@ import (
 	"net/http"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
-	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -38,11 +37,9 @@ func (h *Handler) ServeManageModal(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var u models.User
-	if err := db.Collection("users").
-		FindOne(ctx, bson.M{"_id": uid}).
-		Decode(&u); err != nil {
-
+	usrStore := userstore.New(db)
+	u, err := usrStore.GetByID(ctx, uid)
+	if err != nil {
 		uierrors.HTMXNotFound(w, r, "User not found.", "/system-users")
 		return
 	}

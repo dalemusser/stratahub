@@ -138,4 +138,11 @@ var (
 		ExcludedSubpaths: []string{"/edit", "/delete", "/new"},
 		Fallback:         "/resources",
 	}
+
+	// MaterialsBackURL returns options for materials pages.
+	MaterialsBackURL = BackURLOptions{
+		AllowedPrefix:    "/materials",
+		ExcludedSubpaths: []string{"/edit", "/delete", "/new", "/assign"},
+		Fallback:         "/materials",
+	}
 )

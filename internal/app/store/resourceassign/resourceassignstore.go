@@ -81,3 +81,33 @@ func (s *Store) ListByGroup(ctx context.Context, groupID primitive.ObjectID) ([]
 	}
 	return out, nil
 }
+
+// DeleteByGroup removes all resource assignments for a group.
+// Returns the number of documents deleted.
+func (s *Store) DeleteByGroup(ctx context.Context, groupID primitive.ObjectID) (int64, error) {
+	res, err := s.c.DeleteMany(ctx, bson.M{"group_id": groupID})
+	if err != nil {
+		return 0, err
+	}
+	return res.DeletedCount, nil
+}
+
+// DeleteByResource removes all assignments for a resource.
+// Returns the number of documents deleted.
+func (s *Store) DeleteByResource(ctx context.Context, resourceID primitive.ObjectID) (int64, error) {
+	res, err := s.c.DeleteMany(ctx, bson.M{"resource_id": resourceID})
+	if err != nil {
+		return 0, err
+	}
+	return res.DeletedCount, nil
+}
+
+// DeleteByOrg removes all resource assignments for an organization.
+// Returns the number of documents deleted.
+func (s *Store) DeleteByOrg(ctx context.Context, orgID primitive.ObjectID) (int64, error) {
+	res, err := s.c.DeleteMany(ctx, bson.M{"organization_id": orgID})
+	if err != nil {
+		return 0, err
+	}
+	return res.DeletedCount, nil
+}

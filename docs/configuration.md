@@ -102,6 +102,354 @@ StrataHub configuration is divided into two sections:
 
 ---
 
+## File Storage Configuration
+
+StrataHub supports two storage backends for uploaded files (e.g., Materials):
+
+1. **Local storage** - Files stored on the local filesystem and served by the application
+2. **S3/CloudFront** - Files stored in AWS S3 with signed CloudFront URLs for secure delivery
+
+### Storage Settings
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `storage_type` | string | `"local"` | Storage backend: `"local"` or `"s3"` |
+| `storage_local_path` | string | `"./uploads/materials"` | Local filesystem path for uploaded files |
+| `storage_local_url` | string | `"/files/materials"` | URL prefix for serving local files |
+
+### S3/CloudFront Settings
+
+Required when `storage_type = "s3"`:
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `storage_s3_region` | string | `""` | AWS region (e.g., `"us-east-1"`) |
+| `storage_s3_bucket` | string | `""` | S3 bucket name |
+| `storage_s3_prefix` | string | `"materials/"` | Key prefix for uploaded files |
+| `storage_cf_url` | string | `""` | CloudFront distribution URL (e.g., `"https://d1234.cloudfront.net"`) |
+| `storage_cf_keypair_id` | string | `""` | CloudFront key pair ID for signed URLs |
+| `storage_cf_key_path` | string | `""` | Path to CloudFront private key file (.pem) |
+
+### Local Storage (Development)
+
+Local storage is the default and requires no additional configuration. Files are stored in the `storage_local_path` directory and served at the `storage_local_url` prefix.
+
+```toml
+# Local storage (default - no config needed, or explicit):
+storage_type = "local"
+storage_local_path = "./uploads/materials"
+storage_local_url = "/files/materials"
+```
+
+The application automatically creates the storage directory if it doesn't exist.
+
+### S3/CloudFront Storage (Production)
+
+For production deployments, S3 with CloudFront provides:
+
+- Scalable, durable file storage
+- Global CDN distribution
+- Time-limited signed URLs for secure access
+- Reduced load on the application server
+
+#### AWS Setup Requirements
+
+1. **S3 Bucket** - Create a bucket for file storage (can be private)
+2. **CloudFront Distribution** - Create a distribution with the S3 bucket as origin
+3. **CloudFront Key Pair** - Create a key pair for signing URLs (in AWS account settings, not IAM)
+4. **IAM Credentials** - The application needs `s3:PutObject`, `s3:GetObject`, and `s3:DeleteObject` permissions
+
+#### Configuration Example
+
+```toml
+# S3/CloudFront storage
+storage_type = "s3"
+storage_s3_region = "us-east-1"
+storage_s3_bucket = "my-stratahub-files"
+storage_s3_prefix = "materials/"
+storage_cf_url = "https://d1234abcd.cloudfront.net"
+storage_cf_keypair_id = "APKAEIBAERJR2EXAMPLE"
+storage_cf_key_path = "/etc/stratahub/cloudfront-private-key.pem"
+```
+
+#### Environment Variables for S3/CloudFront
+
+For production, use environment variables for sensitive configuration:
+
+```bash
+export STRATAHUB_STORAGE_TYPE=s3
+export STRATAHUB_STORAGE_S3_REGION=us-east-1
+export STRATAHUB_STORAGE_S3_BUCKET=my-stratahub-files
+export STRATAHUB_STORAGE_S3_PREFIX=materials/
+export STRATAHUB_STORAGE_CF_URL=https://d1234abcd.cloudfront.net
+export STRATAHUB_STORAGE_CF_KEYPAIR_ID=APKAEIBAERJR2EXAMPLE
+export STRATAHUB_STORAGE_CF_KEY_PATH=/etc/stratahub/cloudfront-private-key.pem
+
+# AWS credentials (if not using IAM roles)
+export AWS_ACCESS_KEY_ID=AKIAIOSFODNN7EXAMPLE
+export AWS_SECRET_ACCESS_KEY=wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY
+export AWS_REGION=us-east-1
+```
+
+> **Note:** When running on AWS infrastructure (EC2, ECS, Lambda), use IAM roles instead of static credentials for better security.
+
+---
+
+## Setting Up AWS S3 and CloudFront for File Storage
+
+This section provides step-by-step instructions for configuring AWS S3 and CloudFront to work with StrataHub's file storage system.
+
+### Overview
+
+The architecture uses:
+- **S3** - Private bucket for secure file storage
+- **CloudFront** - CDN for fast, global file delivery with signed URLs
+- **Origin Access Control (OAC)** - Secure connection between CloudFront and S3 (no public bucket access)
+- **Signed URLs** - Time-limited access to files for authenticated users
+
+### Step 1: Create an S3 Bucket
+
+1. Go to **S3** in the AWS Console
+2. Click **Create bucket**
+3. Configure the bucket:
+
+| Setting | Value |
+|---------|-------|
+| Bucket name | Choose a unique name (e.g., `stratahub-files-prod`) |
+| AWS Region | Select your preferred region (e.g., `us-east-1`) |
+| Object Ownership | ACLs disabled (recommended) |
+| Block Public Access | **Block all public access** (checked) |
+| Bucket Versioning | Enable (recommended for data protection) |
+| Default encryption | SSE-S3 or SSE-KMS |
+
+4. Click **Create bucket**
+
+> **Important:** Keep the bucket private. CloudFront will access it via Origin Access Control, not public URLs.
+
+### Step 2: Create a CloudFront Distribution
+
+1. Go to **CloudFront** in the AWS Console
+2. Click **Create distribution**
+3. Configure the origin:
+
+| Setting | Value |
+|---------|-------|
+| Origin domain | Select your S3 bucket from the dropdown |
+| Origin path | Leave empty (prefix is handled by StrataHub) |
+| Name | Auto-generated or custom name |
+| Origin access | **Origin access control settings (recommended)** |
+
+4. Click **Create new OAC** when prompted:
+
+| Setting | Value |
+|---------|-------|
+| Name | `stratahub-oac` (or your preference) |
+| Signing behavior | Sign requests (recommended) |
+| Origin type | S3 |
+
+5. Configure default cache behavior:
+
+| Setting | Value |
+|---------|-------|
+| Viewer protocol policy | Redirect HTTP to HTTPS |
+| Allowed HTTP methods | GET, HEAD |
+| Restrict viewer access | **Yes** |
+| Trusted authorization type | **Trusted key groups** (configure in Step 3) |
+
+6. Configure distribution settings:
+
+| Setting | Value |
+|---------|-------|
+| Price class | Choose based on your needs |
+| Alternate domain name (CNAME) | Optional: your custom domain |
+| Custom SSL certificate | Required if using custom domain |
+| Default root object | Leave empty |
+| Standard logging | Enable (recommended) |
+
+7. Click **Create distribution**
+
+8. **Copy the S3 bucket policy** that CloudFront provides and apply it to your bucket (see Step 4)
+
+### Step 3: Create a CloudFront Key Pair for Signed URLs
+
+CloudFront signed URLs require a public/private key pair. This is different from IAM credentials.
+
+#### Generate the Key Pair
+
+```bash
+# Generate a 2048-bit RSA private key
+openssl genrsa -out cloudfront-private-key.pem 2048
+
+# Extract the public key
+openssl rsa -pubout -in cloudfront-private-key.pem -out cloudfront-public-key.pem
+```
+
+#### Add the Public Key to CloudFront
+
+1. Go to **CloudFront** → **Key management** → **Public keys**
+2. Click **Create public key**
+3. Enter a name (e.g., `stratahub-signing-key`)
+4. Paste the contents of `cloudfront-public-key.pem`
+5. Click **Create public key**
+6. **Copy the Key ID** - you'll need this for `storage_cf_keypair_id`
+
+#### Create a Key Group
+
+1. Go to **CloudFront** → **Key management** → **Key groups**
+2. Click **Create key group**
+3. Enter a name (e.g., `stratahub-key-group`)
+4. Select the public key you just created
+5. Click **Create key group**
+
+#### Update the Distribution
+
+1. Go to your CloudFront distribution → **Behaviors** tab
+2. Edit the default behavior
+3. Under **Restrict viewer access**, select **Yes**
+4. Under **Trusted key groups**, select the key group you created
+5. Save changes
+
+#### Secure the Private Key
+
+Store the private key securely on your server:
+
+```bash
+# Copy to a secure location
+sudo mkdir -p /etc/stratahub
+sudo cp cloudfront-private-key.pem /etc/stratahub/
+sudo chmod 600 /etc/stratahub/cloudfront-private-key.pem
+sudo chown stratahub:stratahub /etc/stratahub/cloudfront-private-key.pem
+
+# Remove the local copy
+rm cloudfront-private-key.pem cloudfront-public-key.pem
+```
+
+### Step 4: Configure S3 Bucket Policy
+
+Apply this policy to allow CloudFront to access your S3 bucket. Replace the placeholders with your values.
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "AllowCloudFrontServicePrincipal",
+            "Effect": "Allow",
+            "Principal": {
+                "Service": "cloudfront.amazonaws.com"
+            },
+            "Action": "s3:GetObject",
+            "Resource": "arn:aws:s3:::YOUR-BUCKET-NAME/*",
+            "Condition": {
+                "StringEquals": {
+                    "AWS:SourceArn": "arn:aws:cloudfront::YOUR-ACCOUNT-ID:distribution/YOUR-DISTRIBUTION-ID"
+                }
+            }
+        }
+    ]
+}
+```
+
+To apply the policy:
+1. Go to **S3** → Your bucket → **Permissions** tab
+2. Edit **Bucket policy**
+3. Paste the policy (with your values)
+4. Save changes
+
+### Step 5: Create IAM Policy for StrataHub
+
+Create an IAM policy that grants StrataHub the minimum permissions needed:
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Sid": "StrataHubS3Access",
+            "Effect": "Allow",
+            "Action": [
+                "s3:PutObject",
+                "s3:GetObject",
+                "s3:DeleteObject"
+            ],
+            "Resource": "arn:aws:s3:::YOUR-BUCKET-NAME/materials/*"
+        },
+        {
+            "Sid": "StrataHubS3List",
+            "Effect": "Allow",
+            "Action": [
+                "s3:ListBucket"
+            ],
+            "Resource": "arn:aws:s3:::YOUR-BUCKET-NAME",
+            "Condition": {
+                "StringLike": {
+                    "s3:prefix": "materials/*"
+                }
+            }
+        }
+    ]
+}
+```
+
+Attach this policy to:
+- An **IAM Role** (recommended for EC2, ECS, Lambda), or
+- An **IAM User** (for servers outside AWS)
+
+### Step 6: Configure StrataHub
+
+With everything set up, configure StrataHub with your values:
+
+```toml
+# S3/CloudFront storage
+storage_type = "s3"
+storage_s3_region = "us-east-1"
+storage_s3_bucket = "stratahub-files-prod"
+storage_s3_prefix = "materials/"
+storage_cf_url = "https://d1234567890abc.cloudfront.net"
+storage_cf_keypair_id = "K1A2B3C4D5E6F7"
+storage_cf_key_path = "/etc/stratahub/cloudfront-private-key.pem"
+```
+
+Or via environment variables:
+
+```bash
+export STRATAHUB_STORAGE_TYPE=s3
+export STRATAHUB_STORAGE_S3_REGION=us-east-1
+export STRATAHUB_STORAGE_S3_BUCKET=stratahub-files-prod
+export STRATAHUB_STORAGE_S3_PREFIX=materials/
+export STRATAHUB_STORAGE_CF_URL=https://d1234567890abc.cloudfront.net
+export STRATAHUB_STORAGE_CF_KEYPAIR_ID=K1A2B3C4D5E6F7
+export STRATAHUB_STORAGE_CF_KEY_PATH=/etc/stratahub/cloudfront-private-key.pem
+```
+
+### Verification
+
+Test your setup:
+
+1. Start StrataHub with the S3 configuration
+2. Upload a material with a file attachment
+3. View the material and click the download link
+4. Verify the file downloads successfully
+
+Check CloudFront logs if downloads fail. Common issues:
+- Incorrect bucket policy (CloudFront can't access S3)
+- Wrong key pair ID (signed URL verification fails)
+- Private key file not readable (check permissions)
+- Clock skew (signed URLs are time-sensitive)
+
+### Cost Considerations
+
+- **S3**: Pay for storage and requests (minimal for most use cases)
+- **CloudFront**: Pay for data transfer and requests (often cheaper than direct S3 access)
+- **Free tier**: Both services include free tier allowances for new accounts
+
+For cost optimization:
+- Use appropriate CloudFront price class (e.g., "Use only North America and Europe")
+- Set reasonable signed URL expiration times (default is typically 1 hour)
+- Enable S3 lifecycle rules to clean up old/unused files
+
+---
+
 ## Environment Variables
 
 Configuration can be overridden using environment variables:

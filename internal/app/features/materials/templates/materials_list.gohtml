@@ -1,0 +1,264 @@
+{{ define "materials_list" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center justify-between mb-2">
+  <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200">📋 Materials</h1>
+</div>
+
+<form
+  id="materials-search-form"
+  action="/materials"
+  method="GET"
+  class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-1 flex flex-col md:flex-row gap-2 md:items-center"
+  hx-get="/materials"
+  hx-target="#materials-table-wrap"
+  hx-select="#materials-table-wrap"
+  hx-swap="outerHTML"
+  hx-push-url="true"
+  hx-trigger="keyup changed delay:300ms from:#q"
+>
+  <input
+    id="q"
+    name="q"
+    type="text"
+    placeholder="Search by title or subject..."
+    value="{{ .Q }}"
+    class="flex-1 px-4 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+  />
+
+  <div class="ml-auto flex gap-2">
+    <a
+      href="/materials?q="
+      hx-get="/materials"
+      hx-vals='{"q":""}'
+      hx-target="#materials-table-wrap"
+      hx-select="#materials-table-wrap"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+      class="px-4 py-2 border rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700 mr-6"
+    >
+      Clear
+    </a>
+
+    <a href="/materials/assignments"
+       class="px-4 py-2 bg-purple-600 text-white rounded text-sm hover:bg-purple-700">
+      All Assignments
+    </a>
+
+    <a href="/materials/new"
+       class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+      + Add Material
+    </a>
+  </div>
+</form>
+
+{{ template "materials_table" . }}
+{{ end }}
+
+{{ define "materials_table" }}
+<!-- Top pager -->
+<div id="materials-table-wrap">
+<div class="flex items-center justify-between mb-1">
+  <div class="text-gray-600 dark:text-gray-400 text-sm">
+    {{ if .Total }}{{ .RangeStart }}-{{ .RangeEnd }} of {{ .Total }} shown{{ else }}0 of 0 shown{{ end }}
+  </div>
+  <div class="flex items-center gap-2">
+    {{ if .HasPrev }}
+      <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+         href="/materials?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}before={{ .PrevCursor }}&start={{ .PrevStart }}"
+         hx-get="/materials?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}before={{ .PrevCursor }}&start={{ .PrevStart }}"
+         hx-target="#materials-table-wrap" hx-swap="outerHTML" hx-push-url="true">Prev</a>
+    {{ else }}
+      <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
+    {{ end }}
+    {{ if .HasNext }}
+      <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+         href="/materials?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}after={{ .NextCursor }}&start={{ .NextStart }}"
+         hx-get="/materials?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}after={{ .NextCursor }}&start={{ .NextStart }}"
+         hx-target="#materials-table-wrap" hx-swap="outerHTML" hx-push-url="true">Next</a>
+    {{ else }}
+      <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
+    {{ end }}
+  </div>
+</div>
+
+<div class="bg-white dark:bg-gray-800 rounded shadow overflow-auto" style="max-height: calc(100vh - 13.5rem); min-height: 10rem;">
+  <table class="min-w-full table-fixed text-sm text-left text-gray-700 dark:text-gray-300">
+    <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs sticky top-0 z-10">
+      <tr>
+        <th class="px-2 py-2 w-[20%]">Title</th>
+        <th class="px-2 py-2 w-[18%]">Subject</th>
+        <th class="px-2 py-2 w-[10%]">Type</th>
+        <th class="px-2 py-2 w-[8%]">Content</th>
+        <th class="px-2 py-2 w-[8%]">Status</th>
+        <th class="px-2 py-2 w-[26%]">Description</th>
+        <th class="px-2 py-2 w-[10%] text-right">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+      {{ range .Items }}
+      <tr>
+        <td class="px-2 py-2 align-middle">{{ .Title }}</td>
+        <td class="px-2 py-2 align-middle">{{ .Subject }}</td>
+        <td class="px-2 py-2 align-middle">{{ .Type }}</td>
+        <td class="px-2 py-2 align-middle">{{ if .HasFile }}File{{ else }}URL{{ end }}</td>
+        <td class="px-2 py-2 align-middle">{{ .Status }}</td>
+        <td class="px-2 py-2 align-middle break-words">{{ .Description }}</td>
+        <td class="px-2 py-2 text-right">
+          <form
+            method="get"
+            action="/materials/{{ .ID.Hex }}/manage_modal"
+            hx-get="/materials/{{ .ID.Hex }}/manage_modal?return=/materials"
+            hx-target="#modal-root"
+            hx-swap="innerHTML"
+            aria-label="Manage material"
+          >
+            <button
+              type="submit"
+              class="bg-indigo-600 text-white px-2 py-1 rounded text-xs md:text-sm hover:bg-indigo-700"
+              title="Manage {{ .Title }}"
+            >
+              Manage
+            </button>
+          </form>
+        </td>
+      </tr>
+      {{ else }}
+      <tr>
+        <td colspan="7" class="px-2 py-6 text-center text-gray-500 dark:text-gray-400">
+          No materials found.
+        </td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+  <div class="w-full border-t border-gray-300 dark:border-gray-600"></div>
+</div>
+</div>
+<div id="modal-root"></div>
+{{ end }}
+
+{{ define "materials_form_oob" }}
+<form
+  id="materials-search-form"
+  hx-swap-oob="outerHTML"
+  action="/materials"
+  method="GET"
+  class="bg-white dark:bg-gray-800 rounded shadow p-4 mb-4 flex flex-col md:flex-row gap-3 md:items-center"
+  hx-get="/materials"
+  hx-target="#materials-table-wrap"
+  hx-select="#materials-table-wrap"
+  hx-swap="outerHTML"
+  hx-push-url="true"
+  hx-trigger="keyup changed delay:300ms from:#q"
+>
+  <input
+    id="q"
+    name="q"
+    type="text"
+    placeholder="Search by title or subject..."
+    value="{{ .Q }}"
+    class="flex-1 px-4 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+  />
+
+  <div class="ml-auto flex gap-2">
+    <a
+      href="/materials?q="
+      hx-get="/materials"
+      hx-vals='{"q":""}'
+      hx-target="#materials-table-wrap"
+      hx-select="#materials-table-wrap"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+      class="px-4 py-2 border rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700 mr-6"
+    >
+      Clear
+    </a>
+
+    <a href="/materials/new"
+       class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+      + Add Material
+    </a>
+  </div>
+</form>
+{{ end }}
+
+{{ define "materials_table_oob_form" }}
+  {{ template "materials_table" . }}
+  {{ template "materials_form_oob" . }}
+{{ end }}
+
+{{ define "material_manage_modal" }}
+<div class="fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/40"
+       onclick="document.getElementById('modal-root').innerHTML=''"></div>
+
+  <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-300 dark:border-gray-600 max-w-md w-full p-4 space-y-4">
+    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Manage Material</h2>
+
+    <p class="text-sm text-gray-700 dark:text-gray-300">
+      {{ .Title }}
+      {{ if .Type }}<span class="text-gray-500 dark:text-gray-400"> ({{ .Type }})</span>{{ end }}
+    </p>
+
+    <div class="text-xs text-gray-500 dark:text-gray-400 space-y-1">
+      {{ if .Subject }}
+        <p><span class="font-semibold">Subject:</span> {{ .Subject }}</p>
+      {{ end }}
+      <p>
+        <span class="font-semibold">Status:</span> {{ .Status | printf "%s" }}
+        · <span class="font-semibold">Content:</span>
+        {{ if .HasFile }}File ({{ .FileName }}){{ else }}URL{{ end }}
+      </p>
+      {{ if .Description }}
+        <p class="mt-1"><span class="font-semibold">Description:</span> {{ .Description }}</p>
+      {{ end }}
+    </div>
+
+    <div class="flex flex-col gap-3 pt-2">
+      <!-- Centered action buttons -->
+      <div class="flex flex-wrap justify-center gap-2">
+        <a
+          href="/materials/{{ .ID }}/view?return=/materials"
+          class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+        >View</a>
+        <a
+          href="/materials/{{ .ID }}/edit?return=/materials"
+          class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+        >Edit</a>
+        <a
+          href="/materials/{{ .ID }}/assign"
+          class="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
+        >Assign</a>
+        <a
+          href="/materials/{{ .ID }}/assignments"
+          class="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
+        >Assignments</a>
+        <button
+          type="button"
+          class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+          onclick="if(confirm('Are you sure you want to delete this material? This will also remove all assignments.')) { document.getElementById('delete-form-{{ .ID }}').submit(); }"
+        >Delete</button>
+      </div>
+
+      <!-- Hidden delete form -->
+      <form id="delete-form-{{ .ID }}" method="post" action="/materials/{{ .ID }}/delete" class="hidden">
+        <input type="hidden" name="return" value="/materials">
+      </form>
+
+      <!-- Close button left-aligned -->
+      <div class="flex justify-start">
+        <button
+          type="button"
+          class="px-3 py-1 border rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+          onclick="document.getElementById('modal-root').innerHTML=''"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{{ end }}

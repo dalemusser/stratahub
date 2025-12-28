@@ -3,6 +3,7 @@ package leaders
 
 import (
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -19,8 +20,7 @@ type leaderRow struct {
 
 // listData is the view model for the leaders list page.
 type listData struct {
-	Title, Role, UserName string
-	IsLoggedIn            bool
+	viewdata.BaseVM
 
 	// left pane
 	OrgQuery      string
@@ -50,9 +50,6 @@ type listData struct {
 	PrevStart   int
 	NextStart   int
 	Rows        []leaderRow
-
-	BackURL     string
-	CurrentPath string
 }
 
 // orgPaneData holds all the data needed to render the org pane.

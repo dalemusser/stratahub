@@ -6,6 +6,8 @@ import (
 	"maps"
 	"strings"
 
+	membershipstore "github.com/dalemusser/stratahub/internal/app/store/memberships"
+	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/search"
@@ -58,8 +60,9 @@ func (h *Handler) fetchLeadersList(
 		base["$or"] = searchOr
 	}
 
-	// Count total
-	total, err := db.Collection("users").CountDocuments(ctx, base)
+	// Count total via store
+	usrStore := userstore.New(db)
+	total, err := usrStore.Count(ctx, base)
 	if err != nil {
 		h.Log.Error("database error counting leaders", zap.Error(err))
 		return result, err
@@ -88,27 +91,10 @@ func (h *Handler) fetchLeadersList(
 		}
 	}
 
-	// Fetch leaders
-	type urow struct {
-		ID             primitive.ObjectID  `bson:"_id"`
-		FullName       string              `bson:"full_name"`
-		FullNameCI     string              `bson:"full_name_ci"`
-		Email          string              `bson:"email"`
-		Status         string              `bson:"status"`
-		Auth           string              `bson:"auth_method"`
-		OrganizationID *primitive.ObjectID `bson:"organization_id"`
-	}
-
-	uc, err := db.Collection("users").Find(ctx, f, find)
+	// Fetch leaders via store
+	urows, err := usrStore.Find(ctx, f, find)
 	if err != nil {
 		h.Log.Error("database error finding leaders", zap.Error(err))
-		return result, err
-	}
-	defer uc.Close(ctx)
-
-	var urows []urow
-	if err := uc.All(ctx, &urows); err != nil {
-		h.Log.Error("database error decoding leaders", zap.Error(err))
 		return result, err
 	}
 
@@ -169,7 +155,7 @@ func (h *Handler) fetchLeadersList(
 			Email:       strings.ToLower(r.Email),
 			OrgName:     on,
 			GroupsCount: groupsByLeader[r.ID],
-			Auth:        r.Auth,
+			Auth:        r.AuthMethod,
 			Status:      r.Status,
 		})
 	}
@@ -191,33 +177,11 @@ func (h *Handler) fetchLeadersList(
 
 // fetchLeaderGroupCounts fetches group counts for each leader.
 func (h *Handler) fetchLeaderGroupCounts(ctx context.Context, db *mongo.Database, leaderIDs []primitive.ObjectID) (map[primitive.ObjectID]int, error) {
-	groupsByLeader := make(map[primitive.ObjectID]int)
-
-	if len(leaderIDs) == 0 {
-		return groupsByLeader, nil
-	}
-
-	curGM, err := db.Collection("group_memberships").Aggregate(ctx, []bson.M{
-		{"$match": bson.M{"role": "leader", "user_id": bson.M{"$in": leaderIDs}}},
-		{"$group": bson.M{"_id": "$user_id", "n": bson.M{"$sum": 1}}},
-	})
+	memStore := membershipstore.New(db)
+	counts, err := memStore.CountGroupsPerLeader(ctx, leaderIDs)
 	if err != nil {
 		h.Log.Error("database error aggregating groups per leader", zap.Error(err))
 		return nil, err
 	}
-	defer curGM.Close(ctx)
-
-	for curGM.Next(ctx) {
-		var row struct {
-			ID primitive.ObjectID `bson:"_id"`
-			N  int                `bson:"n"`
-		}
-		if err := curGM.Decode(&row); err != nil {
-			h.Log.Error("database error decoding group count", zap.Error(err))
-			return nil, err
-		}
-		groupsByLeader[row.ID] = row.N
-	}
-
-	return groupsByLeader, nil
+	return counts, nil
 }

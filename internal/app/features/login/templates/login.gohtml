@@ -4,10 +4,10 @@
 
 {{ define "content" }}
 <div class="mb-4">
-  <h1 class="text-2xl font-bold text-gray-900">🔐 Login</h1>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">🔐 Login</h1>
 </div>
 
-<div class="p-4 bg-white rounded shadow text-gray-700 text-sm">
+<div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm">
   {{ if .Error }}
     <div class="bg-red-100 text-red-700 p-2 rounded mb-2">
       {{ .Error }}
@@ -23,7 +23,7 @@
         type="email"
         id="email"
         name="email"
-        class="w-full border border-gray-300 rounded px-2 py-1"
+        class="w-full border border-gray-300 dark:border-gray-600 rounded px-2 py-1 dark:bg-gray-700 dark:text-gray-100"
         value="{{ .Email }}"
         autocomplete="username"
       />

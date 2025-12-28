@@ -4,24 +4,18 @@ package dashboard
 import (
 	"net/http"
 
-	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/templates"
-	"github.com/dalemusser/waffle/pantry/httpnav"
 	"go.uber.org/zap"
 )
 
 func (h *Handler) ServeMember(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, signedIn := authz.UserCtx(r)
-
+	base := viewdata.NewBaseVM(r, h.DB, "Member Dashboard", "/")
 	data := baseDashboardData{
-		Title:       "Member Dashboard",
-		IsLoggedIn:  signedIn,
-		Role:        role,
-		UserName:    uname,
-		CurrentPath: httpnav.CurrentPath(r),
+		BaseVM: base,
 	}
 
-	h.Log.Debug("member dashboard served", zap.String("user", uname))
+	h.Log.Debug("member dashboard served", zap.String("user", base.UserName))
 
 	templates.Render(w, r, "member_dashboard", data)
 }

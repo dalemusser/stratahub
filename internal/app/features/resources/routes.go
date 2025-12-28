@@ -31,6 +31,9 @@ func AdminRoutes(h *AdminHandler, sm *auth.SessionManager) chi.Router {
 		// VIEW
 		pr.Get("/{id}/view", h.ServeView)
 
+		// DOWNLOAD
+		pr.Get("/{id}/download", h.HandleDownload)
+
 		// EDIT
 		pr.Get("/{id}/edit", h.ServeEdit)
 		pr.Post("/{id}/edit", h.HandleEdit)
@@ -65,6 +68,9 @@ func MemberRoutes(h *MemberHandler, sm *auth.SessionManager) chi.Router {
 
 		// View a single resource (respecting assignment visibility windows).
 		pr.Get("/{resourceID}", h.ServeViewResource)
+
+		// Download a resource file (respecting assignment visibility windows).
+		pr.Get("/{resourceID}/download", h.HandleDownload)
 	})
 
 	return r

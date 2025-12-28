@@ -3,27 +3,23 @@ package resources
 import (
 	"context"
 	"net/http"
+	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
-	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	resourcestore "github.com/dalemusser/stratahub/internal/app/store/resources"
+	"github.com/dalemusser/stratahub/internal/app/system/htmlsanitize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
-	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/pantry/httpnav"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/waffle/pantry/storage"
 	"github.com/dalemusser/waffle/pantry/templates"
 
 	"github.com/go-chi/chi/v5"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.uber.org/zap"
 )
 
 // ServeView renders the admin detail view for a single resource.
 func (h *AdminHandler) ServeView(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, ok := authz.UserCtx(r)
-	if !ok {
-		uierrors.RenderUnauthorized(w, r, "/login")
-		return
-	}
-
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
@@ -35,18 +31,16 @@ func (h *AdminHandler) ServeView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var res models.Resource
-	if err := db.Collection("resources").FindOne(ctx, bson.M{"_id": oid}).Decode(&res); err != nil {
+	resStore := resourcestore.New(db)
+	res, err := resStore.GetByID(ctx, oid)
+	if err != nil {
 		// Treat not found as a 404 to match other admin handlers
 		uierrors.RenderNotFound(w, r, "Resource not found.", "/resources")
 		return
 	}
 
 	data := viewData{
-		Title:               "View Resource",
-		IsLoggedIn:          true,
-		Role:                role,
-		UserName:            uname,
+		BaseVM:              viewdata.NewBaseVM(r, h.DB, "View Resource", "/resources"),
 		ID:                  res.ID.Hex(),
 		ResourceTitle:       res.Title,
 		Subject:             res.Subject,
@@ -55,9 +49,85 @@ func (h *AdminHandler) ServeView(w http.ResponseWriter, r *http.Request) {
 		Type:                res.Type,
 		Status:              res.Status,
 		ShowInLibrary:       res.ShowInLibrary,
-		DefaultInstructions: res.DefaultInstructions,
-		BackURL:             httpnav.ResolveBackURL(r, "/resources"),
+		HasFile:             res.HasFile(),
+		FileName:            res.FileName,
+		FileSize:            res.FileSize,
+		DefaultInstructions: htmlsanitize.PrepareForDisplay(res.DefaultInstructions),
 	}
 
 	templates.Render(w, r, "resource_view", data)
+}
+
+// HandleDownload serves the resource file directly (for local storage) or
+// generates a signed URL and redirects (for S3). For URLs, it redirects directly.
+func (h *AdminHandler) HandleDownload(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
+	defer cancel()
+
+	idHex := chi.URLParam(r, "id")
+	oid, err := primitive.ObjectIDFromHex(idHex)
+	if err != nil {
+		uierrors.RenderBadRequest(w, r, "Invalid resource ID.", "/resources")
+		return
+	}
+
+	resStore := resourcestore.New(h.DB)
+	res, err := resStore.GetByID(ctx, oid)
+	if err != nil {
+		uierrors.RenderNotFound(w, r, "Resource not found.", "/resources")
+		return
+	}
+
+	// If resource has a file, serve it
+	if res.HasFile() {
+		// Build Content-Disposition header for proper filename
+		filename := res.FileName
+		if filename == "" {
+			filename = "download"
+		}
+		contentDisposition := "attachment; filename=\"" + filename + "\""
+
+		// Prevent browser caching of downloads (important when files are replaced)
+		w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		w.Header().Set("Pragma", "no-cache")
+		w.Header().Set("Expires", "0")
+
+		// Check if local storage - serve file directly
+		if localStorage, ok := h.Storage.(*storage.Local); ok {
+			fullPath, err := localStorage.GetFullPath(res.FilePath)
+			if err != nil {
+				h.Log.Error("error getting file path",
+					zap.Error(err),
+					zap.String("path", res.FilePath))
+				uierrors.RenderServerError(w, r, "Failed to locate file.", "/resources")
+				return
+			}
+			w.Header().Set("Content-Disposition", contentDisposition)
+			http.ServeFile(w, r, fullPath)
+			return
+		}
+
+		// For S3/other storage, generate signed URL and redirect
+		signedURL, err := h.Storage.PresignedURL(ctx, res.FilePath, &storage.PresignOptions{
+			Expires:            15 * time.Minute,
+			ContentDisposition: contentDisposition,
+		})
+		if err != nil {
+			h.Log.Error("error generating signed URL",
+				zap.Error(err),
+				zap.String("path", res.FilePath))
+			uierrors.RenderServerError(w, r, "Failed to generate download link.", "/resources")
+			return
+		}
+		http.Redirect(w, r, signedURL, http.StatusSeeOther)
+		return
+	}
+
+	// If resource has a URL, redirect to it
+	if res.LaunchURL != "" {
+		http.Redirect(w, r, res.LaunchURL, http.StatusSeeOther)
+		return
+	}
+
+	uierrors.RenderNotFound(w, r, "No file or URL available for this resource.", "/resources")
 }

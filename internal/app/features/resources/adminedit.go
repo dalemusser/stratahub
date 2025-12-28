@@ -4,34 +4,28 @@ import (
 	"context"
 	"net/http"
 	"strings"
-	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
-	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	resourcestore "github.com/dalemusser/stratahub/internal/app/store/resources"
+	"github.com/dalemusser/stratahub/internal/app/system/htmlsanitize"
 	"github.com/dalemusser/stratahub/internal/app/system/inputval"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/domain/models"
-	"github.com/dalemusser/waffle/pantry/httpnav"
-	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
-	"github.com/dalemusser/waffle/pantry/text"
 	"github.com/dalemusser/waffle/pantry/urlutil"
 	"github.com/go-chi/chi/v5"
-	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.uber.org/zap"
 )
 
 // editResourceInput defines validation rules for editing a resource.
 type editResourceInput struct {
-	Title     string `validate:"required,max=200" label:"Title"`
-	LaunchURL string `validate:"required,url" label:"Launch URL"`
-	Status    string `validate:"required,oneof=active disabled" label:"Status"`
+	Title  string `validate:"required,max=200" label:"Title"`
+	Status string `validate:"required,oneof=active disabled" label:"Status"`
 }
 
 // ServeEdit renders the Edit Resource form for admins.
 // Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
 func (h *AdminHandler) ServeEdit(w http.ResponseWriter, r *http.Request) {
-	role, uname, _, _ := authz.UserCtx(r)
-
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
@@ -43,8 +37,9 @@ func (h *AdminHandler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var res models.Resource
-	if err := db.Collection("resources").FindOne(ctx, bson.M{"_id": oid}).Decode(&res); err != nil {
+	resStore := resourcestore.New(db)
+	res, err := resStore.GetByID(ctx, oid)
+	if err != nil {
 		uierrors.RenderNotFound(w, r, "Resource not found.", "/resources")
 		return
 	}
@@ -54,10 +49,6 @@ func (h *AdminHandler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 	submitReturn := urlutil.SafeReturn(r.URL.Query().Get("return"), "", "/resources")
 
 	vm := resourceFormVM{
-		Title:               "Edit Resource",
-		IsLoggedIn:          true,
-		Role:                role,
-		UserName:            uname,
 		ID:                  res.ID.Hex(),
 		ResourceTitle:       res.Title,
 		Subject:             res.Subject,
@@ -66,11 +57,12 @@ func (h *AdminHandler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 		Type:                res.Type,
 		Status:              res.Status,
 		ShowInLibrary:       res.ShowInLibrary,
+		HasFile:             res.HasFile(),
+		FileName:            res.FileName,
+		FileSize:            res.FileSize,
 		DefaultInstructions: res.DefaultInstructions,
-		BackURL:             httpnav.ResolveBackURL(r, "/resources"),
 		DeleteReturn:        deleteReturn,
 		SubmitReturn:        submitReturn,
-		CurrentPath:         httpnav.CurrentPath(r),
 	}
 
 	h.renderEditForm(w, r, vm, "")
@@ -79,7 +71,8 @@ func (h *AdminHandler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 // HandleEdit processes the Edit Resource form POST for admins.
 // Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
 func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
-	if err := r.ParseForm(); err != nil {
+	// Parse multipart form for file uploads (32MB max)
+	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		h.ErrLog.LogBadRequest(w, r, "parse form failed", err, "Invalid form data.", "/resources")
 		return
 	}
@@ -107,10 +100,30 @@ func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	showInLibrary := r.FormValue("show_in_library") != ""
-	defaultInstructions := strings.TrimSpace(r.FormValue("default_instructions"))
+	// Sanitize HTML content from rich text editor
+	defaultInstructions := htmlsanitize.Sanitize(strings.TrimSpace(r.FormValue("default_instructions")))
+
+	// Check for new file upload
+	file, header, fileErr := r.FormFile("file")
+	hasNewFile := fileErr == nil && header != nil && header.Size > 0
+
+	// Check if user wants to remove file
+	removeFile := r.FormValue("remove_file") != ""
 
 	// Delete-return should never redirect back to a URL containing this id.
 	delReturn := urlutil.SafeReturn(r.FormValue("return"), rid.Hex(), "/resources")
+
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
+	defer cancel()
+	db := h.DB
+
+	// Get existing resource
+	resStore := resourcestore.New(db)
+	existing, err := resStore.GetByID(ctx, rid)
+	if err != nil {
+		uierrors.RenderNotFound(w, r, "Resource not found.", "/resources")
+		return
+	}
 
 	// Helper to re-render the form with a message.
 	reRender := func(msg string) {
@@ -123,6 +136,9 @@ func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 			Type:                typeValue,
 			Status:              status,
 			ShowInLibrary:       showInLibrary,
+			HasFile:             existing.HasFile(),
+			FileName:            existing.FileName,
+			FileSize:            existing.FileSize,
 			DefaultInstructions: defaultInstructions,
 			DeleteReturn:        delReturn,
 			SubmitReturn:        urlutil.SafeReturn(r.FormValue("return"), "", "/resources"),
@@ -131,7 +147,7 @@ func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate required fields using struct tags
-	input := editResourceInput{Title: title, LaunchURL: launchURL, Status: status}
+	input := editResourceInput{Title: title, Status: status}
 	if result := inputval.Validate(input); result.HasErrors() {
 		reRender(result.First())
 		return
@@ -143,33 +159,98 @@ func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Validate launch URL is an absolute HTTP/HTTPS URL
-	if !urlutil.IsValidAbsHTTPURL(launchURL) {
+	// Determine final content state
+	hasURL := launchURL != ""
+	keepExistingFile := existing.HasFile() && !removeFile && !hasNewFile && !hasURL
+	finalHasFile := hasNewFile || keepExistingFile
+	finalHasURL := hasURL && !hasNewFile
+
+	if !finalHasURL && !finalHasFile {
+		reRender("Either Launch URL or File is required.")
+		return
+	}
+	if finalHasURL && finalHasFile {
+		reRender("Cannot have both Launch URL and File. Choose one.")
+		return
+	}
+
+	// Validate launch URL if provided
+	if finalHasURL && !urlutil.IsValidAbsHTTPURL(launchURL) {
 		reRender("Launch URL must be a valid absolute URL (e.g., https://example.com).")
 		return
 	}
 
-	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
-	defer cancel()
-	db := h.DB
+	// Handle file operations
+	var newFilePath, newFileName string
+	var newFileSize int64
 
-	update := bson.M{
-		"title":                title,
-		"title_ci":             text.Fold(title),
-		"subject":              subject,
-		"subject_ci":           text.Fold(subject),
-		"description":          description,
-		"launch_url":           launchURL,
-		"type":                 typeValue,
-		"status":               status,
-		"show_in_library":      showInLibrary,
-		"default_instructions": defaultInstructions,
-		"updated_at":           time.Now(),
+	if hasNewFile {
+		defer file.Close()
+
+		newFileName = header.Filename
+		contentType := header.Header.Get("Content-Type")
+		if contentType == "" {
+			contentType = "application/octet-stream"
+		}
+
+		// Upload new file
+		info, err := uploadFile(ctx, h.Storage, newFileName, file, header.Size, contentType)
+		if err != nil {
+			h.Log.Error("file upload failed", zap.Error(err))
+			reRender("Failed to upload file. Please try again.")
+			return
+		}
+		newFilePath = info.Path
+		newFileSize = info.Size
+
+		// Delete old file if exists
+		if existing.HasFile() {
+			if err := h.Storage.Delete(ctx, existing.FilePath); err != nil {
+				h.Log.Warn("failed to delete old file during update",
+					zap.String("path", existing.FilePath),
+					zap.Error(err))
+			}
+		}
+	} else if removeFile && existing.HasFile() {
+		// Delete existing file
+		if err := h.Storage.Delete(ctx, existing.FilePath); err != nil {
+			h.Log.Warn("failed to delete file on removal",
+				zap.String("path", existing.FilePath),
+				zap.Error(err))
+		}
 	}
 
-	if _, err := db.Collection("resources").UpdateOne(ctx, bson.M{"_id": rid}, bson.M{"$set": update}); err != nil {
+	// Build update model
+	res := models.Resource{
+		Title:               title,
+		Subject:             subject,
+		Description:         description,
+		Type:                typeValue,
+		Status:              status,
+		ShowInLibrary:       showInLibrary,
+		DefaultInstructions: defaultInstructions,
+	}
+
+	if hasNewFile {
+		res.FilePath = newFilePath
+		res.FileName = newFileName
+		res.FileSize = newFileSize
+		res.LaunchURL = "" // Clear URL when adding file
+	} else if keepExistingFile {
+		res.FilePath = existing.FilePath
+		res.FileName = existing.FileName
+		res.FileSize = existing.FileSize
+		res.LaunchURL = "" // Keep URL empty
+	} else {
+		res.LaunchURL = launchURL
+		res.FilePath = "" // Clear file fields
+		res.FileName = ""
+		res.FileSize = 0
+	}
+
+	if err := resStore.Update(ctx, rid, res); err != nil {
 		msg := "Database error while updating resource."
-		if wafflemongo.IsDup(err) {
+		if err == resourcestore.ErrDuplicateTitle {
 			msg = "A resource with that title already exists."
 		}
 		reRender(msg)

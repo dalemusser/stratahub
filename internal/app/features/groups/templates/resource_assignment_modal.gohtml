@@ -1,13 +1,13 @@
 {{ define "group_manage_assignment_modal" }}
 <div class="fixed inset-0 z-50 flex items-center justify-center">
   <div class="absolute inset-0 bg-black/40"></div>
-  <div class="relative bg-white rounded-xl shadow max-w-lg w-full p-4 space-y-4">
-    <h2 class="text-lg font-semibold text-gray-900">Manage Assignment in {{ .GroupName }}</h2>
-    <p class="text-sm text-gray-600">
+  <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-300 dark:border-gray-600 max-w-lg w-full p-4 space-y-4">
+    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Manage Assignment in {{ .GroupName }}</h2>
+    <p class="text-sm text-gray-600 dark:text-gray-400">
       {{ .ResourceTitle }}{{ if .ResourceType }} ({{ .ResourceType }}){{ end }}
     </p>
 
-    <div class="text-sm text-gray-700 space-y-1">
+    <div class="text-sm text-gray-700 dark:text-gray-300 space-y-1">
       <p>Use the actions below to view, edit, or remove this resource assignment.</p>
     </div>
 
@@ -61,7 +61,7 @@
       <div class="flex justify-start">
         <button
           type="button"
-          class="px-3 py-1 border rounded text-sm text-gray-700 hover:bg-gray-50"
+          class="px-3 py-1 border rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600"
           onclick="document.getElementById('modal-root').innerHTML=''"
         >
           Close

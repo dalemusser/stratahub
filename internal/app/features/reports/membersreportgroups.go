@@ -4,7 +4,11 @@ package reports
 import (
 	"context"
 
+	"github.com/dalemusser/stratahub/internal/app/store/queries/reportqueries"
+	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/domain/models"
+	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
+	"github.com/dalemusser/waffle/pantry/text"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -17,7 +21,7 @@ func (h *Handler) fetchReportGroupsPane(
 	ctx context.Context,
 	db *mongo.Database,
 	scopeOrg primitive.ObjectID,
-	memberStatus string,
+	groupsAfter, groupsBefore, memberStatus string,
 ) (groupsPaneResult, error) {
 	var result groupsPaneResult
 
@@ -36,11 +40,28 @@ func (h *Handler) fetchReportGroupsPane(
 		}
 	}
 
-	// Fetch groups in selected org
+	// Build base filter
 	gf := bson.M{"organization_id": scopeOrg}
-	gcur, err := db.Collection("groups").Find(ctx, gf, options.Find().
-		SetSort(bson.D{{Key: "name_ci", Value: 1}, {Key: "_id", Value: 1}}).
-		SetProjection(bson.M{"name": 1}))
+
+	// Count total groups in org
+	total, err := db.Collection("groups").CountDocuments(ctx, gf)
+	if err != nil {
+		h.Log.Error("database error counting groups", zap.Error(err), zap.String("org_id", scopeOrg.Hex()))
+		return result, err
+	}
+	result.Total = total
+
+	// Configure keyset pagination
+	cfg := paging.ConfigureKeyset(groupsBefore, groupsAfter)
+	findOpts := options.Find().SetProjection(bson.M{"name": 1, "name_ci": 1})
+	cfg.ApplyToFind(findOpts, "name_ci")
+
+	// Add cursor condition if present
+	if window := cfg.KeysetWindow("name_ci"); window != nil {
+		gf["$or"] = window["$or"]
+	}
+
+	gcur, err := db.Collection("groups").Find(ctx, gf, findOpts)
 	if err != nil {
 		h.Log.Error("database error finding groups", zap.Error(err), zap.String("org_id", scopeOrg.Hex()))
 		return result, err
@@ -48,13 +69,24 @@ func (h *Handler) fetchReportGroupsPane(
 	defer gcur.Close(ctx)
 
 	type grow struct {
-		ID   primitive.ObjectID `bson:"_id"`
-		Name string             `bson:"name"`
+		ID     primitive.ObjectID `bson:"_id"`
+		Name   string             `bson:"name"`
+		NameCI string             `bson:"name_ci"`
 	}
 	var glist []grow
 	if err := gcur.All(ctx, &glist); err != nil {
 		h.Log.Error("database error decoding groups", zap.Error(err))
 		return result, err
+	}
+
+	// Apply pagination trimming
+	page := paging.TrimPage(&glist, groupsBefore, groupsAfter)
+	result.HasPrev = page.HasPrev
+	result.HasNext = page.HasNext
+
+	// Reverse if paging backwards
+	if groupsBefore != "" {
+		paging.Reverse(glist)
 	}
 
 	// Collect group IDs for member count lookup
@@ -75,6 +107,12 @@ func (h *Handler) fetchReportGroupsPane(
 		result.Rows = append(result.Rows, groupRow{ID: g.ID, Name: g.Name, Count: byGroup[g.ID]})
 	}
 
+	// Build cursors
+	if len(glist) > 0 {
+		result.PrevCursor = wafflemongo.EncodeCursor(text.Fold(glist[0].Name), glist[0].ID)
+		result.NextCursor = wafflemongo.EncodeCursor(text.Fold(glist[len(glist)-1].Name), glist[len(glist)-1].ID)
+	}
+
 	// Count total members in this org (respecting memberStatus)
 	ocond := bson.M{"role": "member", "organization_id": scopeOrg}
 	if memberStatus == "active" || memberStatus == "disabled" {
@@ -92,55 +130,12 @@ func (h *Handler) fetchReportGroupsPane(
 
 // fetchGroupMemberCounts fetches member counts for each group.
 func (h *Handler) fetchGroupMemberCounts(ctx context.Context, db *mongo.Database, gids []primitive.ObjectID, memberStatus string) (map[primitive.ObjectID]int64, error) {
-	byGroup := make(map[primitive.ObjectID]int64)
-
-	if len(gids) == 0 {
-		return byGroup, nil
-	}
-
-	gmMatch := bson.M{
-		"group_id": bson.M{"$in": gids},
-		"role":     "member",
-	}
-
-	userMatch := bson.M{"user.role": "member"}
-	if memberStatus == "active" || memberStatus == "disabled" {
-		userMatch["user.status"] = memberStatus
-	}
-
-	pipeline := []bson.M{
-		{"$match": gmMatch},
-		{"$lookup": bson.M{
-			"from":         "users",
-			"localField":   "user_id",
-			"foreignField": "_id",
-			"as":           "user",
-		}},
-		{"$unwind": "$user"},
-		{"$match": userMatch},
-		{"$group": bson.M{"_id": "$group_id", "count": bson.M{"$sum": 1}}},
-	}
-
-	agg, err := db.Collection("group_memberships").Aggregate(ctx, pipeline)
+	counts, err := reportqueries.CountGroupMembersPerGroup(ctx, db, gids, memberStatus)
 	if err != nil {
 		h.Log.Error("database error aggregating group member counts", zap.Error(err))
 		return nil, err
 	}
-	defer agg.Close(ctx)
-
-	for agg.Next(ctx) {
-		var row struct {
-			ID    primitive.ObjectID `bson:"_id"`
-			Count int64              `bson:"count"`
-		}
-		if err := agg.Decode(&row); err != nil {
-			h.Log.Error("database error decoding group member count", zap.Error(err))
-			return nil, err
-		}
-		byGroup[row.ID] = row.Count
-	}
-
-	return byGroup, nil
+	return counts, nil
 }
 
 // fetchExportCounts calculates the export record count and members in groups count.
@@ -153,82 +148,11 @@ func (h *Handler) fetchExportCounts(
 ) exportCountsResult {
 	var result exportCountsResult
 
-	gmMatch := bson.M{"role": "member"}
-	if scopeOrg != nil {
-		gmMatch["org_id"] = *scopeOrg
-	}
-	if selectedGroup != "" {
-		if gid, err := primitive.ObjectIDFromHex(selectedGroup); err == nil {
-			gmMatch["group_id"] = gid
-		}
-	}
-
-	userMatch := bson.M{"user.role": "member"}
-	if memberStatus == "active" || memberStatus == "disabled" {
-		userMatch["user.status"] = memberStatus
-	}
-
-	// Count memberships
-	var membershipCount int64
-	pipeline := []bson.M{
-		{"$match": gmMatch},
-		{"$lookup": bson.M{
-			"from":         "users",
-			"localField":   "user_id",
-			"foreignField": "_id",
-			"as":           "user",
-		}},
-		{"$unwind": "$user"},
-		{"$match": userMatch},
-		{"$count": "count"},
-	}
-	agg, err := db.Collection("group_memberships").Aggregate(ctx, pipeline)
+	membershipCount, membersWithMembership, err := reportqueries.CountMembershipStats(
+		ctx, db, scopeOrg, selectedGroup, memberStatus,
+	)
 	if err != nil {
-		h.Log.Warn("failed to aggregate membership counts", zap.Error(err))
-	} else {
-		defer agg.Close(ctx)
-		if agg.Next(ctx) {
-			var row struct {
-				Count int64 `bson:"count"`
-			}
-			if err := agg.Decode(&row); err != nil {
-				h.Log.Warn("failed to decode membership count", zap.Error(err))
-			} else {
-				membershipCount = row.Count
-			}
-		}
-	}
-
-	// Count distinct members with memberships
-	var membersWithMembership int64
-	pipeline2 := []bson.M{
-		{"$match": gmMatch},
-		{"$lookup": bson.M{
-			"from":         "users",
-			"localField":   "user_id",
-			"foreignField": "_id",
-			"as":           "user",
-		}},
-		{"$unwind": "$user"},
-		{"$match": userMatch},
-		{"$group": bson.M{"_id": "$user._id"}},
-		{"$count": "count"},
-	}
-	agg2, err := db.Collection("group_memberships").Aggregate(ctx, pipeline2)
-	if err != nil {
-		h.Log.Warn("failed to aggregate distinct member counts", zap.Error(err))
-	} else {
-		defer agg2.Close(ctx)
-		if agg2.Next(ctx) {
-			var row struct {
-				Count int64 `bson:"count"`
-			}
-			if err := agg2.Decode(&row); err != nil {
-				h.Log.Warn("failed to decode distinct member count", zap.Error(err))
-			} else {
-				membersWithMembership = row.Count
-			}
-		}
+		h.Log.Warn("failed to aggregate membership stats", zap.Error(err))
 	}
 
 	result.MembersInGroupsCount = membersWithMembership
