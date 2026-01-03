@@ -40,7 +40,7 @@
     <thead class="bg-white dark:bg-gray-800">
       <tr class="border-b dark:border-gray-700">
         <th class="px-2 py-1 text-left">Name</th>
-        <th class="px-2 py-1 text-left">Email</th>
+        <th class="px-2 py-1 text-left">Login ID</th>
         <th class="px-2 py-1 text-left">Action</th>
       </tr>
     </thead>
@@ -55,7 +55,7 @@
           {{ range .CurrentLeaders }}
           <tr class="border-b dark:border-gray-700">
             <td class="px-2 py-1">{{ .FullName }}</td>
-            <td class="px-2 py-1">{{ .Email }}</td>
+            <td class="px-2 py-1">{{ .LoginID }}</td>
             <td class="px-2 py-1">
               <form
                 hx-post="/groups/{{ $.GroupID }}/manage/remove-leader"
@@ -88,11 +88,11 @@
     <select id="leaderSelect" name="userID" class="border p-1 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
       <option value="">-- Select Leader --</option>
       {{ range .PossibleLeaders }}
-        <option value="{{ .ID }}">{{ .FullName }} ({{ .Email }})</option>
+        <option value="{{ .ID }}">{{ .FullName }} ({{ .LoginID }})</option>
       {{ end }}
     </select>
     <input type="hidden" name="return" value="{{ .BackURL }}">
-    <button class="bg-blue-600 text-white px-2 py-1 text-xs rounded hover:bg-blue-700">Add</button>
+    <button class="bg-indigo-600 text-white px-2 py-1 text-xs rounded hover:bg-indigo-700">Add</button>
   </form>
 </div>
 {{ end }}
@@ -111,7 +111,7 @@
     <thead class="bg-white dark:bg-gray-800">
       <tr class="border-b dark:border-gray-700">
         <th class="px-2 py-1 text-left">Name</th>
-        <th class="px-2 py-1 text-left">Email</th>
+        <th class="px-2 py-1 text-left">Login ID</th>
         <th class="px-2 py-1 text-left">Action</th>
       </tr>
     </thead>
@@ -135,7 +135,7 @@
         {{ range .CurrentMembers }}
         <tr class="border-b dark:border-gray-700">
           <td class="px-2 py-1">{{ .FullName }}</td>
-          <td class="px-2 py-1">{{ .Email }}</td>
+          <td class="px-2 py-1">{{ .LoginID }}</td>
           <td class="px-2 py-1">
             <form
               hx-post="/groups/{{ $.GroupID }}/manage/remove-member"
@@ -227,7 +227,7 @@
     <thead class="bg-white dark:bg-gray-800">
       <tr class="border-b dark:border-gray-700">
         <th class="px-2 py-1 text-left">Name</th>
-        <th class="px-2 py-1 text-left">Email</th>
+        <th class="px-2 py-1 text-left">Login ID</th>
         <th class="px-2 py-1 text-left">Action</th>
       </tr>
     </thead>
@@ -242,7 +242,7 @@
           {{ range .AvailableMembers }}
           <tr class="border-b dark:border-gray-700">
             <td class="px-2 py-1">{{ .FullName }}</td>
-            <td class="px-2 py-1">{{ .Email }}</td>
+            <td class="px-2 py-1">{{ .LoginID }}</td>
             <td class="px-2 py-1">
               <form
                 hx-post="/groups/{{ $.GroupID }}/manage/add-member"
@@ -253,7 +253,7 @@
               >
                 <input type="hidden" name="userID" value="{{ .ID }}" />
                 <input type="hidden" name="return" value="{{ $.BackURL }}">
-                <button class="bg-green-600 text-white px-2 py-1 text-xs rounded hover:bg-green-700">Add</button>
+                <button class="bg-indigo-600 text-white px-2 py-1 text-xs rounded hover:bg-indigo-700">Add</button>
               </form>
             </td>
           </tr>
@@ -393,7 +393,7 @@
       })()"
     >
       <input type="hidden" name="userID" value="{{ .UserID }}">
-      <button class="bg-green-600 text-white px-2 py-0.5 rounded" aria-label="Add back {{ .FullName }}">Add back</button>
+      <button class="bg-indigo-600 text-white px-2 py-0.5 rounded" aria-label="Add back {{ .FullName }}">Add back</button>
     </form>
   </div>
 </div>

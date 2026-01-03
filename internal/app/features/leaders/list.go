@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
@@ -32,6 +33,12 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 	before := query.Get(r, "before")
 	start := paging.ParseStart(r)
 
+	// Determine coordinator scope (if coordinator, limit to assigned orgs)
+	var scopeOrgIDs []primitive.ObjectID
+	if authz.IsCoordinator(r) {
+		scopeOrgIDs = authz.UserOrgIDs(r)
+	}
+
 	// Determine scope
 	selectedOrg := "all"
 	var scopeOrg *primitive.ObjectID
@@ -47,14 +54,14 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch org pane data
-	orgPane, err := h.fetchOrgPane(ctx, db, orgQ, orgAfter, orgBefore)
+	orgPane, err := h.fetchOrgPane(ctx, db, orgQ, orgAfter, orgBefore, scopeOrgIDs)
 	if err != nil {
 		uierrors.RenderServerError(w, r, "A database error occurred.", "/leaders")
 		return
 	}
 
 	// Fetch leaders list
-	leaders, err := h.fetchLeadersList(ctx, db, scopeOrg, search, status, after, before, start)
+	leaders, err := h.fetchLeadersList(ctx, db, scopeOrg, search, status, after, before, start, scopeOrgIDs)
 	if err != nil {
 		uierrors.RenderServerError(w, r, "A database error occurred.", "/leaders")
 		return

@@ -4,14 +4,19 @@ package leaders
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
+	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/system/authutil"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/formutil"
 	"github.com/dalemusser/stratahub/internal/app/system/inputval"
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/domain/models"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/dalemusser/waffle/pantry/text"
@@ -21,9 +26,9 @@ import (
 )
 
 // createLeaderInput defines validation rules for creating a new leader.
+// Note: LoginID is validated conditionally in HandleCreate based on auth method.
 type createLeaderInput struct {
 	FullName string `validate:"required,max=200" label:"Full name"`
-	Email    string `validate:"required,email,max=254" label:"Email"`
 	OrgID    string `validate:"required,objectid" label:"Organization"`
 }
 
@@ -35,16 +40,27 @@ type newData struct {
 	formutil.Base
 
 	Organizations []orgOption
+	AuthMethods   []models.AuthMethod
 
 	// Org is now always locked (passed via URL)
 	OrgHex  string
 	OrgName string
 
-	FullName string
-	Email    string
-	Auth     string
-	Status   string
+	FullName     string
+	LoginID      string
+	Email        string
+	AuthReturnID string
+	Auth         string
+	TempPassword string
+	Status       string
+
+	IsEdit bool // false for new forms
 }
+
+// Template helper methods for auth field visibility
+func (d newData) EmailIsLoginMethod() bool       { return authutil.EmailIsLogin(d.Auth) }
+func (d newData) RequiresAuthReturnIDMethod() bool { return authutil.RequiresAuthReturnID(d.Auth) }
+func (d newData) IsPasswordMethod() bool         { return d.Auth == "password" }
 
 func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
@@ -52,6 +68,8 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 
 	var data newData
 	formutil.SetBase(&data.Base, r, h.DB, "New Leader", "/leaders")
+	data.AuthMethods = models.EnabledAuthMethods
+	data.Auth = "trust" // default auth method
 
 	// Org can be passed via URL param (optional - can select via picker)
 	selectedOrg := normalize.QueryParam(r.URL.Query().Get("org"))
@@ -66,6 +84,11 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 				return
 			}
 		} else {
+			// Coordinator access check: verify access to specified organization
+			if authz.IsCoordinator(r) && !authz.CanAccessOrg(r, orgID) {
+				uierrors.RenderForbidden(w, r, "You don't have access to this organization.", "/leaders")
+				return
+			}
 			data.OrgHex = orgID.Hex()
 			data.OrgName = orgName
 		}
@@ -81,43 +104,70 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	full := normalize.Name(r.FormValue("full_name"))
+	loginID := normalize.Email(r.FormValue("login_id"))
 	email := normalize.Email(r.FormValue("email"))
+	authReturnID := strings.TrimSpace(r.FormValue("auth_return_id"))
 	authm := normalize.AuthMethod(r.FormValue("auth_method"))
 	orgHex := normalize.OrgID(r.FormValue("orgID"))
+	tempPassword := strings.TrimSpace(r.FormValue("temp_password"))
 
 	// New leaders always start as active
 	status := "active"
 
 	// Normalize defaults
 	if authm == "" {
-		authm = "internal"
+		authm = "trust"
 	}
 
 	// Validate required fields using struct tags
-	input := createLeaderInput{FullName: full, Email: email, OrgID: orgHex}
+	input := createLeaderInput{FullName: full, OrgID: orgHex}
 	if result := inputval.Validate(input); result.HasErrors() {
 		h.renderNewWithError(w, r, result.First(),
-			withNewEcho(full, email, orgHex, authm, status))
+			withNewEcho(full, loginID, email, authReturnID, orgHex, authm, tempPassword, status))
+		return
+	}
+
+	// Validate auth fields using centralized logic
+	authResult, err := authutil.ValidateAndResolve(authutil.AuthInput{
+		Method:       authm,
+		LoginID:      loginID,
+		Email:        email,
+		AuthReturnID: authReturnID,
+		TempPassword: tempPassword,
+		IsEdit:       false,
+	})
+	if err != nil {
+		h.renderNewWithError(w, r, err.Error(),
+			withNewEcho(full, loginID, email, authReturnID, orgHex, authm, tempPassword, status))
 		return
 	}
 
 	oid, err := primitive.ObjectIDFromHex(orgHex)
 	if err != nil {
 		h.renderNewWithError(w, r, "Organization is required.",
-			withNewEcho(full, email, orgHex, authm, status))
+			withNewEcho(full, loginID, email, authReturnID, orgHex, authm, tempPassword, status))
+		return
+	}
+
+	// Coordinator access check: verify access to specified organization
+	if authz.IsCoordinator(r) && !authz.CanAccessOrg(r, oid) {
+		uierrors.RenderForbidden(w, r, "You don't have access to this organization.", "/leaders")
 		return
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 
-	// Build & insert (duplicate email is caught by unique index)
+	// Build & insert (duplicate login_id_ci is caught by unique index)
 	now := time.Now()
+	effectiveLoginID := authResult.EffectiveLoginID
+	loginIDCI := text.Fold(effectiveLoginID)
 	doc := bson.M{
 		"_id":             primitive.NewObjectID(),
 		"full_name":       full,
 		"full_name_ci":    text.Fold(full),
-		"email":           email,
+		"login_id":        effectiveLoginID,
+		"login_id_ci":     loginIDCI,
 		"auth_method":     authm,
 		"role":            "leader",
 		"status":          status,
@@ -125,12 +175,29 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		"created_at":      now,
 		"updated_at":      now,
 	}
+
+	// Add optional email if provided
+	if authResult.Email != nil {
+		doc["email"] = *authResult.Email
+	}
+
+	// Add optional auth_return_id if provided
+	if authResult.AuthReturnID != nil {
+		doc["auth_return_id"] = *authResult.AuthReturnID
+	}
+
+	// Add password hash if provided
+	if authResult.PasswordHash != nil {
+		doc["password_hash"] = *authResult.PasswordHash
+		doc["password_temp"] = *authResult.PasswordTemp
+	}
+
 	if _, err := h.DB.Collection("users").InsertOne(ctx, doc); err != nil {
 		msg := "Database error while creating leader."
 		if wafflemongo.IsDup(err) {
-			msg = "A user with that email already exists."
+			msg = "A user with that login ID already exists."
 		}
-		h.renderNewWithError(w, r, msg, withNewEcho(full, email, orgHex, authm, status))
+		h.renderNewWithError(w, r, msg, withNewEcho(full, loginID, email, authReturnID, orgHex, authm, tempPassword, status))
 		return
 	}
 
@@ -145,14 +212,18 @@ func (h *Handler) renderNewWithError(w http.ResponseWriter, r *http.Request, msg
 
 	var data newData
 	formutil.SetBase(&data.Base, r, h.DB, "New Leader", "/leaders")
+	data.AuthMethods = models.EnabledAuthMethods
 	data.SetError(msg)
 
 	if len(echo) > 0 {
 		e := echo[0]
 		data.FullName = e.FullName
+		data.LoginID = e.LoginID
 		data.Email = e.Email
+		data.AuthReturnID = e.AuthReturnID
 		data.OrgHex = e.OrgHex
 		data.Auth = e.Auth
+		data.TempPassword = e.TempPassword
 		data.Status = e.Status
 	}
 
@@ -172,12 +243,15 @@ func (h *Handler) renderNewWithError(w http.ResponseWriter, r *http.Request, msg
 	templates.Render(w, r, "admin_leader_new", data)
 }
 
-func withNewEcho(full, email, orgHex, auth, status string) newData {
+func withNewEcho(full, loginID, email, authReturnID, orgHex, auth, tempPassword, status string) newData {
 	return newData{
-		FullName: full,
-		Email:    email,
-		OrgHex:   orgHex,
-		Auth:     auth,
-		Status:   status,
+		FullName:     full,
+		LoginID:      loginID,
+		Email:        email,
+		AuthReturnID: authReturnID,
+		OrgHex:       orgHex,
+		Auth:         auth,
+		TempPassword: tempPassword,
+		Status:       status,
 	}
 }

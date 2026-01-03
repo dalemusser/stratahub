@@ -44,11 +44,16 @@ func (h *Handler) ServeView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	loginID := ""
+	if u.LoginID != nil {
+		loginID = *u.LoginID
+	}
+
 	templates.Render(w, r, "system_user_view", viewData{
 		BaseVM:   viewdata.NewBaseVM(r, h.DB, "View User", backToSystemUsersURL(r)),
 		ID:       idHex,
 		FullName: u.FullName,
-		Email:    normalize.Email(u.Email),
+		LoginID:  loginID,
 		URole:    normalize.Role(u.Role),
 		UserRole: normalize.Role(u.Role),
 		Auth:     normalize.AuthMethod(u.AuthMethod),

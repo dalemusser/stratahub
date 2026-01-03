@@ -69,10 +69,13 @@
     </div>
   </div>
 
-  <div class="pt-4 border-t dark:border-gray-700">
+  <div class="flex gap-2 pt-4 border-t dark:border-gray-700">
     <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
       Save Page
     </button>
+    <a href="{{ if eq .Slug "about" }}/about{{ else if eq .Slug "contact" }}/contact{{ else if eq .Slug "terms-of-service" }}/terms{{ else if eq .Slug "privacy-policy" }}/privacy{{ else }}/{{ end }}"
+       class="px-3 py-1 border rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 flex items-center"
+       onclick="return confirm('Discard unsaved changes?');">Cancel</a>
   </div>
 </form>
 

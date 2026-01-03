@@ -4,7 +4,6 @@ package members
 import (
 	"context"
 	"net/http"
-	"strings"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/policy/memberpolicy"
@@ -58,6 +57,7 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 	// Determine scope based on policy
 	var selectedOrg string
 	var scopeOrg *primitive.ObjectID
+	var scopeOrgIDs []primitive.ObjectID // For coordinators (multiple orgs)
 
 	if listScope.AllOrgs {
 		// Admin can choose org or see all
@@ -74,19 +74,41 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 				selectedOrg = "all"
 			}
 		}
+	} else if len(listScope.OrgIDs) > 0 {
+		// Coordinator can choose from their assigned orgs or see all their orgs
+		scopeOrgIDs = listScope.OrgIDs
+		if orgParam == "" {
+			selectedOrg = "all"
+		} else {
+			selectedOrg = orgParam
+		}
+		if selectedOrg != "all" {
+			if oid, err := primitive.ObjectIDFromHex(selectedOrg); err == nil {
+				// Verify coordinator has access to this org
+				if authz.CanAccessOrg(r, oid) {
+					scopeOrg = &oid
+				} else {
+					h.Log.Warn("coordinator tried to access unauthorized org, defaulting to all", zap.String("org", selectedOrg))
+					selectedOrg = "all"
+				}
+			} else {
+				h.Log.Warn("invalid org parameter, defaulting to all", zap.String("org", selectedOrg), zap.Error(err))
+				selectedOrg = "all"
+			}
+		}
 	} else {
 		// Leader is scoped to their org
 		selectedOrg = listScope.OrgID.Hex()
 		scopeOrg = &listScope.OrgID
 	}
 
-	// Fetch org pane data (admin only - when they can see all orgs)
-	showOrgPane := listScope.AllOrgs
+	// Fetch org pane data (admin and coordinator - when they can see multiple orgs)
+	showOrgPane := listScope.AllOrgs || len(listScope.OrgIDs) > 0
 	var orgPane orgPaneData
 
 	if showOrgPane {
 		var err error
-		orgPane, err = h.fetchOrgPane(ctx, db, orgQ, orgAfter, orgBefore)
+		orgPane, err = h.fetchOrgPane(ctx, db, orgQ, orgAfter, orgBefore, scopeOrgIDs)
 		if err != nil {
 			h.ErrLog.LogServerError(w, r, "database error fetching org pane", err, "A database error occurred.", "/")
 			return
@@ -94,7 +116,7 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch members list
-	members, err := h.fetchMembersList(ctx, db, scopeOrg, searchQuery, status, after, before, start)
+	members, err := h.fetchMembersList(ctx, db, scopeOrg, searchQuery, status, after, before, start, scopeOrgIDs)
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "database error fetching members list", err, "A database error occurred.", "/")
 		return
@@ -215,10 +237,15 @@ func (h *Handler) ServeManageMemberModal(w http.ResponseWriter, r *http.Request)
 		back = httpnav.ResolveBackURL(r, "/members")
 	}
 
+	loginID := ""
+	if u.LoginID != nil {
+		loginID = *u.LoginID
+	}
+
 	data := memberManageModalData{
 		MemberID: u.ID.Hex(),
 		FullName: u.FullName,
-		Email:    strings.ToLower(u.Email),
+		LoginID:  loginID,
 		OrgName:  orgName,
 		BackURL:  back,
 	}

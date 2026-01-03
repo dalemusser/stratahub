@@ -7,6 +7,7 @@ import (
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	materialstore "github.com/dalemusser/stratahub/internal/app/store/materials"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/htmlsanitize"
 	"github.com/dalemusser/stratahub/internal/app/system/inputval"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
@@ -25,6 +26,12 @@ type editMaterialInput struct {
 
 // ServeEdit renders the Edit Material form for admins.
 func (h *AdminHandler) ServeEdit(w http.ResponseWriter, r *http.Request) {
+	// Check if user can manage materials (admin or coordinator with permission)
+	if !authz.CanManageMaterials(r) {
+		http.Redirect(w, r, "/materials", http.StatusSeeOther)
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
@@ -68,6 +75,12 @@ func (h *AdminHandler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 
 // HandleEdit processes the Edit Material form POST for admins.
 func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
+	// Check if user can manage materials (admin or coordinator with permission)
+	if !authz.CanManageMaterials(r) {
+		http.Redirect(w, r, "/materials", http.StatusSeeOther)
+		return
+	}
+
 	// Parse multipart form for file uploads (32MB max)
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		h.ErrLog.LogBadRequest(w, r, "parse form failed", err, "Invalid form data.", "/materials")

@@ -23,11 +23,23 @@ type createResourceInput struct {
 }
 
 func (h *AdminHandler) ServeNew(w http.ResponseWriter, r *http.Request) {
+	// Check if user can manage resources (admin or coordinator with permission)
+	if !authz.CanManageResources(r) {
+		http.Redirect(w, r, "/resources", http.StatusSeeOther)
+		return
+	}
+
 	vm := resourceFormVM{}
 	h.renderNewForm(w, r, vm, "")
 }
 
 func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
+	// Check if user can manage resources (admin or coordinator with permission)
+	if !authz.CanManageResources(r) {
+		http.Redirect(w, r, "/resources", http.StatusSeeOther)
+		return
+	}
+
 	// Parse multipart form for file uploads (32MB max)
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		h.ErrLog.LogBadRequest(w, r, "parse form failed", err, "Invalid form data.", "/resources")

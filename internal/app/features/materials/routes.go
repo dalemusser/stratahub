@@ -16,30 +16,20 @@ import (
 func AdminRoutes(h *AdminHandler, sm *auth.SessionManager) chi.Router {
 	r := chi.NewRouter()
 
+	// Read-only and assignment routes for admin and coordinator
+	// Coordinators can view materials and assign to their organizations
 	r.Group(func(pr chi.Router) {
-		// Admin-only feature; require a signed-in admin.
 		pr.Use(sm.RequireSignedIn)
-		pr.Use(sm.RequireRole("admin"))
+		pr.Use(sm.RequireRole("admin", "coordinator"))
 
 		// LIST (live search + HTMX table swap)
 		pr.Get("/", h.ServeList)
-
-		// CREATE
-		pr.Get("/new", h.ServeNew)
-		pr.Post("/", h.HandleCreate)
 
 		// VIEW
 		pr.Get("/{id}/view", h.ServeView)
 		pr.Get("/{id}/download", h.HandleDownload)
 
-		// EDIT
-		pr.Get("/{id}/edit", h.ServeEdit)
-		pr.Post("/{id}/edit", h.HandleEdit)
-
-		// DELETE
-		pr.Post("/{id}/delete", h.HandleDelete)
-
-		// ASSIGNMENT (per material)
+		// ASSIGNMENT (per material) - coordinators can assign to their orgs
 		pr.Get("/{id}/assign", h.ServeAssign)
 		pr.Get("/{id}/assign/form", h.ServeAssignForm)
 		pr.Get("/{id}/assign/leaders", h.ServeAssignLeadersPane)
@@ -56,6 +46,24 @@ func AdminRoutes(h *AdminHandler, sm *auth.SessionManager) chi.Router {
 
 		// MANAGE MODAL (HTMX)
 		pr.Get("/{id}/manage_modal", h.ServeManageModal)
+	})
+
+	// Create/edit/delete routes - admins always allowed, coordinators only if they have CanManageMaterials permission
+	// Permission check is done in handlers via authz.CanManageMaterials()
+	r.Group(func(pr chi.Router) {
+		pr.Use(sm.RequireSignedIn)
+		pr.Use(sm.RequireRole("admin", "coordinator"))
+
+		// CREATE
+		pr.Get("/new", h.ServeNew)
+		pr.Post("/", h.HandleCreate)
+
+		// EDIT
+		pr.Get("/{id}/edit", h.ServeEdit)
+		pr.Post("/{id}/edit", h.HandleEdit)
+
+		// DELETE
+		pr.Post("/{id}/delete", h.HandleDelete)
 	})
 
 	return r

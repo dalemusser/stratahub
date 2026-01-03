@@ -5,9 +5,13 @@ import (
 	"context"
 	"html/template"
 	"net/http"
+	"strings"
+	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/store/coordinatorassign"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
+	"github.com/dalemusser/stratahub/internal/app/system/authutil"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/inputval"
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
@@ -16,14 +20,14 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
+	"go.uber.org/zap"
 )
 
 // createSystemUserInput defines validation rules for creating a system user.
+// Note: LoginID is validated conditionally in HandleCreate based on auth method.
 type createSystemUserInput struct {
-	FullName   string `validate:"required,max=200" label:"Full name"`
-	Email      string `validate:"required,email,max=254" label:"Email"`
-	Role       string `validate:"required,oneof=admin analyst" label:"Role"`
-	AuthMethod string `validate:"required,authmethod" label:"Auth method"`
+	FullName string `validate:"required,max=200" label:"Full name"`
+	Role     string `validate:"required,oneof=admin analyst coordinator" label:"Role"`
 }
 
 // ServeNew renders the "Add System User" form.
@@ -39,8 +43,10 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := formData{
-		BaseVM: viewdata.NewBaseVM(r, h.DB, "Add System User", "/system-users"),
-		// Field values start empty; template will show sensible defaults.
+		BaseVM:      viewdata.NewBaseVM(r, h.DB, "Add System User", "/system-users"),
+		AuthMethods: models.EnabledAuthMethods,
+		Auth:        "trust", // default auth method
+		IsEdit:      false,
 	}
 
 	templates.Render(w, r, "system_user_new", data)
@@ -48,7 +54,7 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 
 // HandleCreate processes the Add System User form POST.
 func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
-	_, _, _, ok := authz.UserCtx(r)
+	_, creatorName, creatorOID, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
@@ -60,32 +66,68 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	full := normalize.Name(r.FormValue("full_name"))
+	loginID := normalize.Email(r.FormValue("login_id"))
 	email := normalize.Email(r.FormValue("email"))
+	authReturnID := strings.TrimSpace(r.FormValue("auth_return_id"))
 	userRole := normalize.Role(r.FormValue("role"))
 	authm := normalize.AuthMethod(r.FormValue("auth_method"))
+	tempPassword := strings.TrimSpace(r.FormValue("temp_password"))
+
+	// Get org IDs if coordinator role
+	orgIDStrs := r.Form["orgIDs"]
+	orgIDs := parseOrgIDs(orgIDStrs)
+
+	// Get coordinator permissions (checkboxes)
+	canManageMaterials := r.FormValue("can_manage_materials") == "on"
+	canManageResources := r.FormValue("can_manage_resources") == "on"
 
 	reRender := func(msg string) {
 		templates.Render(w, r, "system_user_new", formData{
-			BaseVM:   viewdata.NewBaseVM(r, h.DB, "Add System User", "/system-users"),
-			FullName: full,
-			Email:    email,
-			URole:    userRole,
-			UserRole: userRole,
-			Auth:     authm,
-			Status:   "active",
-			Error:    template.HTML(msg),
+			BaseVM:             viewdata.NewBaseVM(r, h.DB, "Add System User", "/system-users"),
+			AuthMethods:        models.EnabledAuthMethods,
+			FullName:           full,
+			LoginID:            loginID,
+			Email:              email,
+			AuthReturnID:       authReturnID,
+			URole:              userRole,
+			UserRole:           userRole,
+			Auth:               authm,
+			TempPassword:       tempPassword,
+			Status:             "active",
+			IsEdit:             false,
+			CanManageMaterials: canManageMaterials,
+			CanManageResources: canManageResources,
+			Error:              template.HTML(msg),
 		})
 	}
 
-	// Validate using struct tags (required, email, oneof)
+	// Validate required fields using struct tags
 	input := createSystemUserInput{
-		FullName:   full,
-		Email:      email,
-		Role:       userRole,
-		AuthMethod: authm,
+		FullName: full,
+		Role:     userRole,
 	}
 	if result := inputval.Validate(input); result.HasErrors() {
 		reRender(result.First())
+		return
+	}
+
+	// Validate auth fields using centralized logic
+	authResult, err := authutil.ValidateAndResolve(authutil.AuthInput{
+		Method:       authm,
+		LoginID:      loginID,
+		Email:        email,
+		AuthReturnID: authReturnID,
+		TempPassword: tempPassword,
+		IsEdit:       false,
+	})
+	if err != nil {
+		reRender(err.Error())
+		return
+	}
+
+	// Coordinators must have at least one organization assigned
+	if userRole == "coordinator" && len(orgIDs) == 0 {
+		reRender("Coordinators must be assigned to at least one organization.")
 		return
 	}
 
@@ -95,21 +137,72 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 
 	// Create user via store (handles ID, CI fields, timestamps, and duplicate detection)
 	usrStore := userstore.New(db)
+	effectiveLoginID := authResult.EffectiveLoginID
 	user := models.User{
 		FullName:   full,
-		Email:      email,
+		LoginID:    &effectiveLoginID,
 		Role:       userRole,
 		AuthMethod: authm,
 		Status:     "active",
 	}
 
-	if _, err := usrStore.Create(ctx, user); err != nil {
+	// Add optional email if provided
+	if authResult.Email != nil {
+		user.Email = authResult.Email
+	}
+
+	// Add optional auth_return_id if provided
+	if authResult.AuthReturnID != nil {
+		user.AuthReturnID = authResult.AuthReturnID
+	}
+
+	// Add password hash if provided
+	if authResult.PasswordHash != nil {
+		user.PasswordHash = authResult.PasswordHash
+		user.PasswordTemp = authResult.PasswordTemp
+	}
+
+	// Set coordinator-specific permissions (only relevant if role is coordinator)
+	if userRole == "coordinator" {
+		user.CanManageMaterials = canManageMaterials
+		user.CanManageResources = canManageResources
+	}
+
+	createdUser, err := usrStore.Create(ctx, user)
+	if err != nil {
 		msg := "Database error while creating system user."
-		if err == userstore.ErrDuplicateEmail {
-			msg = "A user with that email already exists."
+		if err == userstore.ErrDuplicateLoginID {
+			msg = "A user with that login ID already exists."
+		} else {
+			h.Log.Error("failed to create system user",
+				zap.Error(err),
+				zap.String("role", userRole),
+				zap.String("login_id", effectiveLoginID))
 		}
 		reRender(msg)
 		return
+	}
+
+	// Create coordinator assignments if role is coordinator
+	if userRole == "coordinator" && len(orgIDs) > 0 {
+		coordStore := coordinatorassign.New(db)
+
+		for _, orgID := range orgIDs {
+			assignment := models.CoordinatorAssignment{
+				UserID:         createdUser.ID,
+				OrganizationID: orgID,
+				CreatedAt:      time.Now().UTC(),
+				CreatedByID:    creatorOID,
+				CreatedByName:  creatorName,
+			}
+			if _, err := coordStore.Create(ctx, assignment); err != nil {
+				h.Log.Error("failed to create coordinator assignment",
+					zap.Error(err),
+					zap.String("user_id", createdUser.ID.Hex()),
+					zap.String("org_id", orgID.Hex()))
+				// Continue with other assignments; log but don't fail
+			}
+		}
 	}
 
 	ret := navigation.SafeBackURL(r, navigation.SystemUsersBackURL)

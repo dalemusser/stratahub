@@ -9,7 +9,6 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/templates"
-	"go.uber.org/zap"
 )
 
 func (h *Handler) ServeAnalyst(w http.ResponseWriter, r *http.Request) {
@@ -29,8 +28,6 @@ func (h *Handler) ServeAnalyst(w http.ResponseWriter, r *http.Request) {
 		MembersCount:       counts.Members,
 		ResourcesCount:     counts.Resources,
 	}
-
-	h.Log.Debug("analyst dashboard served", zap.String("user", base.UserName))
 
 	templates.Render(w, r, "analyst_dashboard", data)
 }

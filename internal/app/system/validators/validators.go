@@ -47,6 +47,7 @@ func EnsureAll(ctx context.Context, db *mongo.Database) error {
 	// Membership and assignment collections
 	ensure("group_memberships", groupMembershipsSchema())
 	ensure("group_resource_assignments", groupResourceAssignmentsSchema())
+	ensure("coordinator_assignments", coordinatorAssignmentsSchema())
 
 	// These don't strictly need validators; we still ensure the collections exist.
 	ensure("login_records", nil)
@@ -158,13 +159,17 @@ func usersSchema() bson.M {
 	return bson.M{
 		"$jsonSchema": bson.M{
 			"bsonType": "object",
-			"required": bson.A{"full_name", "email", "role", "status"},
+			"required": bson.A{"full_name", "role", "status", "auth_method"},
 			"properties": bson.M{
-				"full_name":   bson.M{"bsonType": "string", "minLength": 1, "pattern": ".*\\S.*"},
-				"email":       bson.M{"bsonType": "string", "minLength": 1, "pattern": ".*\\S.*"},
-				"role":        bson.M{"enum": bson.A{"admin", "analyst", "leader", "member", "guest"}},
-				"status":      bson.M{"enum": bson.A{"active", "disabled"}},
-				"auth_method": bson.M{"enum": bson.A{"internal", "google", "classlink", "clever", "microsoft"}},
+				"full_name":    bson.M{"bsonType": "string", "minLength": 1, "pattern": ".*\\S.*"},
+				"full_name_ci": bson.M{"bsonType": "string", "minLength": 1, "pattern": ".*\\S.*"},
+				"login_id":     bson.M{"bsonType": "string"},
+				"login_id_ci":  bson.M{"bsonType": "string"},
+				"auth_return_id": bson.M{"bsonType": "string"},
+				"email":        bson.M{"bsonType": "string"},
+				"role":         bson.M{"enum": bson.A{"admin", "analyst", "coordinator", "leader", "member", "guest"}},
+				"status":       bson.M{"enum": bson.A{"active", "disabled"}},
+				"auth_method":  bson.M{"enum": bson.A{"internal", "google", "classlink", "clever", "microsoft", "schoology", "email", "password", "trust"}},
 			},
 		},
 	}
@@ -268,6 +273,22 @@ func resourcesSchema() bson.M {
 				"show_in_library":      bson.M{"bsonType": "bool"},
 				"description":          bson.M{"bsonType": "string"},
 				"default_instructions": bson.M{"bsonType": "string"},
+			},
+		},
+	}
+}
+
+func coordinatorAssignmentsSchema() bson.M {
+	return bson.M{
+		"$jsonSchema": bson.M{
+			"bsonType": "object",
+			"required": bson.A{"user_id", "organization_id", "created_at"},
+			"properties": bson.M{
+				"user_id":         bson.M{"bsonType": "objectId"},
+				"organization_id": bson.M{"bsonType": "objectId"},
+				"created_at":      bson.M{"bsonType": "date"},
+				"created_by_id":   bson.M{"bsonType": "objectId"},
+				"created_by_name": bson.M{"bsonType": "string"},
 			},
 		},
 	}

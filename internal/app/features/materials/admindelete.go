@@ -8,6 +8,7 @@ import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	materialassignstore "github.com/dalemusser/stratahub/internal/app/store/materialassign"
 	materialstore "github.com/dalemusser/stratahub/internal/app/store/materials"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/txn"
 	"github.com/dalemusser/waffle/pantry/urlutil"
@@ -18,6 +19,12 @@ import (
 
 // HandleDelete deletes a material, its assignments, and its file (if any).
 func (h *AdminHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
+	// Check if user can manage materials (admin or coordinator with permission)
+	if !authz.CanManageMaterials(r) {
+		http.Redirect(w, r, "/materials", http.StatusSeeOther)
+		return
+	}
+
 	idHex := chi.URLParam(r, "id")
 	oid, err := primitive.ObjectIDFromHex(idHex)
 	if err != nil {

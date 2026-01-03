@@ -111,10 +111,14 @@ func (h *Handler) fetchAvailablePaged(
 
 	members = make([]UserItem, 0, len(rows))
 	for _, r := range rows {
+		loginID := ""
+		if r.LoginID != nil {
+			loginID = *r.LoginID
+		}
 		members = append(members, UserItem{
 			ID:       r.ID.Hex(),
 			FullName: r.FullName,
-			Email:    r.Email,
+			LoginID:  loginID,
 		})
 	}
 	shown = len(members)
@@ -216,7 +220,7 @@ func (h *Handler) fetchAvailablePrevInclusive(
 		var rows []struct {
 			ID         primitive.ObjectID `bson:"_id"`
 			FullName   string             `bson:"full_name"`
-			Email      string             `bson:"email"`
+			LoginID    string             `bson:"login_id"`
 			FullNameCI string             `bson:"full_name_ci"`
 		}
 		if err = cur.All(ctx, &rows); err != nil {
@@ -228,7 +232,7 @@ func (h *Handler) fetchAvailablePrevInclusive(
 			members = append(members, UserItem{
 				ID:       r.ID.Hex(),
 				FullName: r.FullName,
-				Email:    r.Email,
+				LoginID:  r.LoginID,
 			})
 		}
 		shown = len(members)
@@ -276,7 +280,7 @@ func (h *Handler) fetchAvailablePrevInclusive(
 	var rowsDesc []struct {
 		ID         primitive.ObjectID `bson:"_id"`
 		FullName   string             `bson:"full_name"`
-		Email      string             `bson:"email"`
+		LoginID    string             `bson:"login_id"`
 		FullNameCI string             `bson:"full_name_ci"`
 	}
 	if err = cur.All(ctx, &rowsDesc); err != nil {
@@ -299,7 +303,7 @@ func (h *Handler) fetchAvailablePrevInclusive(
 		members = append(members, UserItem{
 			ID:       r.ID.Hex(),
 			FullName: r.FullName,
-			Email:    r.Email,
+			LoginID:  r.LoginID,
 		})
 	}
 	shown = len(members)

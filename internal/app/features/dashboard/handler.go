@@ -34,6 +34,8 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 		h.ServeAdmin(w, r)
 	case "analyst":
 		h.ServeAnalyst(w, r)
+	case "coordinator":
+		h.ServeCoordinator(w, r)
 	case "leader":
 		h.ServeLeader(w, r)
 	case "member":

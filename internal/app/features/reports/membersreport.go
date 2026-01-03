@@ -70,6 +70,7 @@ func (h *Handler) ServeMembersReport(w http.ResponseWriter, r *http.Request) {
 
 	// Determine scope based on policy
 	var scopeOrg *primitive.ObjectID
+	var scopeOrgIDs []primitive.ObjectID // For coordinators: list of allowed org IDs
 	selectedOrg := "all"
 
 	if reportScope.AllOrgs {
@@ -84,14 +85,37 @@ func (h *Handler) ServeMembersReport(w http.ResponseWriter, r *http.Request) {
 				selectedOrg = "all"
 			}
 		}
+	} else if len(reportScope.OrgIDs) > 0 {
+		// Coordinator is scoped to multiple orgs
+		scopeOrgIDs = reportScope.OrgIDs
+		if orgParam != "" {
+			selectedOrg = orgParam
+		}
+		if selectedOrg != "all" {
+			if oid, err := primitive.ObjectIDFromHex(selectedOrg); err == nil {
+				// Verify the selected org is in the coordinator's allowed list
+				for _, allowedOrgID := range scopeOrgIDs {
+					if allowedOrgID == oid {
+						scopeOrg = &oid
+						break
+					}
+				}
+				// If not found in allowed list, reset to "all"
+				if scopeOrg == nil {
+					selectedOrg = "all"
+				}
+			} else {
+				selectedOrg = "all"
+			}
+		}
 	} else {
-		// Leader is scoped to their org
+		// Leader is scoped to their single org
 		scopeOrg = &reportScope.OrgID
 		selectedOrg = reportScope.OrgID.Hex()
 	}
 
 	// Fetch org pane data
-	orgPane, err := h.fetchReportOrgPane(ctx, db, orgQ, orgAfter, orgBefore, memberStatus)
+	orgPane, err := h.fetchReportOrgPane(ctx, db, orgQ, orgAfter, orgBefore, memberStatus, scopeOrgIDs)
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "database error fetching org pane", err, "A database error occurred.", "/")
 		return

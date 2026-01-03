@@ -1,4 +1,4 @@
-// internal/app/system/handlers/organizations/list.go
+// internal/app/features/organizations/list.go
 package organizations
 
 import (
@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	organizationstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
@@ -22,8 +23,11 @@ import (
 
 // ServeList handles GET /organizations (with optional ?q= search).
 // It supports HTMX partial refresh of the table when HX-Target="orgs-table-wrap".
-// Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
+// Authorization: RequireRole("admin", "coordinator") middleware in routes.go.
+// Admins see all organizations; coordinators see only their assigned organizations.
 func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
+	role, _, _, _ := authz.UserCtx(r)
+
 	q := query.Search(r, "q")
 	after := query.Get(r, "after")
 	before := query.Get(r, "before")
@@ -36,6 +40,18 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 
 	// Build base filter
 	base := bson.M{}
+
+	// Coordinators can only see their assigned organizations
+	if role == "coordinator" {
+		orgIDs := authz.UserOrgIDs(r)
+		if len(orgIDs) == 0 {
+			// No assigned orgs - show empty list
+			base["_id"] = primitive.NilObjectID // Will match nothing
+		} else {
+			base["_id"] = bson.M{"$in": orgIDs}
+		}
+	}
+
 	var searchOr []bson.M
 	if q != "" {
 		fq := text.Fold(q)

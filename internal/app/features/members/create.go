@@ -5,10 +5,12 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/policy/memberpolicy"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
+	"github.com/dalemusser/stratahub/internal/app/system/authutil"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/formutil"
 	"github.com/dalemusser/stratahub/internal/app/system/inputval"
@@ -46,8 +48,9 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 
 	selectedOrg := normalize.QueryParam(r.URL.Query().Get("org"))
 	data := newData{
-		Auth:   "internal",
-		Status: status.Active,
+		AuthMethods: models.EnabledAuthMethods,
+		Auth:        "trust",
+		Status:      status.Active,
 	}
 	formutil.SetBase(&data.Base, r, db, "Add Member", "/members")
 
@@ -70,7 +73,7 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 		data.OrgHex = orgID.Hex()
 		data.OrgName = orgName
 	} else {
-		// Admin: org can be passed via URL param (optional - can select via picker)
+		// Admin/Coordinator: org can be passed via URL param (optional - can select via picker)
 		if selectedOrg != "" && selectedOrg != "all" {
 			orgID, orgName, err := orgutil.ResolveActiveOrgFromHex(ctx, db, selectedOrg)
 			if err != nil {
@@ -82,11 +85,16 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 					return
 				}
 			} else {
+				// Coordinator access check: verify access to specified organization
+				if role == "coordinator" && !authz.CanAccessOrg(r, orgID) {
+					uierrors.RenderForbidden(w, r, "You don't have access to this organization.", "/members")
+					return
+				}
 				data.OrgHex = orgID.Hex()
 				data.OrgName = orgName
 			}
 		}
-		// OrgLocked stays false for admin - they can change via picker
+		// OrgLocked stays false for admin/coordinator - they can change via picker
 	}
 
 	templates.Render(w, r, "member_new", data)
@@ -112,30 +120,63 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	full := normalize.Name(r.FormValue("full_name"))
+	loginID := normalize.Email(r.FormValue("login_id"))
 	email := normalize.Email(r.FormValue("email"))
+	authReturnID := strings.TrimSpace(r.FormValue("auth_return_id"))
 	authm := normalize.AuthMethod(r.FormValue("auth_method"))
+	tempPassword := strings.TrimSpace(r.FormValue("temp_password"))
 	// New members always start as active
 	stat := status.Active
 	orgHex := normalize.OrgID(r.FormValue("orgID"))
 
-	// Validate required fields using struct tags
-	input := memberInput{FullName: full, Email: email}
-	if result := inputval.Validate(input); result.HasErrors() {
-		h.reRenderNewWithError(w, r, newData{
-			FullName: full, Email: email, Auth: authm, Status: stat, OrgHex: orgHex,
-		}, result.First())
-		return
+	// Normalize defaults
+	if authm == "" {
+		authm = "trust"
 	}
-	// Organization required for admins (leaders are locked to their org)
-	if role != "leader" && orgHex == "" {
-		h.reRenderNewWithError(w, r, newData{
-			FullName: full, Email: email, Auth: authm, Status: stat, OrgHex: orgHex,
-		}, "Organization is required.")
+
+	// Helper to build echo data
+	echoData := func() newData {
+		return newData{
+			FullName: full, LoginID: loginID, Email: email, AuthReturnID: authReturnID,
+			Auth: authm, TempPassword: tempPassword, Status: stat, OrgHex: orgHex,
+		}
+	}
+
+	// Validate required fields using struct tags
+	input := memberInput{FullName: full}
+	if result := inputval.Validate(input); result.HasErrors() {
+		h.reRenderNewWithError(w, r, echoData(), result.First())
 		return
 	}
 
-	if authm == "" {
-		authm = "internal"
+	// Validate auth fields using centralized logic
+	authResult, err := authutil.ValidateAndResolve(authutil.AuthInput{
+		Method:       authm,
+		LoginID:      loginID,
+		Email:        email,
+		AuthReturnID: authReturnID,
+		TempPassword: tempPassword,
+		IsEdit:       false,
+	})
+	if err != nil {
+		h.reRenderNewWithError(w, r, echoData(), err.Error())
+		return
+	}
+
+	// Organization required for admins/coordinators (leaders are locked to their org)
+	if role != "leader" && orgHex == "" {
+		h.reRenderNewWithError(w, r, echoData(), "Organization is required.")
+		return
+	}
+
+	// Coordinator access check: verify access to specified organization
+	if role == "coordinator" && orgHex != "" {
+		if oid, err := primitive.ObjectIDFromHex(orgHex); err == nil {
+			if !authz.CanAccessOrg(r, oid) {
+				uierrors.RenderForbidden(w, r, "You don't have access to this organization.", "/members")
+				return
+			}
+		}
 	}
 
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
@@ -166,14 +207,10 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		case err == nil:
 			orgID = oid
 		case errors.Is(err, orgutil.ErrBadOrgID):
-			h.reRenderNewWithError(w, r, newData{
-				FullName: full, Email: email, Auth: authm, Status: stat, OrgHex: orgHex,
-			}, "Invalid organization ID.")
+			h.reRenderNewWithError(w, r, echoData(), "Invalid organization ID.")
 			return
 		case errors.Is(err, orgutil.ErrOrgNotFound), errors.Is(err, orgutil.ErrOrgNotActive):
-			h.reRenderNewWithError(w, r, newData{
-				FullName: full, Email: email, Auth: authm, Status: stat, OrgHex: orgHex,
-			}, "Organization not found or is not active.")
+			h.reRenderNewWithError(w, r, echoData(), "Organization not found or is not active.")
 			return
 		default:
 			h.ErrLog.LogServerError(w, r, "database error validating organization", err, "A database error occurred.", "/members")
@@ -182,19 +219,35 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	orgPtr := orgID
+	effectiveLoginID := authResult.EffectiveLoginID
 	doc := models.User{
 		FullName:       full,
-		Email:          email,
+		LoginID:        &effectiveLoginID,
 		AuthMethod:     authm,
 		Role:           "member",
 		Status:         stat,
 		OrganizationID: &orgPtr,
 	}
+
+	// Add optional email if provided
+	if authResult.Email != nil {
+		doc.Email = authResult.Email
+	}
+
+	// Add optional auth_return_id if provided
+	if authResult.AuthReturnID != nil {
+		doc.AuthReturnID = authResult.AuthReturnID
+	}
+
+	// Add password hash if provided
+	if authResult.PasswordHash != nil {
+		doc.PasswordHash = authResult.PasswordHash
+		doc.PasswordTemp = authResult.PasswordTemp
+	}
+
 	if _, err := us.Create(ctx, doc); err != nil {
 		if wafflemongo.IsDup(err) {
-			h.reRenderNewWithError(w, r, newData{
-				FullName: full, Email: email, Auth: authm, Status: stat, OrgHex: orgHex,
-			}, "A user with that email already exists.")
+			h.reRenderNewWithError(w, r, echoData(), "A user with that login ID already exists.")
 			return
 		}
 		h.ErrLog.LogServerError(w, r, "database error creating user", err, "A database error occurred.", "/members")
@@ -208,6 +261,7 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 // Helper to re-render form with an inline error message and keep org options for admins.
 func (h *Handler) reRenderNewWithError(w http.ResponseWriter, r *http.Request, data newData, msg string) {
 	formutil.SetBase(&data.Base, r, h.DB, "Add Member", "/members")
+	data.AuthMethods = models.EnabledAuthMethods
 	data.SetError(msg)
 
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())

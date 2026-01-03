@@ -40,11 +40,12 @@ type listData struct {
 	NextStart  int
 }
 
-// orgManageModalData is used for the HTMX “Manage Organization” modal.
+// orgManageModalData is used for the HTMX "Manage Organization" modal.
 type orgManageModalData struct {
 	ID      string
 	Name    string
 	BackURL string
+	Role    string // User's role for conditional button display
 }
 
 // newData is the view model for the "New Organization" page.

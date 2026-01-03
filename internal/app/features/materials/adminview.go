@@ -9,6 +9,7 @@ import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	materialassignstore "github.com/dalemusser/stratahub/internal/app/store/materialassign"
 	materialstore "github.com/dalemusser/stratahub/internal/app/store/materials"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/httpnav"
@@ -43,6 +44,9 @@ func (h *AdminHandler) ServeView(w http.ResponseWriter, r *http.Request) {
 	assignStore := materialassignstore.New(db)
 	assignCount, _ := assignStore.CountByMaterial(ctx, oid)
 
+	// Check if user can edit materials (admin or coordinator with permission)
+	canEdit := authz.CanManageMaterials(r)
+
 	data := viewData{
 		BaseVM:              viewdata.NewBaseVM(r, h.DB, "View Material", "/materials"),
 		ID:                  mat.ID.Hex(),
@@ -57,6 +61,7 @@ func (h *AdminHandler) ServeView(w http.ResponseWriter, r *http.Request) {
 		FileSize:            mat.FileSize,
 		DefaultInstructions: template.HTML(mat.DefaultInstructions),
 		AssignmentCount:     assignCount,
+		CanEdit:             canEdit,
 	}
 
 	templates.Render(w, r, "material_view", data)
@@ -84,6 +89,9 @@ func (h *AdminHandler) ServeManageModal(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Check if user can edit materials (admin or coordinator with permission)
+	canEdit := authz.CanManageMaterials(r)
+
 	data := manageModalData{
 		ID:          mat.ID.Hex(),
 		Title:       mat.Title,
@@ -94,6 +102,7 @@ func (h *AdminHandler) ServeManageModal(w http.ResponseWriter, r *http.Request) 
 		FileName:    mat.FileName,
 		Description: mat.Description,
 		BackURL:     httpnav.ResolveBackURL(r, "/materials"),
+		CanEdit:     canEdit,
 	}
 
 	templates.RenderSnippet(w, "material_manage_modal", data)

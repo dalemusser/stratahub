@@ -7,6 +7,7 @@ import (
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	resourcestore "github.com/dalemusser/stratahub/internal/app/store/resources"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/htmlsanitize"
 	"github.com/dalemusser/stratahub/internal/app/system/inputval"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
@@ -24,8 +25,13 @@ type editResourceInput struct {
 }
 
 // ServeEdit renders the Edit Resource form for admins.
-// Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
 func (h *AdminHandler) ServeEdit(w http.ResponseWriter, r *http.Request) {
+	// Check if user can manage resources (admin or coordinator with permission)
+	if !authz.CanManageResources(r) {
+		http.Redirect(w, r, "/resources", http.StatusSeeOther)
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
@@ -69,8 +75,13 @@ func (h *AdminHandler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleEdit processes the Edit Resource form POST for admins.
-// Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
 func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
+	// Check if user can manage resources (admin or coordinator with permission)
+	if !authz.CanManageResources(r) {
+		http.Redirect(w, r, "/resources", http.StatusSeeOther)
+		return
+	}
+
 	// Parse multipart form for file uploads (32MB max)
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		h.ErrLog.LogBadRequest(w, r, "parse form failed", err, "Invalid form data.", "/resources")

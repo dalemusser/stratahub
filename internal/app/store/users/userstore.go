@@ -53,19 +53,22 @@ func (s *Store) GetLeaderByID(ctx context.Context, id primitive.ObjectID) (*mode
 	return &u, nil
 }
 
-// GetByEmail looks up a user by case-insensitive email. Returns mongo.ErrNoDocuments if not found.
-func (s *Store) GetByEmail(ctx context.Context, email string) (*models.User, error) {
+// GetByLoginID looks up a user by case/diacritic-insensitive login_id. Returns mongo.ErrNoDocuments if not found.
+func (s *Store) GetByLoginID(ctx context.Context, loginID string) (*models.User, error) {
 	var u models.User
-	if err := s.c.FindOne(ctx, bson.M{"email": normalize.Email(email)}).Decode(&u); err != nil {
+	folded := text.Fold(loginID)
+	if err := s.c.FindOne(ctx, bson.M{"login_id_ci": folded}).Decode(&u); err != nil {
 		return nil, err
 	}
 	return &u, nil
 }
 
 var (
-	// ErrDuplicateEmail is returned when attempting to create a user with an email that already exists.
-	ErrDuplicateEmail = errors.New("a user with this email already exists")
-	errBadRole        = errors.New(`role must be "admin"|"analyst"|"leader"|"member"`)
+	// ErrDuplicateLoginID is returned when attempting to create a user with a login_id that already exists.
+	ErrDuplicateLoginID = errors.New("a user with this login ID already exists")
+	// ErrDuplicateEmail is kept for backwards compatibility but maps to ErrDuplicateLoginID
+	ErrDuplicateEmail = ErrDuplicateLoginID
+	errBadRole        = errors.New(`role must be "admin"|"analyst"|"coordinator"|"leader"|"member"`)
 	errBadStatus      = errors.New(`status must be "active"|"disabled"`)
 	errOrgNeeded      = errors.New("leader/member must have organization_id")
 )
@@ -77,14 +80,28 @@ func (s *Store) Create(ctx context.Context, u models.User) (models.User, error) 
 	u.ID = primitive.NewObjectID()
 	u.FullName = normalize.Name(u.FullName)
 	u.FullNameCI = text.Fold(u.FullName)
-	u.Email = normalize.Email(u.Email)
+
+	// Normalize login_id fields
+	if u.LoginID != nil && *u.LoginID != "" {
+		loginID := normalize.Email(*u.LoginID) // lowercase
+		loginIDCI := text.Fold(loginID)        // folded for case/diacritic-insensitive matching
+		u.LoginID = &loginID
+		u.LoginIDCI = &loginIDCI
+	}
+
+	// Normalize email if provided
+	if u.Email != nil && *u.Email != "" {
+		email := normalize.Email(*u.Email) // lowercase
+		u.Email = &email
+	}
+
 	if u.Status == "" {
 		u.Status = status.Active
 	}
 
 	// Validate role
 	switch u.Role {
-	case "admin", "analyst", "leader", "member":
+	case "admin", "analyst", "coordinator", "leader", "member":
 		// ok
 	default:
 		return models.User{}, errBadRole
@@ -118,29 +135,55 @@ func (s *Store) Create(ctx context.Context, u models.User) (models.User, error) 
 // MemberUpdate holds the fields that can be updated for a member.
 type MemberUpdate struct {
 	FullName       string
-	Email          string
+	LoginID        string
+	Email          *string
+	AuthReturnID   *string
 	AuthMethod     string
 	Status         string
 	OrganizationID primitive.ObjectID
+	PasswordHash   *string
+	PasswordTemp   *bool
 }
 
 // UpdateMember updates a member's fields. Only updates users with role="member".
-// Returns ErrDuplicateEmail if the email already exists for another user.
+// Returns ErrDuplicateLoginID if the login_id already exists for another user.
 func (s *Store) UpdateMember(ctx context.Context, id primitive.ObjectID, upd MemberUpdate) error {
+	loginID := normalize.Email(upd.LoginID)
+	loginIDCI := text.Fold(loginID)
+
 	set := bson.M{
 		"full_name":       upd.FullName,
 		"full_name_ci":    text.Fold(upd.FullName),
-		"email":           normalize.Email(upd.Email),
+		"login_id":        loginID,
+		"login_id_ci":     loginIDCI,
 		"auth_method":     upd.AuthMethod,
 		"status":          upd.Status,
 		"organization_id": upd.OrganizationID,
 		"updated_at":      time.Now(),
 	}
 
+	// Optional email field
+	if upd.Email != nil {
+		set["email"] = *upd.Email
+	}
+
+	// Optional auth_return_id field
+	if upd.AuthReturnID != nil {
+		set["auth_return_id"] = *upd.AuthReturnID
+	}
+
+	// Password fields (for password auth method)
+	if upd.PasswordHash != nil {
+		set["password_hash"] = *upd.PasswordHash
+	}
+	if upd.PasswordTemp != nil {
+		set["password_temp"] = *upd.PasswordTemp
+	}
+
 	_, err := s.c.UpdateOne(ctx, bson.M{"_id": id, "role": "member"}, bson.M{"$set": set})
 	if err != nil {
 		if wafflemongo.IsDup(err) {
-			return ErrDuplicateEmail
+			return ErrDuplicateLoginID
 		}
 		return err
 	}
@@ -157,14 +200,14 @@ func (s *Store) DeleteMember(ctx context.Context, id primitive.ObjectID) (int64,
 	return res.DeletedCount, nil
 }
 
-// EmailExistsForOther checks if an email already exists for a user other than the given ID.
-func (s *Store) EmailExistsForOther(ctx context.Context, email string, excludeID primitive.ObjectID) (bool, error) {
+// LoginIDExistsForOther checks if a login_id already exists for a user other than the given ID.
+func (s *Store) LoginIDExistsForOther(ctx context.Context, loginID string, excludeID primitive.ObjectID) (bool, error) {
 	err := s.c.FindOne(ctx, bson.M{
-		"email": normalize.Email(email),
-		"_id":   bson.M{"$ne": excludeID},
+		"login_id_ci": text.Fold(loginID),
+		"_id":         bson.M{"$ne": excludeID},
 	}).Err()
 	if err == nil {
-		return true, nil // found another user with this email
+		return true, nil // found another user with this login_id
 	}
 	if err == mongo.ErrNoDocuments {
 		return false, nil // no duplicate
@@ -188,42 +231,88 @@ func (s *Store) CountByOrg(ctx context.Context, orgID primitive.ObjectID) (int64
 	return s.c.CountDocuments(ctx, bson.M{"organization_id": orgID})
 }
 
-// SystemUserUpdate holds the fields that can be updated for a system user (admin/analyst).
+// SystemUserUpdate holds the fields that can be updated for a system user (admin/analyst/coordinator).
 type SystemUserUpdate struct {
 	FullName   string
-	Email      string
+	LoginID    string
 	AuthMethod string
 	Role       string
 	Status     string
+
+	// Optional auth fields (pointer = optional)
+	Email        *string
+	AuthReturnID *string
+	PasswordHash *string
+	PasswordTemp *bool
+
+	// Coordinator-specific permissions (only relevant when Role == "coordinator")
+	CanManageMaterials bool
+	CanManageResources bool
 }
 
-// UpdateSystemUser updates a system user's fields. Only updates users with role="admin" or "analyst".
-// Returns ErrDuplicateEmail if the email already exists for another user.
+// UpdateSystemUser updates a system user's fields. Only updates users with role="admin", "analyst", or "coordinator".
+// Returns ErrDuplicateLoginID if the login_id already exists for another user.
 func (s *Store) UpdateSystemUser(ctx context.Context, id primitive.ObjectID, upd SystemUserUpdate) error {
+	loginID := normalize.Email(upd.LoginID)
+	loginIDCI := text.Fold(loginID)
+
 	set := bson.M{
 		"full_name":    upd.FullName,
 		"full_name_ci": text.Fold(upd.FullName),
-		"email":        normalize.Email(upd.Email),
+		"login_id":     loginID,
+		"login_id_ci":  loginIDCI,
 		"auth_method":  upd.AuthMethod,
 		"role":         upd.Role,
 		"status":       upd.Status,
 		"updated_at":   time.Now(),
 	}
 
-	_, err := s.c.UpdateOne(ctx, bson.M{"_id": id, "role": bson.M{"$in": []string{"admin", "analyst"}}}, bson.M{"$set": set})
+	// Handle optional email
+	if upd.Email != nil {
+		set["email"] = *upd.Email
+	}
+
+	// Handle optional auth_return_id
+	if upd.AuthReturnID != nil {
+		set["auth_return_id"] = *upd.AuthReturnID
+	}
+
+	// Handle optional password reset
+	if upd.PasswordHash != nil {
+		set["password_hash"] = *upd.PasswordHash
+		if upd.PasswordTemp != nil {
+			set["password_temp"] = *upd.PasswordTemp
+		}
+	}
+
+	update := bson.M{"$set": set}
+
+	// For coordinators, set the permission fields; for others, unset them
+	if upd.Role == "coordinator" {
+		set["can_manage_materials"] = upd.CanManageMaterials
+		set["can_manage_resources"] = upd.CanManageResources
+	} else {
+		// Clear coordinator-specific permissions when role is not coordinator
+		update["$unset"] = bson.M{
+			"can_manage_materials": "",
+			"can_manage_resources": "",
+		}
+	}
+
+	_, err := s.c.UpdateOne(ctx, bson.M{"_id": id, "role": bson.M{"$in": []string{"admin", "analyst", "coordinator"}}}, update)
 	if err != nil {
 		if wafflemongo.IsDup(err) {
-			return ErrDuplicateEmail
+			return ErrDuplicateLoginID
 		}
 		return err
 	}
 	return nil
 }
 
-// DeleteSystemUser deletes a user by ID, but only if they have role="admin" or "analyst".
+// DeleteSystemUser deletes a user by ID, but only if they have role="admin", "analyst", or "coordinator".
 // Returns the number of documents deleted (0 or 1).
 func (s *Store) DeleteSystemUser(ctx context.Context, id primitive.ObjectID) (int64, error) {
-	res, err := s.c.DeleteOne(ctx, bson.M{"_id": id, "role": bson.M{"$in": []string{"admin", "analyst"}}})
+	res, err := s.c.DeleteOne(ctx, bson.M{"_id": id, "role": bson.M{"$in": []string{"admin", "analyst", "coordinator"}}})
 	if err != nil {
 		return 0, err
 	}
@@ -286,4 +375,27 @@ func (s *Store) Find(ctx context.Context, filter bson.M, opts ...*options.FindOp
 // Count returns the number of users matching the given filter.
 func (s *Store) Count(ctx context.Context, filter bson.M) (int64, error) {
 	return s.c.CountDocuments(ctx, filter)
+}
+
+// UpdateThemePreference updates a user's theme preference.
+// Valid values: "light", "dark", "system", or "" (empty = system default).
+func (s *Store) UpdateThemePreference(ctx context.Context, id primitive.ObjectID, theme string) error {
+	set := bson.M{
+		"theme_preference": theme,
+		"updated_at":       time.Now(),
+	}
+	_, err := s.c.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": set})
+	return err
+}
+
+// UpdatePassword updates a user's password hash and clears the temporary flag.
+// This is used when a user changes their own password (not a temp password reset).
+func (s *Store) UpdatePassword(ctx context.Context, id primitive.ObjectID, passwordHash string) error {
+	set := bson.M{
+		"password_hash": passwordHash,
+		"password_temp": false,
+		"updated_at":    time.Now(),
+	}
+	_, err := s.c.UpdateOne(ctx, bson.M{"_id": id}, bson.M{"$set": set})
+	return err
 }

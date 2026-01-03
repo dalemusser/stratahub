@@ -272,26 +272,17 @@ func IsValidEmail(email string) bool {
 	return addr.Address == email
 }
 
-// AllowedAuthMethods is the canonical set of valid authentication methods.
-// Use IsValidAuthMethod() for validation.
-var AllowedAuthMethods = map[string]struct{}{
-	"internal":  {},
-	"google":    {},
-	"classlink": {},
-	"clever":    {},
-	"microsoft": {},
-}
-
-// AllowedAuthMethodsList returns the allowed auth methods as a sorted slice.
+// AllowedAuthMethodsList returns the enabled auth methods as a slice.
 // Useful for displaying in error messages.
+// This uses models.EnabledAuthMethods as the single source of truth.
 func AllowedAuthMethodsList() []string {
-	return []string{"internal", "google", "classlink", "clever", "microsoft"}
+	return models.EnabledAuthMethodValues()
 }
 
-// IsValidAuthMethod checks if the given method (case-insensitive) is allowed.
+// IsValidAuthMethod checks if the given method (case-insensitive) is enabled.
+// This uses models.EnabledAuthMethods as the single source of truth.
 func IsValidAuthMethod(method string) bool {
-	_, ok := AllowedAuthMethods[strings.ToLower(strings.TrimSpace(method))]
-	return ok
+	return models.IsEnabledAuthMethod(strings.ToLower(strings.TrimSpace(method)))
 }
 
 // IsValidResourceType checks if the given type is a valid resource type.

@@ -40,6 +40,9 @@ type listData struct {
 	RangeEnd   int
 	PrevStart  int
 	NextStart  int
+
+	// Permission flags
+	CanCreate bool // True for admin; false for coordinator (view-only)
 }
 
 // manageModalData is used to render the admin "Manage Material" modal.
@@ -53,6 +56,7 @@ type manageModalData struct {
 	FileName    string
 	Description string
 	BackURL     string
+	CanEdit     bool // True for admin; false for coordinator (view-only)
 }
 
 // MaterialTypeOption is used to populate the material type select menu.
@@ -109,6 +113,9 @@ type viewData struct {
 	FileSize            int64
 	DefaultInstructions template.HTML // HTML content, sanitized for safe rendering
 	AssignmentCount     int64
+
+	// Permission flags
+	CanEdit bool // True for admin; false for coordinator (view-only)
 }
 
 // ========================= ASSIGNMENT VIEW MODELS ======================

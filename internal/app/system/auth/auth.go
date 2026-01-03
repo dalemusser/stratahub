@@ -28,12 +28,12 @@ const (
 *─────────────────────────────────────────────────────────────────────────────*/
 
 const (
-	isAuthKey = "is_authenticated"
-	userIDKey = "user_id"
-	userName  = "user_name"
-	userEmail = "user_email"
-	userRole  = "user_role"
-	userOrgID = "organization_id"
+	isAuthKey    = "is_authenticated"
+	userIDKey    = "user_id"
+	userName     = "user_name"
+	userLoginID  = "user_login_id"
+	userRole     = "user_role"
+	userOrgID    = "organization_id"
 )
 
 /*─────────────────────────────────────────────────────────────────────────────*
@@ -171,10 +171,15 @@ type UserFetcher interface {
 type SessionUser struct {
 	ID               string
 	Name             string
-	Email            string
+	LoginID          string   // User's login identifier
 	Role             string
-	OrganizationID   string
-	OrganizationName string
+	OrganizationID   string   // For leaders/members (single org)
+	OrganizationName string   // For leaders/members (single org name)
+	OrganizationIDs  []string // For coordinators (multiple assigned orgs)
+
+	// Coordinator-specific permissions (only relevant when Role == "coordinator")
+	CanManageMaterials bool
+	CanManageResources bool
 }
 
 type ctxKey string
@@ -256,7 +261,7 @@ func (sm *SessionManager) LoadSessionUser(next http.Handler) http.Handler {
 				u := &SessionUser{
 					ID:             userID,
 					Name:           getString(sess, userName),
-					Email:          getString(sess, userEmail),
+					LoginID:        getString(sess, userLoginID),
 					Role:           getString(sess, userRole),
 					OrganizationID: getString(sess, userOrgID),
 				}

@@ -139,7 +139,7 @@
       <input
         id="member-q" name="search" type="text"
         value="{{ .SearchQuery }}"
-        placeholder="Search by name or email"
+        placeholder="Search by name"
         class="flex-1 px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
 
       <select id="member-status" name="status" class="px-3 py-2 border rounded text-sm">
@@ -174,15 +174,15 @@
       </a>
 
       {{ if .ShowOrgPane }}
-        <a href="/members/upload_csv?return={{ .CurrentPath | urlquery }}{{ if and (ne .SelectedOrg "") (ne .SelectedOrg "all") }}&org={{ .SelectedOrg }}{{ end }}"
+        <a href="/upload_csv?allowGroup=true&return={{ .CurrentPath | urlquery }}{{ if and (ne .SelectedOrg "") (ne .SelectedOrg "all") }}&org={{ .SelectedOrg }}{{ end }}"
            class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Upload CSV</a>
         <a href="/members/new?return={{ .CurrentPath | urlquery }}{{ if and (ne .SelectedOrg "") (ne .SelectedOrg "all") }}&org={{ .SelectedOrg }}{{ end }}"
-           class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">+ Add Member</a>
+           class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Add Member</a>
       {{ else }}
-        <a href="/members/upload_csv?return={{ .CurrentPath | urlquery }}"
+        <a href="/upload_csv?allowGroup=true&return={{ .CurrentPath | urlquery }}"
           class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Upload CSV</a>
         <a href="/members/new?return={{ .CurrentPath | urlquery }}"
-           class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">+ Add Member</a>
+           class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Add Member</a>
       {{ end }}
     </form>
 
@@ -224,7 +224,7 @@
         <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs sticky top-0 z-10">
           <tr>
             <th class="px-2 py-2">Name</th>
-            <th class="px-2 py-2">Email</th>
+            <th class="px-2 py-2">Login ID</th>
             <th class="px-2 py-2">Organization</th>
             <th class="px-2 py-2 text-center">Status</th>
             <th class="px-2 py-2 text-right md:whitespace-nowrap">Actions</th>
@@ -234,7 +234,7 @@
           {{ range .MemberRows }}
           <tr>
             <td class="px-2 py-2"><div class="truncate" title="{{ .FullName }}">{{ .FullName }}</div></td>
-            <td class="px-2 py-2"><div class="truncate" title="{{ .Email }}">{{ .Email }}</div></td>
+            <td class="px-2 py-2"><div class="truncate" title="{{ .LoginID }}">{{ .LoginID }}</div></td>
             <td class="px-2 py-2"><div class="truncate" title="{{ .OrgName }}">{{ .OrgName }}</div></td>
             <td class="px-2 py-2 text-center">
               {{ if eq .Status "active" }}
@@ -311,7 +311,7 @@
       {{ .FullName }}
       {{ if .OrgName }}<span class="text-gray-500 dark:text-gray-400"> ({{ .OrgName }})</span>{{ end }}
     </p>
-    <p class="text-xs text-gray-500 dark:text-gray-400">{{ .Email }}</p>
+    <p class="text-xs text-gray-500 dark:text-gray-400">{{ .LoginID }}</p>
 
     <div class="text-sm text-gray-700 dark:text-gray-300">
       <p>Use the actions below to view, edit, or remove this member.</p>
@@ -322,12 +322,12 @@
       <div class="flex justify-center gap-2">
         <a
           href="/members/{{ .MemberID }}/view?return={{ .BackURL | urlquery }}"
-          class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
         >View</a>
 
         <a
           href="/members/{{ .MemberID }}/edit?return={{ .BackURL | urlquery }}"
-          class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
         >Edit</a>
 
         <form

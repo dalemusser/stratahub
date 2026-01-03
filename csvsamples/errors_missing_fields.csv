@@ -1,0 +1,7 @@
+full_name,auth_type,login_id,temp_password,email
+John Smith,password,jsmith,TempPass1,john@school.edu
+,password,noname,TempPass2,noname@school.edu
+Jane Doe,password,,TempPass3,jane@school.edu
+Bob Wilson,password,bwilson,,bob@school.edu
+,trust,,
+Alice Brown,email,,alice@school.edu

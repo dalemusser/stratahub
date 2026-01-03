@@ -17,11 +17,13 @@ import (
 )
 
 // fetchReportOrgPane fetches the org pane data for the members report.
+// scopeOrgIDs limits the orgs to those in the list (for coordinators); nil means all orgs.
 // memberStatus is used to filter the member counts per org.
 func (h *Handler) fetchReportOrgPane(
 	ctx context.Context,
 	db *mongo.Database,
 	orgQ, orgAfter, orgBefore, memberStatus string,
+	scopeOrgIDs []primitive.ObjectID,
 ) (orgPaneResult, error) {
 	var result orgPaneResult
 
@@ -33,6 +35,11 @@ func (h *Handler) fetchReportOrgPane(
 		orgBase["name_ci"] = bson.M{"$gte": q, "$lt": hi}
 	}
 
+	// If scoped to specific orgs (coordinator), filter by those org IDs
+	if len(scopeOrgIDs) > 0 {
+		orgBase["_id"] = bson.M{"$in": scopeOrgIDs}
+	}
+
 	// Count total orgs matching search
 	total, err := db.Collection("organizations").CountDocuments(ctx, orgBase)
 	if err != nil {
@@ -41,10 +48,14 @@ func (h *Handler) fetchReportOrgPane(
 	}
 	result.Total = total
 
-	// Count all members (for "All" row), respecting memberStatus
+	// Count all members (for "All" row), respecting memberStatus and scope
 	allFilter := bson.M{"role": "member"}
 	if memberStatus == "active" || memberStatus == "disabled" {
 		allFilter["status"] = memberStatus
+	}
+	// If scoped to specific orgs (coordinator), only count members in those orgs
+	if len(scopeOrgIDs) > 0 {
+		allFilter["organization_id"] = bson.M{"$in": scopeOrgIDs}
 	}
 	allCount, err := db.Collection("users").CountDocuments(ctx, allFilter)
 	if err != nil {

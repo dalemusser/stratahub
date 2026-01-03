@@ -81,11 +81,11 @@ func (h *LeaderHandler) ServeListMaterials(w http.ResponseWriter, r *http.Reques
 			continue
 		}
 
-		// Build launch URL with id parameter (leader's email)
+		// Build launch URL with id parameter (leader's login ID)
 		launchURL := m.Material.LaunchURL
 		if launchURL != "" {
 			launchURL = urlutil.AddOrSetQueryParams(launchURL, map[string]string{
-				"id": sessionUser.Email,
+				"id": sessionUser.LoginID,
 			})
 		}
 
@@ -187,11 +187,11 @@ func (h *LeaderHandler) ServeViewMaterial(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	// Build launch URL with id parameter (leader's email)
+	// Build launch URL with id parameter (leader's login ID)
 	launchURL := result.Material.LaunchURL
 	if launchURL != "" {
 		launchURL = urlutil.AddOrSetQueryParams(launchURL, map[string]string{
-			"id": sessionUser.Email,
+			"id": sessionUser.LoginID,
 		})
 	}
 
@@ -276,7 +276,7 @@ func (h *LeaderHandler) HandleDownload(w http.ResponseWriter, r *http.Request) {
 		// If it's a URL, redirect to it with id param
 		if result.Material.LaunchURL != "" {
 			launch := urlutil.AddOrSetQueryParams(result.Material.LaunchURL, map[string]string{
-				"id": sessionUser.Email,
+				"id": sessionUser.LoginID,
 			})
 			http.Redirect(w, r, launch, http.StatusSeeOther)
 			return

@@ -1,0 +1,36 @@
+{{/* csv_preview_table renders the preview table for CSV upload.
+     Expects .PreviewRows with fields: IsNew, FullName, LoginID, AuthMethod, Email */}}
+{{ define "csv_preview_table" }}
+<div class="bg-white dark:bg-gray-800 rounded shadow p-3">
+  <div class="border border-gray-200 dark:border-gray-700 rounded overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 dark:bg-gray-700">
+        <tr>
+          <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Status</th>
+          <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Full Name</th>
+          <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Login ID</th>
+          <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Auth Method</th>
+          <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Email</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
+        {{ range .PreviewRows }}
+        <tr class="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700">
+          <td class="px-3 py-2">
+            {{ if .IsNew }}
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">New</span>
+            {{ else }}
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">Update</span>
+            {{ end }}
+          </td>
+          <td class="px-3 py-2 text-gray-900 dark:text-gray-100">{{ .FullName }}</td>
+          <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ .LoginID }}</td>
+          <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ .AuthMethod }}</td>
+          <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ if .Email }}{{ .Email }}{{ else }}-{{ end }}</td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{ end }}

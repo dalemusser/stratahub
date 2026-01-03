@@ -33,5 +33,5 @@ type ManagePageData struct {
 type UserItem struct {
 	ID       string
 	FullName string
-	Email    string
+	LoginID  string
 }

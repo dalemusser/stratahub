@@ -1,0 +1,66 @@
+{{/*
+  auth_fields.gohtml - Shared template partial for authentication fields.
+
+  Expected data fields:
+    .AuthMethods    []models.AuthMethod - list of enabled auth methods
+    .Auth           string              - current auth method value
+    .LoginID        string              - login ID value
+    .Email          string              - email value
+    .AuthReturnID   string              - auth return ID value
+    .TempPassword   string              - temporary password value (for edit forms, leave blank to keep existing)
+    .IsEdit         bool                - true for edit forms (password is optional)
+
+  Template helper methods (implement on your data struct or use authutil.TemplateData):
+    .EmailIsLoginMethod()       bool - returns true if current method uses email as login
+    .RequiresAuthReturnIDMethod() bool - returns true if current method requires auth_return_id
+    .IsPasswordMethod()         bool - returns true if current method is password
+*/}}
+
+{{ define "auth_fields" }}
+  <!-- Auth Method -->
+  <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Auth Method</label>
+    <select name="auth_method" id="auth-method-select"
+            class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
+      {{ range .AuthMethods }}
+      <option value="{{ .Value }}" {{ if eq $.Auth .Value }}selected{{ end }}>{{ .Label }}</option>
+      {{ end }}
+    </select>
+  </div>
+
+  <!-- Login ID (shown for: trust, password, clever, classlink, schoology) -->
+  <div id="login-id-section" class="{{ if .EmailIsLoginMethod }}hidden{{ end }}">
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Login ID</label>
+    <input name="login_id" id="login-id-input" type="text" value="{{ .LoginID }}"
+           class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+  </div>
+
+  <!-- Email (shown for all, but required for: email, google, microsoft; optional for others) -->
+  <div id="email-section">
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+      Email
+      <span id="email-optional-label" class="text-gray-400 font-normal {{ if .EmailIsLoginMethod }}hidden{{ end }}">(optional)</span>
+    </label>
+    <input name="email" id="email-input" type="email" value="{{ .Email }}"
+           class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+  </div>
+
+  <!-- Auth Return ID (shown for: clever, classlink, schoology) -->
+  <div id="auth-return-id-section" class="{{ if not .RequiresAuthReturnIDMethod }}hidden{{ end }}">
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Auth Return ID</label>
+    <input name="auth_return_id" id="auth-return-id-input" type="text" value="{{ .AuthReturnID }}"
+           class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+  </div>
+
+  <!-- Password (shown for: password) -->
+  <div id="temp-password-section" class="{{ if not .IsPasswordMethod }}hidden{{ end }}">
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Temporary Password</label>
+    <input name="temp_password" id="temp-password-input" type="text" value="{{ .TempPassword }}"
+           class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+    {{ if .IsEdit }}
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Leave blank to keep existing password. If set, user will be required to change on next login.</p>
+    {{ else }}
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">User will be required to change this password on first login.</p>
+    {{ end }}
+  </div>
+{{ end }}

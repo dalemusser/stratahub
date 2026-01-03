@@ -14,8 +14,9 @@ import (
 // - OrganizationID set → all Leaders in the org see this material
 // - LeaderID set → only that specific Leader sees this material
 type MaterialAssignment struct {
-	ID         primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	MaterialID primitive.ObjectID `bson:"material_id" json:"material_id"`
+	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	WorkspaceID primitive.ObjectID `bson:"workspace_id" json:"workspace_id"` // Parent workspace
+	MaterialID  primitive.ObjectID `bson:"material_id" json:"material_id"`
 
 	// Exactly one is set - determines assignment scope
 	OrganizationID *primitive.ObjectID `bson:"organization_id,omitempty" json:"organization_id,omitempty"` // Org-wide

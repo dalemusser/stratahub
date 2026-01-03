@@ -1,0 +1,415 @@
+{{ define "upload_csv" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center mb-2">
+  <a href="{{ .BackURL }}"
+     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 mr-2"
+     title="Go back">
+    <- Back
+  </a>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
+    {{ if .GroupMode }}Upload CSV to Group{{ else }}Upload CSV{{ end }}
+  </h1>
+</div>
+
+{{ if .Error }}
+  <div class="mb-3 text-sm text-red-800 bg-red-100 dark:bg-red-900 dark:text-red-200 px-3 py-2 rounded">{{ .Error }}</div>
+{{ end }}
+
+{{ if .ShowPreview }}
+  <!-- Preview Mode: Show what will happen -->
+  <div class="max-w-4xl">
+    {{ if and .GroupMode .GroupID }}
+    <!-- Selected context (read-only in preview) -->
+    <div class="text-sm text-gray-700 dark:text-gray-300 mb-3">
+      <span class="font-semibold">Organization:</span> <span>{{ .OrgName }}</span>
+      <span class="mx-2 text-gray-400">|</span>
+      <span class="font-semibold">Group:</span> <span>{{ .GroupName }}</span>
+    </div>
+    {{ end }}
+
+    <div class="mb-4 p-4 bg-blue-50 dark:bg-gray-700 border border-blue-200 dark:border-gray-600 rounded">
+      <h2 class="text-lg font-semibold text-blue-900 dark:text-gray-100 mb-2">Preview</h2>
+      <p class="text-sm text-blue-800 dark:text-gray-300">
+        {{ if and .GroupMode .GroupID }}
+        Review the members below before importing to group <strong>{{ .GroupName }}</strong>.
+        {{ else }}
+        Review the members below before importing to <strong>{{ .OrgName }}</strong>.
+        {{ end }}
+        Click <strong>Confirm Import</strong> to proceed, or
+        <a href="/upload_csv?org={{ .OrgHex }}{{ if .GroupMode }}&allowGroup=true{{ if .GroupID }}&group={{ .GroupID }}{{ end }}{{ end }}&return={{ .ReturnURL | urlquery }}" class="underline">cancel</a> and start over.
+      </p>
+      <p class="text-sm text-blue-800 dark:text-gray-300 mt-2">
+        <strong>{{ .TotalToCreate }}</strong> new members will be created.
+        <strong>{{ .TotalToUpdate }}</strong> existing members will be updated.
+        {{ if and .GroupMode .GroupID }}All will be added to the group.{{ end }}
+      </p>
+    </div>
+
+    <form method="post" action="/upload_csv/confirm" class="flex items-center gap-4 mb-4">
+      <input type="hidden" name="orgID" value="{{ .OrgHex }}">
+      <input type="hidden" name="groupMode" value="{{ .GroupMode }}">
+      {{ if .GroupMode }}
+      <input type="hidden" name="groupID" value="{{ .GroupID }}">
+      {{ end }}
+      <input type="hidden" name="preview_data" value="{{ .PreviewJSON }}">
+      <input type="hidden" name="return" value="{{ .ReturnURL }}">
+      <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+        Confirm Import
+      </button>
+      <a href="/upload_csv?org={{ .OrgHex }}{{ if .GroupMode }}&group={{ .GroupID }}{{ end }}&return={{ .ReturnURL | urlquery }}"
+         class="px-4 py-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+        Cancel
+      </a>
+    </form>
+
+    {{ template "csv_preview_table" . }}
+  </div>
+
+{{ else if .ShowSummary }}
+  <!-- Summary Mode: Show results after import -->
+  <div class="max-w-4xl">
+    {{ if and .GroupMode .GroupID }}
+    <!-- Selected context (read-only in summary) -->
+    <div class="text-sm text-gray-700 dark:text-gray-300 mb-3">
+      <span class="font-semibold">Organization:</span> <span>{{ .OrgName }}</span>
+      <span class="mx-2 text-gray-400">|</span>
+      <span class="font-semibold">Group:</span> <span>{{ .GroupName }}</span>
+    </div>
+    {{ end }}
+
+    <div class="bg-white dark:bg-gray-800 border dark:border-gray-700 rounded p-4 mb-4">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-3">Import Complete</h2>
+
+      <div class="space-y-1 text-sm">
+        <div>
+          <span class="text-gray-700 dark:text-gray-300">Members Created:</span>
+          <span class="font-medium text-green-600 dark:text-green-400 ml-2">{{ .Created }}</span>
+        </div>
+        <div>
+          <span class="text-gray-700 dark:text-gray-300">Members Updated:</span>
+          <span class="font-medium text-blue-600 dark:text-blue-400 ml-2">{{ .Updated }}</span>
+        </div>
+        {{ if and .GroupMode .GroupID }}
+        <div>
+          <span class="text-gray-700 dark:text-gray-300">Added to Group:</span>
+          <span class="font-medium text-purple-600 dark:text-purple-400 ml-2">{{ .AddedToGroup }}</span>
+        </div>
+        <div>
+          <span class="text-gray-700 dark:text-gray-300">Already in Group:</span>
+          <span class="font-medium text-gray-600 dark:text-gray-400 ml-2">{{ .AlreadyInGroup }}</span>
+        </div>
+        {{ end }}
+        {{ if gt .SkippedCount 0 }}
+        <div>
+          <span class="text-gray-700 dark:text-gray-300">Skipped (different org):</span>
+          <span class="font-medium text-orange-600 dark:text-orange-400 ml-2">{{ .SkippedCount }}</span>
+        </div>
+        {{ end }}
+      </div>
+
+      <div class="mt-4 flex gap-4">
+        <a href="/upload_csv?org={{ .OrgHex }}{{ if .GroupMode }}&allowGroup=true{{ if .GroupID }}&group={{ .GroupID }}{{ end }}{{ end }}&return={{ .BackURL | urlquery }}"
+           class="px-3 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+          Upload Another CSV
+        </a>
+        <a href="{{ .BackURL }}"
+           class="px-3 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+          Done
+        </a>
+      </div>
+    </div>
+
+    {{ template "csv_created_members_table" . }}
+    {{ template "csv_updated_members_table" . }}
+    {{ template "csv_skipped_members_table" . }}
+  </div>
+
+{{ else }}
+  <!-- Upload Form Mode -->
+  {{ if not .Error }}
+    <p class="mb-3 text-xs text-gray-500 dark:text-gray-400">
+      Choose a CSV file and click <strong>Upload & Preview</strong> to preview members before importing.
+    </p>
+  {{ end }}
+
+  <form id="upload-form" method="post" action="/upload_csv" enctype="multipart/form-data"
+        class="space-y-3 max-w-xl bg-white dark:bg-gray-800 p-4 rounded border dark:border-gray-700">
+
+    <input type="hidden" name="return" value="{{ .ReturnURL }}">
+    <input type="hidden" name="groupMode" value="{{ .GroupMode }}">
+
+    <!-- Organization -->
+    <div>
+      <label class="block text-sm font-medium mb-1 dark:text-gray-200">Organization</label>
+      <div id="org-error" class="hidden mb-2 text-sm text-red-600 dark:text-red-400">Please select an organization.</div>
+      {{ if .OrgLocked }}
+        <!-- Leader or locked: org is fixed -->
+        <input type="text" value="{{ .OrgName }}" class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm dark:text-gray-100" readonly />
+        <input type="hidden" name="orgID" id="org-hidden-input" value="{{ .OrgHex }}">
+      {{ else }}
+        <!-- Admin/Coordinator: select via picker -->
+        <div id="selected-org-display" class="min-h-[2.5rem] p-2 border dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 mb-2">
+          <div id="selected-org-name" class="text-sm text-gray-900 dark:text-gray-100 {{ if not .OrgName }}hidden{{ end }}">
+            {{ .OrgName }}
+          </div>
+          <div id="no-org-msg" class="text-gray-500 dark:text-gray-400 text-sm {{ if .OrgName }}hidden{{ end }}">
+            No organization selected
+          </div>
+        </div>
+
+        <input type="hidden" name="orgID" id="org-hidden-input" value="{{ .OrgHex }}">
+
+        <button
+          type="button"
+          id="select-org-btn"
+          class="px-3 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+          hx-get="/organizations/picker{{ if .OrgHex }}?selected={{ .OrgHex }}{{ end }}"
+          hx-target="#org-picker-root"
+          hx-swap="innerHTML"
+        >
+          {{ if .OrgName }}Change Organization...{{ else }}Select Organization...{{ end }}
+        </button>
+      {{ end }}
+    </div>
+
+    {{ if .GroupMode }}
+    <!-- Group (only shown in group mode) -->
+    <div>
+      <label class="block text-sm font-medium mb-1 dark:text-gray-200">Group <span class="font-normal text-gray-500 dark:text-gray-400">(optional)</span></label>
+      {{/* Only truly lock group if BOTH org and group are locked - if org can change, group must be changeable */}}
+      {{ if and .GroupLocked .OrgLocked }}
+        <!-- Locked: group is fixed (org is also locked, so group can't change) -->
+        <input type="text" value="{{ .GroupName }}" class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm dark:text-gray-100" readonly />
+        <input type="hidden" name="groupID" id="group-hidden-input" value="{{ .GroupID }}">
+      {{ else }}
+        <!-- Select via picker (or pre-selected but changeable if org changes) -->
+        <div id="selected-group-display" class="min-h-[2.5rem] p-2 border dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 mb-2">
+          <div id="selected-group-name" class="text-sm text-gray-900 dark:text-gray-100 {{ if not .GroupName }}hidden{{ end }}">
+            {{ .GroupName }}
+          </div>
+          <div id="no-group-msg" class="text-gray-500 dark:text-gray-400 text-sm {{ if .GroupName }}hidden{{ end }}">
+            {{ if .OrgHex }}No group selected{{ else }}Select an organization first{{ end }}
+          </div>
+        </div>
+
+        <input type="hidden" name="groupID" id="group-hidden-input" value="{{ .GroupID }}">
+
+        <button
+          type="button"
+          id="select-group-btn"
+          class="px-3 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 {{ if not .OrgHex }}opacity-50 cursor-not-allowed{{ end }}"
+          hx-target="#group-picker-root"
+          hx-swap="innerHTML"
+          {{ if .OrgHex }}
+          hx-get="/groups/picker?org={{ .OrgHex }}{{ if .GroupID }}&selected={{ .GroupID }}{{ end }}"
+          {{ else }}
+          disabled
+          {{ end }}
+        >
+          {{ if .GroupName }}Change Group...{{ else }}Select Group...{{ end }}
+        </button>
+      {{ end }}
+    </div>
+    {{ end }}
+
+    <div>
+      <label class="block text-sm font-medium mb-1 dark:text-gray-200">CSV File</label>
+      <input type="file" name="csv" accept=".csv" class="w-full border rounded px-3 py-1 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100" required />
+    </div>
+
+    <div class="flex gap-2">
+      <button class="px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700">Upload & Preview</button>
+      <a href="{{ .BackURL }}" class="px-3 py-1 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</a>
+    </div>
+
+    {{ template "csv_format_reference" . }}
+  </form>
+{{ end }}
+
+{{ if not .OrgLocked }}
+<!-- Modal container for organization picker -->
+<div id="org-picker-root"></div>
+{{ end }}
+
+{{/* Show group picker if in group mode AND (group not locked OR org not locked) */}}
+{{ if and .GroupMode (not (and .GroupLocked .OrgLocked)) }}
+<!-- Modal container for group picker -->
+<div id="group-picker-root"></div>
+{{ end }}
+
+{{ if or (not .OrgLocked) (and .GroupMode (not (and .GroupLocked .OrgLocked))) }}
+<script>
+(function() {
+  var selectedOrg = {
+    id: '{{ .OrgHex }}',
+    name: '{{ .OrgName }}'
+  };
+
+  var groupMode = {{ .GroupMode }};
+  var selectedGroup = {
+    id: '{{ .GroupID }}',
+    name: '{{ .GroupName }}'
+  };
+
+  // Organization picker functions
+  window.closeOrgPicker = function() {
+    document.getElementById('org-picker-root').innerHTML = '';
+  };
+
+  window.updateOrgPickerSelection = function(radio) {
+    var hiddenField = document.getElementById('picker-selected-org');
+    if (hiddenField) hiddenField.value = radio.value;
+  };
+
+  window.confirmOrgSelection = function() {
+    var selected = document.querySelector('input[name="org-selection"]:checked');
+    if (selected) {
+      var newOrgId = selected.value;
+      var newOrgName = selected.dataset.name;
+
+      // If org changed and in group mode, clear group selection
+      if (groupMode && newOrgId !== selectedOrg.id) {
+        selectedGroup.id = '';
+        selectedGroup.name = '';
+        updateGroupDisplay();
+      }
+
+      selectedOrg.id = newOrgId;
+      selectedOrg.name = newOrgName;
+      updateOrgDisplay();
+      hideOrgError();
+      if (groupMode) {
+        updateGroupButtonState();
+      }
+    }
+    closeOrgPicker();
+  };
+
+  function updateOrgDisplay() {
+    var orgNameEl = document.getElementById('selected-org-name');
+    var noOrgMsg = document.getElementById('no-org-msg');
+    var hiddenInput = document.getElementById('org-hidden-input');
+    var selectBtn = document.getElementById('select-org-btn');
+
+    if (!hiddenInput) return;
+    hiddenInput.value = selectedOrg.id;
+
+    if (selectedOrg.id && selectedOrg.name) {
+      if (orgNameEl) {
+        orgNameEl.textContent = selectedOrg.name;
+        orgNameEl.classList.remove('hidden');
+      }
+      if (noOrgMsg) noOrgMsg.classList.add('hidden');
+      if (selectBtn) selectBtn.textContent = 'Change Organization...';
+    } else {
+      if (orgNameEl) orgNameEl.classList.add('hidden');
+      if (noOrgMsg) noOrgMsg.classList.remove('hidden');
+      if (selectBtn) selectBtn.textContent = 'Select Organization...';
+    }
+
+    if (selectBtn) {
+      selectBtn.setAttribute('hx-get', '/organizations/picker' + (selectedOrg.id ? '?selected=' + selectedOrg.id : ''));
+      htmx.process(selectBtn);
+    }
+  }
+
+  function hideOrgError() {
+    var orgError = document.getElementById('org-error');
+    if (orgError) orgError.classList.add('hidden');
+  }
+
+  // Group picker functions (only used in group mode)
+  if (groupMode) {
+    window.closeGroupPicker = function() {
+      document.getElementById('group-picker-root').innerHTML = '';
+    };
+
+    window.updateGroupPickerSelection = function(radio) {
+      var hiddenField = document.getElementById('picker-selected-group');
+      if (hiddenField) hiddenField.value = radio.value;
+    };
+
+    window.confirmGroupSelection = function() {
+      var selected = document.querySelector('input[name="group-selection"]:checked');
+      if (selected) {
+        selectedGroup.id = selected.value;
+        selectedGroup.name = selected.dataset.name;
+        updateGroupDisplay();
+        hideGroupError();
+      }
+      closeGroupPicker();
+    };
+  }
+
+  function updateGroupDisplay() {
+    if (!groupMode) return;
+
+    var groupNameEl = document.getElementById('selected-group-name');
+    var noGroupMsg = document.getElementById('no-group-msg');
+    var hiddenInput = document.getElementById('group-hidden-input');
+    var selectBtn = document.getElementById('select-group-btn');
+
+    if (!hiddenInput) return;
+    hiddenInput.value = selectedGroup.id;
+
+    if (selectedGroup.id && selectedGroup.name) {
+      if (groupNameEl) {
+        groupNameEl.textContent = selectedGroup.name;
+        groupNameEl.classList.remove('hidden');
+      }
+      if (noGroupMsg) noGroupMsg.classList.add('hidden');
+      if (selectBtn) selectBtn.textContent = 'Change Group...';
+    } else {
+      if (groupNameEl) groupNameEl.classList.add('hidden');
+      if (noGroupMsg) {
+        noGroupMsg.textContent = selectedOrg.id ? 'No group selected' : 'Select an organization first';
+        noGroupMsg.classList.remove('hidden');
+      }
+      if (selectBtn) selectBtn.textContent = 'Select Group...';
+    }
+
+    updateGroupButtonState();
+  }
+
+  function updateGroupButtonState() {
+    if (!groupMode) return;
+
+    var selectBtn = document.getElementById('select-group-btn');
+    if (!selectBtn) return;
+
+    if (selectedOrg.id) {
+      selectBtn.disabled = false;
+      selectBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+      selectBtn.setAttribute('hx-get', '/groups/picker?org=' + selectedOrg.id + (selectedGroup.id ? '&selected=' + selectedGroup.id : ''));
+      htmx.process(selectBtn);
+    } else {
+      selectBtn.disabled = true;
+      selectBtn.classList.add('opacity-50', 'cursor-not-allowed');
+      selectBtn.removeAttribute('hx-get');
+    }
+  }
+
+  // Form validation (only org is required, group is optional)
+  var form = document.getElementById('upload-form');
+  if (form) {
+    form.addEventListener('submit', function(e) {
+      var orgInput = document.getElementById('org-hidden-input');
+      var orgError = document.getElementById('org-error');
+
+      if (!orgInput || !orgInput.value) {
+        e.preventDefault();
+        if (orgError) orgError.classList.remove('hidden');
+        return false;
+      } else {
+        if (orgError) orgError.classList.add('hidden');
+      }
+      return true;
+    });
+  }
+})();
+</script>
+{{ end }}
+{{ end }}

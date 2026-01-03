@@ -9,7 +9,6 @@ import (
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
-	"github.com/dalemusser/stratahub/internal/app/system/search"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/text"
 	"go.mongodb.org/mongo-driver/bson"
@@ -35,22 +34,16 @@ type memberListResult struct {
 }
 
 // fetchMembersList fetches a paginated list of members with optional filtering.
+// scopeOrgIDs limits members to those in the specified orgs (for coordinators); nil means all orgs.
 func (h *Handler) fetchMembersList(
 	ctx context.Context,
 	db *mongo.Database,
 	scopeOrg *primitive.ObjectID,
 	searchQuery, status, after, before string,
 	start int,
+	scopeOrgIDs []primitive.ObjectID,
 ) (memberListResult, error) {
 	var result memberListResult
-
-	qFold := text.Fold(strings.TrimSpace(searchQuery))
-	hiFold := qFold + "\uffff"
-	sLower := strings.ToLower(strings.TrimSpace(searchQuery))
-	hiEmail := sLower + "\uffff"
-
-	// Email-pivot when searching by email and org+status are constrained
-	emailPivot := search.EmailPivotOK(searchQuery, status, scopeOrg != nil)
 
 	// Build base filter
 	pbase := bson.M{"role": "member"}
@@ -59,19 +52,16 @@ func (h *Handler) fetchMembersList(
 	}
 	if scopeOrg != nil {
 		pbase["organization_id"] = *scopeOrg
+	} else if len(scopeOrgIDs) > 0 {
+		// Coordinator scope: limit to assigned orgs
+		pbase["organization_id"] = bson.M{"$in": scopeOrgIDs}
 	}
 
-	var searchOr []bson.M
+	// Search clause - search by name only
 	if searchQuery != "" {
-		if emailPivot {
-			searchOr = []bson.M{{"email": bson.M{"$gte": sLower, "$lt": hiEmail}}}
-		} else {
-			searchOr = []bson.M{
-				{"full_name_ci": bson.M{"$gte": qFold, "$lt": hiFold}},
-				{"email": bson.M{"$gte": sLower, "$lt": hiEmail}},
-			}
-		}
-		pbase["$or"] = searchOr
+		qFold := text.Fold(strings.TrimSpace(searchQuery))
+		hiFold := qFold + "\uffff"
+		pbase["full_name_ci"] = bson.M{"$gte": qFold, "$lt": hiFold}
 	}
 
 	// Count total via store
@@ -87,22 +77,14 @@ func (h *Handler) fetchMembersList(
 	f := maps.Clone(pbase)
 	find := options.Find()
 	sortField := "full_name_ci"
-	if emailPivot {
-		sortField = "email"
-	}
 
 	// Configure keyset pagination
 	cfg := paging.ConfigureKeyset(before, after)
 	cfg.ApplyToFind(find, sortField)
 
-	// Apply cursor conditions (handle $or clause specially)
+	// Apply cursor conditions
 	if ks := cfg.KeysetWindow(sortField); ks != nil {
-		if searchQuery != "" {
-			f["$and"] = []bson.M{{"$or": searchOr}, ks}
-			delete(f, "$or")
-		} else {
-			maps.Copy(f, ks)
-		}
+		maps.Copy(f, ks)
 	}
 
 	// Fetch users via store
@@ -151,10 +133,14 @@ func (h *Handler) fetchMembersList(
 		if r.OrganizationID != nil {
 			on = orgNames[*r.OrganizationID]
 		}
+		loginID := ""
+		if r.LoginID != nil {
+			loginID = *r.LoginID
+		}
 		result.Rows = append(result.Rows, memberRow{
 			ID:       r.ID,
 			FullName: r.FullName,
-			Email:    strings.ToLower(r.Email),
+			LoginID:  loginID,
 			OrgName:  on,
 			Status:   r.Status,
 		})
@@ -164,10 +150,6 @@ func (h *Handler) fetchMembersList(
 	if len(urows) > 0 {
 		firstKey := urows[0].FullNameCI
 		lastKey := urows[len(urows)-1].FullNameCI
-		if emailPivot {
-			firstKey = strings.ToLower(urows[0].Email)
-			lastKey = strings.ToLower(urows[len(urows)-1].Email)
-		}
 		result.PrevCursor = wafflemongo.EncodeCursor(firstKey, urows[0].ID)
 		result.NextCursor = wafflemongo.EncodeCursor(lastKey, urows[len(urows)-1].ID)
 	}

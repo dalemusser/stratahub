@@ -42,10 +42,12 @@
       Clear
     </a>
 
+    {{ if .CanCreate }}
     <a href="/resources/new"
        class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
-      + Add Resource
+      Add Resource
     </a>
+    {{ end }}
   </div>
 </form>
 
@@ -172,10 +174,12 @@
       Clear
     </a>
 
+    {{ if .CanCreate }}
     <a href="/resources/new"
        class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
-      + Add Resource
+      Add Resource
     </a>
+    {{ end }}
   </div>
 </form>
 {{ end }}
@@ -217,12 +221,13 @@
       <div class="flex justify-center gap-2">
         <a
           href="/resources/{{ .ID }}/view?return=/resources"
-          class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
         >View</a>
 
+        {{ if .CanEdit }}
         <a
           href="/resources/{{ .ID }}/edit?return=/resources"
-          class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
         >Edit</a>
 
         <form
@@ -238,6 +243,7 @@
             Delete
           </button>
         </form>
+        {{ end }}
       </div>
 
       <!-- Close button bottom-left -->

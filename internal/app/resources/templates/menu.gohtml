@@ -6,6 +6,8 @@
     {{ template "menu_admin" . }}
   {{ else if eq .Role "analyst" }}
     {{ template "menu_analyst" . }}
+  {{ else if eq .Role "coordinator" }}
+    {{ template "menu_coordinator" . }}
   {{ else if eq .Role "leader" }}
     {{ template "menu_leader" . }}
   {{ else if eq .Role "member" }}
@@ -33,6 +35,7 @@
   <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/groups" title="Groups"><span class="menu-icon mr-2">👥</span><span class="menu-text">Groups</span></a>
   <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/leaders" title="Leaders"><span class="menu-icon mr-2">👑</span><span class="menu-text">Leaders</span></a>
   <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/members" title="Members"><span class="menu-icon mr-2">⛹️</span><span class="menu-text">Members</span></a>
+  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/upload_csv?allowGroup=true" title="Upload CSV"><span class="menu-icon mr-2">📤</span><span class="menu-text">Upload CSV</span></a>
   <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/system-users" title="System Users"><span class="menu-icon mr-2">🧑‍💻</span><span class="menu-text">System Users</span></a>
   <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/resources" title="Resources"><span class="menu-icon mr-2">📚</span><span class="menu-text">Resources</span></a>
   <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/materials" title="Materials"><span class="menu-icon mr-2">📎</span><span class="menu-text">Materials</span></a>
@@ -40,9 +43,9 @@
 </nav>
 
 {{ if .IsLoggedIn }}
-  <div class="menu-user-info mt-4 pt-4 pb-2 border-t border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-xs">
-    <div class="font-semibold">{{ .UserName }}</div>
-    <div>{{ .Role }}</div>
+  <div class="menu-user-info mt-4 pt-4 pb-4 border-t border-gray-200 dark:border-gray-700 text-xs">
+    <div class="font-semibold truncate text-gray-700 dark:text-gray-300" title="{{ .UserName }}">{{ .UserName }}</div>
+    <div class="text-gray-500 dark:text-gray-500">{{ .Role }}</div>
   </div>
 {{ end }}
 {{ template "menu_footer" }}
@@ -66,9 +69,42 @@
 </nav>
 
 {{ if .IsLoggedIn }}
-  <div class="menu-user-info mt-4 pt-4 pb-2 border-t border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-xs">
-    <div class="font-semibold">{{ .UserName }}</div>
-    <div>{{ .Role }}</div>
+  <div class="menu-user-info mt-4 pt-4 pb-4 border-t border-gray-200 dark:border-gray-700 text-xs">
+    <div class="font-semibold truncate text-gray-700 dark:text-gray-300" title="{{ .UserName }}">{{ .UserName }}</div>
+    <div class="text-gray-500 dark:text-gray-500">{{ .Role }}</div>
+  </div>
+{{ end }}
+{{ template "menu_footer" }}
+{{ end }}
+
+{{/* ─────────────────────────────  Coordinator  ──────────────────────────────*/}}
+{{ define "menu_coordinator" }}
+<div class="mb-2">
+  <div class="flex flex-col items-center">
+    {{ if .LogoURL }}
+      <img src="{{ .LogoURL }}" alt="{{ .SiteName }}" class="h-10 w-auto">
+    {{ end }}
+    <h1 class="menu-header text-xl font-bold text-indigo-600 dark:text-indigo-400">{{ if .SiteName }}{{ .SiteName }}{{ else }}StrataHub{{ end }}</h1>
+  </div>
+</div>
+
+<nav class="space-y-2 text-sm flex-1 pt-4 border-t border-gray-200 dark:border-gray-700">
+  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/dashboard" title="Dashboard"><span class="menu-icon mr-2">🎛️</span><span class="menu-text">Dashboard</span></a>
+  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/reports/members" title="Members Report"><span class="menu-icon mr-2">📈</span><span class="menu-text">Members Report</span></a>
+  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/organizations" title="Organizations"><span class="menu-icon mr-2">🏢</span><span class="menu-text">Organizations</span></a>
+  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/groups" title="Groups"><span class="menu-icon mr-2">👥</span><span class="menu-text">Groups</span></a>
+  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/leaders" title="Leaders"><span class="menu-icon mr-2">👑</span><span class="menu-text">Leaders</span></a>
+  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/members" title="Members"><span class="menu-icon mr-2">⛹️</span><span class="menu-text">Members</span></a>
+  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/upload_csv?allowGroup=true" title="Upload CSV"><span class="menu-icon mr-2">📤</span><span class="menu-text">Upload CSV</span></a>
+  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/resources" title="Resources"><span class="menu-icon mr-2">📚</span><span class="menu-text">Resources</span></a>
+  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/materials" title="Materials"><span class="menu-icon mr-2">📎</span><span class="menu-text">Materials</span></a>
+  {{ template "menu_common" . }}
+</nav>
+
+{{ if .IsLoggedIn }}
+  <div class="menu-user-info mt-4 pt-4 pb-4 border-t border-gray-200 dark:border-gray-700 text-xs">
+    <div class="font-semibold truncate text-gray-700 dark:text-gray-300" title="{{ .UserName }}">{{ .UserName }}</div>
+    <div class="text-gray-500 dark:text-gray-500">{{ .Role }}</div>
   </div>
 {{ end }}
 {{ template "menu_footer" }}
@@ -89,14 +125,16 @@
   <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/dashboard" title="Dashboard"><span class="menu-icon mr-2">🎛️</span><span class="menu-text">Dashboard</span></a>
   <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/groups" title="Groups"><span class="menu-icon mr-2">👥</span><span class="menu-text">Groups</span></a>
   <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/members" title="Members"><span class="menu-icon mr-2">⛹️</span><span class="menu-text">Members</span></a>
+  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/upload_csv?allowGroup=true" title="Upload CSV"><span class="menu-icon mr-2">📤</span><span class="menu-text">Upload CSV</span></a>
   <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/leader/materials" title="My Materials"><span class="menu-icon mr-2">📎</span><span class="menu-text">My Materials</span></a>
   {{ template "menu_common" . }}
 </nav>
 
 {{ if .IsLoggedIn }}
-  <div class="menu-user-info mt-4 pt-4 pb-2 border-t border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-xs">
-    <div class="font-semibold">{{ .UserName }}</div>
-    <div>{{ .Role }}</div>
+  <div class="menu-user-info mt-4 pt-4 pb-4 border-t border-gray-200 dark:border-gray-700 text-xs">
+    <div class="font-semibold truncate text-gray-700 dark:text-gray-300" title="{{ .UserName }}">{{ .UserName }}</div>
+    {{ if .UserOrg }}<div class="truncate text-gray-500 dark:text-gray-500" title="{{ .UserOrg }}">{{ .UserOrg }}</div>{{ end }}
+    <div class="text-gray-500 dark:text-gray-500">{{ .Role }}</div>
   </div>
 {{ end }}
 {{ template "menu_footer" }}
@@ -120,9 +158,10 @@
 </nav>
 
 {{ if .IsLoggedIn }}
-  <div class="menu-user-info mt-4 pt-4 pb-2 border-t border-gray-200 dark:border-gray-700 text-gray-600 dark:text-gray-400 text-xs">
-    <div class="font-semibold">{{ .UserName }}</div>
-    <div>{{ .Role }}</div>
+  <div class="menu-user-info mt-4 pt-4 pb-4 border-t border-gray-200 dark:border-gray-700 text-xs">
+    <div class="font-semibold truncate text-gray-700 dark:text-gray-300" title="{{ .UserName }}">{{ .UserName }}</div>
+    {{ if .UserOrg }}<div class="truncate text-gray-500 dark:text-gray-500" title="{{ .UserOrg }}">{{ .UserOrg }}</div>{{ end }}
+    <div class="text-gray-500 dark:text-gray-500">{{ .Role }}</div>
   </div>
 {{ end }}
 {{ template "menu_footer" }}
@@ -154,6 +193,7 @@
   <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/privacy" title="Privacy Policy"><span class="menu-icon mr-2">🔒</span><span class="menu-text">Privacy</span></a>
 
   {{ if .IsLoggedIn }}
+    <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/profile" title="Profile"><span class="menu-icon mr-2">👤</span><span class="menu-text">Profile</span></a>
     {{ if eq .Role "admin" }}
       <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/settings" title="Site Settings"><span class="menu-icon mr-2">⚙️</span><span class="menu-text">Settings</span></a>
     {{ end }}

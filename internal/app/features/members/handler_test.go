@@ -28,10 +28,10 @@ func newTestHandler(t *testing.T) (*members.Handler, *testutil.Fixtures) {
 
 func adminUser() *auth.SessionUser {
 	return &auth.SessionUser{
-		ID:    primitive.NewObjectID().Hex(),
-		Name:  "Test Admin",
-		Email: "admin@test.com",
-		Role:  "admin",
+		ID:      primitive.NewObjectID().Hex(),
+		Name:    "Test Admin",
+		LoginID: "admin@test.com",
+		Role:    "admin",
 	}
 }
 
@@ -39,7 +39,7 @@ func leaderUser(orgID primitive.ObjectID, userID primitive.ObjectID) *auth.Sessi
 	return &auth.SessionUser{
 		ID:             userID.Hex(),
 		Name:           "Test Leader",
-		Email:          "leader@test.com",
+		LoginID:        "leader@test.com",
 		Role:           "leader",
 		OrganizationID: orgID.Hex(),
 	}
@@ -55,9 +55,9 @@ func TestHandleCreate_Admin_Success(t *testing.T) {
 
 	form := url.Values{
 		"full_name":   {"New Member"},
-		"email":       {"newmember@example.com"},
+		"login_id":    {"newmember@example.com"},
 		"orgID":       {org.ID.Hex()},
-		"auth_method": {"internal"},
+		"auth_method": {"trust"},
 	}
 
 	req := httptest.NewRequest("POST", "/members", strings.NewReader(form.Encode()))
@@ -74,12 +74,12 @@ func TestHandleCreate_Admin_Success(t *testing.T) {
 	// Verify member was created
 	var user struct {
 		FullName       string             `bson:"full_name"`
-		Email          string             `bson:"email"`
+		LoginID        string             `bson:"login_id"`
 		Role           string             `bson:"role"`
 		Status         string             `bson:"status"`
 		OrganizationID primitive.ObjectID `bson:"organization_id"`
 	}
-	err := db.Collection("users").FindOne(ctx, bson.M{"email": "newmember@example.com"}).Decode(&user)
+	err := db.Collection("users").FindOne(ctx, bson.M{"login_id": "newmember@example.com"}).Decode(&user)
 	if err != nil {
 		t.Fatalf("FindOne failed: %v", err)
 	}
@@ -108,7 +108,7 @@ func TestHandleCreate_Leader_Success(t *testing.T) {
 
 	form := url.Values{
 		"full_name": {"Leader's Member"},
-		"email":     {"leadermember@example.com"},
+		"login_id":  {"leadermember@example.com"},
 	}
 
 	req := httptest.NewRequest("POST", "/members", strings.NewReader(form.Encode()))
@@ -126,7 +126,7 @@ func TestHandleCreate_Leader_Success(t *testing.T) {
 	var user struct {
 		OrganizationID primitive.ObjectID `bson:"organization_id"`
 	}
-	err := db.Collection("users").FindOne(ctx, bson.M{"email": "leadermember@example.com"}).Decode(&user)
+	err := db.Collection("users").FindOne(ctx, bson.M{"login_id": "leadermember@example.com"}).Decode(&user)
 	if err != nil {
 		t.Fatalf("FindOne failed: %v", err)
 	}
@@ -150,12 +150,12 @@ func TestHandleCreate_MissingRequiredFields(t *testing.T) {
 		{
 			name: "missing_full_name",
 			form: url.Values{
-				"email": {"test@example.com"},
-				"orgID": {org.ID.Hex()},
+				"login_id": {"test@example.com"},
+				"orgID":    {org.ID.Hex()},
 			},
 		},
 		{
-			name: "missing_email",
+			name: "missing_login_id",
 			form: url.Values{
 				"full_name": {"Test Member"},
 				"orgID":     {org.ID.Hex()},
@@ -193,7 +193,7 @@ func TestHandleCreate_Admin_MissingOrg(t *testing.T) {
 
 	form := url.Values{
 		"full_name": {"Test Member"},
-		"email":     {"test@example.com"},
+		"login_id":  {"test@example.com"},
 		// orgID not provided
 	}
 
@@ -214,7 +214,7 @@ func TestHandleCreate_Admin_MissingOrg(t *testing.T) {
 	}
 }
 
-func TestHandleCreate_DuplicateEmail(t *testing.T) {
+func TestHandleCreate_DuplicateLoginID(t *testing.T) {
 	handler, fixtures := newTestHandler(t)
 	ctx, cancel := testutil.TestContext()
 	defer cancel()
@@ -222,13 +222,13 @@ func TestHandleCreate_DuplicateEmail(t *testing.T) {
 	db := fixtures.DB()
 	org := fixtures.CreateOrganization(ctx, "Test Org")
 
-	// Use unique email based on org ID to avoid collisions across test runs
-	uniqueEmail := "existing_" + org.ID.Hex()[:8] + "@example.com"
-	fixtures.CreateMember(ctx, "Existing Member", uniqueEmail, org.ID)
+	// Use unique login_id based on org ID to avoid collisions across test runs
+	uniqueLoginID := "existing_" + org.ID.Hex()[:8] + "@example.com"
+	fixtures.CreateMember(ctx, "Existing Member", uniqueLoginID, org.ID)
 
 	form := url.Values{
 		"full_name": {"New Member"},
-		"email":     {uniqueEmail},
+		"login_id":  {uniqueLoginID},
 		"orgID":     {org.ID.Hex()},
 	}
 
@@ -242,14 +242,14 @@ func TestHandleCreate_DuplicateEmail(t *testing.T) {
 		handler.HandleCreate(rec, req)
 	}()
 
-	// Should still have only 1 user with this email (duplicate rejected)
-	count, _ := db.Collection("users").CountDocuments(ctx, bson.M{"email": uniqueEmail})
+	// Should still have only 1 user with this login_id (duplicate rejected)
+	count, _ := db.Collection("users").CountDocuments(ctx, bson.M{"login_id": uniqueLoginID})
 	if count != 1 {
-		t.Errorf("expected 1 user with email %s (duplicate rejected), got %d", uniqueEmail, count)
+		t.Errorf("expected 1 user with login_id %s (duplicate rejected), got %d", uniqueLoginID, count)
 	}
 }
 
-func TestHandleCreate_InvalidEmail(t *testing.T) {
+func TestHandleCreate_PasswordAuth_MissingTempPassword(t *testing.T) {
 	handler, fixtures := newTestHandler(t)
 	ctx, cancel := testutil.TestContext()
 	defer cancel()
@@ -258,9 +258,11 @@ func TestHandleCreate_InvalidEmail(t *testing.T) {
 	org := fixtures.CreateOrganization(ctx, "Test Org")
 
 	form := url.Values{
-		"full_name": {"Test Member"},
-		"email":     {"not-an-email"},
-		"orgID":     {org.ID.Hex()},
+		"full_name":   {"Test Member"},
+		"login_id":    {"testmember"},
+		"auth_method": {"password"},
+		"orgID":       {org.ID.Hex()},
+		// temp_password not provided - should fail
 	}
 
 	req := httptest.NewRequest("POST", "/members", strings.NewReader(form.Encode()))
@@ -276,7 +278,7 @@ func TestHandleCreate_InvalidEmail(t *testing.T) {
 	// No member should be created
 	count, _ := db.Collection("users").CountDocuments(ctx, bson.M{"role": "member"})
 	if count != 0 {
-		t.Errorf("expected 0 members (invalid email), got %d", count)
+		t.Errorf("expected 0 members (password auth requires temp_password), got %d", count)
 	}
 }
 
@@ -312,7 +314,7 @@ func TestHandleEdit_Success(t *testing.T) {
 	// Verify member was updated
 	var updated struct {
 		FullName   string `bson:"full_name"`
-		Email      string `bson:"email"`
+		LoginID    string `bson:"login_id"`
 		AuthMethod string `bson:"auth_method"`
 	}
 	err := db.Collection("users").FindOne(ctx, bson.M{"_id": member.ID}).Decode(&updated)
@@ -322,15 +324,15 @@ func TestHandleEdit_Success(t *testing.T) {
 	if updated.FullName != "Updated Name" {
 		t.Errorf("FullName: got %q, want %q", updated.FullName, "Updated Name")
 	}
-	if updated.Email != "updated@example.com" {
-		t.Errorf("Email: got %q, want %q", updated.Email, "updated@example.com")
+	if updated.LoginID != "updated@example.com" {
+		t.Errorf("LoginID: got %q, want %q", updated.LoginID, "updated@example.com")
 	}
 	if updated.AuthMethod != "google" {
 		t.Errorf("AuthMethod: got %q, want %q", updated.AuthMethod, "google")
 	}
 }
 
-func TestHandleEdit_DuplicateEmail(t *testing.T) {
+func TestHandleEdit_DuplicateLoginID(t *testing.T) {
 	handler, fixtures := newTestHandler(t)
 	ctx, cancel := testutil.TestContext()
 	defer cancel()
@@ -340,11 +342,11 @@ func TestHandleEdit_DuplicateEmail(t *testing.T) {
 	fixtures.CreateMember(ctx, "First Member", "first@example.com", org.ID)
 	member2 := fixtures.CreateMember(ctx, "Second Member", "second@example.com", org.ID)
 
-	// Try to change member2's email to first@example.com (should fail)
+	// Try to change member2's login_id to first@example.com (should fail)
 	form := url.Values{
 		"full_name":   {"Second Member"},
 		"email":       {"first@example.com"},
-		"auth_method": {"internal"},
+		"auth_method": {"google"},
 		"status":      {"active"},
 		"orgID":       {org.ID.Hex()},
 	}
@@ -360,16 +362,16 @@ func TestHandleEdit_DuplicateEmail(t *testing.T) {
 		handler.HandleEdit(rec, req)
 	}()
 
-	// Verify member2 still has original email
+	// Verify member2 still has original login_id
 	var member struct {
-		Email string `bson:"email"`
+		LoginID string `bson:"login_id"`
 	}
 	err := db.Collection("users").FindOne(ctx, bson.M{"_id": member2.ID}).Decode(&member)
 	if err != nil {
 		t.Fatalf("FindOne failed: %v", err)
 	}
-	if member.Email != "second@example.com" {
-		t.Errorf("Email should be unchanged: got %q, want %q", member.Email, "second@example.com")
+	if member.LoginID != "second@example.com" {
+		t.Errorf("LoginID should be unchanged: got %q, want %q", member.LoginID, "second@example.com")
 	}
 }
 

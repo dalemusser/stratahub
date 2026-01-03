@@ -269,10 +269,10 @@ func TestCurrentUser_WithUser(t *testing.T) {
 // This simulates what LoadSessionUser middleware does.
 func withTestUser(r *http.Request, role string) *http.Request {
 	user := &auth.SessionUser{
-		ID:    "507f1f77bcf86cd799439011", // Valid ObjectID hex
-		Name:  "Test User",
-		Email: "test@example.com",
-		Role:  role,
+		ID:      "507f1f77bcf86cd799439011", // Valid ObjectID hex
+		Name:    "Test User",
+		LoginID: "test@example.com",
+		Role:    role,
 	}
 	return auth.WithTestUser(r, user)
 }

@@ -1,0 +1,91 @@
+{{/* csv_created_members_table renders the Created Members summary table.
+     Expects .CreatedMembers with fields: FullName, LoginID, AuthMethod, Email */}}
+{{ define "csv_created_members_table" }}
+{{ if .CreatedMembers }}
+<div class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-4">
+  <h3 class="font-semibold text-green-800 dark:text-green-200 text-sm mb-2">Created Members ({{ len .CreatedMembers }})</h3>
+  <div class="border border-gray-200 dark:border-gray-700 rounded overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 dark:bg-gray-700">
+        <tr>
+          <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Full Name</th>
+          <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Login ID</th>
+          <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Auth Method</th>
+          <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Email</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
+        {{ range .CreatedMembers }}
+        <tr class="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700">
+          <td class="px-3 py-2 text-gray-900 dark:text-gray-100">{{ .FullName }}</td>
+          <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ .LoginID }}</td>
+          <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ .AuthMethod }}</td>
+          <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ if .Email }}{{ .Email }}{{ else }}-{{ end }}</td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{ end }}
+{{ end }}
+
+{{/* csv_updated_members_table renders the Updated Members summary table.
+     Expects .UpdatedMembers with fields: FullName, LoginID, AuthMethod, Email */}}
+{{ define "csv_updated_members_table" }}
+{{ if .UpdatedMembers }}
+<div class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-4">
+  <h3 class="font-semibold text-blue-800 dark:text-blue-200 text-sm mb-2">Updated Members ({{ len .UpdatedMembers }})</h3>
+  <div class="border border-gray-200 dark:border-gray-700 rounded overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 dark:bg-gray-700">
+        <tr>
+          <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Full Name</th>
+          <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Login ID</th>
+          <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Auth Method</th>
+          <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Email</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
+        {{ range .UpdatedMembers }}
+        <tr class="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700">
+          <td class="px-3 py-2 text-gray-900 dark:text-gray-100">{{ .FullName }}</td>
+          <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ .LoginID }}</td>
+          <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ .AuthMethod }}</td>
+          <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ if .Email }}{{ .Email }}{{ else }}-{{ end }}</td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{ end }}
+{{ end }}
+
+{{/* csv_skipped_members_table renders the Skipped Members summary table.
+     Expects .SkippedMembers with fields: LoginID, OrgName */}}
+{{ define "csv_skipped_members_table" }}
+{{ if .SkippedMembers }}
+<div class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-4">
+  <h3 class="font-semibold text-orange-800 dark:text-orange-200 text-sm mb-2">Skipped Members ({{ len .SkippedMembers }}) - Already in another organization</h3>
+  <div class="border border-gray-200 dark:border-gray-700 rounded overflow-hidden">
+    <table class="w-full text-sm">
+      <thead class="bg-gray-50 dark:bg-gray-700">
+        <tr>
+          <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Login ID</th>
+          <th class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300">Current Organization</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 dark:divide-gray-600">
+        {{ range .SkippedMembers }}
+        <tr class="bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700">
+          <td class="px-3 py-2 text-gray-900 dark:text-gray-100">{{ .LoginID }}</td>
+          <td class="px-3 py-2 text-gray-700 dark:text-gray-300">{{ .OrgName }}</td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+</div>
+{{ end }}
+{{ end }}

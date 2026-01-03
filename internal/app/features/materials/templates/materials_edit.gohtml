@@ -168,8 +168,9 @@
     </div>
   </div>
 
-  <div class="pt-2">
+  <div class="flex gap-2 pt-2">
     <button class="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Update Material</button>
+    <a href="{{ .BackURL }}" class="px-3 py-1 border rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600">Cancel</a>
   </div>
 </form>
 
@@ -303,6 +304,19 @@ function toggleContentInputs() {
 }
 </script>
 
+{{ if eq .Role "admin" }}
+<form method="post" action="/materials/{{ .ID }}/delete" class="max-w-2xl mt-4">
+  <input type="hidden" name="return" value="{{ .DeleteReturn }}">
+  <button
+    type="submit"
+    class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
+    onclick="return confirm('Delete this material? This will also remove all assignments.');"
+  >
+    Delete Material
+  </button>
+</form>
+{{ end }}
+
 <div class="mt-4 text-xs text-gray-600 dark:text-gray-400 space-y-2 max-w-2xl">
   <p>
     <span class="font-semibold">Status</span> &ndash;
@@ -355,17 +369,4 @@ function toggleContentInputs() {
     </tbody>
   </table>
 </div>
-
-{{ if eq .Role "admin" }}
-<form method="post" action="/materials/{{ .ID }}/delete" class="max-w-2xl mt-4">
-  <input type="hidden" name="return" value="{{ .DeleteReturn }}">
-  <button
-    type="submit"
-    class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
-    onclick="return confirm('Delete this material? This will also remove all assignments.');"
-  >
-    Delete Material
-  </button>
-</form>
-{{ end }}
 {{ end }}

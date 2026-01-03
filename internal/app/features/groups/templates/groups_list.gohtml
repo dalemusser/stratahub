@@ -149,8 +149,11 @@
         class="px-4 py-2 border rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700 mr-6"
       >Clear</a>
 
+      <a href="/upload_csv?allowGroup=true{{ if and (ne .SelectedOrg "") (ne .SelectedOrg "all") }}&org={{ .SelectedOrg }}{{ end }}&return={{ .CurrentPath | urlquery }}"
+         class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Upload CSV</a>
+
       <a href="/groups/new{{ if and (ne .SelectedOrg "") (ne .SelectedOrg "all") }}?org={{ .SelectedOrg }}&{{ else }}?{{ end }}return={{ .CurrentPath | urlquery }}"
-         class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">+ Add Group</a>
+         class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Add Group</a>
     </form>
 
     <!-- Top pager (shows range) -->
@@ -280,12 +283,12 @@
       <div class="flex flex-wrap gap-2 justify-center">
         <a
           href="/groups/{{ .GroupID }}/view?return={{ .BackURL | urlquery }}"
-          class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
         >View</a>
 
         <a
           href="/groups/{{ .GroupID }}/edit?return={{ .BackURL | urlquery }}"
-          class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
         >Edit</a>
 
         <a
@@ -299,11 +302,12 @@
         >Resources</a>
 
         <a
-          href="/groups/{{ .GroupID }}/upload_csv?return={{ .BackURL | urlquery }}"
-          class="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
+          href="/upload_csv?org={{ .OrganizationID }}&group={{ .GroupID }}&return={{ .BackURL | urlquery }}"
+          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
         >CSV</a>
 
-        <!-- Delete Group (assumes you have a POST /groups/{id}/delete handler) -->
+        {{ if or (eq .Role "admin") (eq .Role "coordinator") }}
+        <!-- Delete Group (admin and coordinator) -->
         <form
           method="post"
           action="/groups/{{ .GroupID }}/delete"
@@ -317,6 +321,7 @@
             Delete
           </button>
         </form>
+        {{ end }}
       </div>
 
       <!-- Close bottom-left -->

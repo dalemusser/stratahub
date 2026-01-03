@@ -28,10 +28,10 @@ func newTestHandler(t *testing.T) (*groups.Handler, *testutil.Fixtures) {
 
 func adminUser() *auth.SessionUser {
 	return &auth.SessionUser{
-		ID:    primitive.NewObjectID().Hex(),
-		Name:  "Test Admin",
-		Email: "admin@test.com",
-		Role:  "admin",
+		ID:      primitive.NewObjectID().Hex(),
+		Name:    "Test Admin",
+		LoginID: "admin@test.com",
+		Role:    "admin",
 	}
 }
 
@@ -39,7 +39,7 @@ func leaderUser(orgID primitive.ObjectID, userID primitive.ObjectID) *auth.Sessi
 	return &auth.SessionUser{
 		ID:             userID.Hex(),
 		Name:           "Test Leader",
-		Email:          "leader@test.com",
+		LoginID:        "leader@test.com",
 		Role:           "leader",
 		OrganizationID: orgID.Hex(),
 	}
@@ -236,7 +236,7 @@ func TestHandleCreateGroup_MemberRole_Forbidden(t *testing.T) {
 	memberUser := &auth.SessionUser{
 		ID:             primitive.NewObjectID().Hex(),
 		Name:           "Test Member",
-		Email:          "member@test.com",
+		LoginID:        "member@test.com",
 		Role:           "member",
 		OrganizationID: org.ID.Hex(),
 	}

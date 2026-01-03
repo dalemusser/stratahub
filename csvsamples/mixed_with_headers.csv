@@ -1,0 +1,39 @@
+full_name, auth_type, email
+Alice Martin, email, alice.martin@school.edu
+Brian Nelson, email, brian.nelson@school.edu
+Carla Ortiz, email, carla.ortiz@school.edu
+
+full_name, auth_type, email
+Diana Perry, google, diana.perry@school.edu
+Edward Quinn, google, edward.quinn@school.edu
+Fiona Ross, google, fiona.ross@school.edu
+
+full_name, auth_type, email
+George Shaw, microsoft, george.shaw@school.edu
+Helen Torres, microsoft, helen.torres@school.edu
+Ian Underwood, microsoft, ian.underwood@school.edu
+
+full_name, auth_type, login_id, temp_password, email
+Jackie Vance, password, jvance, TempPass101, jackie.vance@school.edu
+Kyle Watson, password, kwatson, TempPass102, kyle.watson@school.edu
+Lisa Xavier, password, lxavier, TempPass103, lisa.xavier@school.edu
+
+full_name, auth_type, login_id, email
+Marcus Young, trust, myoung, marcus.young@school.edu
+Nancy Zimmerman, trust, nzimmerman, nancy.zimmerman@school.edu
+Oscar Adams, trust, oadams, oscar.adams@school.edu
+
+full_name, auth_type, email
+Paula Brooks, clever, paula.brooks@school.edu
+Quinn Carter, clever, quinn.carter@school.edu
+Rachel Davis, clever, rachel.davis@school.edu
+
+full_name, auth_type, login_id, auth_return_id, email
+Samuel Ellis, classlink, sellis, CL100001, samuel.ellis@school.edu
+Tina Foster, classlink, tfoster, CL100002, tina.foster@school.edu
+Ulysses Grant, classlink, ugrant, CL100003, ulysses.grant@school.edu
+
+full_name, auth_type, email
+Victoria Hayes, schoology, victoria.hayes@school.edu
+William Irving, schoology, william.irving@school.edu
+Xena James, schoology, xena.james@school.edu

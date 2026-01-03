@@ -7,6 +7,7 @@ import (
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	resourcestore "github.com/dalemusser/stratahub/internal/app/store/resources"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/htmlsanitize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
@@ -39,6 +40,9 @@ func (h *AdminHandler) ServeView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Check if user can edit resources (admin or coordinator with permission)
+	canEdit := authz.CanManageResources(r)
+
 	data := viewData{
 		BaseVM:              viewdata.NewBaseVM(r, h.DB, "View Resource", "/resources"),
 		ID:                  res.ID.Hex(),
@@ -53,6 +57,7 @@ func (h *AdminHandler) ServeView(w http.ResponseWriter, r *http.Request) {
 		FileName:            res.FileName,
 		FileSize:            res.FileSize,
 		DefaultInstructions: htmlsanitize.PrepareForDisplay(res.DefaultInstructions),
+		CanEdit:             canEdit,
 	}
 
 	templates.Render(w, r, "resource_view", data)

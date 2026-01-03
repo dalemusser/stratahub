@@ -10,6 +10,10 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+func strPtr(s string) *string {
+	return &s
+}
+
 func TestStore_Create_Admin(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	store := userstore.New(db)
@@ -18,7 +22,7 @@ func TestStore_Create_Admin(t *testing.T) {
 
 	user := models.User{
 		FullName: "Admin User",
-		Email:    "admin@example.com",
+		LoginID:  strPtr("admin@example.com"),
 		Role:     "admin",
 	}
 
@@ -68,7 +72,7 @@ func TestStore_Create_Member(t *testing.T) {
 
 	user := models.User{
 		FullName:       "Member User",
-		Email:          "member@example.com",
+		LoginID:        strPtr("member@example.com"),
 		Role:           "member",
 		OrganizationID: &org.ID,
 	}
@@ -94,7 +98,7 @@ func TestStore_Create_MemberWithoutOrg(t *testing.T) {
 
 	user := models.User{
 		FullName: "Member User",
-		Email:    "member@example.com",
+		LoginID:  strPtr("member@example.com"),
 		Role:     "member",
 		// No OrganizationID
 	}
@@ -113,7 +117,7 @@ func TestStore_Create_LeaderWithoutOrg(t *testing.T) {
 
 	user := models.User{
 		FullName: "Leader User",
-		Email:    "leader@example.com",
+		LoginID:  strPtr("leader@example.com"),
 		Role:     "leader",
 		// No OrganizationID
 	}
@@ -132,7 +136,7 @@ func TestStore_Create_InvalidRole(t *testing.T) {
 
 	user := models.User{
 		FullName: "Test User",
-		Email:    "test@example.com",
+		LoginID:  strPtr("test@example.com"),
 		Role:     "invalid_role",
 	}
 
@@ -142,7 +146,7 @@ func TestStore_Create_InvalidRole(t *testing.T) {
 	}
 }
 
-func TestStore_Create_DuplicateEmail(t *testing.T) {
+func TestStore_Create_DuplicateLoginID(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	store := userstore.New(db)
 	ctx, cancel := testutil.TestContext()
@@ -150,7 +154,7 @@ func TestStore_Create_DuplicateEmail(t *testing.T) {
 
 	user1 := models.User{
 		FullName: "User One",
-		Email:    "duplicate@example.com",
+		LoginID:  strPtr("duplicate@example.com"),
 		Role:     "admin",
 	}
 
@@ -161,13 +165,13 @@ func TestStore_Create_DuplicateEmail(t *testing.T) {
 
 	user2 := models.User{
 		FullName: "User Two",
-		Email:    "duplicate@example.com",
+		LoginID:  strPtr("duplicate@example.com"),
 		Role:     "admin",
 	}
 
 	_, err = store.Create(ctx, user2)
-	if err != userstore.ErrDuplicateEmail {
-		t.Errorf("expected ErrDuplicateEmail, got %v", err)
+	if err != userstore.ErrDuplicateLoginID {
+		t.Errorf("expected ErrDuplicateLoginID, got %v", err)
 	}
 }
 
@@ -179,7 +183,7 @@ func TestStore_GetByID(t *testing.T) {
 
 	user := models.User{
 		FullName:   "Test User",
-		Email:      "getbyid@example.com",
+		LoginID:    strPtr("getbyid@example.com"),
 		Role:       "admin",
 		AuthMethod: "internal",
 	}
@@ -197,8 +201,10 @@ func TestStore_GetByID(t *testing.T) {
 	if found.FullName != created.FullName {
 		t.Errorf("FullName: got %q, want %q", found.FullName, created.FullName)
 	}
-	if found.Email != created.Email {
-		t.Errorf("Email: got %q, want %q", found.Email, created.Email)
+	if found.LoginID == nil || created.LoginID == nil {
+		t.Error("LoginID should not be nil")
+	} else if *found.LoginID != *created.LoginID {
+		t.Errorf("LoginID: got %q, want %q", *found.LoginID, *created.LoginID)
 	}
 }
 
@@ -215,15 +221,15 @@ func TestStore_GetByID_NotFound(t *testing.T) {
 	}
 }
 
-func TestStore_GetByEmail(t *testing.T) {
+func TestStore_GetByLoginID(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	store := userstore.New(db)
 	ctx, cancel := testutil.TestContext()
 	defer cancel()
 
 	user := models.User{
-		FullName: "Email Test User",
-		Email:    "FindMe@Example.COM",
+		FullName: "LoginID Test User",
+		LoginID:  strPtr("FindMe@Example.COM"),
 		Role:     "admin",
 	}
 
@@ -233,9 +239,9 @@ func TestStore_GetByEmail(t *testing.T) {
 	}
 
 	// Search with different case
-	found, err := store.GetByEmail(ctx, "findme@example.com")
+	found, err := store.GetByLoginID(ctx, "findme@example.com")
 	if err != nil {
-		t.Fatalf("GetByEmail failed: %v", err)
+		t.Fatalf("GetByLoginID failed: %v", err)
 	}
 
 	if found.ID != created.ID {
@@ -255,7 +261,7 @@ func TestStore_GetMemberByID(t *testing.T) {
 	// Create a member
 	memberUser := models.User{
 		FullName:       "Member User",
-		Email:          "member@example.com",
+		LoginID:        strPtr("member@example.com"),
 		Role:           "member",
 		OrganizationID: &org.ID,
 	}
@@ -267,7 +273,7 @@ func TestStore_GetMemberByID(t *testing.T) {
 	// Create an admin
 	adminUser := models.User{
 		FullName: "Admin User",
-		Email:    "admin@example.com",
+		LoginID:  strPtr("admin@example.com"),
 		Role:     "admin",
 	}
 	admin, err := store.Create(ctx, adminUser)
@@ -291,7 +297,7 @@ func TestStore_GetMemberByID(t *testing.T) {
 	}
 }
 
-func TestStore_EmailExistsForOther(t *testing.T) {
+func TestStore_LoginIDExistsForOther(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	store := userstore.New(db)
 	ctx, cancel := testutil.TestContext()
@@ -299,7 +305,7 @@ func TestStore_EmailExistsForOther(t *testing.T) {
 
 	user1 := models.User{
 		FullName: "User One",
-		Email:    "user1@example.com",
+		LoginID:  strPtr("user1@example.com"),
 		Role:     "admin",
 	}
 	created1, err := store.Create(ctx, user1)
@@ -309,7 +315,7 @@ func TestStore_EmailExistsForOther(t *testing.T) {
 
 	user2 := models.User{
 		FullName: "User Two",
-		Email:    "user2@example.com",
+		LoginID:  strPtr("user2@example.com"),
 		Role:     "admin",
 	}
 	created2, err := store.Create(ctx, user2)
@@ -317,31 +323,31 @@ func TestStore_EmailExistsForOther(t *testing.T) {
 		t.Fatalf("Create user2 failed: %v", err)
 	}
 
-	// Check if user1's email exists for someone other than user1 (should be false)
-	exists, err := store.EmailExistsForOther(ctx, "user1@example.com", created1.ID)
+	// Check if user1's login_id exists for someone other than user1 (should be false)
+	exists, err := store.LoginIDExistsForOther(ctx, "user1@example.com", created1.ID)
 	if err != nil {
-		t.Fatalf("EmailExistsForOther failed: %v", err)
+		t.Fatalf("LoginIDExistsForOther failed: %v", err)
 	}
 	if exists {
-		t.Error("expected false when checking own email")
+		t.Error("expected false when checking own login_id")
 	}
 
-	// Check if user1's email exists for someone other than user2 (should be true)
-	exists, err = store.EmailExistsForOther(ctx, "user1@example.com", created2.ID)
+	// Check if user1's login_id exists for someone other than user2 (should be true)
+	exists, err = store.LoginIDExistsForOther(ctx, "user1@example.com", created2.ID)
 	if err != nil {
-		t.Fatalf("EmailExistsForOther failed: %v", err)
+		t.Fatalf("LoginIDExistsForOther failed: %v", err)
 	}
 	if !exists {
-		t.Error("expected true when checking another user's email")
+		t.Error("expected true when checking another user's login_id")
 	}
 
-	// Check non-existent email
-	exists, err = store.EmailExistsForOther(ctx, "nonexistent@example.com", created1.ID)
+	// Check non-existent login_id
+	exists, err = store.LoginIDExistsForOther(ctx, "nonexistent@example.com", created1.ID)
 	if err != nil {
-		t.Fatalf("EmailExistsForOther failed: %v", err)
+		t.Fatalf("LoginIDExistsForOther failed: %v", err)
 	}
 	if exists {
-		t.Error("expected false for non-existent email")
+		t.Error("expected false for non-existent login_id")
 	}
 }
 
@@ -356,7 +362,7 @@ func TestStore_UpdateMember(t *testing.T) {
 
 	memberUser := models.User{
 		FullName:       "Original Name",
-		Email:          "original@example.com",
+		LoginID:        strPtr("original@example.com"),
 		Role:           "member",
 		OrganizationID: &org.ID,
 		AuthMethod:     "internal",
@@ -369,7 +375,7 @@ func TestStore_UpdateMember(t *testing.T) {
 	// Update the member
 	upd := userstore.MemberUpdate{
 		FullName:       "Updated Name",
-		Email:          "updated@example.com",
+		LoginID:        "updated@example.com",
 		AuthMethod:     "google",
 		Status:         "disabled",
 		OrganizationID: org.ID,
@@ -389,8 +395,12 @@ func TestStore_UpdateMember(t *testing.T) {
 	if found.FullName != "Updated Name" {
 		t.Errorf("FullName: got %q, want %q", found.FullName, "Updated Name")
 	}
-	if found.Email != "updated@example.com" {
-		t.Errorf("Email: got %q, want %q", found.Email, "updated@example.com")
+	if found.LoginID == nil || *found.LoginID != "updated@example.com" {
+		loginID := ""
+		if found.LoginID != nil {
+			loginID = *found.LoginID
+		}
+		t.Errorf("LoginID: got %q, want %q", loginID, "updated@example.com")
 	}
 	if found.AuthMethod != "google" {
 		t.Errorf("AuthMethod: got %q, want %q", found.AuthMethod, "google")
@@ -411,7 +421,7 @@ func TestStore_DeleteMember(t *testing.T) {
 
 	memberUser := models.User{
 		FullName:       "Delete Me",
-		Email:          "delete@example.com",
+		LoginID:        strPtr("delete@example.com"),
 		Role:           "member",
 		OrganizationID: &org.ID,
 	}
@@ -445,7 +455,7 @@ func TestStore_DeleteMember_WrongRole(t *testing.T) {
 	// Create an admin
 	adminUser := models.User{
 		FullName: "Admin User",
-		Email:    "admin@example.com",
+		LoginID:  strPtr("admin@example.com"),
 		Role:     "admin",
 	}
 	admin, err := store.Create(ctx, adminUser)

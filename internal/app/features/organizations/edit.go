@@ -8,6 +8,7 @@ import (
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	organizationstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/formutil"
 	"github.com/dalemusser/stratahub/internal/app/system/inputval"
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
@@ -31,12 +32,21 @@ type editOrgInput struct {
 }
 
 // ServeEdit renders the Edit Organization page.
-// Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
+// Authorization: RequireRole("admin", "coordinator") middleware in routes.go.
+// Coordinators can only edit organizations they are assigned to.
 func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
+	role, _, _, _ := authz.UserCtx(r)
+
 	idHex := chi.URLParam(r, "id")
 	oid, err := primitive.ObjectIDFromHex(idHex)
 	if err != nil {
 		uierrors.RenderBadRequest(w, r, "Invalid organization ID.", "/organizations")
+		return
+	}
+
+	// Verify coordinator has access to this org
+	if role == "coordinator" && !coordinatorHasAccess(r, oid) {
+		uierrors.RenderForbidden(w, r, "You don't have access to this organization.", "/organizations")
 		return
 	}
 
@@ -72,8 +82,11 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 }
 
 // HandleEdit processes the Edit Organization form POST.
-// Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
+// Authorization: RequireRole("admin", "coordinator") middleware in routes.go.
+// Coordinators can only edit organizations they are assigned to.
 func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
+	role, _, _, _ := authz.UserCtx(r)
+
 	if err := r.ParseForm(); err != nil {
 		h.ErrLog.LogBadRequest(w, r, "parse form failed", err, "Invalid form submission.", "/organizations")
 		return
@@ -83,6 +96,12 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	oid, err := primitive.ObjectIDFromHex(idHex)
 	if err != nil {
 		uierrors.RenderBadRequest(w, r, "Invalid organization ID.", "/organizations")
+		return
+	}
+
+	// Verify coordinator has access to this org
+	if role == "coordinator" && !coordinatorHasAccess(r, oid) {
+		uierrors.RenderForbidden(w, r, "You don't have access to this organization.", "/organizations")
 		return
 	}
 

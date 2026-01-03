@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	settingsstore "github.com/dalemusser/stratahub/internal/app/store/settings"
+	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/domain/models"
@@ -39,6 +40,7 @@ type BaseVM struct {
 	IsLoggedIn bool
 	Role       string
 	UserName   string
+	UserOrg    string // Organization name for leaders/members
 
 	// Page context
 	Title       string
@@ -74,6 +76,11 @@ func NewBaseVM(r *http.Request, db *mongo.Database, title, backDefault string) B
 		Title:       title,
 		BackURL:     httpnav.ResolveBackURL(r, backDefault),
 		CurrentPath: httpnav.CurrentPath(r),
+	}
+
+	// Get organization name for leaders/members
+	if user, ok := auth.CurrentUser(r); ok && user.OrganizationName != "" {
+		vm.UserOrg = user.OrganizationName
 	}
 
 	if db != nil {

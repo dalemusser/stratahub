@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	materialstore "github.com/dalemusser/stratahub/internal/app/store/materials"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
@@ -121,6 +122,9 @@ func (h *AdminHandler) ServeList(w http.ResponseWriter, r *http.Request) {
 		nextCur = wafflemongo.EncodeCursor(rows[len(rows)-1].TitleCI, rows[len(rows)-1].ID)
 	}
 
+	// Check if user can create materials (admin or coordinator with permission)
+	canCreate := authz.CanManageMaterials(r)
+
 	data := listData{
 		BaseVM: viewdata.NewBaseVM(r, h.DB, "Materials", "/"),
 		Q:      q,
@@ -136,6 +140,7 @@ func (h *AdminHandler) ServeList(w http.ResponseWriter, r *http.Request) {
 		RangeEnd:   rng.End,
 		PrevStart:  rng.PrevStart,
 		NextStart:  rng.NextStart,
+		CanCreate:  canCreate,
 	}
 
 	// HTMX partial table refresh

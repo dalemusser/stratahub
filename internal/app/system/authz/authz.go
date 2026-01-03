@@ -52,6 +52,12 @@ func IsMember(r *http.Request) bool {
 	return ok && role == "member"
 }
 
+// IsCoordinator reports whether the current request's user is a coordinator.
+func IsCoordinator(r *http.Request) bool {
+	role, _, _, ok := UserCtx(r)
+	return ok && role == "coordinator"
+}
+
 // UserOrgID returns the current user's organization ID as an ObjectID.
 // Returns NilObjectID if user is not logged in or has no organization.
 func UserOrgID(r *http.Request) primitive.ObjectID {
@@ -64,4 +70,110 @@ func UserOrgID(r *http.Request) primitive.ObjectID {
 		return primitive.NilObjectID
 	}
 	return oid
+}
+
+// UserOrgIDs returns the coordinator's assigned organization IDs.
+// Returns nil if user is not logged in or has no assigned organizations.
+func UserOrgIDs(r *http.Request) []primitive.ObjectID {
+	user, ok := auth.CurrentUser(r)
+	if !ok || len(user.OrganizationIDs) == 0 {
+		return nil
+	}
+	result := make([]primitive.ObjectID, 0, len(user.OrganizationIDs))
+	for _, idHex := range user.OrganizationIDs {
+		oid, err := primitive.ObjectIDFromHex(idHex)
+		if err == nil {
+			result = append(result, oid)
+		}
+	}
+	return result
+}
+
+// CanManageMaterials reports whether the current user can create/edit/delete materials.
+// Admins always can. Coordinators can only if they have the CanManageMaterials permission.
+func CanManageMaterials(r *http.Request) bool {
+	user, ok := auth.CurrentUser(r)
+	if !ok {
+		return false
+	}
+
+	role := strings.ToLower(user.Role)
+
+	// Admins can always manage materials
+	if role == "admin" {
+		return true
+	}
+
+	// Coordinators can manage if they have the permission
+	if role == "coordinator" {
+		return user.CanManageMaterials
+	}
+
+	return false
+}
+
+// CanManageResources reports whether the current user can create/edit/delete resources.
+// Admins always can. Coordinators can only if they have the CanManageResources permission.
+func CanManageResources(r *http.Request) bool {
+	user, ok := auth.CurrentUser(r)
+	if !ok {
+		return false
+	}
+
+	role := strings.ToLower(user.Role)
+
+	// Admins can always manage resources
+	if role == "admin" {
+		return true
+	}
+
+	// Coordinators can manage if they have the permission
+	if role == "coordinator" {
+		return user.CanManageResources
+	}
+
+	return false
+}
+
+// CanAccessOrg reports whether the current user can access the given organization.
+// Admins can access all organizations.
+// Coordinators can access their assigned organizations.
+// Leaders/members can access only their single organization.
+// Analysts cannot access organizations directly.
+func CanAccessOrg(r *http.Request, orgID primitive.ObjectID) bool {
+	user, ok := auth.CurrentUser(r)
+	if !ok {
+		return false
+	}
+
+	role := strings.ToLower(user.Role)
+
+	// Admins can access all organizations
+	if role == "admin" {
+		return true
+	}
+
+	// Coordinators can access their assigned organizations
+	if role == "coordinator" {
+		for _, idHex := range user.OrganizationIDs {
+			if oid, err := primitive.ObjectIDFromHex(idHex); err == nil && oid == orgID {
+				return true
+			}
+		}
+		return false
+	}
+
+	// Leaders/members can access their single organization
+	if role == "leader" || role == "member" {
+		if user.OrganizationID == "" {
+			return false
+		}
+		userOrgID, err := primitive.ObjectIDFromHex(user.OrganizationID)
+		if err != nil {
+			return false
+		}
+		return userOrgID == orgID
+	}
+
+	return false
 }

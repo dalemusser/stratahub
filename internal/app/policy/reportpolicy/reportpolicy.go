@@ -2,6 +2,7 @@
 //
 // Authorization rules:
 //   - Admins and Analysts can view reports for all organizations
+//   - Coordinators can view reports for their assigned organizations
 //   - Leaders can only view reports for their own organization
 //   - Other roles (member) cannot access reports
 package reportpolicy
@@ -18,10 +19,12 @@ type ReportScope struct {
 	// CanView indicates whether the user can view reports at all.
 	CanView bool
 	// AllOrgs indicates whether the user can see data from all organizations.
-	// If false, OrgID specifies the single org they can see.
+	// If false, check OrgID (single org) or OrgIDs (multiple orgs).
 	AllOrgs bool
-	// OrgID is the organization ID the user is restricted to (when AllOrgs is false).
+	// OrgID is the organization ID the user is restricted to (for leaders).
 	OrgID primitive.ObjectID
+	// OrgIDs is the list of organization IDs the user can access (for coordinators).
+	OrgIDs []primitive.ObjectID
 }
 
 // CanViewMembersReport determines what scope of data the current user can access
@@ -29,6 +32,7 @@ type ReportScope struct {
 //
 // Authorization:
 //   - Admin/Analyst: can view report data from all organizations
+//   - Coordinator: can view report data from their assigned organizations
 //   - Leader: can only view report data from their own organization
 //   - Others: cannot view reports
 func CanViewMembersReport(r *http.Request) ReportScope {
@@ -40,6 +44,12 @@ func CanViewMembersReport(r *http.Request) ReportScope {
 	switch role {
 	case "admin", "analyst":
 		return ReportScope{CanView: true, AllOrgs: true}
+	case "coordinator":
+		orgIDs := authz.UserOrgIDs(r)
+		if len(orgIDs) == 0 {
+			return ReportScope{CanView: false}
+		}
+		return ReportScope{CanView: true, AllOrgs: false, OrgIDs: orgIDs}
 	case "leader":
 		orgID := authz.UserOrgID(r)
 		if orgID == primitive.NilObjectID {

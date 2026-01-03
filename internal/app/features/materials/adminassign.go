@@ -63,6 +63,12 @@ func (h *AdminHandler) ServeAssign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Determine coordinator scope (if coordinator, limit to assigned orgs)
+	var scopeOrgIDs []primitive.ObjectID
+	if authz.IsCoordinator(r) {
+		scopeOrgIDs = authz.UserOrgIDs(r)
+	}
+
 	// Parse query params for org pane
 	orgQ := query.Search(r, "org_search")
 	orgAfter := query.Get(r, "org_after")
@@ -73,7 +79,7 @@ func (h *AdminHandler) ServeAssign(w http.ResponseWriter, r *http.Request) {
 	target := query.Get(r, "target")
 
 	// Fetch org pane data
-	orgData, err := h.fetchOrgPaneForAssign(ctx, orgQ, orgAfter, orgBefore)
+	orgData, err := h.fetchOrgPaneForAssign(ctx, orgQ, orgAfter, orgBefore, scopeOrgIDs)
 	if err != nil {
 		h.Log.Error("error fetching org pane", zap.Error(err))
 		uierrors.RenderServerError(w, r, "Failed to load organizations.", "/materials")
@@ -113,6 +119,12 @@ func (h *AdminHandler) ServeAssign(w http.ResponseWriter, r *http.Request) {
 	if selectedOrg != "" {
 		orgID, err := primitive.ObjectIDFromHex(selectedOrg)
 		if err == nil {
+			// Coordinator access check: verify access to selected organization
+			if authz.IsCoordinator(r) && !authz.CanAccessOrg(r, orgID) {
+				uierrors.RenderForbidden(w, r, "You don't have access to this organization.", "/materials")
+				return
+			}
+
 			// Get org name
 			var org struct {
 				Name string `bson:"name"`
@@ -199,6 +211,12 @@ func (h *AdminHandler) ServeAssignLeadersPane(w http.ResponseWriter, r *http.Req
 		return
 	}
 
+	// Coordinator access check: verify access to selected organization
+	if authz.IsCoordinator(r) && !authz.CanAccessOrg(r, orgID) {
+		http.Error(w, "You don't have access to this organization", http.StatusForbidden)
+		return
+	}
+
 	// Fetch org name
 	orgName := ""
 	var org struct {
@@ -281,6 +299,12 @@ func (h *AdminHandler) ServeAssignForm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Coordinator access check: verify access to selected organization
+	if authz.IsCoordinator(r) && !authz.CanAccessOrg(r, orgID) {
+		uierrors.RenderForbidden(w, r, "You don't have access to this organization.", "/materials")
+		return
+	}
+
 	// Fetch org name
 	var org struct {
 		Name string `bson:"name"`
@@ -299,7 +323,7 @@ func (h *AdminHandler) ServeAssignForm(w http.ResponseWriter, r *http.Request) {
 
 	// Build view model
 	data := assignFormData{
-		BaseVM:        viewdata.NewBaseVM(r, h.DB, "Complete Assignment", backURL),
+		BaseVM:        viewdata.NewBaseVM(r, h.DB, "Complete Material Assignment", backURL),
 		MaterialID:    matID.Hex(),
 		MaterialTitle: mat.Title,
 		HasFile:       mat.HasFile(),
@@ -393,6 +417,12 @@ func (h *AdminHandler) HandleAssign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Coordinator access check: verify access to selected organization
+	if authz.IsCoordinator(r) && !authz.CanAccessOrg(r, oid) {
+		uierrors.RenderForbidden(w, r, "You don't have access to this organization.", "/materials")
+		return
+	}
+
 	if leaderIDStr != "" {
 		// Leader assignment
 		lid, err := primitive.ObjectIDFromHex(leaderIDStr)
@@ -478,6 +508,13 @@ func (h *AdminHandler) ServeAssignmentList(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Determine coordinator scope (if coordinator, limit to assigned orgs)
+	var scopeOrgIDs []primitive.ObjectID
+	isCoordinator := authz.IsCoordinator(r)
+	if isCoordinator {
+		scopeOrgIDs = authz.UserOrgIDs(r)
+	}
+
 	// Fetch assignments
 	assignStore := materialassignstore.New(h.DB)
 	assignments, err := assignStore.ListByMaterial(ctx, matID)
@@ -508,21 +545,47 @@ func (h *AdminHandler) ServeAssignmentList(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	// Fetch leader names
+	// Fetch leader info (name and org)
 	leaderNames := make(map[primitive.ObjectID]string)
+	leaderOrgs := make(map[primitive.ObjectID]primitive.ObjectID) // leader ID -> org ID
 	if len(leaderIDs) > 0 {
 		usrStore := userstore.New(h.DB)
 		users, err := usrStore.Find(ctx, bson.M{"_id": bson.M{"$in": leaderIDs}})
 		if err == nil {
 			for _, u := range users {
 				leaderNames[u.ID] = u.FullName
+				if u.OrganizationID != nil {
+					leaderOrgs[u.ID] = *u.OrganizationID
+				}
 			}
 		}
 	}
 
-	// Build list items
+	// Build scope org set for quick lookup (coordinators only)
+	scopeOrgSet := make(map[primitive.ObjectID]bool)
+	for _, oid := range scopeOrgIDs {
+		scopeOrgSet[oid] = true
+	}
+
+	// Build list items, filtering by coordinator scope if applicable
 	items := make([]assignmentListItem, 0, len(assignments))
 	for _, a := range assignments {
+		// For coordinators, filter to only accessible assignments
+		if isCoordinator {
+			if a.OrganizationID != nil {
+				// Org-wide assignment: check if org is in coordinator's scope
+				if !scopeOrgSet[*a.OrganizationID] {
+					continue
+				}
+			} else if a.LeaderID != nil {
+				// Leader assignment: check if leader's org is in coordinator's scope
+				leaderOrgID, ok := leaderOrgs[*a.LeaderID]
+				if !ok || !scopeOrgSet[leaderOrgID] {
+					continue
+				}
+			}
+		}
+
 		item := assignmentListItem{
 			ID:        a.ID.Hex(),
 			CreatedAt: a.CreatedAt.Format("Jan 2, 2006"),
@@ -589,6 +652,14 @@ func (h *AdminHandler) HandleUnassign(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Coordinator access check
+	if authz.IsCoordinator(r) {
+		if !h.canAccessAssignment(ctx, r, assignment) {
+			uierrors.RenderForbidden(w, r, "You don't have access to this assignment.", "/materials")
+			return
+		}
+	}
+
 	// Delete assignment
 	if err := assignStore.Delete(ctx, assignID); err != nil {
 		h.Log.Error("error deleting assignment", zap.Error(err))
@@ -604,14 +675,42 @@ func (h *AdminHandler) HandleUnassign(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, returnURL, http.StatusSeeOther)
 }
 
+// canAccessAssignment checks if the current user (coordinator) can access a specific assignment.
+// For org-wide assignments, checks if org is in coordinator's scope.
+// For leader assignments, checks if leader's org is in coordinator's scope.
+func (h *AdminHandler) canAccessAssignment(ctx context.Context, r *http.Request, assignment models.MaterialAssignment) bool {
+	scopeOrgIDs := authz.UserOrgIDs(r)
+	scopeOrgSet := make(map[primitive.ObjectID]bool)
+	for _, oid := range scopeOrgIDs {
+		scopeOrgSet[oid] = true
+	}
+
+	if assignment.OrganizationID != nil {
+		return scopeOrgSet[*assignment.OrganizationID]
+	}
+
+	if assignment.LeaderID != nil {
+		usrStore := userstore.New(h.DB)
+		leader, err := usrStore.GetByID(ctx, *assignment.LeaderID)
+		if err != nil || leader.OrganizationID == nil {
+			return false
+		}
+		return scopeOrgSet[*leader.OrganizationID]
+	}
+
+	return false
+}
+
 // Helper functions
 
 // fetchOrgPaneForAssign fetches paginated organizations with leader counts.
+// scopeOrgIDs limits results to specific orgs (for coordinators); nil means all orgs.
 func (h *AdminHandler) fetchOrgPaneForAssign(
 	ctx context.Context,
 	orgQ, orgAfter, orgBefore string,
+	scopeOrgIDs []primitive.ObjectID,
 ) (orgutil.OrgPaneData, error) {
-	return orgutil.FetchOrgPane(ctx, h.DB, h.Log, "leader", orgQ, orgAfter, orgBefore)
+	return orgutil.FetchOrgPane(ctx, h.DB, h.Log, "leader", orgQ, orgAfter, orgBefore, scopeOrgIDs)
 }
 
 // leaderPaneResult holds the result of fetching leaders for the assignment pane.
@@ -699,10 +798,14 @@ func (h *AdminHandler) fetchLeaderPaneForAssign(
 	// Build leader rows
 	result.Rows = make([]leaderPaneRow, 0, len(urows))
 	for _, u := range urows {
+		loginID := ""
+		if u.LoginID != nil {
+			loginID = *u.LoginID
+		}
 		result.Rows = append(result.Rows, leaderPaneRow{
 			ID:       u.ID,
 			FullName: u.FullName,
-			Email:    strings.ToLower(u.Email),
+			Email:    strings.ToLower(loginID),
 		})
 	}
 
@@ -721,6 +824,13 @@ func (h *AdminHandler) fetchLeaderPaneForAssign(
 func (h *AdminHandler) ServeAllAssignments(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
+
+	// Determine coordinator scope (if coordinator, limit to assigned orgs)
+	var scopeOrgIDs []primitive.ObjectID
+	isCoordinator := authz.IsCoordinator(r)
+	if isCoordinator {
+		scopeOrgIDs = authz.UserOrgIDs(r)
+	}
 
 	// Fetch all assignments
 	assignStore := materialassignstore.New(h.DB)
@@ -766,21 +876,47 @@ func (h *AdminHandler) ServeAllAssignments(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	// Fetch leader names
+	// Fetch leader info (name and org)
 	leaderNames := make(map[primitive.ObjectID]string)
+	leaderOrgs := make(map[primitive.ObjectID]primitive.ObjectID) // leader ID -> org ID
 	if len(leaderIDs) > 0 {
 		usrStore := userstore.New(h.DB)
 		users, err := usrStore.Find(ctx, bson.M{"_id": bson.M{"$in": leaderIDs}})
 		if err == nil {
 			for _, u := range users {
 				leaderNames[u.ID] = u.FullName
+				if u.OrganizationID != nil {
+					leaderOrgs[u.ID] = *u.OrganizationID
+				}
 			}
 		}
 	}
 
-	// Build list items
+	// Build scope org set for quick lookup (coordinators only)
+	scopeOrgSet := make(map[primitive.ObjectID]bool)
+	for _, oid := range scopeOrgIDs {
+		scopeOrgSet[oid] = true
+	}
+
+	// Build list items, filtering by coordinator scope if applicable
 	items := make([]assignmentListItem, 0, len(assignments))
 	for _, a := range assignments {
+		// For coordinators, filter to only accessible assignments
+		if isCoordinator {
+			if a.OrganizationID != nil {
+				// Org-wide assignment: check if org is in coordinator's scope
+				if !scopeOrgSet[*a.OrganizationID] {
+					continue
+				}
+			} else if a.LeaderID != nil {
+				// Leader assignment: check if leader's org is in coordinator's scope
+				leaderOrgID, ok := leaderOrgs[*a.LeaderID]
+				if !ok || !scopeOrgSet[leaderOrgID] {
+					continue
+				}
+			}
+		}
+
 		item := assignmentListItem{
 			ID:            a.ID.Hex(),
 			MaterialID:    a.MaterialID.Hex(),
@@ -846,6 +982,16 @@ func (h *AdminHandler) ServeAssignmentManageModal(w http.ResponseWriter, r *http
 		return
 	}
 
+	// Coordinator access check
+	if authz.IsCoordinator(r) {
+		if !h.canAccessAssignment(ctx, r, assignment) {
+			uierrors.HTMXError(w, r, http.StatusForbidden, "You don't have access to this assignment.", func() {
+				uierrors.RenderForbidden(w, r, "You don't have access to this assignment.", "/materials")
+			})
+			return
+		}
+	}
+
 	// Fetch material name
 	matStore := materialstore.New(h.DB)
 	mat, _ := matStore.GetByID(ctx, assignment.MaterialID)
@@ -901,6 +1047,14 @@ func (h *AdminHandler) ServeAssignmentView(w http.ResponseWriter, r *http.Reques
 	if err != nil {
 		uierrors.RenderNotFound(w, r, "Assignment not found.", "/materials/assignments")
 		return
+	}
+
+	// Coordinator access check
+	if authz.IsCoordinator(r) {
+		if !h.canAccessAssignment(ctx, r, assignment) {
+			uierrors.RenderForbidden(w, r, "You don't have access to this assignment.", "/materials")
+			return
+		}
 	}
 
 	// Fetch material name
@@ -975,6 +1129,14 @@ func (h *AdminHandler) ServeAssignmentEdit(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
+	// Coordinator access check
+	if authz.IsCoordinator(r) {
+		if !h.canAccessAssignment(ctx, r, assignment) {
+			uierrors.RenderForbidden(w, r, "You don't have access to this assignment.", "/materials")
+			return
+		}
+	}
+
 	// Fetch material name
 	matStore := materialstore.New(h.DB)
 	mat, _ := matStore.GetByID(ctx, assignment.MaterialID)
@@ -1042,6 +1204,14 @@ func (h *AdminHandler) HandleAssignmentEdit(w http.ResponseWriter, r *http.Reque
 	if err != nil {
 		uierrors.RenderNotFound(w, r, "Assignment not found.", "/materials/assignments")
 		return
+	}
+
+	// Coordinator access check
+	if authz.IsCoordinator(r) {
+		if !h.canAccessAssignment(ctx, r, assignment) {
+			uierrors.RenderForbidden(w, r, "You don't have access to this assignment.", "/materials")
+			return
+		}
 	}
 
 	// Resolve org ID for timezone (from org assignment or leader's org)

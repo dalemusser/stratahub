@@ -11,9 +11,10 @@ import (
 //
 // Resources support either a URL OR an uploaded file (mutually exclusive).
 type Resource struct {
-	ID      primitive.ObjectID `bson:"_id,omitempty" json:"id"`
-	Title   string             `bson:"title" json:"title"`
-	TitleCI string             `bson:"title_ci" json:"title_ci"` // lowercase, diacritics-stripped
+	ID          primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	WorkspaceID primitive.ObjectID `bson:"workspace_id" json:"workspace_id"` // Parent workspace
+	Title       string             `bson:"title" json:"title"`
+	TitleCI     string             `bson:"title_ci" json:"title_ci"` // lowercase, diacritics-stripped
 
 	Subject   string `bson:"subject,omitempty" json:"subject,omitempty"`
 	SubjectCI string `bson:"subject_ci,omitempty" json:"subject_ci,omitempty"`
