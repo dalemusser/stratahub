@@ -26,7 +26,8 @@ func newTestHandler(t *testing.T) (*login.Handler, *testutil.Fixtures) {
 		t.Fatalf("NewSessionManager failed: %v", err)
 	}
 
-	handler := login.NewHandler(db, sessionMgr, errLog, logger)
+	// Pass nil for mailer and empty baseURL since tests use trust auth (no email needed)
+	handler := login.NewHandler(db, sessionMgr, errLog, nil, "http://localhost:3000", logger)
 	fixtures := testutil.NewFixtures(t, db)
 	return handler, fixtures
 }

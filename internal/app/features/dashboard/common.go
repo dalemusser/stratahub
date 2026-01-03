@@ -18,3 +18,11 @@ type dashboardWithCounts struct {
 	MembersCount       int64
 	ResourcesCount     int64
 }
+
+// coordinatorDashboardData extends dashboardWithCounts with coordinator-specific permissions.
+type coordinatorDashboardData struct {
+	dashboardWithCounts
+	CanManageResources bool
+	CanManageMaterials bool
+	AssignedOrgNames   []string // Names of organizations this coordinator can manage
+}

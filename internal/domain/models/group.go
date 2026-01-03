@@ -16,6 +16,7 @@ import (
 //     (e.g., "active").
 type Group struct {
 	ID             primitive.ObjectID `bson:"_id" json:"id"`
+	WorkspaceID    primitive.ObjectID `bson:"workspace_id" json:"workspace_id"` // Parent workspace
 	Name           string             `bson:"name" json:"name"`
 	NameCI         string             `bson:"name_ci" json:"name_ci"`
 	Description    string             `bson:"description" json:"description"`

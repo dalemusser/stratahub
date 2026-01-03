@@ -41,8 +41,9 @@
   <!-- Propagate return so HandleEditGroup can send user back -->
   <input type="hidden" name="return" value="{{ .BackURL }}">
 
-  <div class="pt-2">
+  <div class="flex gap-2 pt-2">
     <button class="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Update Group</button>
+    <a href="{{ .BackURL }}" class="px-3 py-1 border rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600">Cancel</a>
   </div>
 </form>
 

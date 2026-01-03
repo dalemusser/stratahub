@@ -1,4 +1,4 @@
-// internal/app/system/csvutil/limits.go
+// internal/app/features/uploadcsv/csvutil/limits.go
 package csvutil
 
 // Upload size and row limits for CSV processing.

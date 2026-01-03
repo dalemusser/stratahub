@@ -16,7 +16,9 @@
     <div class="flex items-start justify-between mb-2">
       <h3 class="font-semibold text-gray-900 dark:text-gray-100 truncate flex-1" title="{{ .Title }}">{{ .Title }}</h3>
       {{ if .IsOrgWide }}
-        <span class="ml-2 shrink-0 px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded">Org</span>
+        <span class="ml-2 shrink-0 px-2 py-0.5 text-xs bg-purple-100 text-purple-700 dark:bg-purple-900 dark:text-purple-300 rounded">Org</span>
+      {{ else }}
+        <span class="ml-2 shrink-0 px-2 py-0.5 text-xs bg-blue-100 text-blue-700 dark:bg-blue-200 dark:text-blue-800 rounded">Leader</span>
       {{ end }}
     </div>
 
@@ -52,7 +54,7 @@
       {{ if .HasDirections }}
         <button type="button"
                 onclick="openDirectionsModal('{{ .ID }}', '{{ .Title }}')"
-                class="inline-flex items-center text-xs text-indigo-600 hover:text-indigo-800 hover:underline">
+                class="inline-flex items-center text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 hover:underline">
           <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
           </svg>
@@ -71,7 +73,7 @@
     <!-- Actions -->
     <div class="mt-auto pt-3 border-t dark:border-gray-700 flex items-center justify-between">
       <a href="/leader/materials/{{ .ID }}"
-         class="text-sm text-indigo-600 hover:underline">
+         class="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
         View Details
       </a>
 
@@ -82,7 +84,7 @@
         </a>
       {{ else if .LaunchURL }}
         <a href="{{ .LaunchURL }}" target="_blank"
-           class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+           class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700">
           Open
         </a>
       {{ end }}
@@ -100,19 +102,21 @@
   <div class="absolute inset-0 bg-black/40" onclick="closeDirectionsModal()"></div>
 
   <!-- Modal panel -->
-  <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-300 dark:border-gray-600 max-w-xl w-full p-4 space-y-4 max-h-[85vh] flex flex-col">
-    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Directions</h2>
+  <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-300 dark:border-gray-600 max-w-xl w-full p-4 max-h-[85vh] flex flex-col">
+    <!-- Header with material title -->
+    <div class="mb-3 pb-3 border-b border-gray-200 dark:border-gray-700 flex items-start justify-between">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100" id="modal-material-title"></h2>
+      <span class="text-xs text-gray-400 dark:text-gray-500 ml-2 shrink-0">Directions</span>
+    </div>
 
-    <p class="text-sm text-gray-700 dark:text-gray-300" id="modal-material-title"></p>
-
-    <!-- Content -->
+    <!-- Directions content -->
     <div class="flex-1 overflow-y-auto">
       <div id="modal-directions-content" class="tiptap-content prose prose-sm max-w-none text-gray-700 dark:text-gray-300">
       </div>
     </div>
 
     <!-- Close button -->
-    <div class="flex justify-start pt-2">
+    <div class="flex justify-start pt-3 mt-3 border-t border-gray-200 dark:border-gray-700">
       <button type="button" onclick="closeDirectionsModal()"
               class="px-3 py-1 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
         Close

@@ -1,4 +1,4 @@
-// internal/app/system/csvutil/members.go
+// internal/app/features/uploadcsv/csvutil/members.go
 package csvutil
 
 import (

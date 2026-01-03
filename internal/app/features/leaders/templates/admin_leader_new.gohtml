@@ -9,7 +9,7 @@
      title="Go back">
     ← Back
   </a>
-  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">👑 Add Leader</h1>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Add Leader</h1>
 </div>
 
 {{ if .Error }}
@@ -25,11 +25,6 @@
   <div>
     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
     <input name="full_name" type="text" value="{{ .FullName }}" required class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm" />
-  </div>
-
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
-    <input name="email" type="email" value="{{ .Email }}" required class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm" />
   </div>
 
   <!-- Organization (select via picker) -->
@@ -62,21 +57,13 @@
     </button>
   </div>
 
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Auth Method</label>
-    <select name="auth_method" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm">
-      <option value="internal"  {{ if eq .Auth "internal" }}selected{{ end }}>internal</option>
-      <option value="google"    {{ if eq .Auth "google" }}selected{{ end }}>google</option>
-      <option value="classlink" {{ if eq .Auth "classlink" }}selected{{ end }}>classlink</option>
-      <option value="clever"    {{ if eq .Auth "clever" }}selected{{ end }}>clever</option>
-      <option value="microsoft" {{ if eq .Auth "microsoft" }}selected{{ end }}>microsoft</option>
-    </select>
-  </div>
+  {{ template "auth_fields" . }}
 
   <!-- Status deliberately omitted: new leaders are always created Active -->
 
-  <div class="pt-2">
+  <div class="flex gap-2 pt-2">
     <button class="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Add Leader</button>
+    <a href="{{ .BackURL }}" class="px-3 py-1 border rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600">Cancel</a>
   </div>
 </form>
 
@@ -137,4 +124,5 @@
   }
 })();
 </script>
+{{ template "auth_toggle_script" . }}
 {{ end }}

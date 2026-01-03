@@ -2,6 +2,7 @@ package materials
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"strings"
@@ -24,11 +25,23 @@ type createMaterialInput struct {
 }
 
 func (h *AdminHandler) ServeNew(w http.ResponseWriter, r *http.Request) {
+	// Check if user can manage materials (admin or coordinator with permission)
+	if !authz.CanManageMaterials(r) {
+		http.Redirect(w, r, "/materials", http.StatusSeeOther)
+		return
+	}
+
 	vm := materialFormVM{}
 	h.renderNewForm(w, r, vm, "")
 }
 
 func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
+	// Check if user can manage materials (admin or coordinator with permission)
+	if !authz.CanManageMaterials(r) {
+		http.Redirect(w, r, "/materials", http.StatusSeeOther)
+		return
+	}
+
 	// Parse multipart form for file uploads (32MB max)
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		h.ErrLog.LogBadRequest(w, r, "parse form failed", err, "Invalid form data.", "/materials")
@@ -152,8 +165,10 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 
 	if _, err := matStore.Create(ctx, mat); err != nil {
 		msg := "Database error while creating material."
-		if err == materialstore.ErrDuplicateTitle {
+		if errors.Is(err, materialstore.ErrDuplicateTitle) {
 			msg = "A material with that title already exists."
+		} else {
+			h.Log.Error("failed to create material", zap.Error(err))
 		}
 		// Clean up uploaded file on error
 		if filePath != "" {

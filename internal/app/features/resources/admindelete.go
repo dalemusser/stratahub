@@ -8,6 +8,7 @@ import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	resourceassignstore "github.com/dalemusser/stratahub/internal/app/store/resourceassign"
 	resourcestore "github.com/dalemusser/stratahub/internal/app/store/resources"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/txn"
 	"github.com/dalemusser/waffle/pantry/urlutil"
@@ -17,8 +18,13 @@ import (
 )
 
 // HandleDelete deletes a resource and its assignments.
-// Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
 func (h *AdminHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
+	// Check if user can manage resources (admin or coordinator with permission)
+	if !authz.CanManageResources(r) {
+		http.Redirect(w, r, "/resources", http.StatusSeeOther)
+		return
+	}
+
 	idHex := chi.URLParam(r, "id")
 	oid, err := primitive.ObjectIDFromHex(idHex)
 	if err != nil {

@@ -9,7 +9,7 @@
      title="Go back">
     ← Back
   </a>
-  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">⛹️ Add Member</h1>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Add Member</h1>
 </div>
 
 {{ if .Error }}
@@ -24,19 +24,13 @@
 
   <!-- Full name -->
   <div>
-    <label class="block text-sm font-medium mb-1 dark:text-gray-200">Full Name</label>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
     <input name="full_name" type="text" value="{{ .FullName }}" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm" required />
-  </div>
-
-  <!-- Email -->
-  <div>
-    <label class="block text-sm font-medium mb-1 dark:text-gray-200">Email</label>
-    <input name="email" type="email" value="{{ .Email }}" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm" required />
   </div>
 
   <!-- Organization -->
   <div>
-    <label class="block text-sm font-medium mb-1 dark:text-gray-200">Organization</label>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Organization</label>
     {{ if .OrgLocked }}
       <!-- Leader: org is locked -->
       <input type="text" value="{{ .OrgName }}" class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm dark:text-gray-100" readonly />
@@ -67,27 +61,23 @@
     {{ end }}
   </div>
 
-  <!-- Auth Method -->
-  <div>
-    <label class="block text-sm font-medium mb-1 dark:text-gray-200">Auth Method</label>
-    <select name="auth_method" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm">
-      <option value="internal"  {{ if eq .Auth "internal" }}selected{{ end }}>internal</option>
-      <option value="google"    {{ if eq .Auth "google" }}selected{{ end }}>google</option>
-      <option value="classlink" {{ if eq .Auth "classlink" }}selected{{ end }}>classlink</option>
-      <option value="clever"    {{ if eq .Auth "clever" }}selected{{ end }}>clever</option>
-      <option value="microsoft" {{ if eq .Auth "microsoft" }}selected{{ end }}>microsoft</option>
-    </select>
-  </div>
+  {{ template "auth_fields" . }}
 
-  <div class="pt-2"><button class="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Create Member</button></div>
+  <div class="flex gap-2 pt-2">
+    <button class="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Add Member</button>
+    <a href="{{ .BackURL }}" class="px-3 py-1 border rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600">Cancel</a>
+  </div>
 </form>
 
 {{ if not .OrgLocked }}
 <!-- Modal container (admin only) -->
 <div id="org-picker-root"></div>
+{{ end }}
 
 <script>
 (function() {
+  {{ if not .OrgLocked }}
+  // Org picker functions (admin only)
   var selectedOrg = {
     id: '{{ .OrgHex }}',
     name: '{{ .OrgName }}'
@@ -134,7 +124,9 @@
     selectBtn.setAttribute('hx-get', '/organizations/picker' + (selectedOrg.id ? '?selected=' + selectedOrg.id : ''));
     htmx.process(selectBtn);
   }
+  {{ end }}
 })();
 </script>
-{{ end }}
+
+{{ template "auth_toggle_script" . }}
 {{ end }}

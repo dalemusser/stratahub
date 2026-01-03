@@ -25,8 +25,8 @@
     <input name="name" type="text" value="{{ .Name }}" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm" required />
   </div>
 
-  {{ if eq .Role "admin" }}
-    <!-- Organization (admin can select via picker) -->
+  {{ if or (eq .Role "admin") (eq .Role "coordinator") }}
+    <!-- Organization (admin/coordinator can select via picker) -->
     <div>
       <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Organization</label>
 
@@ -108,8 +108,9 @@
   <!-- Propagate return so the handler can send user back -->
   <input type="hidden" name="return" value="{{ .BackURL }}">
 
-  <div class="pt-2">
-    <button class="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Create Group</button>
+  <div class="flex gap-2 pt-2">
+    <button class="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Add Group</button>
+    <a href="{{ .BackURL }}" class="px-3 py-1 border rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600">Cancel</a>
   </div>
 </form>
 
@@ -117,7 +118,7 @@
 <div id="org-picker-root"></div>
 <div id="leader-picker-root"></div>
 
-{{ if eq .Role "admin" }}
+{{ if or (eq .Role "admin") (eq .Role "coordinator") }}
 <script>
 (function() {
   // Current selected organization

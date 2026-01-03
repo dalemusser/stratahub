@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/domain/models"
@@ -39,6 +40,14 @@ func (h *Handler) ServeView(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Coordinator access check: verify access to leader's organization
+	if authz.IsCoordinator(r) && usr.OrganizationID != nil {
+		if !authz.CanAccessOrg(r, *usr.OrganizationID) {
+			uierrors.RenderForbidden(w, r, "You don't have access to this leader.", "/leaders")
+			return
+		}
+	}
+
 	orgName := ""
 	if usr.OrganizationID != nil {
 		var o models.Organization
@@ -54,11 +63,15 @@ func (h *Handler) ServeView(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	loginID := ""
+	if usr.LoginID != nil {
+		loginID = *usr.LoginID
+	}
 	data := viewData{
 		BaseVM:   viewdata.NewBaseVM(r, h.DB, "View Leader", "/leaders"),
 		ID:       usr.ID.Hex(),
 		FullName: usr.FullName,
-		Email:    strings.ToLower(usr.Email),
+		Email:    strings.ToLower(loginID),
 		OrgName:  orgName,
 		Status:   usr.Status,
 		Auth:     strings.ToLower(usr.AuthMethod),

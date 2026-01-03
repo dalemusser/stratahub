@@ -6,9 +6,11 @@ import (
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	materialassignstore "github.com/dalemusser/stratahub/internal/app/store/materialassign"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/txn"
+	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -26,6 +28,21 @@ func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
+
+	// Load leader to check organization for coordinator access
+	var usr models.User
+	if err := h.DB.Collection("users").FindOne(ctx, bson.M{"_id": uid, "role": "leader"}).Decode(&usr); err != nil {
+		uierrors.RenderNotFound(w, r, "Leader not found.", "/leaders")
+		return
+	}
+
+	// Coordinator access check: verify access to leader's organization
+	if authz.IsCoordinator(r) && usr.OrganizationID != nil {
+		if !authz.CanAccessOrg(r, *usr.OrganizationID) {
+			uierrors.RenderForbidden(w, r, "You don't have access to this leader.", "/leaders")
+			return
+		}
+	}
 
 	masStore := materialassignstore.New(h.DB)
 

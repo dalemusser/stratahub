@@ -31,12 +31,14 @@ type OrgPaneData struct {
 
 // FetchOrgPane fetches paginated organizations with user counts for a specific role.
 // The role parameter determines which users are counted (e.g., "member", "leader").
+// scopeOrgIDs limits the orgs to those in the list (for coordinators); nil means all orgs.
 func FetchOrgPane(
 	ctx context.Context,
 	db *mongo.Database,
 	log *zap.Logger,
 	role string,
 	orgQ, orgAfter, orgBefore string,
+	scopeOrgIDs []primitive.ObjectID,
 ) (OrgPaneData, error) {
 	var result OrgPaneData
 
@@ -48,6 +50,11 @@ func FetchOrgPane(
 		orgBase["name_ci"] = bson.M{"$gte": q, "$lt": hi}
 	}
 
+	// If scoped to specific orgs (coordinator), filter by those org IDs
+	if len(scopeOrgIDs) > 0 {
+		orgBase["_id"] = bson.M{"$in": scopeOrgIDs}
+	}
+
 	// Count total orgs matching search
 	total, err := db.Collection("organizations").CountDocuments(ctx, orgBase)
 	if err != nil {
@@ -56,8 +63,12 @@ func FetchOrgPane(
 	}
 	result.Total = total
 
-	// Count all users with the specified role (for "All" row)
-	allCount, err := db.Collection("users").CountDocuments(ctx, bson.M{"role": role})
+	// Count all users with the specified role (for "All" row), respecting scope
+	allFilter := bson.M{"role": role}
+	if len(scopeOrgIDs) > 0 {
+		allFilter["organization_id"] = bson.M{"$in": scopeOrgIDs}
+	}
+	allCount, err := db.Collection("users").CountDocuments(ctx, allFilter)
 	if err != nil {
 		log.Error("database error counting all users by role",
 			zap.Error(err),

@@ -13,6 +13,7 @@ import (
 // includes scheduling, instructions, and basic audit fields.
 type GroupResourceAssignment struct {
 	ID             primitive.ObjectID `bson:"_id,omitempty" json:"id"`
+	WorkspaceID    primitive.ObjectID `bson:"workspace_id" json:"workspace_id"` // Parent workspace
 	GroupID        primitive.ObjectID `bson:"group_id" json:"group_id"`
 	OrganizationID primitive.ObjectID `bson:"organization_id" json:"organization_id"`
 	ResourceID     primitive.ObjectID `bson:"resource_id" json:"resource_id"`

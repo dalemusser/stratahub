@@ -5,10 +5,12 @@ import (
 	"context"
 	"errors"
 	"net/http"
+	"strings"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/policy/memberpolicy"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
+	"github.com/dalemusser/stratahub/internal/app/system/authutil"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/formutil"
 	"github.com/dalemusser/stratahub/internal/app/system/inputval"
@@ -17,6 +19,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/txn"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
@@ -80,11 +83,16 @@ func (h *Handler) ServeView(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	loginID := ""
+	if u.LoginID != nil {
+		loginID = *u.LoginID
+	}
+
 	templates.Render(w, r, "member_view", viewData{
 		BaseVM:   viewdata.NewBaseVM(r, h.DB, "View Member", "/members"),
 		ID:       u.ID.Hex(),
 		FullName: u.FullName,
-		Email:    normalize.Email(u.Email),
+		LoginID:  loginID,
 		OrgName:  orgName,
 		Status:   u.Status,
 		Auth:     u.AuthMethod,
@@ -147,14 +155,31 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	loginID := ""
+	if u.LoginID != nil {
+		loginID = *u.LoginID
+	}
+	email := ""
+	if u.Email != nil {
+		email = *u.Email
+	}
+	authReturnID := ""
+	if u.AuthReturnID != nil {
+		authReturnID = *u.AuthReturnID
+	}
+
 	data := editData{
-		ID:       u.ID.Hex(),
-		FullName: u.FullName,
-		Email:    normalize.Email(u.Email),
-		OrgID:    orgHex,  // hidden input will carry this
-		OrgName:  orgName, // read-only display
-		Status:   u.Status,
-		Auth:     u.AuthMethod,
+		AuthMethods:  models.EnabledAuthMethods,
+		ID:           u.ID.Hex(),
+		FullName:     u.FullName,
+		LoginID:      loginID,
+		Email:        email,
+		AuthReturnID: authReturnID,
+		Auth:         u.AuthMethod,
+		OrgID:        orgHex,  // hidden input will carry this
+		OrgName:      orgName, // read-only display
+		Status:       u.Status,
+		IsEdit:       true,
 	}
 	formutil.SetBase(&data.Base, r, h.DB, "Edit Member", "/members")
 
@@ -200,8 +225,11 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	full := normalize.Name(r.FormValue("full_name"))
+	loginID := normalize.Email(r.FormValue("login_id"))
 	email := normalize.Email(r.FormValue("email"))
+	authReturnID := strings.TrimSpace(r.FormValue("auth_return_id"))
 	authm := normalize.AuthMethod(r.FormValue("auth_method"))
+	tempPassword := strings.TrimSpace(r.FormValue("temp_password"))
 	status := normalize.Status(r.FormValue("status"))
 	orgHex := normalize.QueryParam(r.FormValue("orgID"))
 
@@ -229,13 +257,18 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 
 	reRender := func(msg string) {
 		data := editData{
-			ID:       uidHex,
-			FullName: full,
-			Email:    email,
-			OrgID:    orgHex,
-			OrgName:  getOrgName(),
-			Status:   status,
-			Auth:     authm,
+			AuthMethods:  models.EnabledAuthMethods,
+			ID:           uidHex,
+			FullName:     full,
+			LoginID:      loginID,
+			Email:        email,
+			AuthReturnID: authReturnID,
+			Auth:         authm,
+			TempPassword: tempPassword,
+			OrgID:        orgHex,
+			OrgName:      getOrgName(),
+			Status:       status,
+			IsEdit:       true,
 		}
 		formutil.SetBase(&data.Base, r, h.DB, "Edit Member", "/members")
 		data.SetError(msg)
@@ -243,9 +276,23 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate required fields using struct tags
-	input := memberInput{FullName: full, Email: email}
+	input := memberInput{FullName: full}
 	if result := inputval.Validate(input); result.HasErrors() {
 		reRender(result.First())
+		return
+	}
+
+	// Validate auth fields using centralized logic
+	authResult, err := authutil.ValidateAndResolve(authutil.AuthInput{
+		Method:       authm,
+		LoginID:      loginID,
+		Email:        email,
+		AuthReturnID: authReturnID,
+		TempPassword: tempPassword,
+		IsEdit:       true,
+	})
+	if err != nil {
+		reRender(err.Error())
 		return
 	}
 
@@ -261,28 +308,46 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Check duplicate email (exclude this user)
-	exists, err := h.Users.EmailExistsForOther(ctx, email, uid)
+	// Check duplicate loginID (exclude this user)
+	effectiveLoginID := authResult.EffectiveLoginID
+	exists, err := h.Users.LoginIDExistsForOther(ctx, effectiveLoginID, uid)
 	if err != nil {
-		h.ErrLog.LogServerError(w, r, "database error checking duplicate email", err, "A database error occurred.", "/members")
+		h.ErrLog.LogServerError(w, r, "database error checking duplicate login ID", err, "A database error occurred.", "/members")
 		return
 	}
 	if exists {
-		reRender("A user with that email already exists.")
+		reRender("A user with that login ID already exists.")
 		return
 	}
 
 	upd := userstore.MemberUpdate{
 		FullName:       full,
-		Email:          email,
+		LoginID:        effectiveLoginID,
 		AuthMethod:     authm,
 		Status:         status,
 		OrganizationID: oid,
 	}
+
+	// Set optional email if provided
+	if authResult.Email != nil {
+		upd.Email = authResult.Email
+	}
+
+	// Set optional auth_return_id if provided
+	if authResult.AuthReturnID != nil {
+		upd.AuthReturnID = authResult.AuthReturnID
+	}
+
+	// Handle password reset if provided
+	if authResult.PasswordHash != nil {
+		upd.PasswordHash = authResult.PasswordHash
+		upd.PasswordTemp = authResult.PasswordTemp
+	}
+
 	if err := h.Users.UpdateMember(ctx, uid, upd); err != nil {
 		msg := "Database error while updating the member."
 		if errors.Is(err, userstore.ErrDuplicateEmail) {
-			msg = "A user with that email already exists."
+			msg = "A user with that login ID already exists."
 		}
 		reRender(msg)
 		return

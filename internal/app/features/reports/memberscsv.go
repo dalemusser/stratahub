@@ -99,6 +99,7 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 		SetProjection(bson.M{
 			"full_name":       1,
 			"full_name_ci":    1,
+			"login_id":        1,
 			"email":           1,
 			"status":          1,
 			"organization_id": 1,
@@ -111,6 +112,7 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 
 	type userInfo struct {
 		FullName string
+		LoginID  string
 		Email    string
 		Status   string
 		OrgID    primitive.ObjectID
@@ -123,7 +125,8 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 			ID         primitive.ObjectID  `bson:"_id"`
 			FullName   string              `bson:"full_name"`
 			FullNameCI string              `bson:"full_name_ci"`
-			Email      string              `bson:"email"`
+			LoginID    *string             `bson:"login_id"`
+			Email      *string             `bson:"email"`
 			Status     string              `bson:"status"`
 			OrgID      *primitive.ObjectID `bson:"organization_id"`
 		}
@@ -135,9 +138,18 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 			// Skip users without an organization; they shouldn't appear in this report.
 			continue
 		}
+		loginID := ""
+		if row.LoginID != nil {
+			loginID = *row.LoginID
+		}
+		email := ""
+		if row.Email != nil {
+			email = *row.Email
+		}
 		userByID[row.ID] = userInfo{
 			FullName: row.FullName,
-			Email:    row.Email,
+			LoginID:  loginID,
+			Email:    email,
 			Status:   row.Status,
 			OrgID:    *row.OrgID,
 		}
@@ -311,7 +323,7 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 	cw.UseCRLF = true
 	defer cw.Flush()
 
-	if err := cw.Write([]string{"full_name", "email", "organization", "group", "leaders", "status"}); err != nil {
+	if err := cw.Write([]string{"full_name", "login_id", "email", "organization", "group", "leaders", "status"}); err != nil {
 		h.Log.Error("CSV write failed (header)", zap.Error(err), zap.String("user", userName))
 		return
 	}
@@ -340,7 +352,8 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 
 		if writeErr = cw.Write([]string{
 			sanitizeCSVField(ui.FullName),
-			strings.ToLower(ui.Email),
+			ui.LoginID,
+			ui.Email,
 			sanitizeCSVField(org),
 			sanitizeCSVField(groupName),
 			sanitizeCSVField(leaders),
@@ -362,7 +375,8 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 			org := orgName[ui.OrgID]
 			if writeErr = cw.Write([]string{
 				sanitizeCSVField(ui.FullName),
-				strings.ToLower(ui.Email),
+				ui.LoginID,
+				ui.Email,
 				sanitizeCSVField(org),
 				"",
 				"",
@@ -398,7 +412,7 @@ func writeEmptyCSV(w http.ResponseWriter, r *http.Request) {
 	defer cw.Flush()
 
 	// Error intentionally not checked - headers only, client likely disconnected
-	cw.Write([]string{"full_name", "email", "organization", "group", "leaders", "status"})
+	cw.Write([]string{"full_name", "login_id", "email", "organization", "group", "leaders", "status"})
 }
 
 // csvFilenameFromQuery returns a sanitized CSV filename based on the

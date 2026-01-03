@@ -18,11 +18,9 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 		pr.Get("/", h.ServeList)
 		pr.Get("/{id}/manage_modal", h.ServeManageMemberModal)
 
-		// Add / Upload
+		// Add
 		pr.Get("/new", h.ServeNew)
 		pr.Post("/", h.HandleCreate)
-		pr.Get("/upload_csv", h.ServeUploadCSV)
-		pr.Post("/upload_csv", h.HandleUploadCSV)
 
 		// View / Edit / Delete single member
 		pr.Get("/{id}/view", h.ServeView)

@@ -99,12 +99,14 @@ func (f *Fixtures) CreateUser(ctx context.Context, fullName, email, role string,
 	f.t.Helper()
 
 	now := time.Now().UTC()
+	loginIDCI := text.Fold(email)
 	user := models.User{
 		ID:             primitive.NewObjectID(),
 		FullName:       fullName,
 		FullNameCI:     text.Fold(fullName),
-		Email:          email,
-		AuthMethod:     "internal",
+		LoginID:        &email,
+		LoginIDCI:      &loginIDCI,
+		AuthMethod:     "trust",
 		Role:           role,
 		Status:         "active",
 		OrganizationID: orgID,
@@ -137,12 +139,14 @@ func (f *Fixtures) CreateDisabledUser(ctx context.Context, fullName, email strin
 	f.t.Helper()
 
 	now := time.Now().UTC()
+	loginIDCI := text.Fold(email)
 	user := models.User{
 		ID:         primitive.NewObjectID(),
 		FullName:   fullName,
 		FullNameCI: text.Fold(fullName),
-		Email:      email,
-		AuthMethod: "internal",
+		LoginID:    &email,
+		LoginIDCI:  &loginIDCI,
+		AuthMethod: "trust",
 		Role:       "member",
 		Status:     "disabled",
 		CreatedAt:  now,

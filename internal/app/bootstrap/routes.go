@@ -12,6 +12,7 @@ import (
 	leadersfeature "github.com/dalemusser/stratahub/internal/app/features/leaders"
 	loginfeature "github.com/dalemusser/stratahub/internal/app/features/login"
 	logoutfeature "github.com/dalemusser/stratahub/internal/app/features/logout"
+	profilefeature "github.com/dalemusser/stratahub/internal/app/features/profile"
 	materialsfeature "github.com/dalemusser/stratahub/internal/app/features/materials"
 	membersfeature "github.com/dalemusser/stratahub/internal/app/features/members"
 	organizationsfeature "github.com/dalemusser/stratahub/internal/app/features/organizations"
@@ -20,6 +21,8 @@ import (
 	resourcesfeature "github.com/dalemusser/stratahub/internal/app/features/resources"
 	settingsfeature "github.com/dalemusser/stratahub/internal/app/features/settings"
 	systemusersfeature "github.com/dalemusser/stratahub/internal/app/features/systemusers"
+	uploadcsvfeature "github.com/dalemusser/stratahub/internal/app/features/uploadcsv"
+	userinfofeature "github.com/dalemusser/stratahub/internal/app/features/userinfo"
 	appresources "github.com/dalemusser/stratahub/internal/app/resources"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
@@ -114,11 +117,18 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	r.Mount("/pages", pagesfeature.EditRoutes(pagesHandler, sessionMgr))
 
 	// Authentication
-	loginHandler := loginfeature.NewHandler(deps.StrataHubMongoDatabase, sessionMgr, errLog, logger)
+	loginHandler := loginfeature.NewHandler(deps.StrataHubMongoDatabase, sessionMgr, errLog, deps.Mailer, appCfg.BaseURL, logger)
 	r.Mount("/login", loginfeature.Routes(loginHandler))
 
 	logoutHandler := logoutfeature.NewHandler(sessionMgr, logger)
 	r.Mount("/logout", logoutfeature.Routes(logoutHandler, sessionMgr))
+
+	// User profile (any logged-in user)
+	profileHandler := profilefeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
+	r.Route("/profile", func(sr chi.Router) {
+		sr.Use(sessionMgr.RequireRole("admin", "analyst", "coordinator", "leader", "member"))
+		sr.Mount("/", profilefeature.Routes(profileHandler))
+	})
 
 	// Error pages
 	errorsHandler := errorsfeature.NewHandler()
@@ -143,6 +153,10 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 
 	membersHandler := membersfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
 	r.Mount("/members", membersfeature.Routes(membersHandler, sessionMgr))
+
+	// CSV upload (standalone feature accessible from members, groups, organizations)
+	uploadCSVHandler := &uploadcsvfeature.Handler{DB: deps.StrataHubMongoDatabase, Log: logger, ErrLog: errLog}
+	r.Mount("/upload_csv", uploadcsvfeature.Routes(uploadCSVHandler, sessionMgr))
 
 	sysUsersHandler := systemusersfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
 	r.Mount("/system-users", systemusersfeature.Routes(sysUsersHandler, sessionMgr))
@@ -171,6 +185,10 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		sr.Use(sessionMgr.RequireRole("admin"))
 		settingsHandler.MountRoutes(sr)
 	})
+
+	// User info API (for games to identify the current player)
+	userInfoHandler := userinfofeature.NewHandler()
+	userinfofeature.MountRoutes(r, userInfoHandler)
 
 	return r, nil
 }

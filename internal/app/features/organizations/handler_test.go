@@ -27,10 +27,10 @@ func newTestHandler(t *testing.T) (*organizations.Handler, *testutil.Fixtures) {
 
 func adminRequest(r *http.Request) *http.Request {
 	user := &auth.SessionUser{
-		ID:    "507f1f77bcf86cd799439011",
-		Name:  "Test Admin",
-		Email: "admin@test.com",
-		Role:  "admin",
+		ID:      "507f1f77bcf86cd799439011",
+		Name:    "Test Admin",
+		LoginID: "admin@test.com",
+		Role:    "admin",
 	}
 	return auth.WithTestUser(r, user)
 }

@@ -46,4 +46,15 @@ type AppConfig struct {
 	StorageCFURL       string // CloudFront distribution URL
 	StorageCFKeyPairID string // CloudFront key pair ID
 	StorageCFKeyPath   string // Path to CloudFront private key file
+
+	// Email/SMTP configuration
+	MailSMTPHost string // SMTP server host (e.g., localhost for Mailpit, email-smtp.us-east-1.amazonaws.com for SES)
+	MailSMTPPort int    // SMTP server port (e.g., 1025 for Mailpit, 587 for SES)
+	MailSMTPUser string // SMTP username (empty for Mailpit, SES SMTP credentials for AWS)
+	MailSMTPPass string // SMTP password
+	MailFrom     string // From email address (e.g., noreply@stratahub.com)
+	MailFromName string // From display name (e.g., StrataHub)
+
+	// Base URL for email links (magic links, password reset, etc.)
+	BaseURL string // e.g., "https://stratahub.com" or "http://localhost:3000"
 }

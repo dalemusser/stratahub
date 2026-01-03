@@ -66,7 +66,7 @@ func WithUser(r *http.Request, user TestUser) *http.Request {
 	sessionUser := &auth.SessionUser{
 		ID:             user.ID,
 		Name:           user.Name,
-		Email:          user.Email,
+		LoginID:        user.Email,
 		Role:           user.Role,
 		OrganizationID: user.OrganizationID,
 	}

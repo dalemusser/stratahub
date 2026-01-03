@@ -103,6 +103,7 @@ func (h *Handler) ServeGroupView(w http.ResponseWriter, r *http.Request) {
 		GroupID:           group.ID.Hex(),
 		Name:              group.Name,
 		Description:       group.Description,
+		OrganizationID:    group.OrganizationID.Hex(),
 		OrganizationName:  orgName,
 		LeadersCount:      int(leadersCount),
 		MembersCount:      int(membersCount),

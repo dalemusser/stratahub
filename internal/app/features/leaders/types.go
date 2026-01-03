@@ -11,7 +11,7 @@ import (
 type leaderRow struct {
 	ID          primitive.ObjectID
 	FullName    string
-	Email       string
+	LoginID     string
 	OrgName     string
 	GroupsCount int
 	Auth        string

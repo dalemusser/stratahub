@@ -10,6 +10,29 @@
     <script>
       // Initialize dark mode before page renders to prevent flash
       (function() {
+        // Check for theme preference cookie (set on login)
+        var cookies = document.cookie.split(';');
+        var themePref = null;
+        for (var i = 0; i < cookies.length; i++) {
+          var c = cookies[i].trim();
+          if (c.indexOf('theme_pref=') === 0) {
+            themePref = c.substring(11);
+            break;
+          }
+        }
+
+        // If we have a preference cookie, apply it and clear the cookie
+        if (themePref) {
+          if (themePref === 'system') {
+            localStorage.removeItem('theme');
+          } else {
+            localStorage.setItem('theme', themePref);
+          }
+          // Clear the cookie
+          document.cookie = 'theme_pref=; path=/; max-age=0';
+        }
+
+        // Apply theme: check localStorage first, then system preference
         var theme = localStorage.getItem('theme');
         if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
           document.documentElement.classList.add('dark');

@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/dalemusser/stratahub/internal/app/system/indexes"
+	"github.com/dalemusser/stratahub/internal/app/system/mailer"
 	"github.com/dalemusser/stratahub/internal/app/system/seeding"
 	"github.com/dalemusser/stratahub/internal/app/system/validators"
 	"github.com/dalemusser/waffle/config"
@@ -78,10 +79,25 @@ func ConnectDB(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig
 		return DBDeps{}, fmt.Errorf("unknown storage type: %s", appCfg.StorageType)
 	}
 
+	// Initialize email mailer
+	mail := mailer.New(mailer.Config{
+		Host:     appCfg.MailSMTPHost,
+		Port:     appCfg.MailSMTPPort,
+		User:     appCfg.MailSMTPUser,
+		Pass:     appCfg.MailSMTPPass,
+		From:     appCfg.MailFrom,
+		FromName: appCfg.MailFromName,
+	}, logger)
+	logger.Info("initialized email mailer",
+		zap.String("host", appCfg.MailSMTPHost),
+		zap.Int("port", appCfg.MailSMTPPort),
+	)
+
 	return DBDeps{
 		StrataHubMongoClient:   client,
 		StrataHubMongoDatabase: db,
 		FileStorage:            store,
+		Mailer:                 mail,
 	}, nil
 }
 

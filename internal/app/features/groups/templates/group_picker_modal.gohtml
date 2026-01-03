@@ -1,0 +1,118 @@
+{{ define "group_picker_modal" }}
+<div class="fixed inset-0 z-50 flex items-center justify-center">
+  <div class="absolute inset-0 bg-black/40" onclick="closeGroupPicker()"></div>
+  <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-300 dark:border-gray-600 max-w-lg w-full p-4 space-y-3" style="max-height: 80vh; display: flex; flex-direction: column;">
+    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Select Group</h2>
+    {{ if .OrgName }}
+    <p class="text-sm text-gray-600 dark:text-gray-400">Organization: <strong>{{ .OrgName }}</strong></p>
+    {{ end }}
+
+    <!-- Search -->
+    <form
+      hx-get="/groups/picker"
+      hx-target="#group-picker-list"
+      hx-swap="innerHTML"
+      hx-trigger="submit, keyup changed delay:300ms from:#group-search"
+      class="flex gap-2"
+    >
+      <!-- Preserve selected ID and org filter across searches -->
+      <input type="hidden" name="selected" id="picker-selected-group" value="{{ .SelectedID }}">
+      {{ if .OrgID }}<input type="hidden" name="org" value="{{ .OrgID }}">{{ end }}
+      <input
+        id="group-search"
+        name="q"
+        type="text"
+        placeholder="Search groups..."
+        value="{{ .Query }}"
+        class="flex-1 px-3 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+      />
+      <a
+        href="#"
+        hx-get="/groups/picker?selected={{ .SelectedID }}{{ if .OrgID }}&org={{ .OrgID }}{{ end }}"
+        hx-target="#group-picker-list"
+        hx-swap="innerHTML"
+        class="px-3 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+      >Clear</a>
+    </form>
+
+    <!-- Group list (scrollable) -->
+    <div id="group-picker-list" class="flex-1 overflow-y-auto" style="min-height: 200px; max-height: 400px;">
+      {{ template "group_picker_list" . }}
+    </div>
+
+    <!-- Actions -->
+    <div class="flex justify-between pt-2 border-t dark:border-gray-700">
+      <button
+        type="button"
+        class="px-4 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+        onclick="closeGroupPicker()"
+      >
+        Cancel
+      </button>
+      <button
+        type="button"
+        class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
+        onclick="confirmGroupSelection()"
+      >
+        Done
+      </button>
+    </div>
+  </div>
+</div>
+{{ end }}
+
+{{ define "group_picker_list" }}
+<!-- Pager info -->
+<div class="flex items-center justify-between mb-2 text-sm text-gray-600 dark:text-gray-400">
+  <span>
+    {{ if .Total }}{{ .RangeStart }}-{{ .RangeEnd }} of {{ .Total }}{{ else }}0 of 0{{ end }}
+  </span>
+  <span class="flex gap-2">
+    {{ if .HasPrev }}
+      <a class="px-2 py-1 border dark:border-gray-600 rounded text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+         href="#"
+         hx-get="/groups/picker?q={{ .Query | urlquery }}&before={{ .PrevCursor }}&start={{ .PrevStart }}&selected={{ .SelectedID }}{{ if .OrgID }}&org={{ .OrgID }}{{ end }}"
+         hx-target="#group-picker-list"
+         hx-swap="innerHTML">Prev</a>
+    {{ else }}
+      <span class="px-2 py-1 border dark:border-gray-600 rounded text-xs text-gray-400 dark:text-gray-500">Prev</span>
+    {{ end }}
+    {{ if .HasNext }}
+      <a class="px-2 py-1 border dark:border-gray-600 rounded text-xs text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+         href="#"
+         hx-get="/groups/picker?q={{ .Query | urlquery }}&after={{ .NextCursor }}&start={{ .NextStart }}&selected={{ .SelectedID }}{{ if .OrgID }}&org={{ .OrgID }}{{ end }}"
+         hx-target="#group-picker-list"
+         hx-swap="innerHTML">Next</a>
+    {{ else }}
+      <span class="px-2 py-1 border dark:border-gray-600 rounded text-xs text-gray-400 dark:text-gray-500">Next</span>
+    {{ end }}
+  </span>
+</div>
+
+<!-- Groups with radio buttons -->
+<div class="divide-y divide-gray-200 dark:divide-gray-700">
+  {{ range .Groups }}
+  <label class="flex items-center gap-3 px-2 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer">
+    <input
+      type="radio"
+      name="group-selection"
+      class="group-radio h-4 w-4 text-indigo-600 border-gray-300 dark:border-gray-600 focus:ring-indigo-500"
+      value="{{ .ID }}"
+      data-name="{{ .Name }}"
+      {{ if .Selected }}checked{{ end }}
+      onchange="updateGroupPickerSelection(this)"
+    />
+    <div class="flex-1 min-w-0">
+      <div class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ .Name }}</div>
+      {{ if .OrgName }}
+      <div class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ .OrgName }}</div>
+      {{ end }}
+    </div>
+  </label>
+  {{ else }}
+  <div class="px-2 py-4 text-center text-gray-500 dark:text-gray-400 text-sm">
+    No groups found.
+  </div>
+  {{ end }}
+</div>
+{{ end }}

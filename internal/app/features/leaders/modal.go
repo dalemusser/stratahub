@@ -6,10 +6,11 @@ import (
 	"strings"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
-	"github.com/dalemusser/waffle/pantry/query"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
+	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
@@ -21,7 +22,7 @@ import (
 type leaderManageModalData struct {
 	LeaderID string
 	FullName string
-	Email    string
+	LoginID  string
 	OrgName  string
 	BackURL  string
 }
@@ -48,6 +49,14 @@ func (h *Handler) ServeLeaderManageModal(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Coordinator access check: verify access to leader's organization
+	if authz.IsCoordinator(r) && usr.OrganizationID != nil {
+		if !authz.CanAccessOrg(r, *usr.OrganizationID) {
+			uierrors.HTMXForbidden(w, r, "You don't have access to this leader.", "/leaders")
+			return
+		}
+	}
+
 	orgName := ""
 	if usr.OrganizationID != nil {
 		var o models.Organization
@@ -68,10 +77,14 @@ func (h *Handler) ServeLeaderManageModal(w http.ResponseWriter, r *http.Request)
 		back = httpnav.ResolveBackURL(r, "/leaders")
 	}
 
+	loginID := ""
+	if usr.LoginID != nil {
+		loginID = *usr.LoginID
+	}
 	data := leaderManageModalData{
 		LeaderID: uid.Hex(),
 		FullName: usr.FullName,
-		Email:    strings.ToLower(usr.Email),
+		LoginID:  strings.ToLower(loginID),
 		OrgName:  orgName,
 		BackURL:  back,
 	}

@@ -129,7 +129,7 @@ func (h *Handler) buildPageData(r *http.Request, gid, q, after, before string) (
 			ni, nj := strings.ToLower(s[i].FullName), strings.ToLower(s[j].FullName)
 			if ni == nj {
 				if s[i].FullName == s[j].FullName {
-					return s[i].Email < s[j].Email
+					return s[i].LoginID < s[j].LoginID
 				}
 				return s[i].FullName < s[j].FullName
 			}
@@ -210,7 +210,7 @@ func (h *Handler) fetchUserItemsByIDs(ctx context.Context, col *mongo.Collection
 	cur, err := col.Find(
 		ctx,
 		bson.M{"_id": bson.M{"$in": ids}},
-		options.Find().SetProjection(bson.M{"full_name": 1, "email": 1}),
+		options.Find().SetProjection(bson.M{"full_name": 1, "login_id": 1}),
 	)
 	if err != nil {
 		h.Log.Error("database error finding users by IDs", zap.Error(err))
@@ -221,7 +221,7 @@ func (h *Handler) fetchUserItemsByIDs(ctx context.Context, col *mongo.Collection
 	var users []struct {
 		ID       primitive.ObjectID `bson:"_id"`
 		FullName string             `bson:"full_name"`
-		Email    string             `bson:"email"`
+		LoginID  *string            `bson:"login_id"`
 	}
 	if err := cur.All(ctx, &users); err != nil {
 		h.Log.Error("database error decoding users", zap.Error(err))
@@ -230,10 +230,14 @@ func (h *Handler) fetchUserItemsByIDs(ctx context.Context, col *mongo.Collection
 
 	out := make([]UserItem, len(users))
 	for i, u := range users {
+		loginID := ""
+		if u.LoginID != nil {
+			loginID = *u.LoginID
+		}
 		out[i] = UserItem{
 			ID:       u.ID.Hex(),
 			FullName: u.FullName,
-			Email:    u.Email,
+			LoginID:  loginID,
 		}
 	}
 	return out, nil
@@ -244,7 +248,7 @@ func (h *Handler) fetchUserItems(ctx context.Context, col *mongo.Collection, fil
 	cur, err := col.Find(
 		ctx,
 		filter,
-		options.Find().SetProjection(bson.M{"_id": 1, "full_name": 1, "email": 1}),
+		options.Find().SetProjection(bson.M{"_id": 1, "full_name": 1, "login_id": 1}),
 	)
 	if err != nil {
 		h.Log.Error("database error finding users", zap.Error(err))
@@ -260,10 +264,14 @@ func (h *Handler) fetchUserItems(ctx context.Context, col *mongo.Collection, fil
 
 	out := make([]UserItem, len(users))
 	for i, u := range users {
+		loginID := ""
+		if u.LoginID != nil {
+			loginID = *u.LoginID
+		}
 		out[i] = UserItem{
 			ID:       u.ID.Hex(),
 			FullName: u.FullName,
-			Email:    u.Email,
+			LoginID:  loginID,
 		}
 	}
 	return out, nil

@@ -4,7 +4,9 @@ package systemusers
 import (
 	"html/template"
 
+	"github.com/dalemusser/stratahub/internal/app/system/authutil"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/domain/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -12,7 +14,7 @@ import (
 type userRow struct {
 	ID       primitive.ObjectID
 	FullName string
-	Email    string
+	LoginID  string
 	Role     string
 	Auth     string
 	Status   string
@@ -44,22 +46,51 @@ type listData struct {
 	Flash template.HTML
 }
 
+// CoordinatorOrg represents an organization assigned to a coordinator.
+type CoordinatorOrg struct {
+	ID   string
+	Name string
+}
+
 // Form view model for New/Edit system user.
 type formData struct {
 	viewdata.BaseVM
 
+	AuthMethods []models.AuthMethod
+
 	ID       string
 	FullName string
+	LoginID  string
 	Email    string
 	URole    string // legacy
 	UserRole string // preferred
 	Auth     string
 	Status   string
 
+	// Auth fields for conditional display
+	AuthReturnID string
+	TempPassword string
+	IsEdit       bool
+
 	IsSelf bool
+
+	// Coordinator organization assignments (for edit form)
+	CoordinatorOrgs []CoordinatorOrg
+
+	// Coordinator-specific permissions
+	CanManageMaterials bool
+	CanManageResources bool
+
+	// Previous role (for detecting role changes in edit)
+	PreviousRole string
 
 	Error template.HTML
 }
+
+// Template helper methods for auth field visibility
+func (d formData) EmailIsLoginMethod() bool       { return authutil.EmailIsLogin(d.Auth) }
+func (d formData) RequiresAuthReturnIDMethod() bool { return authutil.RequiresAuthReturnID(d.Auth) }
+func (d formData) IsPasswordMethod() bool         { return d.Auth == "password" }
 
 // View-only model for the "View System User" page.
 type viewData struct {
@@ -67,7 +98,7 @@ type viewData struct {
 
 	ID       string
 	FullName string
-	Email    string
+	LoginID  string
 	URole    string
 	UserRole string
 	Auth     string
@@ -78,7 +109,7 @@ type viewData struct {
 type manageModalData struct {
 	ID       string
 	FullName string
-	Email    string
+	LoginID  string
 	Role     string
 	Auth     string
 	Status   string

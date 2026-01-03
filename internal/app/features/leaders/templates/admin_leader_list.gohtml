@@ -121,7 +121,7 @@
       <!-- Reset range to 1 on new searches -->
       <input type="hidden" name="start" value="1">
 
-      <input id="leader-q" name="search" type="text" value="{{ .SearchQuery }}" placeholder="Search by name or email"
+      <input id="leader-q" name="search" type="text" value="{{ .SearchQuery }}" placeholder="Search by name"
              class="flex-1 px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
 
       <select id="leader-status" name="status" class="px-3 py-2 border rounded text-sm">
@@ -141,7 +141,7 @@
       >Clear</a>
 
       <a href="/leaders/new{{ if and (ne .SelectedOrg "") (ne .SelectedOrg "all") }}?org={{ .SelectedOrg }}&{{ else }}?{{ end }}return={{ .CurrentPath | urlquery }}"
-         class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">+ Add Leader</a>
+         class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Add Leader</a>
     </form>
 
     <!-- Top pager (shows range) -->
@@ -183,7 +183,7 @@
         <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs sticky top-0 z-10">
           <tr>
             <th class="px-2 py-2">Full Name</th>
-            <th class="px-2 py-2">Email</th>
+            <th class="px-2 py-2">Login ID</th>
             <th class="px-2 py-2">Organization</th>
             <th class="px-2 py-2 text-center">Groups</th>
             <th class="px-2 py-2 text-center">Auth</th>
@@ -195,7 +195,7 @@
           {{ range .Rows }}
             <tr>
               <td class="px-2 py-2 align-middle"><div class="truncate" title="{{ .FullName }}">{{ .FullName }}</div></td>
-              <td class="px-2 py-2 align-middle"><div class="truncate" title="{{ .Email }}">{{ .Email }}</div></td>
+              <td class="px-2 py-2 align-middle"><div class="truncate" title="{{ .LoginID }}">{{ .LoginID }}</div></td>
               <td class="px-2 py-2 align-middle"><div class="truncate" title="{{ .OrgName }}">{{ .OrgName }}</div></td>
               <td class="px-2 py-2 align-middle text-center whitespace-nowrap">{{ .GroupsCount }}</td>
               <td class="px-2 py-2 align-middle text-center whitespace-nowrap">{{ .Auth }}</td>
@@ -273,7 +273,7 @@
     <p class="text-sm text-gray-700 dark:text-gray-300">
       {{ .FullName }}
       {{ if .OrgName }}<span class="text-gray-500 dark:text-gray-400"> ({{ .OrgName }})</span>{{ end }}<br>
-      <span class="text-gray-500 dark:text-gray-400">{{ .Email }}</span>
+      <span class="text-gray-500 dark:text-gray-400">{{ .LoginID }}</span>
     </p>
 
     <p class="text-sm text-gray-700 dark:text-gray-300">
@@ -285,12 +285,12 @@
       <div class="flex justify-center gap-2">
         <a
           href="/leaders/{{ .LeaderID }}/view?return={{ .BackURL | urlquery }}"
-          class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
         >View</a>
 
         <a
           href="/leaders/{{ .LeaderID }}/edit?return={{ .BackURL | urlquery }}"
-          class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
         >Edit</a>
 
         <form

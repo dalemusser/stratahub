@@ -9,7 +9,7 @@
      title="Go back">
     ← Back
   </a>
-  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">🧑‍💻 Edit System User</h1>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Edit System User</h1>
 </div>
 
 {{ if .Error }}
@@ -18,8 +18,9 @@
   </div>
 {{ end }}
 
-<form method="post" action="/system-users/{{ .ID }}/edit" class="space-y-3 max-w-xl bg-white dark:bg-gray-800 p-4 rounded border dark:border-gray-700">
+<form method="post" action="/system-users/{{ .ID }}/edit" class="space-y-3 max-w-xl bg-white dark:bg-gray-800 p-4 rounded border dark:border-gray-700" id="edit-user-form" onsubmit="return confirmRoleChange()">
   <input type="hidden" name="return" value="{{ .BackURL }}">
+  <input type="hidden" name="previous_role" value="{{ .PreviousRole }}">
 
   <div>
     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
@@ -27,35 +28,85 @@
   </div>
 
   <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
-    <input name="email" type="email" value="{{ .Email }}" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm" required />
-  </div>
-
-  <div>
     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
     <select
       name="role"
+      id="role-select"
       class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm"
       {{ if .IsSelf }}disabled{{ end }}
+      onchange="handleRoleChange(this.value)"
     >
-      <option value="admin"   {{ if eq .UserRole "admin" }}selected{{ end }}>admin</option>
-      <option value="analyst" {{ if eq .UserRole "analyst" }}selected{{ end }}>analyst</option>
+      <option value="admin"       {{ if eq .UserRole "admin" }}selected{{ end }}>admin</option>
+      <option value="analyst"     {{ if eq .UserRole "analyst" }}selected{{ end }}>analyst</option>
+      <option value="coordinator" {{ if eq .UserRole "coordinator" }}selected{{ end }}>coordinator</option>
     </select>
     {{ if .IsSelf }}
       <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">You can't change your own role. Ask another admin to make this change.</p>
+    {{ else }}
+      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Coordinators can manage leaders and members in their assigned organizations.</p>
     {{ end }}
   </div>
 
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Auth Method</label>
-    <select name="auth_method" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm">
-      <option value="internal"  {{ if or (eq .Auth "internal")  (eq .Auth "") }}selected{{ end }}>internal</option>
-      <option value="google"    {{ if eq .Auth "google" }}selected{{ end }}>google</option>
-      <option value="classlink" {{ if eq .Auth "classlink" }}selected{{ end }}>classlink</option>
-      <option value="clever"    {{ if eq .Auth "clever" }}selected{{ end }}>clever</option>
-      <option value="microsoft" {{ if eq .Auth "microsoft" }}selected{{ end }}>microsoft</option>
-    </select>
+  <!-- Role change warning (shown when changing from coordinator) -->
+  <div id="role-change-warning" class="hidden p-3 border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 text-amber-800 dark:text-amber-300 rounded text-sm">
+    <strong>Warning:</strong> Changing from coordinator to another role will remove all organization assignments for this user.
   </div>
+
+  <!-- Coordinator Organizations (shown only when role is coordinator) -->
+  <div id="coordinator-orgs-section" class="{{ if ne .UserRole "coordinator" }}hidden{{ end }}">
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Organizations</label>
+
+    <!-- Selected orgs display as chips -->
+    <div id="selected-orgs-display" class="min-h-[2.5rem] p-2 border dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 mb-2">
+      <div id="selected-orgs-chips" class="flex flex-wrap gap-1">
+        {{/* Org chips are populated via JavaScript on page load */}}
+      </div>
+      <div id="no-orgs-msg" class="text-gray-500 dark:text-gray-400 text-sm {{ if .CoordinatorOrgs }}hidden{{ end }}">
+        No organizations selected
+      </div>
+    </div>
+
+    <!-- Hidden inputs for form submission -->
+    <div id="org-hidden-inputs">
+      {{/* Hidden inputs are managed via JavaScript */}}
+    </div>
+
+    <!-- Button to open picker -->
+    <button
+      type="button"
+      id="select-orgs-btn"
+      class="px-3 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+      hx-get="/system-users/org-picker"
+      hx-target="#org-picker-root"
+      hx-swap="innerHTML"
+    >
+      {{ if .CoordinatorOrgs }}Change Organizations...{{ else }}Select Organizations...{{ end }}
+    </button>
+
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+      Coordinators must be assigned to at least one organization.
+    </p>
+  </div>
+
+  <!-- Coordinator Permissions (shown only when role is coordinator) -->
+  <div id="coordinator-permissions-section" class="{{ if ne .UserRole "coordinator" }}hidden{{ end }}">
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Additional Permissions</label>
+    <div class="space-y-2 p-3 border dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700">
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" name="can_manage_materials" class="rounded border-gray-300 dark:border-gray-500 text-indigo-600 focus:ring-indigo-500" {{ if .CanManageMaterials }}checked{{ end }} />
+        <span class="text-sm text-gray-700 dark:text-gray-300">Can manage Materials</span>
+      </label>
+      <label class="flex items-center gap-2 cursor-pointer">
+        <input type="checkbox" name="can_manage_resources" class="rounded border-gray-300 dark:border-gray-500 text-indigo-600 focus:ring-indigo-500" {{ if .CanManageResources }}checked{{ end }} />
+        <span class="text-sm text-gray-700 dark:text-gray-300">Can manage Resources</span>
+      </label>
+    </div>
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+      By default, coordinators can view and assign materials/resources. Check these to also allow creating, editing, and deleting.
+    </p>
+  </div>
+
+  {{ template "auth_fields" . }}
 
   <div>
     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
@@ -72,21 +123,169 @@
     {{ end }}
   </div>
 
-  <div class="pt-2">
+  <div class="flex gap-2 pt-2">
     <button class="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Update System User</button>
+    <a href="{{ .BackURL }}" class="px-3 py-1 border rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600">Cancel</a>
   </div>
 </form>
-{{ if eq .Role "admin" }}
+
+{{ if and (eq .Role "admin") (not .IsSelf) }}
 <!-- Danger zone: Delete System User -->
 <form method="post" action="/system-users/{{ .ID }}/delete" class="max-w-xl mt-4">
   <input type="hidden" name="return" value="{{ .BackURL }}">
   <button
     type="submit"
     class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
-    onclick="return confirm('Delete this system user?');"
+    onclick="return confirm('Delete this system user?{{ if eq .UserRole "coordinator" }} This will also remove all organization assignments.{{ end }}');"
   >
     Delete System User
   </button>
 </form>
 {{ end }}
+
+<!-- Modal container for org picker -->
+<div id="org-picker-root"></div>
+
+<script>
+(function() {
+  // Store for selected organizations: { id: name, ... }
+  var selectedOrgs = {};
+  var previousRole = '{{ .PreviousRole }}';
+  var currentRole = '{{ .UserRole }}';
+
+  // Initialize selected orgs from server data
+  {{ range .CoordinatorOrgs }}
+  selectedOrgs['{{ .ID }}'] = '{{ .Name }}';
+  {{ end }}
+
+  // Show/hide coordinator orgs section, permissions section, and warning based on role
+  window.handleRoleChange = function(role) {
+    var orgsSection = document.getElementById('coordinator-orgs-section');
+    var permsSection = document.getElementById('coordinator-permissions-section');
+    var warning = document.getElementById('role-change-warning');
+
+    if (role === 'coordinator') {
+      orgsSection.classList.remove('hidden');
+      permsSection.classList.remove('hidden');
+      warning.classList.add('hidden');
+    } else {
+      orgsSection.classList.add('hidden');
+      permsSection.classList.add('hidden');
+      // Show warning if was coordinator and now changing to something else
+      if (previousRole === 'coordinator') {
+        warning.classList.remove('hidden');
+      } else {
+        warning.classList.add('hidden');
+      }
+    }
+    currentRole = role;
+  };
+
+  // Confirm role change from coordinator before form submission
+  window.confirmRoleChange = function() {
+    if (previousRole === 'coordinator' && currentRole !== 'coordinator') {
+      return confirm('Changing this user from coordinator to ' + currentRole + ' will remove all their organization assignments. Do you want to proceed?');
+    }
+    return true;
+  };
+
+  // Close the org picker modal
+  window.closeOrgPicker = function() {
+    document.getElementById('org-picker-root').innerHTML = '';
+  };
+
+  // Update checkbox selection state (called when checkbox changes)
+  window.updateOrgPickerSelection = function() {
+    var checkboxes = document.querySelectorAll('.org-checkbox');
+    checkboxes.forEach(function(cb) {
+      if (cb.checked) {
+        selectedOrgs[cb.value] = cb.dataset.name;
+      } else {
+        delete selectedOrgs[cb.value];
+      }
+    });
+    // Update hidden field for pagination preservation
+    var hiddenField = document.getElementById('picker-selected-ids');
+    if (hiddenField) {
+      hiddenField.value = Object.keys(selectedOrgs).join(',');
+    }
+  };
+
+  // Confirm org selection from modal
+  window.confirmOrgSelection = function() {
+    var checkboxes = document.querySelectorAll('.org-checkbox');
+    selectedOrgs = {};
+    checkboxes.forEach(function(cb) {
+      if (cb.checked) {
+        selectedOrgs[cb.value] = cb.dataset.name;
+      }
+    });
+    updateOrgsDisplay();
+    closeOrgPicker();
+  };
+
+  // Remove an org from selection
+  window.removeOrg = function(id) {
+    delete selectedOrgs[id];
+    updateOrgsDisplay();
+  };
+
+  // Update the display of selected organizations
+  function updateOrgsDisplay() {
+    var chipsContainer = document.getElementById('selected-orgs-chips');
+    var hiddenContainer = document.getElementById('org-hidden-inputs');
+    var noOrgsMsg = document.getElementById('no-orgs-msg');
+    var selectBtn = document.getElementById('select-orgs-btn');
+
+    chipsContainer.innerHTML = '';
+    hiddenContainer.innerHTML = '';
+
+    var ids = Object.keys(selectedOrgs);
+    if (ids.length === 0) {
+      noOrgsMsg.classList.remove('hidden');
+      selectBtn.textContent = 'Select Organizations...';
+    } else {
+      noOrgsMsg.classList.add('hidden');
+      selectBtn.textContent = 'Change Organizations...';
+      ids.forEach(function(id) {
+        var name = selectedOrgs[id];
+        var chip = document.createElement('span');
+        chip.className = 'org-chip inline-flex items-center gap-1 px-2 py-1 bg-teal-100 dark:bg-teal-900/40 text-teal-800 dark:text-teal-300 rounded text-xs';
+        chip.dataset.id = id;
+        chip.innerHTML = name + ' <button type="button" class="hover:text-red-600" onclick="removeOrg(\'' + id + '\')">&times;</button>';
+        chipsContainer.appendChild(chip);
+
+        var input = document.createElement('input');
+        input.type = 'hidden';
+        input.name = 'orgIDs';
+        input.value = id;
+        hiddenContainer.appendChild(input);
+      });
+    }
+
+    // Update hx-get to include selected IDs
+    var selectedParam = ids.length > 0 ? '?selected=' + ids.join(',') : '';
+    selectBtn.setAttribute('hx-get', '/system-users/org-picker' + selectedParam);
+    htmx.process(selectBtn);
+  }
+
+  // When modal opens or refreshes, sync checkbox state with our selection
+  document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target.id === 'org-picker-root' || evt.detail.target.id === 'org-picker-list') {
+      document.querySelectorAll('.org-checkbox').forEach(function(cb) {
+        cb.checked = !!selectedOrgs[cb.value];
+      });
+      var hiddenField = document.getElementById('picker-selected-ids');
+      if (hiddenField) {
+        hiddenField.value = Object.keys(selectedOrgs).join(',');
+      }
+    }
+  });
+
+  // Initialize display on page load
+  updateOrgsDisplay();
+})();
+</script>
+
+{{ template "auth_toggle_script" . }}
 {{ end }}

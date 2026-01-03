@@ -2,6 +2,7 @@
 //
 // Authorization rules:
 //   - Admins can view and manage all members across all organizations
+//   - Coordinators can view and manage members within their assigned organizations
 //   - Leaders can only view and manage members within their own organization
 //   - Other roles (analyst, member) cannot access member management
 package memberpolicy
@@ -28,10 +29,12 @@ type ListScope struct {
 	// CanList indicates whether the user can list members at all.
 	CanList bool
 	// AllOrgs indicates whether the user can see members from all organizations.
-	// If false, OrgID specifies the single org they can see.
+	// If false, check OrgID (single org) or OrgIDs (multiple orgs).
 	AllOrgs bool
-	// OrgID is the organization ID the user is restricted to (when AllOrgs is false).
+	// OrgID is the organization ID the user is restricted to (for leaders).
 	OrgID primitive.ObjectID
+	// OrgIDs is the list of organization IDs the user can access (for coordinators).
+	OrgIDs []primitive.ObjectID
 }
 
 // CanListMembers determines what scope of members the current user can list.
@@ -39,6 +42,7 @@ type ListScope struct {
 //
 // Authorization:
 //   - Admin: can list all members from all organizations
+//   - Coordinator: can list members from their assigned organizations
 //   - Leader: can only list members from their own organization
 //   - Others: cannot list members
 func CanListMembers(r *http.Request) ListScope {
@@ -50,6 +54,12 @@ func CanListMembers(r *http.Request) ListScope {
 	switch role {
 	case "admin":
 		return ListScope{CanList: true, AllOrgs: true}
+	case "coordinator":
+		orgIDs := authz.UserOrgIDs(r)
+		if len(orgIDs) == 0 {
+			return ListScope{CanList: false}
+		}
+		return ListScope{CanList: true, AllOrgs: false, OrgIDs: orgIDs}
 	case "leader":
 		orgID := authz.UserOrgID(r)
 		if orgID == primitive.NilObjectID {
@@ -65,6 +75,7 @@ func CanListMembers(r *http.Request) ListScope {
 //
 // Authorization:
 //   - Admin: can view any member
+//   - Coordinator: can view members in their assigned organizations
 //   - Leader: can only view members in their organization
 //   - Others: cannot view members
 //
@@ -78,6 +89,12 @@ func CanViewMember(ctx context.Context, db *mongo.Database, r *http.Request, mem
 	switch role {
 	case "admin":
 		return true, nil
+	case "coordinator":
+		if memberOrgID == nil {
+			return false, nil
+		}
+		// Coordinator can view members in any of their assigned organizations
+		return authz.CanAccessOrg(r, *memberOrgID), nil
 	case "leader":
 		userOrgID := authz.UserOrgID(r)
 		if userOrgID == primitive.NilObjectID {
@@ -98,6 +115,7 @@ func CanViewMember(ctx context.Context, db *mongo.Database, r *http.Request, mem
 //
 // Authorization:
 //   - Admin: can manage any member
+//   - Coordinator: can manage members in their assigned organizations
 //   - Leader: can only manage members in their organization
 //   - Others: cannot manage members
 //

@@ -28,10 +28,10 @@ func newTestHandler(t *testing.T) (*leaders.Handler, *testutil.Fixtures) {
 
 func adminRequest(r *http.Request) *http.Request {
 	user := &auth.SessionUser{
-		ID:    primitive.NewObjectID().Hex(),
-		Name:  "Test Admin",
-		Email: "admin@test.com",
-		Role:  "admin",
+		ID:      primitive.NewObjectID().Hex(),
+		Name:    "Test Admin",
+		LoginID: "admin@test.com",
+		Role:    "admin",
 	}
 	return auth.WithTestUser(r, user)
 }
@@ -46,9 +46,9 @@ func TestHandleCreate_Success(t *testing.T) {
 
 	form := url.Values{
 		"full_name":   {"New Leader"},
-		"email":       {"newleader@example.com"},
+		"login_id":    {"newleader@example.com"},
 		"orgID":       {org.ID.Hex()},
-		"auth_method": {"internal"},
+		"auth_method": {"trust"},
 	}
 
 	req := httptest.NewRequest("POST", "/leaders", strings.NewReader(form.Encode()))
@@ -65,11 +65,11 @@ func TestHandleCreate_Success(t *testing.T) {
 	// Verify leader was created
 	var user struct {
 		FullName       string             `bson:"full_name"`
-		Email          string             `bson:"email"`
+		LoginID        string             `bson:"login_id"`
 		Role           string             `bson:"role"`
 		OrganizationID primitive.ObjectID `bson:"organization_id"`
 	}
-	err := db.Collection("users").FindOne(ctx, bson.M{"email": "newleader@example.com"}).Decode(&user)
+	err := db.Collection("users").FindOne(ctx, bson.M{"login_id": "newleader@example.com"}).Decode(&user)
 	if err != nil {
 		t.Fatalf("FindOne failed: %v", err)
 	}
@@ -99,12 +99,12 @@ func TestHandleCreate_MissingRequiredFields(t *testing.T) {
 		{
 			name: "missing_full_name",
 			form: url.Values{
-				"email": {"test@example.com"},
-				"orgID": {org.ID.Hex()},
+				"login_id": {"test@example.com"},
+				"orgID":    {org.ID.Hex()},
 			},
 		},
 		{
-			name: "missing_email",
+			name: "missing_login_id",
 			form: url.Values{
 				"full_name": {"Test Leader"},
 				"orgID":     {org.ID.Hex()},
@@ -114,7 +114,7 @@ func TestHandleCreate_MissingRequiredFields(t *testing.T) {
 			name: "missing_org",
 			form: url.Values{
 				"full_name": {"Test Leader"},
-				"email":     {"test@example.com"},
+				"login_id":  {"test@example.com"},
 			},
 		},
 	}
@@ -140,7 +140,7 @@ func TestHandleCreate_MissingRequiredFields(t *testing.T) {
 	}
 }
 
-func TestHandleCreate_DuplicateEmail(t *testing.T) {
+func TestHandleCreate_DuplicateLoginID(t *testing.T) {
 	handler, fixtures := newTestHandler(t)
 	ctx, cancel := testutil.TestContext()
 	defer cancel()
@@ -151,7 +151,7 @@ func TestHandleCreate_DuplicateEmail(t *testing.T) {
 
 	form := url.Values{
 		"full_name": {"New Leader"},
-		"email":     {"existing@example.com"},
+		"login_id":  {"existing@example.com"},
 		"orgID":     {org.ID.Hex()},
 	}
 
@@ -172,7 +172,7 @@ func TestHandleCreate_DuplicateEmail(t *testing.T) {
 	}
 }
 
-func TestHandleCreate_InvalidEmail(t *testing.T) {
+func TestHandleCreate_LoginIDAccepted(t *testing.T) {
 	handler, fixtures := newTestHandler(t)
 	ctx, cancel := testutil.TestContext()
 	defer cancel()
@@ -180,9 +180,10 @@ func TestHandleCreate_InvalidEmail(t *testing.T) {
 	db := fixtures.DB()
 	org := fixtures.CreateOrganization(ctx, "Test Org")
 
+	// Login ID can be any string (not required to be email)
 	form := url.Values{
 		"full_name": {"Test Leader"},
-		"email":     {"not-an-email"},
+		"login_id":  {"username123"},
 		"orgID":     {org.ID.Hex()},
 	}
 
@@ -191,15 +192,15 @@ func TestHandleCreate_InvalidEmail(t *testing.T) {
 	req = adminRequest(req)
 
 	rec := httptest.NewRecorder()
-	func() {
-		defer func() { recover() }()
-		handler.HandleCreate(rec, req)
-	}()
+	handler.HandleCreate(rec, req)
 
-	// No leader should be created
+	// Leader should be created
+	if rec.Code != http.StatusSeeOther {
+		t.Errorf("expected status %d, got %d", http.StatusSeeOther, rec.Code)
+	}
 	count, _ := db.Collection("users").CountDocuments(ctx, bson.M{"role": "leader"})
-	if count != 0 {
-		t.Errorf("expected 0 leaders (invalid email), got %d", count)
+	if count != 1 {
+		t.Errorf("expected 1 leader, got %d", count)
 	}
 }
 
@@ -212,7 +213,7 @@ func TestHandleCreate_InvalidOrgID(t *testing.T) {
 
 	form := url.Values{
 		"full_name": {"Test Leader"},
-		"email":     {"test@example.com"},
+		"login_id":  {"test@example.com"},
 		"orgID":     {"not-a-valid-objectid"},
 	}
 
@@ -243,7 +244,7 @@ func TestHandleCreate_DefaultAuthMethod(t *testing.T) {
 
 	form := url.Values{
 		"full_name": {"Test Leader"},
-		"email":     {"test@example.com"},
+		"login_id":  {"test@example.com"},
 		"orgID":     {org.ID.Hex()},
 		// auth_method not specified
 	}
@@ -259,15 +260,171 @@ func TestHandleCreate_DefaultAuthMethod(t *testing.T) {
 		t.Errorf("expected status %d, got %d", http.StatusSeeOther, rec.Code)
 	}
 
-	// Verify auth_method defaults to internal
+	// Verify auth_method defaults to trust
 	var user struct {
 		AuthMethod string `bson:"auth_method"`
 	}
-	err := db.Collection("users").FindOne(ctx, bson.M{"email": "test@example.com"}).Decode(&user)
+	err := db.Collection("users").FindOne(ctx, bson.M{"login_id": "test@example.com"}).Decode(&user)
 	if err != nil {
 		t.Fatalf("FindOne failed: %v", err)
 	}
-	if user.AuthMethod != "internal" {
-		t.Errorf("AuthMethod: got %q, want %q", user.AuthMethod, "internal")
+	if user.AuthMethod != "trust" {
+		t.Errorf("AuthMethod: got %q, want %q", user.AuthMethod, "trust")
+	}
+}
+
+func TestHandleCreate_EmailAuthMethod_UsesEmailAsLoginID(t *testing.T) {
+	handler, fixtures := newTestHandler(t)
+	ctx, cancel := testutil.TestContext()
+	defer cancel()
+
+	db := fixtures.DB()
+	org := fixtures.CreateOrganization(ctx, "Test Org")
+
+	// For email auth method, email field is used for both login_id and email
+	form := url.Values{
+		"full_name":   {"Test Leader"},
+		"email":       {"test@example.com"},
+		"orgID":       {org.ID.Hex()},
+		"auth_method": {"email"},
+	}
+
+	req := httptest.NewRequest("POST", "/leaders", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = adminRequest(req)
+
+	rec := httptest.NewRecorder()
+	handler.HandleCreate(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Errorf("expected status %d, got %d", http.StatusSeeOther, rec.Code)
+	}
+
+	var user struct {
+		LoginID    string `bson:"login_id"`
+		Email      string `bson:"email"`
+		AuthMethod string `bson:"auth_method"`
+	}
+	err := db.Collection("users").FindOne(ctx, bson.M{"login_id": "test@example.com"}).Decode(&user)
+	if err != nil {
+		t.Fatalf("FindOne failed: %v", err)
+	}
+	if user.LoginID != "test@example.com" {
+		t.Errorf("LoginID: got %q, want %q", user.LoginID, "test@example.com")
+	}
+	if user.Email != "test@example.com" {
+		t.Errorf("Email: got %q, want %q", user.Email, "test@example.com")
+	}
+	if user.AuthMethod != "email" {
+		t.Errorf("AuthMethod: got %q, want %q", user.AuthMethod, "email")
+	}
+}
+
+func TestHandleCreate_EmailAuthMethod_RequiresEmail(t *testing.T) {
+	handler, fixtures := newTestHandler(t)
+	ctx, cancel := testutil.TestContext()
+	defer cancel()
+
+	db := fixtures.DB()
+	org := fixtures.CreateOrganization(ctx, "Test Org")
+
+	// Missing email for email auth method
+	form := url.Values{
+		"full_name":   {"Test Leader"},
+		"orgID":       {org.ID.Hex()},
+		"auth_method": {"email"},
+	}
+
+	req := httptest.NewRequest("POST", "/leaders", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = adminRequest(req)
+
+	rec := httptest.NewRecorder()
+	func() {
+		defer func() { recover() }()
+		handler.HandleCreate(rec, req)
+	}()
+
+	// No leader should be created
+	count, _ := db.Collection("users").CountDocuments(ctx, bson.M{"role": "leader"})
+	if count != 0 {
+		t.Errorf("expected 0 leaders (missing email), got %d", count)
+	}
+}
+
+func TestHandleCreate_CleverAuthMethod_RequiresAuthReturnID(t *testing.T) {
+	handler, fixtures := newTestHandler(t)
+	ctx, cancel := testutil.TestContext()
+	defer cancel()
+
+	db := fixtures.DB()
+	org := fixtures.CreateOrganization(ctx, "Test Org")
+
+	// Missing auth_return_id for clever auth method
+	form := url.Values{
+		"full_name":   {"Test Leader"},
+		"login_id":    {"cleveruser123"},
+		"orgID":       {org.ID.Hex()},
+		"auth_method": {"clever"},
+	}
+
+	req := httptest.NewRequest("POST", "/leaders", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = adminRequest(req)
+
+	rec := httptest.NewRecorder()
+	func() {
+		defer func() { recover() }()
+		handler.HandleCreate(rec, req)
+	}()
+
+	// No leader should be created
+	count, _ := db.Collection("users").CountDocuments(ctx, bson.M{"role": "leader"})
+	if count != 0 {
+		t.Errorf("expected 0 leaders (missing auth_return_id), got %d", count)
+	}
+}
+
+func TestHandleCreate_CleverAuthMethod_Success(t *testing.T) {
+	handler, fixtures := newTestHandler(t)
+	ctx, cancel := testutil.TestContext()
+	defer cancel()
+
+	db := fixtures.DB()
+	org := fixtures.CreateOrganization(ctx, "Test Org")
+
+	form := url.Values{
+		"full_name":      {"Test Leader"},
+		"login_id":       {"cleveruser123"},
+		"auth_return_id": {"clever-abc-123"},
+		"orgID":          {org.ID.Hex()},
+		"auth_method":    {"clever"},
+	}
+
+	req := httptest.NewRequest("POST", "/leaders", strings.NewReader(form.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req = adminRequest(req)
+
+	rec := httptest.NewRecorder()
+	handler.HandleCreate(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Errorf("expected status %d, got %d", http.StatusSeeOther, rec.Code)
+	}
+
+	var user struct {
+		LoginID      string `bson:"login_id"`
+		AuthReturnID string `bson:"auth_return_id"`
+		AuthMethod   string `bson:"auth_method"`
+	}
+	err := db.Collection("users").FindOne(ctx, bson.M{"login_id": "cleveruser123"}).Decode(&user)
+	if err != nil {
+		t.Fatalf("FindOne failed: %v", err)
+	}
+	if user.AuthReturnID != "clever-abc-123" {
+		t.Errorf("AuthReturnID: got %q, want %q", user.AuthReturnID, "clever-abc-123")
+	}
+	if user.AuthMethod != "clever" {
+		t.Errorf("AuthMethod: got %q, want %q", user.AuthMethod, "clever")
 	}
 }

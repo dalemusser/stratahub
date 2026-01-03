@@ -43,14 +43,16 @@
     </a>
 
     <a href="/materials/assignments"
-       class="px-4 py-2 bg-purple-600 text-white rounded text-sm hover:bg-purple-700">
+       class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
       All Assignments
     </a>
 
+    {{ if .CanCreate }}
     <a href="/materials/new"
        class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
-      + Add Material
+      Add Material
     </a>
+    {{ end }}
   </div>
 </form>
 
@@ -177,10 +179,12 @@
       Clear
     </a>
 
+    {{ if .CanCreate }}
     <a href="/materials/new"
        class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
-      + Add Material
+      Add Material
     </a>
+    {{ end }}
   </div>
 </form>
 {{ end }}
@@ -222,31 +226,37 @@
       <div class="flex flex-wrap justify-center gap-2">
         <a
           href="/materials/{{ .ID }}/view?return=/materials"
-          class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
         >View</a>
+        {{ if .CanEdit }}
         <a
           href="/materials/{{ .ID }}/edit?return=/materials"
-          class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
         >Edit</a>
+        {{ end }}
         <a
           href="/materials/{{ .ID }}/assign"
-          class="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
+          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
         >Assign</a>
         <a
           href="/materials/{{ .ID }}/assignments"
-          class="px-3 py-1 bg-purple-600 text-white rounded text-sm hover:bg-purple-700"
+          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
         >Assignments</a>
+        {{ if .CanEdit }}
         <button
           type="button"
           class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
           onclick="if(confirm('Are you sure you want to delete this material? This will also remove all assignments.')) { document.getElementById('delete-form-{{ .ID }}').submit(); }"
         >Delete</button>
+        {{ end }}
       </div>
 
+      {{ if .CanEdit }}
       <!-- Hidden delete form -->
       <form id="delete-form-{{ .ID }}" method="post" action="/materials/{{ .ID }}/delete" class="hidden">
         <input type="hidden" name="return" value="/materials">
       </form>
+      {{ end }}
 
       <!-- Close button left-aligned -->
       <div class="flex justify-start">

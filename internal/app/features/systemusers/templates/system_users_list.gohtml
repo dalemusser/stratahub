@@ -20,13 +20,14 @@
     <input
       id="su-q" name="search" type="text"
       value="{{ .SearchQuery }}"
-      placeholder="Search by name or email"
+      placeholder="Search by name"
       class="px-3 py-2 border rounded flex-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
 
     <select id="su-role" name="role" class="px-3 py-2 border rounded text-sm">
       <option value="" {{ if not .URole }}selected{{ end }}>All Roles</option>
       <option value="admin"   {{ if eq .URole "admin" }}selected{{ end }}>Admin</option>
       <option value="analyst" {{ if eq .URole "analyst" }}selected{{ end }}>Analyst</option>
+      <option value="coordinator" {{ if eq .URole "coordinator" }}selected{{ end }}>Coordinator</option>
     </select>
 
     <select id="su-status" name="status" class="px-3 py-2 border rounded text-sm">
@@ -47,7 +48,7 @@
     >Clear</a>
 
     <a href="/system-users/new?return={{ .CurrentPath | urlquery }}"
-       class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">+ Add User</a>
+       class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Add User</a>
   </form>
 
   <!-- Top pager -->
@@ -86,7 +87,7 @@
       <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs sticky top-0 z-10">
         <tr>
           <th class="px-2 py-2">Full Name</th>
-          <th class="px-2 py-2">Email</th>
+          <th class="px-2 py-2">Login ID</th>
           <th class="px-2 py-2">Role</th>
           <th class="px-2 py-2">Auth</th>
           <th class="px-2 py-2 text-center">Status</th>
@@ -97,11 +98,12 @@
         {{ range .Rows }}
         <tr>
           <td class="px-2 py-2 align-middle"><div class="truncate" title="{{ .FullName }}">{{ .FullName }}</div></td>
-          <td class="px-2 py-2 align-middle"><div class="truncate" title="{{ .Email }}">{{ .Email }}</div></td>
+          <td class="px-2 py-2 align-middle"><div class="truncate" title="{{ .LoginID }}">{{ .LoginID }}</div></td>
           <td class="px-2 py-2 align-middle">
             <span class="inline-flex items-center px-2 py-1 rounded-full text-xs
                          {{ if eq .Role "admin" }}bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-400
                          {{ else if eq .Role "analyst" }}bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-400
+                         {{ else if eq .Role "coordinator" }}bg-teal-100 text-teal-800 dark:bg-teal-900/40 dark:text-teal-400
                          {{ else }}bg-gray-100 text-gray-700 dark:bg-gray-600 dark:text-gray-300{{ end }}">
               {{ .Role }}
             </span>
@@ -168,7 +170,7 @@
     <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Manage System User</h2>
 
     <p class="text-sm text-gray-700 dark:text-gray-300">
-      {{ .FullName }} <span class="text-gray-500 dark:text-gray-400">({{ .Email }})</span><br/>
+      {{ .FullName }} <span class="text-gray-500 dark:text-gray-400">({{ .LoginID }})</span><br/>
       <span class="capitalize">{{ .Role }}</span> · {{ .Auth }} · {{ .Status }}
     </p>
 
@@ -177,13 +179,13 @@
         <!-- View -->
         <a
           href="/system-users/{{ .ID }}/view?return={{ .BackURL | urlquery }}"
-          class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
         >View</a>
 
         <!-- Edit -->
         <a
           href="/system-users/{{ .ID }}/edit?return={{ .BackURL | urlquery }}"
-          class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
         >Edit</a>
 
         <!-- Delete -->

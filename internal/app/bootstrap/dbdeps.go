@@ -2,6 +2,7 @@
 package bootstrap
 
 import (
+	"github.com/dalemusser/stratahub/internal/app/system/mailer"
 	"github.com/dalemusser/waffle/pantry/storage"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -28,4 +29,7 @@ type DBDeps struct {
 
 	// FileStorage for material file uploads
 	FileStorage storage.Store
+
+	// Mailer for sending emails (verification codes, etc.)
+	Mailer *mailer.Mailer
 }

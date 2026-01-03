@@ -16,6 +16,9 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 		// LIST
 		pr.Get("/", h.ServeGroupsList)
 
+		// PICKER (modal for selecting a group)
+		pr.Get("/picker", h.ServeGroupPicker)
+
 		// CREATE
 		pr.Get("/new", h.ServeNewGroup)
 		pr.Post("/", h.HandleCreateGroup)
@@ -54,10 +57,6 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 		pr.Post("/{id}/assign_resources/{assignmentID}/update", h.HandleUpdateResourceAssignment)
 		pr.Post("/{id}/assign_resources/add", h.HandleAssignResource)
 		pr.Post("/{id}/assign_resources/remove", h.HandleRemoveAssignment)
-
-		// UPLOAD CSV
-		pr.Get("/{id}/upload_csv", h.ServeUploadCSV)
-		pr.Post("/{id}/upload_csv", h.HandleUploadCSV)
 	})
 
 	return r

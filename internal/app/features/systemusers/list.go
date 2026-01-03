@@ -4,12 +4,10 @@ import (
 	"maps"
 	"net/http"
 	"strconv"
-	"strings"
 
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
-	"github.com/dalemusser/stratahub/internal/app/system/search"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
@@ -48,37 +46,21 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Base filter: system users (admin/analyst).
-	roleSet := []string{"admin", "analyst"}
+	// Base filter: system users (admin/analyst/coordinator).
+	roleSet := []string{"admin", "analyst", "coordinator"}
 	base := bson.M{"role": bson.M{"$in": roleSet}}
 	if status == "active" || status == "disabled" {
 		base["status"] = status
 	}
-	if uRole == "admin" || uRole == "analyst" {
+	if uRole == "admin" || uRole == "analyst" || uRole == "coordinator" {
 		base["role"] = uRole
 	}
 
-	// Decide whether to pivot to email sorting:
-	// reuse the shared helper for "no-org" email pivot.
-	emailPivot := search.EmailPivotNoOrgOK(searchQ, status)
-
-	// Search clause
+	// Search clause - search by name only
 	if searchQ != "" {
 		qFold := text.Fold(searchQ)
 		hiFold := qFold + "\uffff"
-		sLower := strings.ToLower(searchQ)
-		hiEmail := sLower + "\uffff"
-
-		if emailPivot {
-			base["$or"] = []bson.M{
-				{"email": bson.M{"$gte": sLower, "$lt": hiEmail}},
-			}
-		} else {
-			base["$or"] = []bson.M{
-				{"full_name_ci": bson.M{"$gte": qFold, "$lt": hiFold}},
-				{"email": bson.M{"$gte": sLower, "$lt": hiEmail}},
-			}
-		}
+		base["full_name_ci"] = bson.M{"$gte": qFold, "$lt": hiFold}
 	}
 
 	// Count and find via store
@@ -92,11 +74,8 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 	// Clone base filter, then add cursor conditions
 	f := maps.Clone(base)
 
-	// Sort field
+	// Sort field - always by name
 	sortField := "full_name_ci"
-	if emailPivot {
-		sortField = "email"
-	}
 
 	// Configure keyset pagination
 	find := options.Find()
@@ -136,10 +115,14 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 
 	rows := make([]userRow, 0, shown)
 	for _, rr := range raw {
+		loginID := ""
+		if rr.LoginID != nil {
+			loginID = *rr.LoginID
+		}
 		rows = append(rows, userRow{
 			ID:       rr.ID,
 			FullName: rr.FullName,
-			Email:    normalize.Email(rr.Email),
+			LoginID:  loginID,
 			Role:     normalize.Role(rr.Role),
 			Auth:     normalize.AuthMethod(rr.AuthMethod),
 			Status:   normalize.Status(rr.Status),
@@ -150,10 +133,6 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 	if shown > 0 {
 		firstKey := raw[0].FullNameCI
 		lastKey := raw[shown-1].FullNameCI
-		if emailPivot {
-			firstKey = normalize.Email(raw[0].Email)
-			lastKey = normalize.Email(raw[shown-1].Email)
-		}
 		prevCur = wafflemongo.EncodeCursor(firstKey, raw[0].ID)
 		nextCur = wafflemongo.EncodeCursor(lastKey, raw[shown-1].ID)
 	}

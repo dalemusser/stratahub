@@ -2,7 +2,11 @@
 package organizations
 
 import (
+	"net/http"
+
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )
@@ -21,4 +25,15 @@ func NewHandler(db *mongo.Database, errLog *uierrors.ErrorLogger, logger *zap.Lo
 		Log:    logger,
 		ErrLog: errLog,
 	}
+}
+
+// coordinatorHasAccess checks if the coordinator user has access to the given organization.
+func coordinatorHasAccess(r *http.Request, orgID primitive.ObjectID) bool {
+	orgIDs := authz.UserOrgIDs(r)
+	for _, id := range orgIDs {
+		if id == orgID {
+			return true
+		}
+	}
+	return false
 }

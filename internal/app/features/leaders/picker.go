@@ -55,7 +55,7 @@ func (h *Handler) ServeLeaderPicker(w http.ResponseWriter, r *http.Request) {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
-	if role != "admin" && role != "leader" {
+	if role != "admin" && role != "coordinator" && role != "leader" {
 		uierrors.RenderForbidden(w, r, "Access denied.", "/dashboard")
 		return
 	}
@@ -78,6 +78,13 @@ func (h *Handler) ServeLeaderPicker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	orgID, orgName, err := orgutil.ResolveActiveOrgFromHex(ctx, db, orgHex)
+	if err == nil && role == "coordinator" {
+		// Verify coordinator has access to this org
+		if !authz.CanAccessOrg(r, orgID) {
+			uierrors.RenderForbidden(w, r, "You don't have access to this organization.", "/dashboard")
+			return
+		}
+	}
 	if err != nil {
 		if orgutil.IsExpectedOrgError(err) {
 			uierrors.RenderBadRequest(w, r, "Organization not found.", "/dashboard")

@@ -46,10 +46,15 @@ func (h *Handler) ServeManageModal(w http.ResponseWriter, r *http.Request) {
 
 	back := backToSystemUsersURL(r)
 
+	loginID := ""
+	if u.LoginID != nil {
+		loginID = *u.LoginID
+	}
+
 	data := manageModalData{
 		ID:       idHex,
 		FullName: u.FullName,
-		Email:    normalize.Email(u.Email),
+		LoginID:  loginID,
 		Role:     normalize.Role(u.Role),
 		Auth:     normalize.AuthMethod(u.AuthMethod),
 		Status:   normalize.Status(u.Status),

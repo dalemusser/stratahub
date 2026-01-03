@@ -50,7 +50,7 @@ func (h *Handler) ServeOrgPicker(w http.ResponseWriter, r *http.Request) {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
-	if role != "admin" && role != "leader" {
+	if role != "admin" && role != "coordinator" && role != "leader" {
 		uierrors.RenderForbidden(w, r, "Access denied.", "/dashboard")
 		return
 	}
@@ -71,6 +71,16 @@ func (h *Handler) ServeOrgPicker(w http.ResponseWriter, r *http.Request) {
 		"status": "active",
 	}
 
+	// Coordinators can only see their assigned organizations
+	if role == "coordinator" {
+		orgIDs := authz.UserOrgIDs(r)
+		if len(orgIDs) == 0 {
+			filter["_id"] = primitive.NilObjectID // Will match nothing
+		} else {
+			filter["_id"] = bson.M{"$in": orgIDs}
+		}
+	}
+
 	// Add search filter if query provided (match from start of name)
 	if q != "" {
 		qFold := text.Fold(q)
@@ -88,6 +98,15 @@ func (h *Handler) ServeOrgPicker(w http.ResponseWriter, r *http.Request) {
 	// Count total (without pagination)
 	countFilter := bson.M{
 		"status": "active",
+	}
+	// Coordinators can only see their assigned organizations
+	if role == "coordinator" {
+		orgIDs := authz.UserOrgIDs(r)
+		if len(orgIDs) == 0 {
+			countFilter["_id"] = primitive.NilObjectID // Will match nothing
+		} else {
+			countFilter["_id"] = bson.M{"$in": orgIDs}
+		}
 	}
 	if q != "" {
 		qFold := text.Fold(q)

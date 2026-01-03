@@ -3,9 +3,12 @@ package leaders
 import (
 	"context"
 	"net/http"
+	"strings"
 	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/system/authutil"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/formutil"
 	"github.com/dalemusser/stratahub/internal/app/system/inputval"
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
@@ -22,9 +25,9 @@ import (
 )
 
 // editLeaderInput defines validation rules for editing a leader.
+// Note: LoginID is validated conditionally in HandleEdit based on auth method.
 type editLeaderInput struct {
 	FullName string `validate:"required,max=200" label:"Full name"`
-	Email    string `validate:"required,email,max=254" label:"Email"`
 	Status   string `validate:"required,oneof=active disabled" label:"Status"`
 }
 
@@ -32,10 +35,27 @@ type editLeaderInput struct {
 type editData struct {
 	formutil.Base
 
-	ID, FullName, Email string
-	OrgID, OrgName      string // Org is read-only display + hidden orgID
-	Status, Auth        string
+	ID          string
+	AuthMethods []models.AuthMethod
+
+	FullName     string
+	LoginID      string
+	Email        string
+	AuthReturnID string
+	Auth         string
+	TempPassword string
+	Status       string
+
+	OrgID   string // hidden field
+	OrgName string // read-only display
+
+	IsEdit bool // true for edit forms
 }
+
+// Template helper methods for auth field visibility
+func (d editData) EmailIsLoginMethod() bool       { return authutil.EmailIsLogin(d.Auth) }
+func (d editData) RequiresAuthReturnIDMethod() bool { return authutil.RequiresAuthReturnID(d.Auth) }
+func (d editData) IsPasswordMethod() bool         { return d.Auth == "password" }
 
 // ServeEdit renders the Edit Leader page.
 func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
@@ -55,6 +75,14 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Coordinator access check: verify access to leader's organization
+	if authz.IsCoordinator(r) && usr.OrganizationID != nil {
+		if !authz.CanAccessOrg(r, *usr.OrganizationID) {
+			uierrors.RenderForbidden(w, r, "You don't have access to this leader.", "/leaders")
+			return
+		}
+	}
+
 	orgHex := ""
 	orgName := ""
 	if usr.OrganizationID != nil {
@@ -72,14 +100,31 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	loginID := ""
+	if usr.LoginID != nil {
+		loginID = *usr.LoginID
+	}
+	email := ""
+	if usr.Email != nil {
+		email = *usr.Email
+	}
+	authReturnID := ""
+	if usr.AuthReturnID != nil {
+		authReturnID = *usr.AuthReturnID
+	}
+
 	data := editData{
-		ID:       usr.ID.Hex(),
-		FullName: usr.FullName,
-		Email:    normalize.Email(usr.Email),
-		OrgID:    orgHex,  // hidden field
-		OrgName:  orgName, // read-only display
-		Status:   usr.Status,
-		Auth:     normalize.AuthMethod(usr.AuthMethod),
+		ID:           usr.ID.Hex(),
+		AuthMethods:  models.EnabledAuthMethods,
+		FullName:     usr.FullName,
+		LoginID:      loginID,
+		Email:        email,
+		AuthReturnID: authReturnID,
+		Auth:         normalize.AuthMethod(usr.AuthMethod),
+		Status:       usr.Status,
+		OrgID:        orgHex,
+		OrgName:      orgName,
+		IsEdit:       true,
 	}
 	formutil.SetBase(&data.Base, r, h.DB, "Edit Leader", "/leaders")
 
@@ -101,13 +146,26 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	full := normalize.Name(r.FormValue("full_name"))
+	loginID := normalize.Email(r.FormValue("login_id"))
 	email := normalize.Email(r.FormValue("email"))
+	authReturnID := strings.TrimSpace(r.FormValue("auth_return_id"))
 	authm := normalize.AuthMethod(r.FormValue("auth_method"))
+	tempPassword := strings.TrimSpace(r.FormValue("temp_password"))
 	status := normalize.Status(r.FormValue("status"))
 	orgHex := normalize.QueryParam(r.FormValue("orgID")) // carried as hidden; not changeable
 
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
+
+	// Coordinator access check: verify access to leader's organization
+	if authz.IsCoordinator(r) && orgHex != "" {
+		if oid, err := primitive.ObjectIDFromHex(orgHex); err == nil {
+			if !authz.CanAccessOrg(r, oid) {
+				uierrors.RenderForbidden(w, r, "You don't have access to this leader.", "/leaders")
+				return
+			}
+		}
+	}
 
 	// load org name for re-render convenience
 	orgName := ""
@@ -125,15 +183,28 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Normalize empty status to active
+	// Normalize defaults
 	if status == "" {
 		status = "active"
+	}
+	if authm == "" {
+		authm = "trust"
 	}
 
 	reRender := func(msg string) {
 		data := editData{
-			ID: uid.Hex(), FullName: full, Email: email, OrgID: orgHex, OrgName: orgName,
-			Status: status, Auth: authm,
+			ID:           uid.Hex(),
+			AuthMethods:  models.EnabledAuthMethods,
+			FullName:     full,
+			LoginID:      loginID,
+			Email:        email,
+			AuthReturnID: authReturnID,
+			Auth:         authm,
+			TempPassword: tempPassword,
+			Status:       status,
+			OrgID:        orgHex,
+			OrgName:      orgName,
+			IsEdit:       true,
 		}
 		formutil.SetBase(&data.Base, r, h.DB, "Edit Leader", "/leaders")
 		data.SetError(msg)
@@ -141,18 +212,34 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate required fields using struct tags
-	input := editLeaderInput{FullName: full, Email: email, Status: status}
+	input := editLeaderInput{FullName: full, Status: status}
 	if result := inputval.Validate(input); result.HasErrors() {
 		reRender(result.First())
 		return
 	}
 
-	// Early uniqueness check: same email used by a different user?
+	// Validate auth fields using centralized logic
+	authResult, err := authutil.ValidateAndResolve(authutil.AuthInput{
+		Method:       authm,
+		LoginID:      loginID,
+		Email:        email,
+		AuthReturnID: authReturnID,
+		TempPassword: tempPassword,
+		IsEdit:       true,
+	})
+	if err != nil {
+		reRender(err.Error())
+		return
+	}
+
+	// Early uniqueness check: same login_id used by a different user?
+	effectiveLoginID := authResult.EffectiveLoginID
+	loginIDCI := text.Fold(effectiveLoginID)
 	if err := h.DB.Collection("users").FindOne(ctx, bson.M{
-		"email": email,
-		"_id":   bson.M{"$ne": uid},
+		"login_id_ci": loginIDCI,
+		"_id":         bson.M{"$ne": uid},
 	}).Err(); err == nil {
-		reRender("A user with that email already exists.")
+		reRender("A user with that login ID already exists.")
 		return
 	}
 
@@ -160,15 +247,33 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	up := bson.M{
 		"full_name":    full,
 		"full_name_ci": text.Fold(full),
-		"email":        email,
+		"login_id":     effectiveLoginID,
+		"login_id_ci":  loginIDCI,
 		"auth_method":  authm,
 		"status":       status,
 		"updated_at":   time.Now(),
 	}
+
+	// Handle optional email
+	if authResult.Email != nil {
+		up["email"] = *authResult.Email
+	}
+
+	// Handle optional auth_return_id
+	if authResult.AuthReturnID != nil {
+		up["auth_return_id"] = *authResult.AuthReturnID
+	}
+
+	// Handle password reset if provided
+	if authResult.PasswordHash != nil {
+		up["password_hash"] = *authResult.PasswordHash
+		up["password_temp"] = *authResult.PasswordTemp
+	}
+
 	if _, err := h.DB.Collection("users").UpdateOne(ctx, bson.M{"_id": uid, "role": "leader"}, bson.M{"$set": up}); err != nil {
 		msg := "Database error while updating leader."
 		if wafflemongo.IsDup(err) {
-			msg = "A user with that email already exists."
+			msg = "A user with that login ID already exists."
 		}
 		reRender(msg)
 		return

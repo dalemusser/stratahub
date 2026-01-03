@@ -41,7 +41,7 @@ func (h *Handler) ServeNewGroup(w http.ResponseWriter, r *http.Request) {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
-	if role != "admin" && role != "leader" {
+	if role != "admin" && role != "coordinator" && role != "leader" {
 		uierrors.RenderForbidden(w, r, "You do not have access to create groups.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
@@ -53,8 +53,8 @@ func (h *Handler) ServeNewGroup(w http.ResponseWriter, r *http.Request) {
 	var data newGroupData
 	formutil.SetBase(&data.Base, r, h.DB, "Add Group", "/groups")
 
-	if role == "admin" {
-		// Admin: org can be passed via URL query param (optional - can select via picker)
+	if role == "admin" || role == "coordinator" {
+		// Admin/Coordinator: org can be passed via URL query param (optional - can select via picker)
 		selectedOrg := normalize.QueryParam(r.URL.Query().Get("org"))
 		if selectedOrg != "" && selectedOrg != "all" {
 			orgID, orgName, err := orgutil.ResolveActiveOrgFromHex(ctx, db, selectedOrg)
@@ -120,7 +120,7 @@ func (h *Handler) HandleCreateGroup(w http.ResponseWriter, r *http.Request) {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
-	if role != "admin" && role != "leader" {
+	if role != "admin" && role != "coordinator" && role != "leader" {
 		uierrors.RenderForbidden(w, r, "You do not have access to create groups.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
@@ -151,7 +151,7 @@ func (h *Handler) HandleCreateGroup(w http.ResponseWriter, r *http.Request) {
 	// Resolve org
 	var orgID primitive.ObjectID
 	var err error
-	if role == "admin" {
+	if role == "admin" || role == "coordinator" {
 		orgHex := normalize.QueryParam(r.FormValue("orgID"))
 		orgID, err = primitive.ObjectIDFromHex(orgHex)
 		if err != nil {
@@ -161,6 +161,11 @@ func (h *Handler) HandleCreateGroup(w http.ResponseWriter, r *http.Request) {
 				OrgHex:         orgHex,
 				SelectedLeader: toSet(r.Form["leaderIDs"]),
 			}, "Please select an organization.")
+			return
+		}
+		// Verify coordinator has access to selected org
+		if role == "coordinator" && !authz.CanAccessOrg(r, orgID) {
+			uierrors.RenderForbidden(w, r, "You don't have access to this organization.", httpnav.ResolveBackURL(r, "/groups"))
 			return
 		}
 	} else {
@@ -273,8 +278,8 @@ func (h *Handler) reRenderNewWithError(w http.ResponseWriter, r *http.Request, d
 	defer cancel()
 	db := h.DB
 
-	if data.Role == "admin" {
-		// Admin: reload the org name if an org was selected
+	if data.Role == "admin" || data.Role == "coordinator" {
+		// Admin/Coordinator: reload the org name if an org was selected
 		if data.OrgHex != "" {
 			orgID, err := primitive.ObjectIDFromHex(data.OrgHex)
 			if err == nil {

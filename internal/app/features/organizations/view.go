@@ -7,6 +7,7 @@ import (
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	organizationstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/timezones"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
@@ -17,8 +18,11 @@ import (
 )
 
 // ServeView renders the read-only "View Organization" page.
-// Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
+// Authorization: RequireRole("admin", "coordinator") middleware in routes.go.
+// Coordinators can only view organizations they are assigned to.
 func (h *Handler) ServeView(w http.ResponseWriter, r *http.Request) {
+	role, _, _, _ := authz.UserCtx(r)
+
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
@@ -27,6 +31,12 @@ func (h *Handler) ServeView(w http.ResponseWriter, r *http.Request) {
 	orgID, err := primitive.ObjectIDFromHex(idHex)
 	if err != nil {
 		uierrors.RenderBadRequest(w, r, "Invalid organization ID.", "/organizations")
+		return
+	}
+
+	// Verify coordinator has access to this org
+	if role == "coordinator" && !coordinatorHasAccess(r, orgID) {
+		uierrors.RenderForbidden(w, r, "You don't have access to this organization.", "/organizations")
 		return
 	}
 

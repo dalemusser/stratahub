@@ -30,8 +30,10 @@ type GroupListResult struct {
 
 // ListFilter defines the filter options for listing groups.
 type ListFilter struct {
-	OrgID       *primitive.ObjectID // nil means all orgs
-	SearchQuery string              // prefix search on name_ci
+	OrgID       *primitive.ObjectID  // nil means all orgs (single org filter)
+	OrgIDs      []primitive.ObjectID // filter to these orgs (for coordinators); takes precedence if non-empty
+	GroupIDs    []primitive.ObjectID // filter to these specific groups (for leaders); takes precedence if non-empty
+	SearchQuery string               // prefix search on name_ci
 }
 
 // ListGroupsWithCounts fetches a paginated list of groups with org names,
@@ -98,7 +100,13 @@ func ListGroupsWithCounts(
 // buildBaseClauses builds the base filter clauses from the ListFilter.
 func buildBaseClauses(filter ListFilter) []bson.M {
 	var clauses []bson.M
-	if filter.OrgID != nil {
+	// GroupIDs takes highest precedence (for leaders scoped to specific groups)
+	if len(filter.GroupIDs) > 0 {
+		clauses = append(clauses, bson.M{"_id": bson.M{"$in": filter.GroupIDs}})
+	} else if len(filter.OrgIDs) > 0 {
+		// OrgIDs next (for coordinators scoped to multiple orgs)
+		clauses = append(clauses, bson.M{"organization_id": bson.M{"$in": filter.OrgIDs}})
+	} else if filter.OrgID != nil {
 		clauses = append(clauses, bson.M{"organization_id": *filter.OrgID})
 	}
 	if filter.SearchQuery != "" {

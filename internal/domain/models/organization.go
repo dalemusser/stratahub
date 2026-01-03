@@ -10,6 +10,7 @@ import (
 // Organization includes case/diacritic-insensitive fields for search/sort.
 type Organization struct {
 	ID          primitive.ObjectID `bson:"_id"`
+	WorkspaceID primitive.ObjectID `bson:"workspace_id"` // Parent workspace
 	Name        string             `bson:"name"`
 	NameCI      string             `bson:"name_ci"` // ← always stored
 	City        string             `bson:"city"`

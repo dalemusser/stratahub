@@ -18,10 +18,12 @@ import (
 )
 
 // fetchOrgPane fetches the org pane data including paginated orgs with group counts.
+// scopeOrgIDs limits the orgs to those in the list (for coordinators); nil means all orgs.
 func (h *Handler) fetchOrgPane(
 	ctx context.Context,
 	db *mongo.Database,
 	orgQ, orgAfter, orgBefore string,
+	scopeOrgIDs []primitive.ObjectID,
 ) (orgPaneData, error) {
 	var result orgPaneData
 
@@ -31,6 +33,11 @@ func (h *Handler) fetchOrgPane(
 		q := text.Fold(orgQ)
 		hi := q + "\uffff"
 		orgBase["name_ci"] = bson.M{"$gte": q, "$lt": hi}
+	}
+
+	// If scoped to specific orgs (coordinator), filter by those org IDs
+	if len(scopeOrgIDs) > 0 {
+		orgBase["_id"] = bson.M{"$in": scopeOrgIDs}
 	}
 
 	// Count total orgs matching search
@@ -99,8 +106,12 @@ func (h *Handler) fetchOrgPane(
 		result.NextCursor = wafflemongo.EncodeCursor(last.NameCI, last.ID)
 	}
 
-	// Count all groups (for "All" row)
-	allCount, err := db.Collection("groups").CountDocuments(ctx, bson.M{})
+	// Count all groups (for "All" row), respecting scope
+	allFilter := bson.M{}
+	if len(scopeOrgIDs) > 0 {
+		allFilter["organization_id"] = bson.M{"$in": scopeOrgIDs}
+	}
+	allCount, err := db.Collection("groups").CountDocuments(ctx, allFilter)
 	if err != nil {
 		h.Log.Error("database error counting all groups", zap.Error(err))
 		return result, err

@@ -28,10 +28,10 @@ func newTestHandler(t *testing.T) (*systemusers.Handler, *testutil.Fixtures) {
 
 func adminUser() *auth.SessionUser {
 	return &auth.SessionUser{
-		ID:    primitive.NewObjectID().Hex(),
-		Name:  "Test Admin",
-		Email: "admin@test.com",
-		Role:  "admin",
+		ID:      primitive.NewObjectID().Hex(),
+		Name:    "Test Admin",
+		LoginID: "admin@test.com",
+		Role:    "admin",
 	}
 }
 
@@ -46,7 +46,7 @@ func TestHandleCreate_Admin_Success(t *testing.T) {
 		"full_name":   {"New Admin"},
 		"email":       {"newadmin@example.com"},
 		"role":        {"admin"},
-		"auth_method": {"internal"},
+		"auth_method": {"email"}, // email method uses email as login_id
 	}
 
 	req := httptest.NewRequest("POST", "/system-users", strings.NewReader(form.Encode()))
@@ -63,12 +63,12 @@ func TestHandleCreate_Admin_Success(t *testing.T) {
 	// Verify admin was created
 	var user struct {
 		FullName   string `bson:"full_name"`
-		Email      string `bson:"email"`
+		LoginID    string `bson:"login_id"`
 		Role       string `bson:"role"`
 		Status     string `bson:"status"`
 		AuthMethod string `bson:"auth_method"`
 	}
-	err := db.Collection("users").FindOne(ctx, bson.M{"email": "newadmin@example.com"}).Decode(&user)
+	err := db.Collection("users").FindOne(ctx, bson.M{"login_id": "newadmin@example.com"}).Decode(&user)
 	if err != nil {
 		t.Fatalf("FindOne failed: %v", err)
 	}
@@ -113,7 +113,7 @@ func TestHandleCreate_Analyst_Success(t *testing.T) {
 		Role       string `bson:"role"`
 		AuthMethod string `bson:"auth_method"`
 	}
-	err := db.Collection("users").FindOne(ctx, bson.M{"email": "analyst@example.com"}).Decode(&user)
+	err := db.Collection("users").FindOne(ctx, bson.M{"login_id": "analyst@example.com"}).Decode(&user)
 	if err != nil {
 		t.Fatalf("FindOne failed: %v", err)
 	}
@@ -132,12 +132,12 @@ func TestHandleCreate_InvalidRole(t *testing.T) {
 
 	db := fixtures.DB()
 
-	// Try to create with member or leader role (only admin/analyst allowed)
+	// Try to create with member or leader role (only admin/analyst/coordinator allowed)
 	form := url.Values{
 		"full_name":   {"Invalid User"},
 		"email":       {"invalid@example.com"},
 		"role":        {"member"},
-		"auth_method": {"internal"},
+		"auth_method": {"email"},
 	}
 
 	req := httptest.NewRequest("POST", "/system-users", strings.NewReader(form.Encode()))
@@ -173,7 +173,7 @@ func TestHandleCreate_MissingRequiredFields(t *testing.T) {
 			form: url.Values{
 				"email":       {"test@example.com"},
 				"role":        {"admin"},
-				"auth_method": {"internal"},
+				"auth_method": {"email"},
 			},
 		},
 		{
@@ -181,7 +181,7 @@ func TestHandleCreate_MissingRequiredFields(t *testing.T) {
 			form: url.Values{
 				"full_name":   {"Test User"},
 				"role":        {"admin"},
-				"auth_method": {"internal"},
+				"auth_method": {"email"},
 			},
 		},
 		{
@@ -189,7 +189,7 @@ func TestHandleCreate_MissingRequiredFields(t *testing.T) {
 			form: url.Values{
 				"full_name":   {"Test User"},
 				"email":       {"test@example.com"},
-				"auth_method": {"internal"},
+				"auth_method": {"email"},
 			},
 		},
 		{
@@ -235,7 +235,7 @@ func TestHandleCreate_DuplicateEmail(t *testing.T) {
 		"full_name":   {"New Admin"},
 		"email":       {"existing@example.com"},
 		"role":        {"admin"},
-		"auth_method": {"internal"},
+		"auth_method": {"email"},
 	}
 
 	req := httptest.NewRequest("POST", "/system-users", strings.NewReader(form.Encode()))
@@ -266,7 +266,7 @@ func TestHandleCreate_InvalidEmail(t *testing.T) {
 		"full_name":   {"Test User"},
 		"email":       {"not-an-email"},
 		"role":        {"admin"},
-		"auth_method": {"internal"},
+		"auth_method": {"email"},
 	}
 
 	req := httptest.NewRequest("POST", "/system-users", strings.NewReader(form.Encode()))
@@ -297,7 +297,7 @@ func TestHandleCreate_Unauthenticated(t *testing.T) {
 		"full_name":   {"Test User"},
 		"email":       {"test@example.com"},
 		"role":        {"admin"},
-		"auth_method": {"internal"},
+		"auth_method": {"email"},
 	}
 
 	req := httptest.NewRequest("POST", "/system-users", strings.NewReader(form.Encode()))

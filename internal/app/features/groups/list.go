@@ -3,14 +3,12 @@ package groups
 
 import (
 	"context"
-	"errors"
 	"net/http"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/store/queries/groupqueries"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
-	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
@@ -52,7 +50,7 @@ func dedupObjectIDs(in []primitive.ObjectID) []primitive.ObjectID {
 }
 
 // ServeGroupsList handles GET /groups (relative to mount) with admin org
-// filtering and leader scoping.
+// filtering, coordinator org filtering, and leader scoping.
 func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
 	_, _, uid, ok := authz.UserCtx(r)
 	if !ok {
@@ -60,8 +58,8 @@ func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Only admins and leaders may view Groups
-	if !(authz.IsAdmin(r) || authz.IsLeader(r)) {
+	// Only admins, coordinators, and leaders may view Groups
+	if !(authz.IsAdmin(r) || authz.IsCoordinator(r) || authz.IsLeader(r)) {
 		uierrors.RenderForbidden(w, r, "You don't have permission to view this page.", httpnav.ResolveBackURL(r, "/"))
 		return
 	}
@@ -81,32 +79,78 @@ func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
 	before := normalize.QueryParam(r.URL.Query().Get("before"))
 	start := paging.ParseStart(r)
 
-	// Leaders are forced to their own org; no org pane.
-	showOrgPane := authz.IsAdmin(r)
+	// Determine org pane visibility and scope based on role
+	var showOrgPane bool
+	var scopeOrgIDs []primitive.ObjectID   // For coordinators: limit org pane to these orgs
+	var leaderGroupIDs []primitive.ObjectID // For leaders: limit to their assigned groups
+
 	if authz.IsLeader(r) {
-		oid, _, err := orgutil.ResolveLeaderOrg(ctx, db, uid)
-		if errors.Is(err, orgutil.ErrUserNotFound) || errors.Is(err, orgutil.ErrNoOrganization) {
-			uierrors.RenderForbidden(w, r, "Your account is not linked to an organization.", httpnav.ResolveBackURL(r, "/"))
-			return
-		}
+		// Leaders see only groups they are assigned to as leaders; no org pane
+		cur, err := db.Collection("group_memberships").Find(ctx, bson.M{
+			"user_id": uid,
+			"role":    "leader",
+		})
 		if err != nil {
-			h.ErrLog.LogServerError(w, r, "database error resolving leader org", err, "A database error occurred.", "/groups")
+			h.ErrLog.LogServerError(w, r, "database error fetching leader groups", err, "A database error occurred.", "/groups")
 			return
 		}
-		selectedOrg = oid.Hex()
+		defer cur.Close(ctx)
+
+		for cur.Next(ctx) {
+			var gm struct {
+				GroupID primitive.ObjectID `bson:"group_id"`
+			}
+			if err := cur.Decode(&gm); err == nil {
+				leaderGroupIDs = append(leaderGroupIDs, gm.GroupID)
+			}
+		}
+		if err := cur.Err(); err != nil {
+			h.ErrLog.LogServerError(w, r, "database error iterating leader groups", err, "A database error occurred.", "/groups")
+			return
+		}
+
 		showOrgPane = false
+	} else if authz.IsCoordinator(r) {
+		// Coordinators see org pane filtered to their assigned orgs
+		scopeOrgIDs = authz.UserOrgIDs(r)
+		if len(scopeOrgIDs) == 0 {
+			uierrors.RenderForbidden(w, r, "You are not assigned to any organizations.", httpnav.ResolveBackURL(r, "/"))
+			return
+		}
+		showOrgPane = true
+		if selectedOrg == "" {
+			selectedOrg = "all"
+		}
+		// Validate selected org is in coordinator's allowed list
+		if selectedOrg != "all" {
+			if oid, err := primitive.ObjectIDFromHex(selectedOrg); err == nil {
+				allowed := false
+				for _, allowedOrgID := range scopeOrgIDs {
+					if allowedOrgID == oid {
+						allowed = true
+						break
+					}
+				}
+				if !allowed {
+					selectedOrg = "all"
+				}
+			} else {
+				selectedOrg = "all"
+			}
+		}
 	} else {
-		// For admins, default to "all" when empty.
+		// Admins see all orgs
+		showOrgPane = true
 		if selectedOrg == "" {
 			selectedOrg = "all"
 		}
 	}
 
-	// --- build org pane (admins only) ---
+	// --- build org pane (admins and coordinators) ---
 	var orgPane orgPaneData
 	if showOrgPane {
 		var err error
-		orgPane, err = h.fetchOrgPane(ctx, db, orgQ, orgAfter, orgBefore)
+		orgPane, err = h.fetchOrgPane(ctx, db, orgQ, orgAfter, orgBefore, scopeOrgIDs)
 		if err != nil {
 			h.ErrLog.LogServerError(w, r, "database error fetching org pane", err, "A database error occurred.", "/groups")
 			return
@@ -114,7 +158,7 @@ func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// --- build right-side groups table ---
-	groups, shown, total, prevCur, nextCur, hasPrev, hasNext, err := h.fetchGroupsList(ctx, db, selectedOrg, search, after, before)
+	groups, shown, total, prevCur, nextCur, hasPrev, hasNext, err := h.fetchGroupsList(ctx, db, selectedOrg, search, after, before, scopeOrgIDs, leaderGroupIDs)
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "database error fetching groups list", err, "A database error occurred.", "/groups")
 		return
@@ -158,17 +202,27 @@ func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
 }
 
 // fetchGroupsList fetches the paginated groups list with counts using groupqueries.
+// scopeOrgIDs limits the results to groups in those orgs (for coordinators); nil means no restriction.
+// leaderGroupIDs limits the results to those specific groups (for leaders); takes precedence if non-empty.
 func (h *Handler) fetchGroupsList(
 	ctx context.Context,
 	db *mongo.Database,
 	selectedOrg, search, after, before string,
+	scopeOrgIDs []primitive.ObjectID,
+	leaderGroupIDs []primitive.ObjectID,
 ) ([]groupListItem, int, int64, string, string, bool, bool, error) {
 	// Build filter
 	var filter groupqueries.ListFilter
-	if selectedOrg != "" && selectedOrg != "all" {
+	if len(leaderGroupIDs) > 0 {
+		// Leader - scope to their assigned groups only
+		filter.GroupIDs = leaderGroupIDs
+	} else if selectedOrg != "" && selectedOrg != "all" {
 		if oid, err := primitive.ObjectIDFromHex(selectedOrg); err == nil {
 			filter.OrgID = &oid
 		}
+	} else if len(scopeOrgIDs) > 0 {
+		// Coordinator viewing "all" - scope to their assigned orgs
+		filter.OrgIDs = scopeOrgIDs
 	}
 	filter.SearchQuery = search
 
@@ -218,12 +272,12 @@ func (h *Handler) fetchGroupsList(
 // ServeGroupManageModal handles GET /groups/{id}/manage_modal and returns
 // the snippet for the Manage Group modal.
 func (h *Handler) ServeGroupManageModal(w http.ResponseWriter, r *http.Request) {
-	_, _, _, ok := authz.UserCtx(r)
+	role, _, _, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
-	if !(authz.IsAdmin(r) || authz.IsLeader(r)) {
+	if !(authz.IsAdmin(r) || authz.IsCoordinator(r) || authz.IsLeader(r)) {
 		uierrors.RenderForbidden(w, r, "You don't have permission to view this page.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
@@ -285,8 +339,10 @@ func (h *Handler) ServeGroupManageModal(w http.ResponseWriter, r *http.Request) 
 	data := groupManageModalData{
 		GroupID:          gid,
 		GroupName:        g.Name,
+		OrganizationID:   g.OrganizationID.Hex(),
 		OrganizationName: orgName,
 		BackURL:          back,
+		Role:             role,
 	}
 
 	templates.RenderSnippet(w, "group_manage_group_modal", data)

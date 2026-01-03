@@ -11,8 +11,10 @@ import (
 type groupManageModalData struct {
 	GroupID          string
 	GroupName        string
+	OrganizationID   string
 	OrganizationName string
 	BackURL          string
+	Role             string
 }
 
 // groupListItem represents a single group row in the list.

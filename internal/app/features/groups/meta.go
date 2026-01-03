@@ -57,6 +57,7 @@ type groupViewData struct {
 	GroupID          string
 	Name             string
 	Description      string
+	OrganizationID   string
 	OrganizationName string
 	LeadersCount     int
 	MembersCount     int

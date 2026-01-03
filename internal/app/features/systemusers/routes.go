@@ -28,6 +28,9 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 		pr.Get("/new", h.ServeNew)
 		pr.Post("/", h.HandleCreate)
 
+		// Organization picker for coordinator assignment
+		pr.Get("/org-picker", h.ServeOrgPicker)
+
 		// View / edit / delete specific system user
 		pr.Get("/{id}/view", h.ServeView)
 		pr.Get("/{id}/edit", h.ServeEdit)

@@ -30,21 +30,18 @@
 
   <div class="ml-auto flex gap-2">
     <a
-      href="/organizations?q="
-      hx-get="/organizations"
-      hx-vals='{"q":""}'
-      hx-target="#content"
-      hx-swap="innerHTML"
-      hx-push-url="true"
-      class="px-4 py-2 border rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700 mr-6"
+      href="/organizations"
+      class="px-4 py-2 border rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700 {{ if eq .Role "admin" }}mr-6{{ end }}"
     >
       Clear
     </a>
 
+    {{ if eq .Role "admin" }}
     <a href="/organizations/new"
        class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
-      + Add Organization
+      Add Organization
     </a>
+    {{ end }}
   </div>
 </form>
 
@@ -158,14 +155,20 @@
       <div class="flex justify-center gap-2">
         <a
           href="/organizations/{{ .ID }}/view?return={{ .BackURL | urlquery }}"
-          class="px-3 py-1 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
         >View</a>
 
         <a
           href="/organizations/{{ .ID }}/edit?return={{ .BackURL | urlquery }}"
-          class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700"
+          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
         >Edit</a>
 
+        <a
+          href="/upload_csv?org={{ .ID }}&allowGroup=true&return={{ .BackURL | urlquery }}"
+          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
+        >CSV</a>
+
+        {{ if eq .Role "admin" }}
         <form
           method="post"
           action="/organizations/{{ .ID }}/delete"
@@ -178,6 +181,7 @@
             Delete
           </button>
         </form>
+        {{ end }}
       </div>
 
       <div class="flex justify-start">

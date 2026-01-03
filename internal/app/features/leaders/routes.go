@@ -9,16 +9,16 @@ import (
 func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 	r := chi.NewRouter()
 
-	// Picker endpoint - accessible by admin and leader roles
+	// Picker endpoint - accessible by admin, coordinator, and leader roles
 	r.Group(func(pr chi.Router) {
 		pr.Use(sm.RequireSignedIn)
 		pr.Get("/picker", h.ServeLeaderPicker)
 	})
 
-	// Admin-only routes
+	// Admin and coordinator routes (coordinators have filtered views, see handlers)
 	r.Group(func(pr chi.Router) {
 		pr.Use(sm.RequireSignedIn)
-		pr.Use(sm.RequireRole("admin"))
+		pr.Use(sm.RequireRole("admin", "coordinator"))
 
 		pr.Get("/", h.ServeList)
 		pr.Get("/new", h.ServeNew)

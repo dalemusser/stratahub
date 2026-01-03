@@ -33,6 +33,17 @@ var appConfigKeys = []config.AppKey{
 	{Name: "storage_cf_url", Default: "", Desc: "CloudFront distribution URL"},
 	{Name: "storage_cf_keypair_id", Default: "", Desc: "CloudFront key pair ID"},
 	{Name: "storage_cf_key_path", Default: "", Desc: "Path to CloudFront private key file"},
+
+	// Email/SMTP configuration
+	{Name: "mail_smtp_host", Default: "localhost", Desc: "SMTP server host"},
+	{Name: "mail_smtp_port", Default: "1025", Desc: "SMTP server port"},
+	{Name: "mail_smtp_user", Default: "", Desc: "SMTP username"},
+	{Name: "mail_smtp_pass", Default: "", Desc: "SMTP password"},
+	{Name: "mail_from", Default: "noreply@stratahub.com", Desc: "From email address"},
+	{Name: "mail_from_name", Default: "StrataHub", Desc: "From display name"},
+
+	// Base URL for email links (magic links, etc.)
+	{Name: "base_url", Default: "http://localhost:3000", Desc: "Base URL for email links"},
 }
 
 // LoadConfig loads WAFFLE core config and app-specific config.
@@ -73,6 +84,17 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 		StorageCFURL:       appValues.String("storage_cf_url"),
 		StorageCFKeyPairID: appValues.String("storage_cf_keypair_id"),
 		StorageCFKeyPath:   appValues.String("storage_cf_key_path"),
+
+		// Email/SMTP
+		MailSMTPHost: appValues.String("mail_smtp_host"),
+		MailSMTPPort: appValues.Int("mail_smtp_port"),
+		MailSMTPUser: appValues.String("mail_smtp_user"),
+		MailSMTPPass: appValues.String("mail_smtp_pass"),
+		MailFrom:     appValues.String("mail_from"),
+		MailFromName: appValues.String("mail_from_name"),
+
+		// Base URL
+		BaseURL: appValues.String("base_url"),
 	}
 
 	return coreCfg, appCfg, nil

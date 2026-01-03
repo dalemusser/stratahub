@@ -10,6 +10,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -37,6 +38,21 @@ func countActiveAdmins(ctx context.Context, db *mongo.Database) (int64, error) {
 	return userstore.New(db).CountActiveAdmins(ctx)
 }
 
+// editFormParams holds parameters for renderEditForm.
+type editFormParams struct {
+	ID           string
+	FullName     string
+	LoginID      string
+	Email        string
+	AuthReturnID string
+	TempPassword string
+	Role         string
+	Auth         string
+	Status       string
+	IsSelf       bool
+	ErrMsg       template.HTML
+}
+
 /*
 renderEditForm centralizes rendering of the Edit System User form
 with the posted values and an optional error message.
@@ -48,20 +64,23 @@ func renderEditForm(
 	w http.ResponseWriter,
 	r *http.Request,
 	db *mongo.Database,
-	idHex, full, email, uRole, authm, status string,
-	isSelf bool,
-	errMsg template.HTML,
+	p editFormParams,
 ) {
 	templates.Render(w, r, "system_user_edit", formData{
-		BaseVM:   viewdata.NewBaseVM(r, db, "Edit System User", backToSystemUsersURL(r)),
-		ID:       idHex,
-		FullName: full,
-		Email:    email,
-		URole:    uRole,
-		UserRole: uRole,
-		Auth:     authm,
-		Status:   status,
-		IsSelf:   isSelf,
-		Error:    errMsg,
+		BaseVM:       viewdata.NewBaseVM(r, db, "Edit System User", backToSystemUsersURL(r)),
+		AuthMethods:  models.EnabledAuthMethods,
+		ID:           p.ID,
+		FullName:     p.FullName,
+		LoginID:      p.LoginID,
+		Email:        p.Email,
+		AuthReturnID: p.AuthReturnID,
+		TempPassword: p.TempPassword,
+		URole:        p.Role,
+		UserRole:     p.Role,
+		Auth:         p.Auth,
+		Status:       p.Status,
+		IsEdit:       true,
+		IsSelf:       p.IsSelf,
+		Error:        p.ErrMsg,
 	})
 }

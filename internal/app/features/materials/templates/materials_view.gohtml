@@ -83,23 +83,25 @@
   </div>
 
   <div class="pt-3 flex gap-2">
+    {{ if .CanEdit }}
     <a
       href="/materials/{{ .ID }}/edit?return={{ .BackURL | urlquery }}"
-      class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700"
+      class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
     >
       Edit Material
     </a>
+    {{ end }}
 
     <a
       href="/materials/{{ .ID }}/assign"
-      class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+      class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
     >
       Assign
     </a>
 
     <a
       href="/materials/{{ .ID }}/assignments"
-      class="inline-flex items-center px-4 py-2 bg-purple-600 text-white rounded hover:bg-purple-700"
+      class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
     >
       Assignments
     </a>

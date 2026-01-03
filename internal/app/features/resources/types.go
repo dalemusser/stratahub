@@ -46,6 +46,9 @@ type listData struct {
 	RangeEnd   int
 	PrevStart  int
 	NextStart  int
+
+	// Permission flags
+	CanCreate bool // True for admin; false for coordinator (view-only)
 }
 
 // manageModalData is used to render the admin "Manage Resource" modal.
@@ -58,6 +61,7 @@ type manageModalData struct {
 	ShowInLibrary bool
 	Description   string
 	BackURL       string
+	CanEdit       bool // True for admin; false for coordinator (view-only)
 }
 
 // ResourceTypeOption is used to populate the resource type select menu.
@@ -117,6 +121,9 @@ type viewData struct {
 	HasFile  bool
 	FileName string
 	FileSize int64
+
+	// Permission flags
+	CanEdit bool // True for admin; false for coordinator (view-only)
 }
 
 // ========================= MEMBER VIEW MODELS ===============================

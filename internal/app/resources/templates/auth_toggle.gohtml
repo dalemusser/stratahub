@@ -1,0 +1,85 @@
+{{/*
+  auth_toggle.gohtml - Shared JavaScript for auth field visibility toggling.
+
+  Include this template after your form that uses auth_fields.gohtml.
+  The JavaScript expects the standard element IDs defined in auth_fields.gohtml:
+    - auth-method-select
+    - login-id-section, login-id-input
+    - email-section, email-input, email-optional-label
+    - auth-return-id-section, auth-return-id-input
+    - temp-password-section, temp-password-input
+*/}}
+
+{{ define "auth_toggle_script" }}
+<script>
+(function() {
+  var authSelect = document.getElementById('auth-method-select');
+  if (!authSelect) return; // Exit if no auth select found
+
+  var loginIdSection = document.getElementById('login-id-section');
+  var loginIdInput = document.getElementById('login-id-input');
+  var emailOptionalLabel = document.getElementById('email-optional-label');
+  var emailInput = document.getElementById('email-input');
+  var passwordSection = document.getElementById('temp-password-section');
+  var passwordInput = document.getElementById('temp-password-input');
+  var authReturnIdSection = document.getElementById('auth-return-id-section');
+  var authReturnIdInput = document.getElementById('auth-return-id-input');
+
+  // Methods where email IS the login identity (no separate Login ID field)
+  var emailIsLoginMethods = ['email', 'google', 'microsoft'];
+  // Methods that require auth_return_id
+  var authReturnIdMethods = ['clever', 'classlink', 'schoology'];
+
+  function toggleAuthFields() {
+    var method = authSelect.value;
+
+    // Login ID: hide for email/google/microsoft (email becomes login_id)
+    if (loginIdSection && loginIdInput) {
+      if (emailIsLoginMethods.indexOf(method) !== -1) {
+        loginIdSection.classList.add('hidden');
+        loginIdInput.required = false;
+      } else {
+        loginIdSection.classList.remove('hidden');
+        loginIdInput.required = true;
+      }
+    }
+
+    // Email: required for email/google/microsoft, optional for others
+    if (emailOptionalLabel && emailInput) {
+      if (emailIsLoginMethods.indexOf(method) !== -1) {
+        emailOptionalLabel.classList.add('hidden');
+        emailInput.required = true;
+      } else {
+        emailOptionalLabel.classList.remove('hidden');
+        emailInput.required = false;
+      }
+    }
+
+    // Password field: show only for 'password' auth
+    if (passwordSection && passwordInput) {
+      if (method === 'password') {
+        passwordSection.classList.remove('hidden');
+      } else {
+        passwordSection.classList.add('hidden');
+        passwordInput.value = '';
+      }
+    }
+
+    // Auth Return ID: show only for clever/classlink/schoology
+    if (authReturnIdSection && authReturnIdInput) {
+      if (authReturnIdMethods.indexOf(method) !== -1) {
+        authReturnIdSection.classList.remove('hidden');
+        authReturnIdInput.required = true;
+      } else {
+        authReturnIdSection.classList.add('hidden');
+        authReturnIdInput.required = false;
+      }
+    }
+  }
+
+  authSelect.addEventListener('change', toggleAuthFields);
+  // Initial state check
+  toggleAuthFields();
+})();
+</script>
+{{ end }}

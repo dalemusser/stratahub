@@ -6,7 +6,6 @@ import (
 
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/templates"
-	"go.uber.org/zap"
 )
 
 func (h *Handler) ServeMember(w http.ResponseWriter, r *http.Request) {
@@ -14,8 +13,6 @@ func (h *Handler) ServeMember(w http.ResponseWriter, r *http.Request) {
 	data := baseDashboardData{
 		BaseVM: base,
 	}
-
-	h.Log.Debug("member dashboard served", zap.String("user", base.UserName))
 
 	templates.Render(w, r, "member_dashboard", data)
 }

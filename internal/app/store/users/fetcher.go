@@ -16,15 +16,17 @@ import (
 // Fetcher implements auth.UserFetcher to load fresh user data on each request.
 // It fetches user and organization data from MongoDB.
 type Fetcher struct {
-	users *mongo.Collection
-	orgs  *mongo.Collection
+	users            *mongo.Collection
+	orgs             *mongo.Collection
+	coordAssignments *mongo.Collection
 }
 
 // NewFetcher creates a UserFetcher that queries the given database.
 func NewFetcher(db *mongo.Database) *Fetcher {
 	return &Fetcher{
-		users: db.Collection("users"),
-		orgs:  db.Collection("organizations"),
+		users:            db.Collection("users"),
+		orgs:             db.Collection("organizations"),
+		coordAssignments: db.Collection("coordinator_assignments"),
 	}
 }
 
@@ -44,12 +46,14 @@ func (f *Fetcher) FetchUser(ctx context.Context, userID string) *auth.SessionUse
 	// Fetch the user with projection for only needed fields
 	var u models.User
 	proj := options.FindOne().SetProjection(bson.M{
-		"_id":             1,
-		"full_name":       1,
-		"email":           1,
-		"role":            1,
-		"status":          1,
-		"organization_id": 1,
+		"_id":                  1,
+		"full_name":            1,
+		"login_id":             1,
+		"role":                 1,
+		"status":               1,
+		"organization_id":      1,
+		"can_manage_materials": 1,
+		"can_manage_resources": 1,
 	})
 
 	if err := f.users.FindOne(ctx, bson.M{"_id": oid}, proj).Decode(&u); err != nil {
@@ -63,14 +67,18 @@ func (f *Fetcher) FetchUser(ctx context.Context, userID string) *auth.SessionUse
 	}
 
 	// Build the session user
+	loginID := ""
+	if u.LoginID != nil {
+		loginID = *u.LoginID
+	}
 	su := &auth.SessionUser{
-		ID:    u.ID.Hex(),
-		Name:  u.FullName,
-		Email: u.Email,
-		Role:  normalize.Role(u.Role),
+		ID:      u.ID.Hex(),
+		Name:    u.FullName,
+		LoginID: loginID,
+		Role:    normalize.Role(u.Role),
 	}
 
-	// If user has an organization, fetch the org name
+	// If user has a single organization (leaders/members), fetch the org name
 	if u.OrganizationID != nil {
 		su.OrganizationID = u.OrganizationID.Hex()
 
@@ -80,6 +88,27 @@ func (f *Fetcher) FetchUser(ctx context.Context, userID string) *auth.SessionUse
 			su.OrganizationName = org.Name
 		}
 		// If org fetch fails, we still return the user with empty org name
+	}
+
+	// For coordinators, fetch their organization assignments and set permissions
+	if su.Role == "coordinator" {
+		// Set coordinator-specific permissions
+		su.CanManageMaterials = u.CanManageMaterials
+		su.CanManageResources = u.CanManageResources
+
+		cur, err := f.coordAssignments.Find(ctx, bson.M{"user_id": oid})
+		if err == nil {
+			defer cur.Close(ctx)
+			for cur.Next(ctx) {
+				var ca struct {
+					OrganizationID primitive.ObjectID `bson:"organization_id"`
+				}
+				if cur.Decode(&ca) == nil {
+					su.OrganizationIDs = append(su.OrganizationIDs, ca.OrganizationID.Hex())
+				}
+			}
+		}
+		// If query fails, coordinator will have empty org list (safe fallback)
 	}
 
 	return su

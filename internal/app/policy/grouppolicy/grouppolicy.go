@@ -27,8 +27,9 @@ func IsLeader(ctx context.Context, db *mongo.Database, groupID, userID primitive
 }
 
 // CanManageGroup reports whether the current request user can manage the group:
-// admins always can; leaders can only if they are a leader of this specific group
-// AND the group belongs to their organization.
+// - Admins always can
+// - Coordinators can if the group is in one of their assigned organizations
+// - Leaders can only if they are a leader of this specific group AND the group belongs to their organization
 // Returns an error if the database check fails, allowing callers to distinguish
 // between "not authorized" (false, nil) and "database error" (false, err).
 func CanManageGroup(ctx context.Context, db *mongo.Database, r *http.Request, groupID, groupOrgID primitive.ObjectID) (bool, error) {
@@ -38,6 +39,10 @@ func CanManageGroup(ctx context.Context, db *mongo.Database, r *http.Request, gr
 	}
 	if role == "admin" {
 		return true, nil
+	}
+	if role == "coordinator" {
+		// Coordinators can manage groups in any of their assigned organizations
+		return authz.CanAccessOrg(r, groupOrgID), nil
 	}
 	if role != "leader" {
 		return false, nil

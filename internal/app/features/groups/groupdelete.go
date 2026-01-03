@@ -21,15 +21,15 @@ import (
 	"go.uber.org/zap"
 )
 
-// HandleDeleteGroup handles deleting a group (admin only).
+// HandleDeleteGroup handles deleting a group (admin and coordinator).
 func (h *Handler) HandleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 	role, _, _, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
-	// Admin only delete (safer). Change later if you want leader-of-group delete.
-	if role != "admin" {
+	// Admin and coordinator can delete groups (coordinators are restricted to their orgs via policy check below)
+	if role != "admin" && role != "coordinator" {
 		uierrors.RenderForbidden(w, r, "You do not have access to delete groups.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}

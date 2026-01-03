@@ -50,22 +50,22 @@
 <div class="pt-4 flex flex-wrap gap-2">
   <a
     href="/groups/{{ .GroupID }}/edit?return={{ .CurrentPath | urlquery }}"
-    class="px-3 py-1 bg-red-600 text-white text-sm rounded hover:bg-red-700"
+    class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
   >Edit Group</a>
 
   <a
     href="/groups/{{ .GroupID }}/manage?return={{ .CurrentPath | urlquery }}"
-    class="px-3 py-1 bg-blue-600 text-white text-sm rounded hover:bg-blue-700"
+    class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
   >Manage Users</a>
 
   <a
-    href="/groups/{{ .GroupID }}/upload_csv?return={{ .CurrentPath | urlquery }}"
-    class="px-3 py-1 bg-purple-600 text-white text-sm rounded hover:bg-purple-700"
+    href="/upload_csv?org={{ .OrganizationID }}&group={{ .GroupID }}&return={{ .CurrentPath | urlquery }}"
+    class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
   >Upload CSV</a>
 
   <a
     href="/groups/{{ .GroupID }}/assign_resources?return={{ .CurrentPath | urlquery }}"
-    class="px-3 py-1 bg-green-600 text-white text-sm rounded hover:bg-green-700"
+    class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
   >Assign Resources</a>
 </div>
 

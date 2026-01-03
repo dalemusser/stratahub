@@ -1,10 +1,10 @@
 package resources_test
 
 import (
+	"bytes"
+	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
-	"strings"
 	"testing"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
@@ -16,22 +16,41 @@ import (
 	"go.uber.org/zap"
 )
 
+// createMultipartRequest creates a multipart form request with the given form values.
+func createMultipartRequest(t *testing.T, urlPath string, formValues map[string]string) (*http.Request, string) {
+	t.Helper()
+	var buf bytes.Buffer
+	writer := multipart.NewWriter(&buf)
+	for key, val := range formValues {
+		if err := writer.WriteField(key, val); err != nil {
+			t.Fatalf("failed to write field %s: %v", key, err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatalf("failed to close multipart writer: %v", err)
+	}
+	req := httptest.NewRequest("POST", urlPath, &buf)
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	return req, writer.FormDataContentType()
+}
+
 func newTestAdminHandler(t *testing.T) (*resources.AdminHandler, *testutil.Fixtures) {
 	t.Helper()
 	db := testutil.SetupTestDB(t)
 	logger := zap.NewNop()
 	errLog := uierrors.NewErrorLogger(logger)
-	handler := resources.NewAdminHandler(db, errLog, logger)
+	// Pass nil for storage since tests don't use file uploads
+	handler := resources.NewAdminHandler(db, nil, errLog, logger)
 	fixtures := testutil.NewFixtures(t, db)
 	return handler, fixtures
 }
 
 func adminUser() *auth.SessionUser {
 	return &auth.SessionUser{
-		ID:    primitive.NewObjectID().Hex(),
-		Name:  "Test Admin",
-		Email: "admin@test.com",
-		Role:  "admin",
+		ID:      primitive.NewObjectID().Hex(),
+		Name:    "Test Admin",
+		LoginID: "admin@test.com",
+		Role:    "admin",
 	}
 }
 
@@ -42,15 +61,14 @@ func TestHandleCreate_Success(t *testing.T) {
 
 	db := fixtures.DB()
 
-	form := url.Values{
-		"title":      {"Test Resource"},
-		"launch_url": {"https://example.com/resource"},
-		"type":       {"game"},
-		"status":     {"active"},
+	formValues := map[string]string{
+		"title":      "Test Resource",
+		"launch_url": "https://example.com/resource",
+		"type":       "game",
+		"status":     "active",
 	}
 
-	req := httptest.NewRequest("POST", "/resources", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req, _ := createMultipartRequest(t, "/resources", formValues)
 	req = auth.WithTestUser(req, adminUser())
 
 	rec := httptest.NewRecorder()
@@ -92,19 +110,18 @@ func TestHandleCreate_WithAllFields(t *testing.T) {
 
 	db := fixtures.DB()
 
-	form := url.Values{
-		"title":                {"Complete Resource"},
-		"subject":              {"Mathematics"},
-		"description":          {"A complete test resource"},
-		"launch_url":           {"https://example.com/complete"},
-		"type":                 {"video"},
-		"status":               {"active"},
-		"show_in_library":      {"on"},
-		"default_instructions": {"Complete all exercises"},
+	formValues := map[string]string{
+		"title":                "Complete Resource",
+		"subject":              "Mathematics",
+		"description":          "A complete test resource",
+		"launch_url":           "https://example.com/complete",
+		"type":                 "video",
+		"status":               "active",
+		"show_in_library":      "on",
+		"default_instructions": "Complete all exercises",
 	}
 
-	req := httptest.NewRequest("POST", "/resources", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req, _ := createMultipartRequest(t, "/resources", formValues)
 	req = auth.WithTestUser(req, adminUser())
 
 	rec := httptest.NewRecorder()
@@ -146,13 +163,12 @@ func TestHandleCreate_MissingTitle(t *testing.T) {
 
 	db := fixtures.DB()
 
-	form := url.Values{
-		"launch_url": {"https://example.com/resource"},
-		"status":     {"active"},
+	formValues := map[string]string{
+		"launch_url": "https://example.com/resource",
+		"status":     "active",
 	}
 
-	req := httptest.NewRequest("POST", "/resources", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req, _ := createMultipartRequest(t, "/resources", formValues)
 	req = auth.WithTestUser(req, adminUser())
 
 	rec := httptest.NewRecorder()
@@ -175,13 +191,12 @@ func TestHandleCreate_MissingLaunchURL(t *testing.T) {
 
 	db := fixtures.DB()
 
-	form := url.Values{
-		"title":  {"Test Resource"},
-		"status": {"active"},
+	formValues := map[string]string{
+		"title":  "Test Resource",
+		"status": "active",
 	}
 
-	req := httptest.NewRequest("POST", "/resources", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req, _ := createMultipartRequest(t, "/resources", formValues)
 	req = auth.WithTestUser(req, adminUser())
 
 	rec := httptest.NewRecorder()
@@ -204,14 +219,13 @@ func TestHandleCreate_InvalidLaunchURL(t *testing.T) {
 
 	db := fixtures.DB()
 
-	form := url.Values{
-		"title":      {"Test Resource"},
-		"launch_url": {"not-a-valid-url"},
-		"status":     {"active"},
+	formValues := map[string]string{
+		"title":      "Test Resource",
+		"launch_url": "not-a-valid-url",
+		"status":     "active",
 	}
 
-	req := httptest.NewRequest("POST", "/resources", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req, _ := createMultipartRequest(t, "/resources", formValues)
 	req = auth.WithTestUser(req, adminUser())
 
 	rec := httptest.NewRecorder()
@@ -235,14 +249,13 @@ func TestHandleCreate_DuplicateTitle(t *testing.T) {
 	db := fixtures.DB()
 	fixtures.CreateResource(ctx, "Existing Resource", "https://example.com/existing")
 
-	form := url.Values{
-		"title":      {"Existing Resource"},
-		"launch_url": {"https://example.com/duplicate"},
-		"status":     {"active"},
+	formValues := map[string]string{
+		"title":      "Existing Resource",
+		"launch_url": "https://example.com/duplicate",
+		"status":     "active",
 	}
 
-	req := httptest.NewRequest("POST", "/resources", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req, _ := createMultipartRequest(t, "/resources", formValues)
 	req = auth.WithTestUser(req, adminUser())
 
 	rec := httptest.NewRecorder()
@@ -265,14 +278,13 @@ func TestHandleCreate_DefaultsApplied(t *testing.T) {
 
 	db := fixtures.DB()
 
-	form := url.Values{
-		"title":      {"Minimal Resource"},
-		"launch_url": {"https://example.com/minimal"},
+	formValues := map[string]string{
+		"title":      "Minimal Resource",
+		"launch_url": "https://example.com/minimal",
 		// type and status not provided
 	}
 
-	req := httptest.NewRequest("POST", "/resources", strings.NewReader(form.Encode()))
-	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req, _ := createMultipartRequest(t, "/resources", formValues)
 	req = auth.WithTestUser(req, adminUser())
 
 	rec := httptest.NewRecorder()

@@ -45,12 +45,21 @@ func EnsureAll(ctx context.Context, db *mongo.Database) error {
 	if err := ensureMaterialAssignments(ctx, db); err != nil {
 		problems = append(problems, "material_assignments: "+err.Error())
 	}
+	if err := ensureCoordinatorAssignments(ctx, db); err != nil {
+		problems = append(problems, "coordinator_assignments: "+err.Error())
+	}
 	// dashboards typically read "recent activity" from login_records
 	if err := ensureLoginRecords(ctx, db); err != nil {
 		problems = append(problems, "login_records: "+err.Error())
 	}
 	if err := ensurePages(ctx, db); err != nil {
 		problems = append(problems, "pages: "+err.Error())
+	}
+	if err := ensureWorkspaces(ctx, db); err != nil {
+		problems = append(problems, "workspaces: "+err.Error())
+	}
+	if err := ensureEmailVerifications(ctx, db); err != nil {
+		problems = append(problems, "email_verifications: "+err.Error())
 	}
 
 	if len(problems) > 0 {
@@ -341,10 +350,11 @@ func ensureIndexSet(ctx context.Context, coll *mongo.Collection, models []mongo.
 func ensureUsers(ctx context.Context, db *mongo.Database) error {
 	c := db.Collection("users")
 	return ensureIndexSet(ctx, c, []mongo.IndexModel{
-		// 1) Email must be unique across all users (global, cross‑org)
+		// 1) login_id_ci must be unique across all users (global, cross‑org)
+		//    This is the folded (case/diacritic-insensitive) version of login_id
 		{
-			Keys:    bson.D{{Key: "email", Value: 1}},
-			Options: options.Index().SetUnique(true).SetName("uniq_users_email"),
+			Keys:    bson.D{{Key: "login_id_ci", Value: 1}},
+			Options: options.Index().SetUnique(true).SetName("uniq_users_login_id_ci"),
 		},
 
 		// 2) Members lists (org-scoped): covers both with and without status filter.
@@ -377,16 +387,16 @@ func ensureUsers(ctx context.Context, db *mongo.Database) error {
 			Options: options.Index().SetName("idx_users_role_status_fullnameci_id"),
 		},
 
-		// 4) Email search path when you pivot sort to email (members screens)
+		// 4) login_id search path when you pivot sort to login_id (members screens)
 		{
 			Keys: bson.D{
 				{Key: "role", Value: 1},
 				{Key: "organization_id", Value: 1},
 				{Key: "status", Value: 1},
-				{Key: "email", Value: 1},
+				{Key: "login_id_ci", Value: 1},
 				{Key: "_id", Value: 1},
 			},
-			Options: options.Index().SetName("idx_users_role_org_status_email_id"),
+			Options: options.Index().SetName("idx_users_role_org_status_loginidci_id"),
 		},
 
 		// 5) Handy single-field lookup
@@ -695,6 +705,38 @@ func ensureMaterialAssignments(ctx context.Context, db *mongo.Database) error {
 	})
 }
 
+func ensureCoordinatorAssignments(ctx context.Context, db *mongo.Database) error {
+	c := db.Collection("coordinator_assignments")
+	return ensureIndexSet(ctx, c, []mongo.IndexModel{
+		// Unique constraint: a coordinator can only be assigned to an org once
+		{
+			Keys: bson.D{
+				{Key: "user_id", Value: 1},
+				{Key: "organization_id", Value: 1},
+			},
+			Options: options.Index().
+				SetUnique(true).
+				SetName("uniq_coordassign_user_org"),
+		},
+		// Lookup by user (for authorization checks and listing coordinator's orgs)
+		{
+			Keys: bson.D{
+				{Key: "user_id", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_coordassign_user"),
+		},
+		// Lookup by organization (for listing coordinators for an org, cascade deletes)
+		{
+			Keys: bson.D{
+				{Key: "organization_id", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_coordassign_org"),
+		},
+	})
+}
+
 func ensurePages(ctx context.Context, db *mongo.Database) error {
 	c := db.Collection("pages")
 	return ensureIndexSet(ctx, c, []mongo.IndexModel{
@@ -706,6 +748,71 @@ func ensurePages(ctx context.Context, db *mongo.Database) error {
 			Options: options.Index().
 				SetUnique(true).
 				SetName("uniq_pages_slug"),
+		},
+	})
+}
+
+func ensureWorkspaces(ctx context.Context, db *mongo.Database) error {
+	c := db.Collection("workspaces")
+	return ensureIndexSet(ctx, c, []mongo.IndexModel{
+		// Unique subdomain for each workspace (e.g., "mhs" for mhs.adroit.games)
+		{
+			Keys: bson.D{
+				{Key: "subdomain", Value: 1},
+			},
+			Options: options.Index().
+				SetUnique(true).
+				SetName("uniq_workspaces_subdomain"),
+		},
+		// Unique name_ci for workspace names (case-insensitive)
+		{
+			Keys: bson.D{
+				{Key: "name_ci", Value: 1},
+			},
+			Options: options.Index().
+				SetUnique(true).
+				SetName("uniq_workspaces_nameci"),
+		},
+		// Status + name_ci + _id listing index
+		{
+			Keys: bson.D{
+				{Key: "status", Value: 1},
+				{Key: "name_ci", Value: 1},
+				{Key: "_id", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_workspaces_status_nameci__id"),
+		},
+	})
+}
+
+func ensureEmailVerifications(ctx context.Context, db *mongo.Database) error {
+	c := db.Collection("email_verifications")
+	return ensureIndexSet(ctx, c, []mongo.IndexModel{
+		// TTL index for auto-cleanup of expired verifications
+		{
+			Keys: bson.D{
+				{Key: "expires_at", Value: 1},
+			},
+			Options: options.Index().
+				SetExpireAfterSeconds(0).
+				SetName("idx_emailverify_expires_ttl"),
+		},
+		// Lookup by token (for magic link verification)
+		{
+			Keys: bson.D{
+				{Key: "token", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_emailverify_token"),
+		},
+		// Lookup by user_id (for code verification and cleanup)
+		{
+			Keys: bson.D{
+				{Key: "user_id", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_emailverify_user"),
 		},
 	})
 }

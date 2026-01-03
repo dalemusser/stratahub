@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/store/coordinatorassign"
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
 	materialassignstore "github.com/dalemusser/stratahub/internal/app/store/materialassign"
 	membershipstore "github.com/dalemusser/stratahub/internal/app/store/memberships"
@@ -52,16 +53,18 @@ func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 // cascadeDeleteOrg deletes all documents related to an organization in the correct order:
 // 1. group_resource_assignments (references groups)
 // 2. material_assignments (references organization)
-// 3. group_memberships (references groups and users)
-// 4. groups (references organization)
-// 5. users (references organization)
-// 6. organization itself
+// 3. coordinator_assignments (references organization)
+// 4. group_memberships (references groups and users)
+// 5. groups (references organization)
+// 6. users (references organization)
+// 7. organization itself
 func (h *Handler) cascadeDeleteOrg(ctx context.Context, orgID primitive.ObjectID) error {
 	db := h.DB
 	idHex := orgID.Hex()
 
 	rasStore := resourceassignstore.New(db)
 	masStore := materialassignstore.New(db)
+	casStore := coordinatorassign.New(db)
 	memStore := membershipstore.New(db)
 	grpStore := groupstore.New(db)
 	usrStore := userstore.New(db)
@@ -83,7 +86,15 @@ func (h *Handler) cascadeDeleteOrg(ctx context.Context, orgID primitive.ObjectID
 		h.Log.Debug("deleted material_assignments", zap.Int64("count", cnt), zap.String("org_id", idHex))
 	}
 
-	// 3. Delete all group memberships for this organization.
+	// 3. Delete all coordinator assignments for this organization.
+	if cnt, err := casStore.DeleteByOrg(ctx, orgID); err != nil {
+		h.Log.Error("failed to delete coordinator_assignments", zap.Error(err), zap.String("org_id", idHex))
+		return err
+	} else if cnt > 0 {
+		h.Log.Debug("deleted coordinator_assignments", zap.Int64("count", cnt), zap.String("org_id", idHex))
+	}
+
+	// 4. Delete all group memberships for this organization.
 	if cnt, err := memStore.DeleteByOrg(ctx, orgID); err != nil {
 		h.Log.Error("failed to delete group_memberships", zap.Error(err), zap.String("org_id", idHex))
 		return err
@@ -91,7 +102,7 @@ func (h *Handler) cascadeDeleteOrg(ctx context.Context, orgID primitive.ObjectID
 		h.Log.Debug("deleted group_memberships", zap.Int64("count", cnt), zap.String("org_id", idHex))
 	}
 
-	// 4. Delete all groups for this organization.
+	// 5. Delete all groups for this organization.
 	if cnt, err := grpStore.DeleteByOrg(ctx, orgID); err != nil {
 		h.Log.Error("failed to delete groups", zap.Error(err), zap.String("org_id", idHex))
 		return err
@@ -99,7 +110,7 @@ func (h *Handler) cascadeDeleteOrg(ctx context.Context, orgID primitive.ObjectID
 		h.Log.Debug("deleted groups", zap.Int64("count", cnt), zap.String("org_id", idHex))
 	}
 
-	// 5. Delete all users for this organization.
+	// 6. Delete all users for this organization.
 	// Note: Only deletes users with role "member" or "leader" that belong to this org.
 	// System users (admin/analyst) don't have organization_id set.
 	if cnt, err := usrStore.DeleteByOrg(ctx, orgID); err != nil {
@@ -109,7 +120,7 @@ func (h *Handler) cascadeDeleteOrg(ctx context.Context, orgID primitive.ObjectID
 		h.Log.Debug("deleted users", zap.Int64("count", cnt), zap.String("org_id", idHex))
 	}
 
-	// 6. Delete the organization itself.
+	// 7. Delete the organization itself.
 	cnt, err := orgStore.Delete(ctx, orgID)
 	if err != nil {
 		h.Log.Error("failed to delete organization", zap.Error(err), zap.String("org_id", idHex))

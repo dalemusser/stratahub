@@ -4,7 +4,6 @@ package resources
 import (
 	"context"
 	"net/http"
-	"strings"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
@@ -20,13 +19,15 @@ import (
 
 // ServeManageModal renders the Manage Resource modal for a single resource.
 // It is used by the admin library UI to offer View/Edit/Delete actions.
+// Coordinators can view resources but cannot edit/delete them.
 func (h *AdminHandler) ServeManageModal(w http.ResponseWriter, r *http.Request) {
 	role, _, _, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
-	if strings.ToLower(role) != "admin" {
+	// Admin and coordinator can access; others are forbidden
+	if role != "admin" && role != "coordinator" {
 		uierrors.HTMXForbidden(w, r, "You do not have access to manage resources.", "/resources")
 		return
 	}
@@ -74,6 +75,7 @@ func (h *AdminHandler) ServeManageModal(w http.ResponseWriter, r *http.Request) 
 		ShowInLibrary: row.ShowInLibrary,
 		Description:   row.Description,
 		BackURL:       back,
+		CanEdit:       authz.CanManageResources(r),
 	}
 
 	templates.RenderSnippet(w, "resource_manage_modal", vm)

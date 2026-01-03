@@ -1,0 +1,79 @@
+{{ define "coordinator_dashboard" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="mb-3">
+  <h1 class="text-2xl font-semibold text-gray-800 dark:text-gray-200">🎛️ Dashboard</h1>
+  <p class="text-gray-500 dark:text-gray-400 text-sm">Coordinator Panel</p>
+</div>
+
+<!-- Stats row -->
+<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2 mb-4">
+  <a href="/organizations" class="bg-white dark:bg-gray-800 rounded-lg shadow p-2 text-center hover:shadow-md transition-shadow">
+    <div class="text-gray-500 dark:text-gray-400 text-xs">Organizations</div>
+    <div class="text-indigo-600 text-xl font-bold">{{ .OrganizationsCount }}</div>
+  </a>
+
+  <a href="/leaders" class="bg-white dark:bg-gray-800 rounded-lg shadow p-2 text-center hover:shadow-md transition-shadow">
+    <div class="text-gray-500 dark:text-gray-400 text-xs">Leaders</div>
+    <div class="text-indigo-600 text-xl font-bold">{{ .LeadersCount }}</div>
+  </a>
+
+  <a href="/groups" class="bg-white dark:bg-gray-800 rounded-lg shadow p-2 text-center hover:shadow-md transition-shadow">
+    <div class="text-gray-500 dark:text-gray-400 text-xs">Groups</div>
+    <div class="text-indigo-600 text-xl font-bold">{{ .GroupsCount }}</div>
+  </a>
+
+  <a href="/members" class="bg-white dark:bg-gray-800 rounded-lg shadow p-2 text-center hover:shadow-md transition-shadow">
+    <div class="text-gray-500 dark:text-gray-400 text-xs">Members</div>
+    <div class="text-indigo-600 text-xl font-bold">{{ .MembersCount }}</div>
+  </a>
+
+  <a href="/resources" class="bg-white dark:bg-gray-800 rounded-lg shadow p-2 text-center hover:shadow-md transition-shadow">
+    <div class="text-gray-500 dark:text-gray-400 text-xs">Resources</div>
+    <div class="text-indigo-600 text-xl font-bold">{{ .ResourcesCount }}</div>
+  </a>
+</div>
+
+<!-- Quick Actions -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-2">
+  <h2 class="text-base font-semibold text-gray-800 dark:text-gray-200 mb-2">Quick Actions</h2>
+  <div class="flex flex-wrap gap-2">
+    <a
+      href="/groups/new?return={{ .CurrentPath | urlquery }}"
+      class="px-2 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 inline-block"
+    >
+      Add Group
+    </a>
+    <a
+      href="/leaders/new?return={{ .CurrentPath | urlquery }}"
+      class="px-2 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 inline-block"
+    >
+      Add Leader
+    </a>
+    <a
+      href="/members/new?return={{ .CurrentPath | urlquery }}"
+      class="px-2 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 inline-block"
+    >
+      Add Member
+    </a>
+  </div>
+</div>
+
+<div class="mt-4 bg-gray-50 dark:bg-gray-800 rounded p-3 text-sm text-gray-600 dark:text-gray-400">
+  <p>
+    As a coordinator, you can manage leaders, members, and groups within your assigned organization{{ if gt (len .AssignedOrgNames) 1 }}s{{ end }}:
+    <span class="font-medium text-gray-700 dark:text-gray-300">{{ range $i, $name := .AssignedOrgNames }}{{ if $i }}, {{ end }}{{ $name }}{{ else }}<em>None assigned</em>{{ end }}</span>
+  </p>
+  <p class="mt-2">
+  {{ if and .CanManageResources .CanManageMaterials }}
+    You also have permission to manage resources and materials.
+  {{ else if .CanManageResources }}
+    You also have permission to manage resources.
+  {{ else if .CanManageMaterials }}
+    You also have permission to manage materials.
+  {{ end }}
+  </p>
+</div>
+{{ end }}
