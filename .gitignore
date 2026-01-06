@@ -41,6 +41,7 @@ config.json
 
 # Build output
 bin/
+stratahub
 
 # Tailwind standalone CLI (platform-specific binary)
 tailwindcss
