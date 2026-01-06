@@ -25,6 +25,8 @@ func (h *AdminHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	actorRole, _, actorID, _ := authz.UserCtx(r)
+
 	idHex := chi.URLParam(r, "id")
 	oid, err := primitive.ObjectIDFromHex(idHex)
 	if err != nil {
@@ -61,6 +63,9 @@ func (h *AdminHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 		h.ErrLog.LogServerError(w, r, "delete resource failed", err, "Unable to delete resource.", "")
 		return
 	}
+
+	// Audit log: resource deleted (before file cleanup, after DB success)
+	h.AuditLog.ResourceDeleted(ctx, r, actorID, oid, actorRole, res.Title)
 
 	// Delete file from storage if exists (after successful DB deletion)
 	if res.HasFile() {

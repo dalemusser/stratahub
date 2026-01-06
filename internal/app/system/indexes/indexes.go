@@ -61,6 +61,9 @@ func EnsureAll(ctx context.Context, db *mongo.Database) error {
 	if err := ensureEmailVerifications(ctx, db); err != nil {
 		problems = append(problems, "email_verifications: "+err.Error())
 	}
+	if err := ensureOAuthStates(ctx, db); err != nil {
+		problems = append(problems, "oauth_states: "+err.Error())
+	}
 
 	if len(problems) > 0 {
 		return errors.New(strings.Join(problems, "; "))
@@ -813,6 +816,30 @@ func ensureEmailVerifications(ctx context.Context, db *mongo.Database) error {
 			},
 			Options: options.Index().
 				SetName("idx_emailverify_user"),
+		},
+	})
+}
+
+func ensureOAuthStates(ctx context.Context, db *mongo.Database) error {
+	c := db.Collection("oauth_states")
+	return ensureIndexSet(ctx, c, []mongo.IndexModel{
+		// Unique state token
+		{
+			Keys: bson.D{
+				{Key: "state", Value: 1},
+			},
+			Options: options.Index().
+				SetUnique(true).
+				SetName("uniq_oauth_state"),
+		},
+		// TTL index for auto-cleanup of expired states
+		{
+			Keys: bson.D{
+				{Key: "expires_at", Value: 1},
+			},
+			Options: options.Index().
+				SetExpireAfterSeconds(0).
+				SetName("idx_oauth_expires_ttl"),
 		},
 	})
 }

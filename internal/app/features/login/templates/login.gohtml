@@ -4,12 +4,12 @@
 
 {{ define "content" }}
 <div class="mb-4">
-  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">🔐 Login</h1>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Login</h1>
 </div>
 
-<div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm">
+<div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm max-w-md">
   {{ if .Error }}
-    <div class="bg-red-100 text-red-700 p-2 rounded mb-2">
+    <div class="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 p-2 rounded mb-4">
       {{ .Error }}
     </div>
   {{ end }}

@@ -219,7 +219,7 @@ func (h *Handler) HandleUpdateResourceAssignment(w http.ResponseWriter, r *http.
 		return
 	}
 
-	_, uname, _, _ := authz.UserCtx(r)
+	actorRole, uname, actorID, _ := authz.UserCtx(r)
 
 	// Resolve the organization's timezone so we can interpret the submitted
 	// datetime strings in the correct local time before converting to UTC.
@@ -251,6 +251,13 @@ func (h *Handler) HandleUpdateResourceAssignment(w http.ResponseWriter, r *http.
 		uierrors.RenderForbidden(w, r, "A database error occurred.", httpnav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
 		return
 	}
+
+	// Audit log: resource assignment updated
+	var orgID *primitive.ObjectID
+	if !group.OrganizationID.IsZero() {
+		orgID = &group.OrganizationID
+	}
+	h.AuditLog.ResourceAssignmentUpdated(ctx, r, actorID, asn.ID, asn.ResourceID, group.ID, orgID, actorRole)
 
 	// Redirect back to the assignments list (or provided return URL).
 	h.redirectAssignResources(w, r, gid)

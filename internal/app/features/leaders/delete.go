@@ -19,6 +19,12 @@ import (
 // HandleDelete removes a leader and all of their group memberships and
 // material assignments. It is mounted on POST /leaders/{id}/delete.
 func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
+	actorRole, _, actorID, ok := authz.UserCtx(r)
+	if !ok {
+		uierrors.RenderUnauthorized(w, r, "/login")
+		return
+	}
+
 	uidHex := chi.URLParam(r, "id")
 	uid, err := primitive.ObjectIDFromHex(uidHex)
 	if err != nil {
@@ -65,6 +71,9 @@ func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 		uierrors.RenderServerError(w, r, "Failed to delete leader.", "/leaders")
 		return
 	}
+
+	// Audit log: leader deleted
+	h.AuditLog.UserDeleted(ctx, r, actorID, uid, usr.OrganizationID, actorRole, "leader")
 
 	// Optional return parameter, otherwise send back to leaders list.
 	ret := navigation.SafeBackURL(r, navigation.LeadersBackURL)

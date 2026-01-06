@@ -1,6 +1,8 @@
 // internal/app/bootstrap/appconfig.go
 package bootstrap
 
+import "time"
+
 // AppConfig holds service-specific configuration for this WAFFLE app.
 //
 // These values come from environment variables, configuration files, or
@@ -57,4 +59,16 @@ type AppConfig struct {
 
 	// Base URL for email links (magic links, password reset, etc.)
 	BaseURL string // e.g., "https://stratahub.com" or "http://localhost:3000"
+
+	// Email verification settings
+	EmailVerifyExpiry time.Duration // How long email verification codes/links are valid (default: 10m)
+
+	// Audit logging configuration
+	// Values: "all" (MongoDB + zap), "db" (MongoDB only), "log" (zap only), "off" (disabled)
+	AuditLogAuth  string // Phase 1: authentication events (login, logout, password, verification)
+	AuditLogAdmin string // Phase 2: admin actions (user/group/org CRUD, membership changes)
+
+	// Google OAuth configuration
+	GoogleClientID     string // Google OAuth2 client ID
+	GoogleClientSecret string // Google OAuth2 client secret
 }

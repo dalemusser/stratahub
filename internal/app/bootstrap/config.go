@@ -3,6 +3,7 @@ package bootstrap
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/dalemusser/waffle/config"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
@@ -36,7 +37,7 @@ var appConfigKeys = []config.AppKey{
 
 	// Email/SMTP configuration
 	{Name: "mail_smtp_host", Default: "localhost", Desc: "SMTP server host"},
-	{Name: "mail_smtp_port", Default: "1025", Desc: "SMTP server port"},
+	{Name: "mail_smtp_port", Default: 1025, Desc: "SMTP server port"},
 	{Name: "mail_smtp_user", Default: "", Desc: "SMTP username"},
 	{Name: "mail_smtp_pass", Default: "", Desc: "SMTP password"},
 	{Name: "mail_from", Default: "noreply@stratahub.com", Desc: "From email address"},
@@ -44,6 +45,17 @@ var appConfigKeys = []config.AppKey{
 
 	// Base URL for email links (magic links, etc.)
 	{Name: "base_url", Default: "http://localhost:3000", Desc: "Base URL for email links"},
+
+	// Email verification settings
+	{Name: "email_verify_expiry", Default: "10m", Desc: "Email verification code/link expiry (e.g., 10m, 1h, 90s)"},
+
+	// Audit logging settings
+	{Name: "audit_log_auth", Default: "all", Desc: "Auth event logging: 'all' (db+log), 'db', 'log', or 'off'"},
+	{Name: "audit_log_admin", Default: "all", Desc: "Admin event logging: 'all' (db+log), 'db', 'log', or 'off'"},
+
+	// Google OAuth configuration
+	{Name: "google_client_id", Default: "", Desc: "Google OAuth2 client ID"},
+	{Name: "google_client_secret", Default: "", Desc: "Google OAuth2 client secret"},
 }
 
 // LoadConfig loads WAFFLE core config and app-specific config.
@@ -95,6 +107,17 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 
 		// Base URL
 		BaseURL: appValues.String("base_url"),
+
+		// Email verification
+		EmailVerifyExpiry: appValues.Duration("email_verify_expiry", 10*time.Minute),
+
+		// Audit logging
+		AuditLogAuth:  appValues.String("audit_log_auth"),
+		AuditLogAdmin: appValues.String("audit_log_admin"),
+
+		// Google OAuth
+		GoogleClientID:     appValues.String("google_client_id"),
+		GoogleClientSecret: appValues.String("google_client_secret"),
 	}
 
 	return coreCfg, appCfg, nil

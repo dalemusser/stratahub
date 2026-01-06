@@ -123,7 +123,7 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 
 // HandleEdit processes the Edit System User form POST.
 func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
-	_, editorName, editorOID, ok := authz.UserCtx(r)
+	actorRole, editorName, editorOID, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
@@ -288,15 +288,46 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Audit log: check for status change or general update
+	oldStatus := normalize.Status(existingUser.Status)
+	if oldStatus != status {
+		if status == "disabled" {
+			h.AuditLog.UserDisabled(ctx, r, editorOID, uid, nil, actorRole)
+		} else if status == "active" {
+			h.AuditLog.UserEnabled(ctx, r, editorOID, uid, nil, actorRole)
+		}
+	} else {
+		// General update - log changed fields
+		h.AuditLog.UserUpdated(ctx, r, editorOID, uid, nil, actorRole, "system user details")
+	}
+
 	// Handle coordinator assignment changes
 	coordStore := coordinatorassign.New(db)
 
 	// If role changed FROM coordinator to something else, delete all assignments
 	if previousRole == "coordinator" && userRole != "coordinator" {
+		// Fetch existing assignments for audit logging before deleting
+		existingAssigns, listErr := coordStore.ListByUser(ctx, uid)
+		if listErr != nil {
+			h.Log.Error("failed to list coordinator assignments for audit",
+				zap.Error(listErr),
+				zap.String("user_id", uid.Hex()))
+		}
+
 		if _, err := coordStore.DeleteByUser(ctx, uid); err != nil {
 			h.Log.Error("failed to delete coordinator assignments on role change",
 				zap.Error(err),
 				zap.String("user_id", uid.Hex()))
+		} else if listErr == nil {
+			// Audit log: coordinator unassigned from each organization
+			oStore := orgstore.New(db)
+			for _, a := range existingAssigns {
+				orgName := ""
+				if org, err := oStore.GetByID(ctx, a.OrganizationID); err == nil {
+					orgName = org.Name
+				}
+				h.AuditLog.CoordinatorUnassignedFromOrg(ctx, r, editorOID, uid, a.OrganizationID, actorRole, orgName)
+			}
 		}
 	}
 
@@ -322,6 +353,7 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Delete assignments that are no longer selected
+		oStore := orgstore.New(db)
 		for hexID := range existingOrgIDs {
 			if _, exists := newOrgIDs[hexID]; !exists {
 				orgOID := existingOrgIDs[hexID]
@@ -332,6 +364,13 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 							h.Log.Error("failed to delete coordinator assignment",
 								zap.Error(err),
 								zap.String("assignment_id", a.ID.Hex()))
+						} else {
+							// Audit log: coordinator unassigned from organization
+							orgName := ""
+							if org, err := oStore.GetByID(ctx, orgOID); err == nil {
+								orgName = org.Name
+							}
+							h.AuditLog.CoordinatorUnassignedFromOrg(ctx, r, editorOID, uid, orgOID, actorRole, orgName)
 						}
 						break
 					}
@@ -354,6 +393,13 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 						zap.Error(err),
 						zap.String("user_id", uid.Hex()),
 						zap.String("org_id", orgOID.Hex()))
+				} else {
+					// Audit log: coordinator assigned to organization
+					orgName := ""
+					if org, err := oStore.GetByID(ctx, orgOID); err == nil {
+						orgName = org.Name
+					}
+					h.AuditLog.CoordinatorAssignedToOrg(ctx, r, editorOID, uid, orgOID, actorRole, orgName)
 				}
 			}
 		}
@@ -366,7 +412,7 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 // HandleDelete deletes a system user, enforcing safety guards
 // (cannot delete self, cannot delete last active admin).
 func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
-	_, _, who, ok := userContext(r) // who = current user's ObjectID
+	actorRole, _, who, ok := userContext(r) // who = current user's ObjectID
 	if !ok {
 		return
 	}
@@ -458,6 +504,9 @@ func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 		h.ErrLog.LogServerError(w, r, "database error deleting system user", err, "A database error occurred.", "/system-users")
 		return
 	}
+
+	// Audit log: system user deleted
+	h.AuditLog.UserDeleted(ctx, r, who, uid, nil, actorRole, normalize.Role(u.Role))
 
 	http.Redirect(w, r, backToSystemUsersURL(r), http.StatusSeeOther)
 }

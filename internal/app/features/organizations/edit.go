@@ -85,7 +85,7 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 // Authorization: RequireRole("admin", "coordinator") middleware in routes.go.
 // Coordinators can only edit organizations they are assigned to.
 func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
-	role, _, _, _ := authz.UserCtx(r)
+	actorRole, _, actorID, _ := authz.UserCtx(r)
 
 	if err := r.ParseForm(); err != nil {
 		h.ErrLog.LogBadRequest(w, r, "parse form failed", err, "Invalid form submission.", "/organizations")
@@ -100,7 +100,7 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Verify coordinator has access to this org
-	if role == "coordinator" && !coordinatorHasAccess(r, oid) {
+	if actorRole == "coordinator" && !coordinatorHasAccess(r, oid) {
 		uierrors.RenderForbidden(w, r, "You don't have access to this organization.", "/organizations")
 		return
 	}
@@ -186,6 +186,9 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		reRender(msg)
 		return
 	}
+
+	// Audit log: organization updated
+	h.AuditLog.OrgUpdated(ctx, r, actorID, oid, actorRole, "organization details")
 
 	// Redirect to explicit return (if safe), otherwise back to the list.
 	ret := navigation.SafeBackURL(r, navigation.OrganizationsBackURL)

@@ -263,6 +263,9 @@ func (h *Handler) HandleCreateGroup(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Audit log: group created
+	h.AuditLog.GroupCreated(ctx, r, uid, doc.ID, &orgID, role, name)
+
 	// Success redirect
 	ret := navigation.SafeBackURL(r, navigation.GroupsBackURL)
 	http.Redirect(w, r, ret, http.StatusSeeOther)

@@ -25,6 +25,8 @@ func (h *AdminHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	actorRole, _, actorID, _ := authz.UserCtx(r)
+
 	idHex := chi.URLParam(r, "id")
 	oid, err := primitive.ObjectIDFromHex(idHex)
 	if err != nil {
@@ -61,6 +63,9 @@ func (h *AdminHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 		h.ErrLog.LogServerError(w, r, "delete material failed", err, "Unable to delete material.", "")
 		return
 	}
+
+	// Audit log: material deleted (before file cleanup, after DB success)
+	h.AuditLog.MaterialDeleted(ctx, r, actorID, oid, actorRole, mat.Title)
 
 	// 3) Delete file from storage (outside transaction, best effort)
 	if mat.HasFile() {

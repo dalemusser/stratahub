@@ -20,6 +20,14 @@ import (
 
 // HandleAddLeader adds a leader to the group.
 func (h *Handler) HandleAddLeader(w http.ResponseWriter, r *http.Request) {
+	actorRole, _, actorID, ok := authz.UserCtx(r)
+	if !ok {
+		uierrors.HTMXError(w, r, http.StatusUnauthorized, "Unauthorized.", func() {
+			uierrors.RenderUnauthorized(w, r, "/login")
+		})
+		return
+	}
+
 	gid := chi.URLParam(r, "id")
 	targetHex := r.FormValue("userID")
 
@@ -72,12 +80,15 @@ func (h *Handler) HandleAddLeader(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Audit log: leader added to group
+	h.AuditLog.MemberAddedToGroup(ctx, r, actorID, targetOID, group.ID, &group.OrganizationID, actorRole, "leader")
+
 	h.renderLeadersPartial(w, r, gid)
 }
 
 // HandleRemoveLeader removes a leader from the group.
 func (h *Handler) HandleRemoveLeader(w http.ResponseWriter, r *http.Request) {
-	_, _, uid, ok := authz.UserCtx(r)
+	actorRole, _, actorID, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.HTMXError(w, r, http.StatusUnauthorized, "Unauthorized.", func() {
 			uierrors.RenderUnauthorized(w, r, "/login")
@@ -124,7 +135,7 @@ func (h *Handler) HandleRemoveLeader(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if uid == targetOID {
+	if actorID == targetOID {
 		uierrors.HTMXBadRequest(w, r, "You cannot remove yourself as leader.", "/groups")
 		return
 	}
@@ -144,6 +155,10 @@ func (h *Handler) HandleRemoveLeader(w http.ResponseWriter, r *http.Request) {
 		h.ErrLog.HTMXLogBadRequest(w, r, "database error removing leader from group", err, "Failed to remove leader.", "/groups")
 		return
 	}
+
+	// Audit log: leader removed from group
+	h.AuditLog.MemberRemovedFromGroup(ctx, r, actorID, targetOID, group.ID, &group.OrganizationID, actorRole)
+
 	h.renderLeadersPartial(w, r, gid)
 }
 

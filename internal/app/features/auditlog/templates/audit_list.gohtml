@@ -1,0 +1,162 @@
+{{ define "audit_list" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center justify-between mb-2">
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Audit Log</h1>
+</div>
+
+<section class="flex-1 min-w-0">
+  <!-- Filter Controls -->
+  <form
+    hx-get="/audit"
+    hx-target="#content"
+    hx-swap="innerHTML"
+    hx-push-url="true"
+    hx-trigger="submit, change from:#audit-category, change from:#audit-event-type"
+    class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-1 flex flex-wrap items-center gap-2"
+  >
+    <select id="audit-category" name="category" class="px-3 py-2 border rounded text-sm">
+      <option value="" {{ if not .Category }}selected{{ end }}>All Categories</option>
+      {{ range .Categories }}
+      <option value="{{ .Value }}" {{ if eq $.Category .Value }}selected{{ end }}>{{ .Label }}</option>
+      {{ end }}
+    </select>
+
+    <select id="audit-event-type" name="event_type" class="px-3 py-2 border rounded text-sm">
+      <option value="" {{ if not .EventType }}selected{{ end }}>All Events</option>
+      {{ range .EventTypes }}
+      <option value="{{ . }}" {{ if eq $.EventType . }}selected{{ end }}>{{ . }}</option>
+      {{ end }}
+    </select>
+
+    <input
+      type="date"
+      name="start_date"
+      value="{{ .StartDate }}"
+      placeholder="Start date"
+      class="px-3 py-2 border rounded text-sm"
+    />
+
+    <input
+      type="date"
+      name="end_date"
+      value="{{ .EndDate }}"
+      placeholder="End date"
+      class="px-3 py-2 border rounded text-sm"
+    />
+
+    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+      Filter
+    </button>
+
+    <a
+      href="/audit"
+      hx-get="/audit"
+      hx-target="#content"
+      hx-swap="innerHTML"
+      hx-push-url="true"
+      class="px-4 py-2 border rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700"
+    >Clear</a>
+  </form>
+
+  <!-- Pagination -->
+  <div class="flex items-center justify-between mb-1">
+    <div class="text-gray-600 dark:text-gray-400 text-sm">
+      {{ if .Total }}Page {{ .Page }} of {{ .TotalPages }} ({{ .Total }} total){{ else }}No events found{{ end }}
+    </div>
+    <div class="flex items-center gap-2">
+      {{ if .HasPrev }}
+        <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+           href="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&page={{ .PrevPage }}"
+           hx-get="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&page={{ .PrevPage }}"
+           hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Prev</a>
+      {{ else }}
+        <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
+      {{ end }}
+      {{ if .HasNext }}
+        <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+           href="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&page={{ .NextPage }}"
+           hx-get="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&page={{ .NextPage }}"
+           hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Next</a>
+      {{ else }}
+        <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
+      {{ end }}
+    </div>
+  </div>
+
+  <!-- Events Table -->
+  <div class="bg-white dark:bg-gray-800 rounded shadow overflow-auto" style="max-height: calc(100vh - 14rem); min-height: 10rem;">
+    <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+      <colgroup>
+        <col style="width: 140px;" />
+        <col style="width: 100px;" />
+        <col style="width: 180px;" />
+        <col style="width: 140px;" />
+        <col style="width: 140px;" />
+        <col style="width: 120px;" />
+        <col style="width: 100px;" />
+        <col style="width: 60px;" />
+      </colgroup>
+      <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs sticky top-0 z-10">
+        <tr>
+          <th class="px-2 py-2">Timestamp</th>
+          <th class="px-2 py-2">Category</th>
+          <th class="px-2 py-2">Event</th>
+          <th class="px-2 py-2">Actor</th>
+          <th class="px-2 py-2">Target</th>
+          <th class="px-2 py-2">Organization</th>
+          <th class="px-2 py-2">IP</th>
+          <th class="px-2 py-2 text-center">Status</th>
+        </tr>
+      </thead>
+      <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+        {{ range .Items }}
+        <tr>
+          <td class="px-2 py-2 align-middle text-xs whitespace-nowrap">
+            {{ .Timestamp.Format "Jan 02 15:04:05" }}
+          </td>
+          <td class="px-2 py-2 align-middle">
+            <span class="inline-flex items-center px-2 py-1 rounded-full text-xs
+                         {{ if eq .Category "auth" }}bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-400
+                         {{ else if eq .Category "admin" }}bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-400
+                         {{ else if eq .Category "security" }}bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-400
+                         {{ else }}bg-gray-100 text-gray-700 dark:bg-gray-600 dark:text-gray-300{{ end }}">
+              {{ .Category }}
+            </span>
+          </td>
+          <td class="px-2 py-2 align-middle">
+            <div class="truncate text-xs" title="{{ .EventType }}">{{ .EventType }}</div>
+          </td>
+          <td class="px-2 py-2 align-middle">
+            <div class="truncate" title="{{ .ActorName }}">{{ .ActorName }}</div>
+          </td>
+          <td class="px-2 py-2 align-middle">
+            <div class="truncate" title="{{ .TargetName }}">{{ .TargetName }}</div>
+          </td>
+          <td class="px-2 py-2 align-middle">
+            <div class="truncate" title="{{ .OrgName }}">{{ .OrgName }}</div>
+          </td>
+          <td class="px-2 py-2 align-middle">
+            <div class="truncate text-xs" title="{{ .IP }}">{{ .IP }}</div>
+          </td>
+          <td class="px-2 py-2 align-middle text-center">
+            {{ if .Success }}
+              <span class="px-2 py-1 text-xs bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 rounded">OK</span>
+            {{ else }}
+              <span class="px-2 py-1 text-xs bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400 rounded">Fail</span>
+            {{ end }}
+          </td>
+        </tr>
+        {{ else }}
+        <tr>
+          <td colspan="8" class="px-2 py-6 text-center text-gray-500 dark:text-gray-400">No audit events found.</td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+    <div class="w-full border-t border-gray-300 dark:border-gray-600"></div>
+  </div>
+</section>
+{{ end }}

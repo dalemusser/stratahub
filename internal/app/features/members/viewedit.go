@@ -189,7 +189,7 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 // HandleEdit – update a member (re-render form on validation errors)
 // Authorization: Admin can edit any member; Leader can only edit members in their org.
 func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
-	_, _, _, ok := authz.UserCtx(r)
+	actorRole, _, actorID, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
@@ -223,6 +223,14 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		uierrors.RenderForbidden(w, r, "You don't have permission to edit this member.", httpnav.ResolveBackURL(r, "/members"))
 		return
 	}
+
+	// Fetch current member to get old status for audit logging
+	currentMember, err := h.Users.GetMemberByID(ctx, uid)
+	if err != nil {
+		h.ErrLog.LogServerError(w, r, "database error loading member", err, "A database error occurred.", "/members")
+		return
+	}
+	oldStatus := normalize.Status(currentMember.Status)
 
 	full := normalize.Name(r.FormValue("full_name"))
 	loginID := normalize.Email(r.FormValue("login_id"))
@@ -353,6 +361,18 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Audit log: check for status change or general update
+	if oldStatus != status {
+		if status == "disabled" {
+			h.AuditLog.UserDisabled(ctx, r, actorID, uid, memberInfo.OrganizationID, actorRole)
+		} else if status == "active" {
+			h.AuditLog.UserEnabled(ctx, r, actorID, uid, memberInfo.OrganizationID, actorRole)
+		}
+	} else {
+		// General update - log changed fields
+		h.AuditLog.UserUpdated(ctx, r, actorID, uid, memberInfo.OrganizationID, actorRole, "member details")
+	}
+
 	ret := navigation.SafeBackURL(r, navigation.MembersBackURL)
 	http.Redirect(w, r, ret, http.StatusSeeOther)
 }
@@ -360,7 +380,7 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 // HandleDelete – remove memberships then delete the user
 // Authorization: Admin can delete any member; Leader can only delete members in their org.
 func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
-	_, _, _, ok := authz.UserCtx(r)
+	actorRole, _, actorID, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
@@ -415,6 +435,9 @@ func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 		h.ErrLog.LogServerError(w, r, "database error deleting member", err, "A database error occurred.", "/members")
 		return
 	}
+
+	// Audit log: member deleted
+	h.AuditLog.UserDeleted(ctx, r, actorID, uid, memberInfo.OrganizationID, actorRole, "member")
 
 	ret := navigation.SafeBackURL(r, navigation.MembersBackURL)
 	http.Redirect(w, r, ret, http.StatusSeeOther)

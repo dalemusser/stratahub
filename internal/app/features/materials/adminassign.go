@@ -12,6 +12,7 @@ import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	materialassignstore "github.com/dalemusser/stratahub/internal/app/store/materialassign"
 	materialstore "github.com/dalemusser/stratahub/internal/app/store/materials"
+	orgstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
@@ -365,7 +366,7 @@ func (h *AdminHandler) ServeAssignForm(w http.ResponseWriter, r *http.Request) {
 
 // HandleAssign processes the assignment form POST.
 func (h *AdminHandler) HandleAssign(w http.ResponseWriter, r *http.Request) {
-	_, userName, userID, _ := authz.UserCtx(r)
+	actorRole, userName, userID, _ := authz.UserCtx(r)
 
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
@@ -380,7 +381,7 @@ func (h *AdminHandler) HandleAssign(w http.ResponseWriter, r *http.Request) {
 
 	// Verify material exists
 	matStore := materialstore.New(h.DB)
-	_, err = matStore.GetByID(ctx, matID)
+	mat, err := matStore.GetByID(ctx, matID)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			uierrors.RenderNotFound(w, r, "Material not found.", "/materials")
@@ -471,12 +472,31 @@ func (h *AdminHandler) HandleAssign(w http.ResponseWriter, r *http.Request) {
 	}
 
 	assignStore := materialassignstore.New(h.DB)
-	_, err = assignStore.Create(ctx, assignment)
+	createdAssign, err := assignStore.Create(ctx, assignment)
 	if err != nil {
 		h.Log.Error("error creating assignment", zap.Error(err))
 		uierrors.RenderServerError(w, r, "Failed to create assignment.", "/materials/"+matID.Hex()+"/assign")
 		return
 	}
+
+	// Audit log: material assigned
+	var targetType, targetName string
+	var auditOrgID *primitive.ObjectID
+	if leaderID != nil {
+		targetType = "leader"
+		usrStore := userstore.New(h.DB)
+		if user, err := usrStore.GetByID(ctx, *leaderID); err == nil {
+			targetName = user.FullName
+			auditOrgID = user.OrganizationID
+		}
+	} else if orgID != nil {
+		targetType = "organization"
+		auditOrgID = orgID
+		if org, err := orgstore.New(h.DB).GetByID(ctx, *orgID); err == nil {
+			targetName = org.Name
+		}
+	}
+	h.AuditLog.MaterialAssigned(ctx, r, userID, createdAssign.ID, matID, auditOrgID, actorRole, mat.Title, targetType, targetName)
 
 	// Redirect to assignments list
 	http.Redirect(w, r, "/materials/"+matID.Hex()+"/assignments", http.StatusSeeOther)
@@ -628,6 +648,8 @@ func (h *AdminHandler) ServeAssignmentList(w http.ResponseWriter, r *http.Reques
 
 // HandleUnassign deletes an assignment.
 func (h *AdminHandler) HandleUnassign(w http.ResponseWriter, r *http.Request) {
+	actorRole, _, actorID, _ := authz.UserCtx(r)
+
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 
@@ -666,6 +688,18 @@ func (h *AdminHandler) HandleUnassign(w http.ResponseWriter, r *http.Request) {
 		uierrors.RenderServerError(w, r, "Failed to delete assignment.", "/materials")
 		return
 	}
+
+	// Audit log: material unassigned
+	var auditOrgID *primitive.ObjectID
+	if assignment.OrganizationID != nil {
+		auditOrgID = assignment.OrganizationID
+	} else if assignment.LeaderID != nil {
+		usrStore := userstore.New(h.DB)
+		if user, err := usrStore.GetByID(ctx, *assignment.LeaderID); err == nil {
+			auditOrgID = user.OrganizationID
+		}
+	}
+	h.AuditLog.MaterialUnassigned(ctx, r, actorID, assignID, assignment.MaterialID, auditOrgID, actorRole)
 
 	// Redirect back - use return param or fall back to material's assignments
 	returnURL := r.FormValue("return")
@@ -1189,6 +1223,8 @@ func (h *AdminHandler) ServeAssignmentEdit(w http.ResponseWriter, r *http.Reques
 
 // HandleAssignmentEdit processes the edit form for an assignment.
 func (h *AdminHandler) HandleAssignmentEdit(w http.ResponseWriter, r *http.Request) {
+	actorRole, _, actorID, _ := authz.UserCtx(r)
+
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 
@@ -1302,6 +1338,18 @@ func (h *AdminHandler) HandleAssignmentEdit(w http.ResponseWriter, r *http.Reque
 		reRender("Failed to update assignment.")
 		return
 	}
+
+	// Audit log: material assignment updated
+	var auditOrgID *primitive.ObjectID
+	if assignment.OrganizationID != nil {
+		auditOrgID = assignment.OrganizationID
+	} else if assignment.LeaderID != nil {
+		usrStore := userstore.New(h.DB)
+		if user, err := usrStore.GetByID(ctx, *assignment.LeaderID); err == nil {
+			auditOrgID = user.OrganizationID
+		}
+	}
+	h.AuditLog.MaterialAssignmentUpdated(ctx, r, actorID, assignID, assignment.MaterialID, auditOrgID, actorRole)
 
 	// Redirect back
 	returnURL := r.FormValue("return")

@@ -4,10 +4,14 @@ package bootstrap
 import (
 	"net/http"
 
+	activityfeature "github.com/dalemusser/stratahub/internal/app/features/activity"
+	auditlogfeature "github.com/dalemusser/stratahub/internal/app/features/auditlog"
+	authgooglefeature "github.com/dalemusser/stratahub/internal/app/features/authgoogle"
 	dashboardfeature "github.com/dalemusser/stratahub/internal/app/features/dashboard"
 	errorsfeature "github.com/dalemusser/stratahub/internal/app/features/errors"
 	groupsfeature "github.com/dalemusser/stratahub/internal/app/features/groups"
 	healthfeature "github.com/dalemusser/stratahub/internal/app/features/health"
+	heartbeatfeature "github.com/dalemusser/stratahub/internal/app/features/heartbeat"
 	homefeature "github.com/dalemusser/stratahub/internal/app/features/home"
 	leadersfeature "github.com/dalemusser/stratahub/internal/app/features/leaders"
 	loginfeature "github.com/dalemusser/stratahub/internal/app/features/login"
@@ -24,8 +28,13 @@ import (
 	uploadcsvfeature "github.com/dalemusser/stratahub/internal/app/features/uploadcsv"
 	userinfofeature "github.com/dalemusser/stratahub/internal/app/features/userinfo"
 	appresources "github.com/dalemusser/stratahub/internal/app/resources"
+	"github.com/dalemusser/stratahub/internal/app/store/activity"
+	"github.com/dalemusser/stratahub/internal/app/store/audit"
+	"github.com/dalemusser/stratahub/internal/app/store/oauthstate"
+	"github.com/dalemusser/stratahub/internal/app/store/sessions"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
+	"github.com/dalemusser/stratahub/internal/app/system/auditlog"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/config"
 	"github.com/dalemusser/waffle/pantry/fileserver"
@@ -81,6 +90,17 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	// Create error logger for handlers.
 	errLog := errorsfeature.NewErrorLogger(logger)
 
+	// Create audit store and logger for security event tracking.
+	auditStore := audit.New(deps.StrataHubMongoDatabase)
+	auditConfig := auditlog.Config{
+		Auth:  appCfg.AuditLogAuth,
+		Admin: appCfg.AuditLogAdmin,
+	}
+	auditLogger := auditlog.New(auditStore, logger, auditConfig)
+
+	// Create sessions store for activity tracking.
+	sessionsStore := sessions.New(deps.StrataHubMongoDatabase)
+
 	r := chi.NewRouter()
 
 	// Global auth middleware: loads SessionUser into context if logged in.
@@ -117,11 +137,31 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	r.Mount("/pages", pagesfeature.EditRoutes(pagesHandler, sessionMgr))
 
 	// Authentication
-	loginHandler := loginfeature.NewHandler(deps.StrataHubMongoDatabase, sessionMgr, errLog, deps.Mailer, appCfg.BaseURL, logger)
+	googleEnabled := appCfg.GoogleClientID != "" && appCfg.GoogleClientSecret != ""
+	loginHandler := loginfeature.NewHandler(deps.StrataHubMongoDatabase, sessionMgr, errLog, deps.Mailer, auditLogger, sessionsStore, appCfg.BaseURL, appCfg.EmailVerifyExpiry, googleEnabled, logger)
 	r.Mount("/login", loginfeature.Routes(loginHandler))
 
-	logoutHandler := logoutfeature.NewHandler(sessionMgr, logger)
+	logoutHandler := logoutfeature.NewHandler(sessionMgr, auditLogger, sessionsStore, logger)
 	r.Mount("/logout", logoutfeature.Routes(logoutHandler, sessionMgr))
+
+	// Google OAuth (only mount if configured)
+	if appCfg.GoogleClientID != "" && appCfg.GoogleClientSecret != "" {
+		oauthStateStore := oauthstate.New(deps.StrataHubMongoDatabase)
+		googleHandler := authgooglefeature.NewHandler(
+			deps.StrataHubMongoDatabase,
+			sessionMgr,
+			errLog,
+			auditLogger,
+			sessionsStore,
+			oauthStateStore,
+			appCfg.GoogleClientID,
+			appCfg.GoogleClientSecret,
+			appCfg.BaseURL,
+			logger,
+		)
+		r.Mount("/auth/google", authgooglefeature.Routes(googleHandler))
+		logger.Info("Google OAuth enabled", zap.String("redirect_url", appCfg.BaseURL+"/auth/google/callback"))
+	}
 
 	// User profile (any logged-in user)
 	profileHandler := profilefeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
@@ -140,36 +180,41 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	r.Mount("/dashboard", dashboardfeature.Routes(dashboardHandler, sessionMgr))
 
 	// Organization management
-	orgHandler := organizationsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
+	orgHandler := organizationsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, auditLogger, logger)
 	r.Mount("/organizations", organizationsfeature.Routes(orgHandler, sessionMgr))
 
 	// Group management
-	groupsHandler := groupsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
+	groupsHandler := groupsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, auditLogger, logger)
 	r.Mount("/groups", groupsfeature.Routes(groupsHandler, sessionMgr))
 
 	// User management
-	leadersHandler := leadersfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
+	leadersHandler := leadersfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, auditLogger, logger)
 	r.Mount("/leaders", leadersfeature.Routes(leadersHandler, sessionMgr))
 
-	membersHandler := membersfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
+	membersHandler := membersfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, auditLogger, logger)
 	r.Mount("/members", membersfeature.Routes(membersHandler, sessionMgr))
 
 	// CSV upload (standalone feature accessible from members, groups, organizations)
 	uploadCSVHandler := &uploadcsvfeature.Handler{DB: deps.StrataHubMongoDatabase, Log: logger, ErrLog: errLog}
 	r.Mount("/upload_csv", uploadcsvfeature.Routes(uploadCSVHandler, sessionMgr))
 
-	sysUsersHandler := systemusersfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
+	sysUsersHandler := systemusersfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, auditLogger, logger)
 	r.Mount("/system-users", systemusersfeature.Routes(sysUsersHandler, sessionMgr))
 
+	// Audit log (admin and coordinator access)
+	auditLogHandler := auditlogfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
+	r.Mount("/audit", auditlogfeature.Routes(auditLogHandler, sessionMgr))
+
 	// Resource management (admin and member views)
-	adminResHandler := resourcesfeature.NewAdminHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, logger)
+	adminResHandler := resourcesfeature.NewAdminHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, auditLogger, logger)
 	r.Mount("/resources", resourcesfeature.AdminRoutes(adminResHandler, sessionMgr))
 
-	memberResHandler := resourcesfeature.NewMemberHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, logger)
+	activityStore := activity.New(deps.StrataHubMongoDatabase)
+	memberResHandler := resourcesfeature.NewMemberHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, activityStore, sessionMgr, logger)
 	r.Mount("/member/resources", resourcesfeature.MemberRoutes(memberResHandler, sessionMgr))
 
 	// Material management (admin and leader views)
-	adminMatHandler := materialsfeature.NewAdminHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, logger)
+	adminMatHandler := materialsfeature.NewAdminHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, auditLogger, logger)
 	r.Mount("/materials", materialsfeature.AdminRoutes(adminMatHandler, sessionMgr))
 
 	leaderMatHandler := materialsfeature.NewLeaderHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, logger)
@@ -189,6 +234,14 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	// User info API (for games to identify the current player)
 	userInfoHandler := userinfofeature.NewHandler()
 	userinfofeature.MountRoutes(r, userInfoHandler)
+
+	// Activity dashboard (for leaders to monitor student activity)
+	activityHandler := activityfeature.NewHandler(deps.StrataHubMongoDatabase, sessionsStore, activityStore, sessionMgr, errLog, logger)
+	r.Mount("/activity", activityfeature.Routes(activityHandler, sessionMgr))
+
+	// Heartbeat API (for activity tracking)
+	heartbeatHandler := heartbeatfeature.NewHandler(sessionsStore, activityStore, sessionMgr, logger)
+	r.Mount("/api/heartbeat", heartbeatfeature.Routes(heartbeatHandler, sessionMgr))
 
 	return r, nil
 }

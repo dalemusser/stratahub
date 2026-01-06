@@ -23,6 +23,26 @@ import (
 	"go.uber.org/zap"
 )
 
+// getActivitySessionID extracts the activity session ID from the user's session cookie.
+func (h *MemberHandler) getActivitySessionID(r *http.Request) primitive.ObjectID {
+	if h.SessionMgr == nil {
+		return primitive.NilObjectID
+	}
+	sess, err := h.SessionMgr.GetSession(r)
+	if err != nil {
+		return primitive.NilObjectID
+	}
+	activitySessionID, ok := sess.Values["activity_session_id"].(string)
+	if !ok || activitySessionID == "" {
+		return primitive.NilObjectID
+	}
+	oid, err := primitive.ObjectIDFromHex(activitySessionID)
+	if err != nil {
+		return primitive.NilObjectID
+	}
+	return oid
+}
+
 // ServeViewResource handles GET /member/resources/{resourceID} for members.
 // It enforces that the current user is a member, checks that the resource is
 // currently available based on the group assignment visibility window, and
@@ -139,6 +159,17 @@ func (h *MemberHandler) ServeViewResource(w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	// Record the resource view event
+	activitySessionID := h.getActivitySessionID(r)
+	if h.Activity != nil && !activitySessionID.IsZero() {
+		if err := h.Activity.RecordResourceView(ctx, member.ID, activitySessionID, member.OrganizationID, oid, res.Title); err != nil {
+			h.Log.Warn("failed to record resource view",
+				zap.Error(err),
+				zap.String("resource_id", resourceID),
+				zap.String("member_id", member.ID.Hex()))
+		}
+	}
+
 	data := viewResourceData{
 		common: common{
 			BaseVM: viewdata.NewBaseVM(r, h.DB, "View Resource", "/member/resources"),
@@ -157,6 +188,7 @@ func (h *MemberHandler) ServeViewResource(w http.ResponseWriter, r *http.Request
 		FileName:            res.FileName,
 		Status:              res.Status,
 		AvailableUntil:      availableUntil,
+		BackURL:             "/member/resources",
 		CanOpen:             canOpen,
 		TimeZone:            tzLabel,
 	}
@@ -242,6 +274,17 @@ func (h *MemberHandler) HandleDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Record the resource launch event (for file downloads)
+	activitySessionID := h.getActivitySessionID(r)
+	if h.Activity != nil && !activitySessionID.IsZero() {
+		if err := h.Activity.RecordResourceLaunch(ctx, member.ID, activitySessionID, member.OrganizationID, oid, res.Title); err != nil {
+			h.Log.Warn("failed to record resource launch",
+				zap.Error(err),
+				zap.String("resource_id", resourceID),
+				zap.String("member_id", member.ID.Hex()))
+		}
+	}
+
 	// If resource has a file, serve it
 	if res.HasFile() {
 		// Build Content-Disposition header for proper filename
@@ -300,4 +343,108 @@ func (h *MemberHandler) HandleDownload(w http.ResponseWriter, r *http.Request) {
 	}
 
 	uierrors.RenderNotFound(w, r, "No file or URL available for this resource.", "/member/resources")
+}
+
+// HandleLaunch handles GET /member/resources/{resourceID}/launch for members.
+// It records the resource launch event and redirects to the actual launch URL.
+func (h *MemberHandler) HandleLaunch(w http.ResponseWriter, r *http.Request) {
+	resourceID := chi.URLParam(r, "resourceID")
+	oid, err := primitive.ObjectIDFromHex(resourceID)
+	if err != nil {
+		uierrors.RenderBadRequest(w, r, "Invalid resource ID.", "/member/resources")
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
+	defer cancel()
+	db := h.DB
+
+	// Verify member access using policy layer
+	member, err := resourcepolicy.VerifyMemberAccess(ctx, db, r)
+	if err != nil {
+		h.ErrLog.LogServerError(w, r, "database error verifying member access", err, "A database error occurred.", "/member/resources")
+		return
+	}
+	if member == nil {
+		uierrors.RenderNotFound(w, r, "Member not found.", "/login")
+		return
+	}
+
+	orgName, loc, _ := resolveMemberOrgLocation(ctx, db, member.OrganizationID)
+	nowLocal := time.Now().In(loc)
+
+	// Fetch the resource
+	resStore := resourcestore.New(db)
+	res, err := resStore.GetByID(ctx, oid)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			uierrors.RenderNotFound(w, r, "Resource not found.", "/member/resources")
+			return
+		}
+		h.ErrLog.LogServerError(w, r, "find resource failed", err, "A database error occurred.", "/member/resources")
+		return
+	}
+
+	// Check if member has access to this resource via group assignment
+	assignment, err := resourcepolicy.CanViewResource(ctx, db, member.ID, oid)
+	if err != nil {
+		h.ErrLog.LogServerError(w, r, "policy check failed", err, "A database error occurred.", "/member/resources")
+		return
+	}
+	if assignment == nil {
+		uierrors.RenderForbidden(w, r, "You do not have access to this resource.", "/member/resources")
+		return
+	}
+
+	// Check visibility window
+	if assignment.VisibleFrom != nil && !assignment.VisibleFrom.IsZero() {
+		fromLocal := assignment.VisibleFrom.In(loc)
+		if nowLocal.Before(fromLocal) {
+			uierrors.RenderForbidden(w, r, "This resource is not yet available.", "/member/resources")
+			return
+		}
+	} else {
+		uierrors.RenderForbidden(w, r, "This resource is not available.", "/member/resources")
+		return
+	}
+
+	if assignment.VisibleUntil != nil && !assignment.VisibleUntil.IsZero() {
+		untilLocal := assignment.VisibleUntil.In(loc)
+		if nowLocal.After(untilLocal) {
+			uierrors.RenderForbidden(w, r, "This resource is no longer available.", "/member/resources")
+			return
+		}
+	}
+
+	// Check if resource is active
+	if res.Status != "active" {
+		uierrors.RenderForbidden(w, r, "This resource is not currently active.", "/member/resources")
+		return
+	}
+
+	// Resource must have a launch URL
+	if res.LaunchURL == "" {
+		uierrors.RenderBadRequest(w, r, "This resource does not have a launch URL.", "/member/resources")
+		return
+	}
+
+	// Record the resource launch event
+	activitySessionID := h.getActivitySessionID(r)
+	if h.Activity != nil && !activitySessionID.IsZero() {
+		if err := h.Activity.RecordResourceLaunch(ctx, member.ID, activitySessionID, member.OrganizationID, oid, res.Title); err != nil {
+			h.Log.Warn("failed to record resource launch",
+				zap.Error(err),
+				zap.String("resource_id", resourceID),
+				zap.String("member_id", member.ID.Hex()))
+		}
+	}
+
+	// Build launch URL with id (email), group (name), org (name)
+	launch := urlutil.AddOrSetQueryParams(res.LaunchURL, map[string]string{
+		"id":    member.Email,
+		"group": assignment.GroupName,
+		"org":   orgName,
+	})
+
+	http.Redirect(w, r, launch, http.StatusSeeOther)
 }

@@ -13,6 +13,7 @@ import (
 	organizationstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
 	resourceassignstore "github.com/dalemusser/stratahub/internal/app/store/resourceassign"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/txn"
@@ -26,6 +27,12 @@ import (
 // (no replica set), falls back to sequential deletes with best-effort cleanup.
 // Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
 func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
+	actorRole, _, actorID, ok := authz.UserCtx(r)
+	if !ok {
+		uierrors.RenderUnauthorized(w, r, "/login")
+		return
+	}
+
 	idHex := chi.URLParam(r, "id")
 	oid, err := primitive.ObjectIDFromHex(idHex)
 	if err != nil {
@@ -36,6 +43,15 @@ func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Long())
 	defer cancel()
 
+	// Get org name before deleting for audit log
+	orgStore := organizationstore.New(h.DB)
+	org, err := orgStore.GetByID(ctx, oid)
+	if err != nil {
+		uierrors.RenderNotFound(w, r, "Organization not found.", "/organizations")
+		return
+	}
+	orgName := org.Name
+
 	// Use txn.Run for atomic cascading delete with automatic fallback.
 	if err := txn.Run(ctx, h.DB, h.Log, func(ctx context.Context) error {
 		return h.cascadeDeleteOrg(ctx, oid)
@@ -43,6 +59,9 @@ func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 		h.ErrLog.LogServerError(w, r, "delete organization failed", err, "Failed to delete organization. Please try again.", "/organizations")
 		return
 	}
+
+	// Audit log: organization deleted
+	h.AuditLog.OrgDeleted(ctx, r, actorID, oid, actorRole, orgName)
 
 	h.Log.Info("organization deleted with cascading cleanup", zap.String("org_id", idHex))
 

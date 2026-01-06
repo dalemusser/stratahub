@@ -12,6 +12,7 @@ import (
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
 	orgstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
 	resourceassignstore "github.com/dalemusser/stratahub/internal/app/store/resourceassign"
+	resourcestore "github.com/dalemusser/stratahub/internal/app/store/resources"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/domain/models"
@@ -71,7 +72,7 @@ func (h *Handler) HandleAssignResource(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, uname, _, _ := authz.UserCtx(r)
+	actorRole, uname, actorID, _ := authz.UserCtx(r)
 
 	// Resolve the organization's timezone so we can interpret the submitted
 	// datetime strings in the correct local time before converting to UTC.
@@ -112,11 +113,25 @@ func (h *Handler) HandleAssignResource(w http.ResponseWriter, r *http.Request) {
 		CreatedByName:  uname,
 	}
 
-	if _, err := resourceassignstore.New(db).Create(ctx, a); err != nil {
+	createdAssign, err := resourceassignstore.New(db).Create(ctx, a)
+	if err != nil {
 		h.Log.Warn("resource assign create", zap.Error(err))
 		uierrors.RenderForbidden(w, r, "A database error occurred.", httpnav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
 		return
 	}
+
+	// Get resource title for audit log
+	var resourceTitle string
+	if res, err := resourcestore.New(db).GetByID(ctx, resourceOID); err == nil {
+		resourceTitle = res.Title
+	}
+
+	// Audit log: resource assigned to group
+	var orgID *primitive.ObjectID
+	if !group.OrganizationID.IsZero() {
+		orgID = &group.OrganizationID
+	}
+	h.AuditLog.ResourceAssignedToGroup(ctx, r, actorID, createdAssign.ID, resourceOID, group.ID, orgID, actorRole, resourceTitle, group.Name)
 
 	h.redirectAssignResources(w, r, gid)
 }
@@ -181,11 +196,20 @@ func (h *Handler) HandleRemoveAssignment(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	actorRole, _, actorID, _ := authz.UserCtx(r)
+
 	if err := resourceassignstore.New(db).Delete(ctx, assignID); err != nil {
 		h.Log.Warn("resource assign delete", zap.Error(err))
 		uierrors.RenderForbidden(w, r, "A database error occurred.", httpnav.ResolveBackURL(r, "/groups/"+gid+"/assign_resources"))
 		return
 	}
+
+	// Audit log: resource unassigned from group
+	var orgID *primitive.ObjectID
+	if !group.OrganizationID.IsZero() {
+		orgID = &group.OrganizationID
+	}
+	h.AuditLog.ResourceUnassignedFromGroup(ctx, r, actorID, assignID, asn.ResourceID, group.ID, orgID, actorRole)
 
 	h.redirectAssignResources(w, r, gid)
 }

@@ -10,6 +10,7 @@ import (
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/store/coordinatorassign"
+	orgstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/authutil"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
@@ -54,7 +55,7 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 
 // HandleCreate processes the Add System User form POST.
 func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
-	_, creatorName, creatorOID, ok := authz.UserCtx(r)
+	actorRole, creatorName, creatorOID, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
@@ -183,9 +184,13 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Audit log: system user created
+	h.AuditLog.UserCreated(ctx, r, creatorOID, createdUser.ID, nil, actorRole, userRole, authm)
+
 	// Create coordinator assignments if role is coordinator
 	if userRole == "coordinator" && len(orgIDs) > 0 {
 		coordStore := coordinatorassign.New(db)
+		oStore := orgstore.New(db)
 
 		for _, orgID := range orgIDs {
 			assignment := models.CoordinatorAssignment{
@@ -201,6 +206,13 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 					zap.String("user_id", createdUser.ID.Hex()),
 					zap.String("org_id", orgID.Hex()))
 				// Continue with other assignments; log but don't fail
+			} else {
+				// Audit log: coordinator assigned to organization
+				orgName := ""
+				if org, err := oStore.GetByID(ctx, orgID); err == nil {
+					orgName = org.Name
+				}
+				h.AuditLog.CoordinatorAssignedToOrg(ctx, r, creatorOID, createdUser.ID, orgID, actorRole, orgName)
 			}
 		}
 	}

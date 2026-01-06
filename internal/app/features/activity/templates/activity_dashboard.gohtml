@@ -1,0 +1,176 @@
+{{ define "activity_dashboard" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Activity Dashboard</h1>
+  <div class="flex items-center gap-2">
+    <a href="/activity/summary" class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700">
+      Weekly Summary
+    </a>
+    {{ if or (eq .Role "admin") (eq .Role "coordinator") }}
+    <a href="/activity/export" class="text-sm px-3 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700">
+      Export Data
+    </a>
+    {{ end }}
+  </div>
+</div>
+
+<!-- Stats -->
+<div class="flex gap-4 mb-4">
+  <div class="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 text-center">
+    <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Total</div>
+    <div class="text-xl font-bold text-gray-900 dark:text-gray-100">{{ .TotalMembers }}</div>
+  </div>
+  <div class="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 text-center">
+    <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Active</div>
+    <div class="text-xl font-bold text-green-600 dark:text-green-400">{{ .OnlineCount }}</div>
+  </div>
+  <div class="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 text-center">
+    <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Idle</div>
+    <div class="text-xl font-bold text-yellow-600 dark:text-yellow-400">{{ .IdleCount }}</div>
+  </div>
+  <div class="flex-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg px-4 py-3 text-center">
+    <div class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Offline</div>
+    <div class="text-xl font-bold text-gray-400 dark:text-gray-500">{{ .OfflineCount }}</div>
+  </div>
+</div>
+
+<!-- Filters -->
+<div class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-1 flex flex-wrap items-center gap-4">
+  <!-- Refresh controls -->
+  <div class="flex items-center gap-2 mr-2">
+    <button id="refresh-btn"
+            type="button"
+            class="text-sm px-2 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+            title="Refresh now">
+      Refresh
+    </button>
+    <span id="countdown" class="text-xs text-gray-500 dark:text-gray-400 w-8 text-center">30s</span>
+  </div>
+
+  <input id="search-filter"
+         type="text"
+         name="search"
+         value="{{ .SearchQuery }}"
+         placeholder="Search by name"
+         class="flex-1 min-w-[200px] max-w-xs px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-indigo-400"
+         hx-get="/activity/online-table"
+         hx-target="#online-table"
+         hx-swap="innerHTML"
+         hx-trigger="keyup changed delay:300ms"
+         hx-include="#group-filter, #status-filter"
+         hx-vals='{"sort":"{{ .SortBy }}","dir":"{{ .SortDir }}","page":"1"}'>
+
+  <div class="flex items-center gap-2">
+    <label class="text-sm text-gray-600 dark:text-gray-400">Group:</label>
+    <select id="group-filter"
+            class="text-sm border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            hx-get="/activity/online-table"
+            hx-target="#online-table"
+            hx-swap="innerHTML"
+            hx-include="#search-filter, #status-filter"
+            hx-vals='{"sort":"{{ .SortBy }}","dir":"{{ .SortDir }}","page":"1"}'
+            name="group">
+      {{ range .Groups }}
+      <option value="{{ .ID }}" {{ if .Selected }}selected{{ end }}>{{ .Name }}</option>
+      {{ end }}
+    </select>
+  </div>
+
+  <div class="flex items-center gap-2">
+    <label class="text-sm text-gray-600 dark:text-gray-400">Status:</label>
+    <select id="status-filter"
+            class="text-sm border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            hx-get="/activity/online-table"
+            hx-target="#online-table"
+            hx-swap="innerHTML"
+            hx-include="#search-filter, #group-filter"
+            hx-vals='{"sort":"{{ .SortBy }}","dir":"{{ .SortDir }}","page":"1"}'
+            name="status">
+      <option value="all" {{ if eq .StatusFilter "all" }}selected{{ end }}>All Statuses</option>
+      <option value="online" {{ if eq .StatusFilter "online" }}selected{{ end }}>Active</option>
+      <option value="idle" {{ if eq .StatusFilter "idle" }}selected{{ end }}>Idle</option>
+      <option value="offline" {{ if eq .StatusFilter "offline" }}selected{{ end }}>Offline</option>
+    </select>
+  </div>
+</div>
+
+<!-- Members Table -->
+<div id="online-table">
+  {{ template "activity_online_table" . }}
+</div>
+
+<script>
+(function() {
+  var scrollPos = 0;
+  var scrollContainer = null;
+  var countdown = 30;
+  var countdownEl = document.getElementById('countdown');
+  var refreshBtn = document.getElementById('refresh-btn');
+  var countdownInterval = null;
+
+  // Update countdown display
+  function updateCountdown() {
+    if (countdownEl) {
+      countdownEl.textContent = countdown + 's';
+    }
+  }
+
+  // Start countdown timer
+  function startCountdown() {
+    countdown = 30;
+    updateCountdown();
+    if (countdownInterval) clearInterval(countdownInterval);
+    countdownInterval = setInterval(function() {
+      countdown--;
+      if (countdown < 0) countdown = 30;
+      updateCountdown();
+    }, 1000);
+  }
+
+  // Manual refresh - trigger HTMX to reload the table
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', function() {
+      var table = document.querySelector('#online-table > div[hx-get]');
+      if (table) {
+        // Get the URL from hx-get attribute and make a direct HTMX request
+        var url = table.getAttribute('hx-get');
+        if (url) {
+          htmx.ajax('GET', url, {target: '#online-table', swap: 'innerHTML'});
+        }
+      }
+      countdown = 30;
+      updateCountdown();
+    });
+  }
+
+  // Before HTMX swaps content, save scroll position
+  document.body.addEventListener('htmx:beforeSwap', function(evt) {
+    if (evt.detail.target && evt.detail.target.id === 'online-table') {
+      scrollContainer = document.querySelector('#online-table .overflow-auto');
+      if (scrollContainer) {
+        scrollPos = scrollContainer.scrollTop;
+      }
+    }
+  });
+
+  // After HTMX swaps content, restore scroll position and reset countdown
+  document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target && evt.detail.target.id === 'online-table') {
+      scrollContainer = document.querySelector('#online-table .overflow-auto');
+      if (scrollContainer && scrollPos > 0) {
+        scrollContainer.scrollTop = scrollPos;
+      }
+      // Reset countdown after refresh
+      countdown = 30;
+      updateCountdown();
+    }
+  });
+
+  // Start countdown on page load
+  startCountdown();
+})();
+</script>
+{{ end }}

@@ -60,9 +60,31 @@ StrataHub configuration is divided into two sections:
 | `lets_encrypt_email` | string | `""` | Email for Let's Encrypt registration |
 | `lets_encrypt_cache_dir` | string | `""` | Directory to cache Let's Encrypt certificates |
 | `lets_encrypt_challenge` | string | `"http-01"` | ACME challenge type: `"http-01"` or `"dns-01"` |
-| `domain` | string | `""` | Domain for TLS certificate |
+| `domain` | string | `""` | Single domain for TLS certificate (backward compatible) |
+| `domains` | []string | `[]` | Multiple domains for TLS certificate (e.g., `["example.com", "*.example.com"]`) |
 | `route53_hosted_zone_id` | string | `""` | AWS Route53 zone ID (for dns-01 challenge) |
 | `acme_directory_url` | string | `""` | Custom ACME directory URL |
+
+> **Note:** Use either `domain` (single domain) or `domains` (multiple domains), not both. Wildcard certificates (e.g., `*.example.com`) require `lets_encrypt_challenge = "dns-01"`.
+
+#### Multi-Domain and Wildcard Certificates
+
+For certificates covering multiple domains (e.g., apex domain + wildcard), use the `domains` array with DNS-01 challenge:
+
+```toml
+# Multi-domain certificate with wildcard
+use_https = true
+use_lets_encrypt = true
+lets_encrypt_email = "admin@example.com"
+lets_encrypt_challenge = "dns-01"
+domains = ["example.com", "*.example.com"]
+route53_hosted_zone_id = "Z1234567890ABC"
+```
+
+This configuration:
+- Covers both `example.com` and all subdomains (`*.example.com`)
+- Uses DNS-01 challenge via AWS Route 53 (required for wildcards)
+- Automatically renews certificates 30 days before expiry via background renewal
 
 ### CORS Settings
 
@@ -99,6 +121,66 @@ StrataHub configuration is divided into two sections:
 | `session_domain` | string | `""` | Session cookie domain (blank = current host) |
 
 > **Security Note:** The `session_key` must be a strong, random string in production. Never use the default development key in production environments.
+
+---
+
+## Email/SMTP Configuration
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `mail_smtp_host` | string | `"localhost"` | SMTP server hostname |
+| `mail_smtp_port` | int | `1025` | SMTP server port |
+| `mail_smtp_user` | string | `""` | SMTP username |
+| `mail_smtp_pass` | string | `""` | SMTP password |
+| `mail_from` | string | `"noreply@stratahub.com"` | From email address |
+| `mail_from_name` | string | `"StrataHub"` | From display name |
+| `base_url` | string | `"http://localhost:3000"` | Base URL for magic links |
+| `email_verify_expiry` | duration | `"10m"` | Email verification code/link expiry (e.g., 10m, 1h, 90s) |
+
+### Email Configuration for Development
+
+For local development, use [Mailpit](https://github.com/axllent/mailpit) to capture emails:
+
+```bash
+# Install Mailpit (macOS)
+brew install mailpit
+
+# Run Mailpit
+mailpit
+# or
+brew services start mailpit
+```
+
+- **SMTP**: localhost:1025 (default, no config needed)
+- **Web UI**: http://localhost:8025
+
+### Email Configuration for Production
+
+For production, configure a real SMTP server:
+
+```toml
+mail_smtp_host = "email-smtp.us-east-1.amazonaws.com"
+mail_smtp_port = 587
+mail_smtp_user = "your-ses-smtp-user"
+mail_smtp_pass = "your-ses-smtp-password"
+mail_from = "noreply@yourdomain.com"
+mail_from_name = "Your App Name"
+base_url = "https://yourdomain.com"
+email_verify_expiry = "10m"  # or "15m", "1h", etc.
+```
+
+Or via environment variables:
+
+```bash
+export STRATAHUB_MAIL_SMTP_HOST=email-smtp.us-east-1.amazonaws.com
+export STRATAHUB_MAIL_SMTP_PORT=587
+export STRATAHUB_MAIL_SMTP_USER=your-ses-smtp-user
+export STRATAHUB_MAIL_SMTP_PASS=your-ses-smtp-password
+export STRATAHUB_MAIL_FROM=noreply@yourdomain.com
+export STRATAHUB_MAIL_FROM_NAME="Your App Name"
+export STRATAHUB_BASE_URL=https://yourdomain.com
+export STRATAHUB_EMAIL_VERIFY_EXPIRY=10m
+```
 
 ---
 

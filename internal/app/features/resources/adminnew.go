@@ -138,7 +138,7 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		fileSize = info.Size
 	}
 
-	_, uname, memberID, ok := authz.UserCtx(r)
+	actorRole, uname, actorID, ok := authz.UserCtx(r)
 
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
@@ -160,11 +160,12 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		DefaultInstructions: defaultInstructions,
 	}
 	if ok {
-		res.CreatedByID = &memberID
+		res.CreatedByID = &actorID
 		res.CreatedByName = uname
 	}
 
-	if _, err := resStore.Create(ctx, res); err != nil {
+	createdRes, err := resStore.Create(ctx, res)
+	if err != nil {
 		msg := "Database error while creating resource."
 		if err == resourcestore.ErrDuplicateTitle {
 			msg = "A resource with that title already exists."
@@ -182,6 +183,9 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		reRender(msg)
 		return
 	}
+
+	// Audit log: resource created
+	h.AuditLog.ResourceCreated(ctx, r, actorID, createdRes.ID, actorRole, title)
 
 	ret := navigation.SafeBackURL(r, navigation.ResourcesBackURL)
 	http.Redirect(w, r, ret, http.StatusSeeOther)
