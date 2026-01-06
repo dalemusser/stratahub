@@ -8,21 +8,25 @@ func TestIsValidAuthMethod(t *testing.T) {
 		want   bool
 	}{
 		// Valid methods
-		{"internal", true},
+		{"trust", true},
+		{"password", true},
+		{"email", true},
 		{"google", true},
-		{"classlink", true},
-		{"clever", true},
 		{"microsoft", true},
+		{"clever", true},
+		{"classlink", true},
+		{"schoology", true},
 
 		// Valid methods - case insensitive
-		{"INTERNAL", true},
+		{"TRUST", true},
+		{"PASSWORD", true},
 		{"Google", true},
 		{"ClassLink", true},
 		{"CLEVER", true},
 		{"Microsoft", true},
 
 		// Valid with whitespace
-		{"  internal  ", true},
+		{"  trust  ", true},
 		{"\tgoogle\t", true},
 
 		// Invalid methods
@@ -32,6 +36,7 @@ func TestIsValidAuthMethod(t *testing.T) {
 		{"oauth", false},
 		{"saml", false},
 		{"ldap", false},
+		{"internal", false}, // old name, now called "trust"
 	}
 
 	for _, tt := range tests {
@@ -47,12 +52,16 @@ func TestIsValidAuthMethod(t *testing.T) {
 func TestAllowedAuthMethodsList(t *testing.T) {
 	list := AllowedAuthMethodsList()
 
-	if len(list) != 5 {
-		t.Errorf("AllowedAuthMethodsList() has %d items, want 5", len(list))
+	if len(list) != 8 {
+		t.Errorf("AllowedAuthMethodsList() has %d items, want 8", len(list))
 	}
 
-	expected := []string{"internal", "google", "classlink", "clever", "microsoft"}
+	expected := []string{"trust", "password", "email", "google", "microsoft", "clever", "classlink", "schoology"}
 	for i, want := range expected {
+		if i >= len(list) {
+			t.Errorf("AllowedAuthMethodsList() missing index %d, want %q", i, want)
+			continue
+		}
 		if list[i] != want {
 			t.Errorf("AllowedAuthMethodsList()[%d] = %q, want %q", i, list[i], want)
 		}

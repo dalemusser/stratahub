@@ -32,10 +32,11 @@
 
   function toggleAuthFields() {
     var method = authSelect.value;
+    var isEmailLoginMethod = emailIsLoginMethods.indexOf(method) !== -1;
 
     // Login ID: hide for email/google/microsoft (email becomes login_id)
     if (loginIdSection && loginIdInput) {
-      if (emailIsLoginMethods.indexOf(method) !== -1) {
+      if (isEmailLoginMethod) {
         loginIdSection.classList.add('hidden');
         loginIdInput.required = false;
       } else {
@@ -46,9 +47,13 @@
 
     // Email: required for email/google/microsoft, optional for others
     if (emailOptionalLabel && emailInput) {
-      if (emailIsLoginMethods.indexOf(method) !== -1) {
+      if (isEmailLoginMethod) {
         emailOptionalLabel.classList.add('hidden');
         emailInput.required = true;
+        // Auto-populate email from login_id if it looks like an email and email is empty
+        if (loginIdInput && emailInput.value.trim() === '' && loginIdInput.value.indexOf('@') !== -1) {
+          emailInput.value = loginIdInput.value;
+        }
       } else {
         emailOptionalLabel.classList.remove('hidden');
         emailInput.required = false;

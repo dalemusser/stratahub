@@ -20,7 +20,8 @@ func newTestHandler(t *testing.T) *logout.Handler {
 		t.Fatalf("NewSessionManager failed: %v", err)
 	}
 
-	return logout.NewHandler(sessionMgr, logger)
+	// Pass nil for audit logger and sessions store in tests (handler has nil checks)
+	return logout.NewHandler(sessionMgr, nil, nil, logger)
 }
 
 func TestServeLogout_RedirectsToHome(t *testing.T) {
@@ -93,7 +94,7 @@ func TestServeLogout_WithExistingSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf("NewSessionManager failed: %v", err)
 	}
-	handler := logout.NewHandler(sessionMgr, logger)
+	handler := logout.NewHandler(sessionMgr, nil, nil, logger)
 
 	// First, simulate having a session by making a request and setting session values
 	req1 := httptest.NewRequest("GET", "/setup", nil)

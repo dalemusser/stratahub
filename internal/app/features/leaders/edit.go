@@ -133,6 +133,12 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 
 // HandleEdit processes the Edit Leader form submission.
 func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
+	actorRole, _, actorID, ok := authz.UserCtx(r)
+	if !ok {
+		uierrors.RenderUnauthorized(w, r, "/login")
+		return
+	}
+
 	if err := r.ParseForm(); err != nil {
 		h.ErrLog.LogBadRequest(w, r, "parse form failed", err, "Invalid form submission.", "/leaders")
 		return
@@ -232,6 +238,18 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Fetch current leader to get old status for audit logging
+	var currentLeader models.User
+	if err := h.DB.Collection("users").FindOne(ctx, bson.M{"_id": uid, "role": "leader"}).Decode(&currentLeader); err != nil {
+		if err == mongo.ErrNoDocuments {
+			uierrors.RenderNotFound(w, r, "Leader not found.", "/leaders")
+		} else {
+			h.ErrLog.LogServerError(w, r, "database error loading leader", err, "A database error occurred.", "/leaders")
+		}
+		return
+	}
+	oldStatus := normalize.Status(currentLeader.Status)
+
 	// Early uniqueness check: same login_id used by a different user?
 	effectiveLoginID := authResult.EffectiveLoginID
 	loginIDCI := text.Fold(effectiveLoginID)
@@ -277,6 +295,18 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		}
 		reRender(msg)
 		return
+	}
+
+	// Audit log: check for status change or general update
+	if oldStatus != status {
+		if status == "disabled" {
+			h.AuditLog.UserDisabled(ctx, r, actorID, uid, currentLeader.OrganizationID, actorRole)
+		} else if status == "active" {
+			h.AuditLog.UserEnabled(ctx, r, actorID, uid, currentLeader.OrganizationID, actorRole)
+		}
+	} else {
+		// General update - log changed fields
+		h.AuditLog.UserUpdated(ctx, r, actorID, uid, currentLeader.OrganizationID, actorRole, "leader details")
 	}
 
 	ret := navigation.SafeBackURL(r, navigation.LeadersBackURL)

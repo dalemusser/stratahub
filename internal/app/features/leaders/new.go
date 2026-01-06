@@ -98,6 +98,12 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
+	actorRole, _, actorID, ok := authz.UserCtx(r)
+	if !ok {
+		uierrors.RenderUnauthorized(w, r, "/login")
+		return
+	}
+
 	if err := r.ParseForm(); err != nil {
 		h.renderNewWithError(w, r, "Bad request.")
 		return
@@ -192,7 +198,8 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		doc["password_temp"] = *authResult.PasswordTemp
 	}
 
-	if _, err := h.DB.Collection("users").InsertOne(ctx, doc); err != nil {
+	res, err := h.DB.Collection("users").InsertOne(ctx, doc)
+	if err != nil {
 		msg := "Database error while creating leader."
 		if wafflemongo.IsDup(err) {
 			msg = "A user with that login ID already exists."
@@ -200,6 +207,10 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		h.renderNewWithError(w, r, msg, withNewEcho(full, loginID, email, authReturnID, orgHex, authm, tempPassword, status))
 		return
 	}
+
+	// Audit log: leader created
+	newUserID := res.InsertedID.(primitive.ObjectID)
+	h.AuditLog.UserCreated(ctx, r, actorID, newUserID, &oid, actorRole, "leader", authm)
 
 	// Success: honor optional return parameter, otherwise go back to leaders list.
 	ret := navigation.SafeBackURL(r, navigation.LeadersBackURL)

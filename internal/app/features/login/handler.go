@@ -3,14 +3,18 @@ package login
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"strings"
+	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/store/emailverify"
+	"github.com/dalemusser/stratahub/internal/app/store/sessions"
 	settingsstore "github.com/dalemusser/stratahub/internal/app/store/settings"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
+	"github.com/dalemusser/stratahub/internal/app/system/auditlog"
 	"github.com/dalemusser/stratahub/internal/app/system/authutil"
 	"github.com/dalemusser/stratahub/internal/app/system/mailer"
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
@@ -30,13 +34,16 @@ import (
 )
 
 type Handler struct {
-	DB          *mongo.Database
-	Log         *zap.Logger
-	SessionMgr  *auth.SessionManager
-	ErrLog      *uierrors.ErrorLogger
-	Mailer      *mailer.Mailer
-	EmailVerify *emailverify.Store
-	BaseURL     string // Base URL for magic links (e.g., "https://stratahub.com")
+	DB            *mongo.Database
+	Log           *zap.Logger
+	SessionMgr    *auth.SessionManager
+	ErrLog        *uierrors.ErrorLogger
+	Mailer        *mailer.Mailer
+	EmailVerify   *emailverify.Store
+	AuditLog      *auditlog.Logger
+	Sessions      *sessions.Store // Activity session tracking
+	BaseURL       string          // Base URL for magic links (e.g., "https://stratahub.com")
+	GoogleEnabled bool            // True if Google OAuth is configured
 }
 
 /*─────────────────────────────────────────────────────────────────────────────*
@@ -45,9 +52,10 @@ type Handler struct {
 
 type loginFormData struct {
 	viewdata.BaseVM
-	Error     string
-	LoginID   string // What the user typed (displayed as "email" in UI for backwards compat)
-	ReturnURL string
+	Error         string
+	LoginID       string // What the user typed (displayed as "email" in UI for backwards compat)
+	ReturnURL     string
+	GoogleEnabled bool // True if Google OAuth is configured
 }
 
 type passwordFormData struct {
@@ -71,17 +79,43 @@ type emailVerifyFormData struct {
 	LoginID   string // Display the login ID (read-only)
 	Email     string // Email where code was sent
 	ReturnURL string
+	Resent    bool // True if code was just resent (for success message)
 }
 
-func NewHandler(db *mongo.Database, sessionMgr *auth.SessionManager, errLog *uierrors.ErrorLogger, mail *mailer.Mailer, baseURL string, logger *zap.Logger) *Handler {
+type magicLinkSuccessData struct {
+	SiteName  string
+	ReturnURL string
+}
+
+// formatExpiryDuration formats a time.Duration as a human-readable string
+// e.g., "10 minutes", "1 hour", "30 minutes"
+func formatExpiryDuration(d time.Duration) string {
+	minutes := int(d.Minutes())
+	if minutes < 60 {
+		if minutes == 1 {
+			return "1 minute"
+		}
+		return fmt.Sprintf("%d minutes", minutes)
+	}
+	hours := minutes / 60
+	if hours == 1 {
+		return "1 hour"
+	}
+	return fmt.Sprintf("%d hours", hours)
+}
+
+func NewHandler(db *mongo.Database, sessionMgr *auth.SessionManager, errLog *uierrors.ErrorLogger, mail *mailer.Mailer, audit *auditlog.Logger, sessStore *sessions.Store, baseURL string, emailVerifyExpiry time.Duration, googleEnabled bool, logger *zap.Logger) *Handler {
 	return &Handler{
-		DB:          db,
-		Log:         logger,
-		SessionMgr:  sessionMgr,
-		ErrLog:      errLog,
-		Mailer:      mail,
-		EmailVerify: emailverify.New(db),
-		BaseURL:     baseURL,
+		DB:            db,
+		Log:           logger,
+		SessionMgr:    sessionMgr,
+		ErrLog:        errLog,
+		Mailer:        mail,
+		EmailVerify:   emailverify.New(db, emailVerifyExpiry),
+		AuditLog:      audit,
+		Sessions:      sessStore,
+		BaseURL:       baseURL,
+		GoogleEnabled: googleEnabled,
 	}
 }
 
@@ -93,8 +127,9 @@ func (h *Handler) ServeLogin(w http.ResponseWriter, r *http.Request) {
 	ret := query.Get(r, "return")
 
 	templates.Render(w, r, "login", loginFormData{
-		BaseVM:    viewdata.NewBaseVM(r, h.DB, "Login", "/"),
-		ReturnURL: ret,
+		BaseVM:        viewdata.NewBaseVM(r, h.DB, "Login", "/"),
+		ReturnURL:     ret,
+		GoogleEnabled: h.GoogleEnabled,
 	})
 }
 
@@ -142,6 +177,8 @@ func (h *Handler) HandleLoginPost(w http.ResponseWriter, r *http.Request) {
 
 	switch err {
 	case mongo.ErrNoDocuments:
+		// Audit log: login failed - user not found
+		h.AuditLog.LoginFailedUserNotFound(ctx, r, loginID)
 		h.renderFormWithError(w, r, "No account found for that login ID.", loginID)
 		return
 	case nil:
@@ -154,6 +191,8 @@ func (h *Handler) HandleLoginPost(w http.ResponseWriter, r *http.Request) {
 	/*── check status: disabled users cannot log in ────────────────────────*/
 
 	if normalize.Status(u.Status) == "disabled" {
+		// Audit log: login failed - user disabled
+		h.AuditLog.LoginFailedUserDisabled(ctx, r, u.ID, u.OrganizationID, loginID)
 		h.renderFormWithError(
 			w,
 			r,
@@ -181,7 +220,19 @@ func (h *Handler) HandleLoginPost(w http.ResponseWriter, r *http.Request) {
 		// Email verification: send code and redirect to verification page
 		h.startEmailFlow(w, r, &u, ret)
 
-	case "google", "microsoft", "classlink", "clever", "schoology":
+	case "google":
+		// Redirect to Google OAuth flow
+		if h.GoogleEnabled {
+			redirectURL := "/auth/google"
+			if ret != "" {
+				redirectURL += "?return=" + ret
+			}
+			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+		} else {
+			h.renderFormWithError(w, r, "Google sign-in is not configured. Please contact an administrator.", loginID)
+		}
+
+	case "microsoft", "classlink", "clever", "schoology":
 		// SSO methods (future feature)
 		h.renderFormWithError(w, r, "This account uses "+authMethod+" sign-in, which is not yet available. Please contact an administrator.", loginID)
 
@@ -218,11 +269,30 @@ func (h *Handler) createSessionAndRedirect(w http.ResponseWriter, r *http.Reques
 		loginID = *u.LoginID
 	}
 
+	// Create activity session for tracking
+	if h.Sessions != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
+		defer cancel()
+
+		ip := extractIP(r)
+		activitySess, err := h.Sessions.Create(ctx, u.ID, u.OrganizationID, ip, r.UserAgent())
+		if err != nil {
+			h.Log.Warn("failed to create activity session", zap.Error(err), zap.String("user_id", u.ID.Hex()))
+		} else {
+			// Store activity session ID in cookie session
+			sess.Values["activity_session_id"] = activitySess.ID.Hex()
+		}
+	}
+
 	if err := sess.Save(r, w); err != nil {
 		h.Log.Error("save session failed", zap.Error(err), zap.String("login_id", loginID))
 		h.renderFormWithError(w, r, "Unable to create session. Please try again.", loginID)
 		return
 	}
+
+	// Audit log: login success
+	authMethod := normalize.AuthMethod(u.AuthMethod)
+	h.AuditLog.LoginSuccess(r.Context(), r, u.ID, u.OrganizationID, authMethod, loginID)
 
 	// Set theme preference cookie for the layout script to apply on page load.
 	// This cookie is read once by JavaScript to set localStorage, then cleared.
@@ -241,6 +311,116 @@ func (h *Handler) createSessionAndRedirect(w http.ResponseWriter, r *http.Reques
 
 	dest := urlutil.SafeReturn(returnURL, "", "/dashboard")
 	http.Redirect(w, r, dest, http.StatusSeeOther)
+}
+
+// extractIP extracts the client IP address from the request.
+func extractIP(r *http.Request) string {
+	// Check X-Forwarded-For header (for reverse proxies)
+	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
+		// Take the first IP in the list
+		if idx := strings.Index(xff, ","); idx != -1 {
+			return strings.TrimSpace(xff[:idx])
+		}
+		return strings.TrimSpace(xff)
+	}
+	// Check X-Real-IP header
+	if xri := r.Header.Get("X-Real-IP"); xri != "" {
+		return strings.TrimSpace(xri)
+	}
+	// Fall back to RemoteAddr
+	ip := r.RemoteAddr
+	// Remove port if present
+	if idx := strings.LastIndex(ip, ":"); idx != -1 {
+		ip = ip[:idx]
+	}
+	return ip
+}
+
+// createSessionAndRenderMagicSuccess creates an authenticated session and renders
+// a page that broadcasts to other tabs and redirects via JavaScript.
+// This allows the original verify-email tab to detect the login and redirect.
+func (h *Handler) createSessionAndRenderMagicSuccess(w http.ResponseWriter, r *http.Request, u *models.User, returnURL string) {
+	sess, err := h.SessionMgr.GetSession(r)
+	if err != nil {
+		if scErr, ok := err.(securecookie.Error); ok && scErr.IsDecode() {
+			h.Log.Warn("session cookie invalid, using fresh session",
+				zap.Error(err),
+				zap.String("user_id", u.ID.Hex()))
+		} else {
+			h.Log.Error("session store error during login, using fresh session",
+				zap.Error(err),
+				zap.String("user_id", u.ID.Hex()))
+		}
+	}
+
+	// Clear any pending login state
+	delete(sess.Values, "pending_user_id")
+	delete(sess.Values, "pending_login_id")
+	delete(sess.Values, "pending_email")
+	delete(sess.Values, "pending_return_url")
+
+	// Set authenticated state
+	sess.Values["is_authenticated"] = true
+	sess.Values["user_id"] = u.ID.Hex()
+
+	loginID := ""
+	if u.LoginID != nil {
+		loginID = *u.LoginID
+	}
+
+	// Create activity session for tracking
+	if h.Sessions != nil {
+		ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
+		defer cancel()
+
+		ip := extractIP(r)
+		activitySess, err := h.Sessions.Create(ctx, u.ID, u.OrganizationID, ip, r.UserAgent())
+		if err != nil {
+			h.Log.Warn("failed to create activity session", zap.Error(err), zap.String("user_id", u.ID.Hex()))
+		} else {
+			// Store activity session ID in cookie session
+			sess.Values["activity_session_id"] = activitySess.ID.Hex()
+		}
+	}
+
+	if err := sess.Save(r, w); err != nil {
+		h.Log.Error("save session failed", zap.Error(err), zap.String("login_id", loginID))
+		h.renderFormWithError(w, r, "Unable to create session. Please try again.", loginID)
+		return
+	}
+
+	// Audit log: login success (email auth via magic link or code)
+	authMethod := normalize.AuthMethod(u.AuthMethod)
+	h.AuditLog.LoginSuccess(r.Context(), r, u.ID, u.OrganizationID, authMethod, loginID)
+
+	// Set theme preference cookie
+	themePref := u.ThemePreference
+	if themePref == "" {
+		themePref = "system"
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     "theme_pref",
+		Value:    themePref,
+		Path:     "/",
+		MaxAge:   60,
+		HttpOnly: false,
+		SameSite: http.SameSiteLaxMode,
+	})
+
+	// Get site name for branding
+	siteName := "StrataHub"
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
+	settings, err := settingsstore.New(h.DB).Get(ctx)
+	cancel()
+	if err == nil && settings.SiteName != "" {
+		siteName = settings.SiteName
+	}
+
+	dest := urlutil.SafeReturn(returnURL, "", "/dashboard")
+	templates.Render(w, r, "login_magic_link_success", magicLinkSuccessData{
+		SiteName:  siteName,
+		ReturnURL: dest,
+	})
 }
 
 // startPasswordFlow stores pending login info in session and redirects to password page.
@@ -289,10 +469,11 @@ func (h *Handler) renderFormWithError(w http.ResponseWriter, r *http.Request, ms
 	}
 
 	templates.Render(w, r, "login", loginFormData{
-		BaseVM:    viewdata.NewBaseVM(r, h.DB, "Login", "/"),
-		Error:     msg,
-		LoginID:   loginID,
-		ReturnURL: ret,
+		BaseVM:        viewdata.NewBaseVM(r, h.DB, "Login", "/"),
+		Error:         msg,
+		LoginID:       loginID,
+		ReturnURL:     ret,
+		GoogleEnabled: h.GoogleEnabled,
 	})
 }
 
@@ -382,6 +563,8 @@ func (h *Handler) HandlePasswordSubmit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if !authutil.CheckPassword(password, *u.PasswordHash) {
+		// Audit log: login failed - wrong password
+		h.AuditLog.LoginFailedWrongPassword(ctx, r, u.ID, u.OrganizationID, pendingLoginID)
 		h.renderPasswordFormWithError(w, r, "Incorrect password. Please try again.", pendingLoginID, returnURL)
 		return
 	}
@@ -509,7 +692,7 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Load user for session creation
+	// Load user for session creation and audit logging
 	var u models.User
 	err = h.DB.Collection("users").FindOne(ctx, bson.M{"_id": oid}).Decode(&u)
 	if err != nil {
@@ -517,6 +700,9 @@ func (h *Handler) HandleChangePassword(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
+
+	// Audit log: password changed (was temporary password)
+	h.AuditLog.PasswordChanged(ctx, r, u.ID, u.OrganizationID, true)
 
 	// Complete login
 	h.createSessionAndRedirect(w, r, &u, returnURL)
@@ -556,8 +742,8 @@ func (h *Handler) startEmailFlow(w http.ResponseWriter, r *http.Request, u *mode
 		return
 	}
 
-	// Create verification record
-	result, err := h.EmailVerify.Create(ctx, u.ID, email)
+	// Create verification record (not a resend)
+	result, err := h.EmailVerify.Create(ctx, u.ID, email, false)
 	if err != nil {
 		h.Log.Error("failed to create email verification", zap.Error(err), zap.String("email", email))
 		h.renderFormWithError(w, r, "Failed to send verification email. Please try again.", email)
@@ -579,7 +765,7 @@ func (h *Handler) startEmailFlow(w http.ResponseWriter, r *http.Request, u *mode
 		SiteName:  siteName,
 		Code:      result.Code,
 		MagicLink: magicLink,
-		ExpiresIn: "10 minutes",
+		ExpiresIn: formatExpiryDuration(h.EmailVerify.Expiry()),
 	}
 	mailMsg := mailer.BuildVerificationEmail(emailData)
 	mailMsg.To = email
@@ -591,6 +777,9 @@ func (h *Handler) startEmailFlow(w http.ResponseWriter, r *http.Request, u *mode
 	}
 
 	h.Log.Info("verification email sent", zap.String("email", email), zap.String("user_id", u.ID.Hex()))
+
+	// Audit log: verification code sent
+	h.AuditLog.VerificationCodeSent(ctx, r, u.ID, u.OrganizationID, email)
 
 	// Store pending email login in session
 	sess, err := h.SessionMgr.GetSession(r)
@@ -657,11 +846,15 @@ func (h *Handler) ServeVerifyEmail(w http.ResponseWriter, r *http.Request) {
 
 	returnURL, _ := sess.Values["pending_return_url"].(string)
 
+	// Check if code was just resent (for success message)
+	resent := query.Get(r, "resent") == "1"
+
 	templates.Render(w, r, "login_verify_email", emailVerifyFormData{
 		BaseVM:    viewdata.NewBaseVM(r, h.DB, "Verify Email", "/login"),
 		LoginID:   pendingLoginID,
 		Email:     pendingEmail,
 		ReturnURL: returnURL,
+		Resent:    resent,
 	})
 }
 
@@ -702,8 +895,11 @@ func (h *Handler) handleMagicLink(w http.ResponseWriter, r *http.Request, token 
 
 	h.Log.Info("user logged in via magic link", zap.String("user_id", u.ID.Hex()), zap.String("email", v.Email))
 
-	// Complete login
-	h.createSessionAndRedirect(w, r, &u, returnURL)
+	// Audit log: magic link used
+	h.AuditLog.MagicLinkUsed(ctx, r, u.ID, u.OrganizationID, v.Email)
+
+	// Complete login - render success page that broadcasts to other tabs
+	h.createSessionAndRenderMagicSuccess(w, r, &u, returnURL)
 }
 
 /*─────────────────────────────────────────────────────────────────────────────*
@@ -751,7 +947,16 @@ func (h *Handler) HandleVerifyEmailSubmit(w http.ResponseWriter, r *http.Request
 
 	_, err = h.EmailVerify.VerifyCode(ctx, oid, code)
 	if err != nil {
+		if errors.Is(err, emailverify.ErrTooManyAttempts) {
+			h.Log.Warn("too many verification attempts", zap.String("user_id", pendingUserID))
+			// Audit log: verification code failed - too many attempts
+			h.AuditLog.VerificationCodeFailed(ctx, r, oid, nil, "too many attempts")
+			h.renderVerifyEmailFormWithError(w, r, "Too many incorrect attempts. Please request a new verification code.", pendingLoginID, pendingEmail, returnURL)
+			return
+		}
 		h.Log.Warn("invalid verification code", zap.Error(err), zap.String("user_id", pendingUserID))
+		// Audit log: verification code failed - invalid or expired
+		h.AuditLog.VerificationCodeFailed(ctx, r, oid, nil, "invalid or expired code")
 		h.renderVerifyEmailFormWithError(w, r, "Invalid or expired verification code. Please try again.", pendingLoginID, pendingEmail, returnURL)
 		return
 	}
@@ -811,9 +1016,14 @@ func (h *Handler) HandleResendCode(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Create new verification record (this deletes any existing one)
-	result, err := h.EmailVerify.Create(ctx, oid, pendingEmail)
+	// Create new verification record (this is a resend)
+	result, err := h.EmailVerify.Create(ctx, oid, pendingEmail, true)
 	if err != nil {
+		if errors.Is(err, emailverify.ErrTooManyResends) {
+			h.Log.Warn("too many resend attempts", zap.String("email", pendingEmail), zap.String("user_id", pendingUserID))
+			h.renderVerifyEmailFormWithError(w, r, "Too many resend attempts. Please wait a few minutes before trying again.", "", pendingEmail, returnURL)
+			return
+		}
 		h.Log.Error("failed to create email verification for resend", zap.Error(err), zap.String("email", pendingEmail))
 		h.renderVerifyEmailFormWithError(w, r, "Failed to resend verification email. Please try again.", "", pendingEmail, returnURL)
 		return
@@ -834,7 +1044,7 @@ func (h *Handler) HandleResendCode(w http.ResponseWriter, r *http.Request) {
 		SiteName:  siteName,
 		Code:      result.Code,
 		MagicLink: magicLink,
-		ExpiresIn: "10 minutes",
+		ExpiresIn: formatExpiryDuration(h.EmailVerify.Expiry()),
 	}
 	mailMsg := mailer.BuildVerificationEmail(emailData)
 	mailMsg.To = pendingEmail
@@ -847,7 +1057,9 @@ func (h *Handler) HandleResendCode(w http.ResponseWriter, r *http.Request) {
 
 	h.Log.Info("verification email resent", zap.String("email", pendingEmail), zap.String("user_id", pendingUserID))
 
-	// Redirect back to verify page with a success indication
-	// (we can't easily flash messages without additional infrastructure, so just redirect)
-	http.Redirect(w, r, "/login/verify-email", http.StatusSeeOther)
+	// Audit log: verification code resent
+	h.AuditLog.VerificationCodeResent(ctx, r, oid, nil, pendingEmail, result.ResendCount)
+
+	// Redirect back to verify page with success indicator
+	http.Redirect(w, r, "/login/verify-email?resent=1", http.StatusSeeOther)
 }

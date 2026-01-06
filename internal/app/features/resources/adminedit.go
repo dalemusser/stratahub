@@ -82,6 +82,8 @@ func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	actorRole, _, actorID, _ := authz.UserCtx(r)
+
 	// Parse multipart form for file uploads (32MB max)
 	if err := r.ParseMultipartForm(32 << 20); err != nil {
 		h.ErrLog.LogBadRequest(w, r, "parse form failed", err, "Invalid form data.", "/resources")
@@ -267,6 +269,9 @@ func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		reRender(msg)
 		return
 	}
+
+	// Audit log: resource updated
+	h.AuditLog.ResourceUpdated(ctx, r, actorID, rid, actorRole, title)
 
 	// Success: redirect to provided ?return= (sanitized and MUST NOT reference this id)
 	ret := urlutil.SafeReturn(r.FormValue("return"), rid.Hex(), "/resources")

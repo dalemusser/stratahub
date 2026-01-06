@@ -23,7 +23,7 @@ import (
 
 // HandleDeleteGroup handles deleting a group (admin and coordinator).
 func (h *Handler) HandleDeleteGroup(w http.ResponseWriter, r *http.Request) {
-	role, _, _, ok := authz.UserCtx(r)
+	role, _, actorID, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
@@ -89,6 +89,9 @@ func (h *Handler) HandleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 		h.ErrLog.LogServerError(w, r, "database error deleting group", err, "Failed to delete group.", "/groups")
 		return
 	}
+
+	// Audit log: group deleted
+	h.AuditLog.GroupDeleted(ctx, r, actorID, groupOID, &group.OrganizationID, role, group.Name)
 
 	// Redirect back to caller or to /groups.
 	ret := navigation.SafeBackURL(r, navigation.GroupsBackURL)

@@ -122,8 +122,11 @@ func (m *Mailer) Send(email Email) error {
 }
 
 // randomBoundary generates a random boundary string for multipart emails.
+// Panics if the system's cryptographic random number generator fails.
 func randomBoundary() string {
 	b := make([]byte, 16)
-	_, _ = rand.Read(b)
+	if _, err := rand.Read(b); err != nil {
+		panic("crypto/rand.Read failed: " + err.Error())
+	}
 	return "----=_Part_" + hex.EncodeToString(b)
 }

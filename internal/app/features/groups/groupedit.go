@@ -101,7 +101,7 @@ func (h *Handler) ServeEditGroup(w http.ResponseWriter, r *http.Request) {
 
 // HandleEditGroup processes the Edit Group form submission.
 func (h *Handler) HandleEditGroup(w http.ResponseWriter, r *http.Request) {
-	_, _, _, ok := authz.UserCtx(r)
+	actorRole, _, actorID, ok := authz.UserCtx(r)
 	if !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
@@ -208,6 +208,9 @@ func (h *Handler) HandleEditGroup(w http.ResponseWriter, r *http.Request) {
 		templates.Render(w, r, "group_edit", data)
 		return
 	}
+
+	// Audit log: group updated
+	h.AuditLog.GroupUpdated(ctx, r, actorID, groupOID, &group.OrganizationID, actorRole, "group details")
 
 	ret := urlutil.SafeReturn(r.FormValue("return"), "", fmt.Sprintf("/groups/%s/manage", groupOID.Hex()))
 	http.Redirect(w, r, ret, http.StatusSeeOther)

@@ -3,6 +3,7 @@ package materials
 
 import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/system/auditlog"
 	"github.com/dalemusser/waffle/pantry/storage"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
@@ -14,10 +15,11 @@ import (
 // It is constructed once at startup in bootstrap, using the
 // shared Mongo database handle, file storage, and logger.
 type AdminHandler struct {
-	DB      *mongo.Database
-	Storage storage.Store
-	Log     *zap.Logger
-	ErrLog  *uierrors.ErrorLogger
+	DB       *mongo.Database
+	Storage  storage.Store
+	Log      *zap.Logger
+	ErrLog   *uierrors.ErrorLogger
+	AuditLog *auditlog.Logger
 }
 
 // LeaderHandler owns the leader-facing Material handlers
@@ -34,12 +36,13 @@ type LeaderHandler struct {
 
 // NewAdminHandler constructs an AdminHandler bound to the
 // given Mongo database, file storage, and logger.
-func NewAdminHandler(db *mongo.Database, store storage.Store, errLog *uierrors.ErrorLogger, logger *zap.Logger) *AdminHandler {
+func NewAdminHandler(db *mongo.Database, store storage.Store, errLog *uierrors.ErrorLogger, audit *auditlog.Logger, logger *zap.Logger) *AdminHandler {
 	return &AdminHandler{
-		DB:      db,
-		Storage: store,
-		Log:     logger,
-		ErrLog:  errLog,
+		DB:       db,
+		Storage:  store,
+		Log:      logger,
+		ErrLog:   errLog,
+		AuditLog: audit,
 	}
 }
 

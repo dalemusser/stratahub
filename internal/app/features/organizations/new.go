@@ -6,7 +6,9 @@ import (
 	"net/http"
 	"strings"
 
+	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	organizationstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/formutil"
 	"github.com/dalemusser/stratahub/internal/app/system/inputval"
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
@@ -44,6 +46,12 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 // HandleCreate processes the New Organization form submission.
 // Authorization: RequireRole("admin") middleware in routes.go ensures only admins reach this handler.
 func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
+	actorRole, _, actorID, ok := authz.UserCtx(r)
+	if !ok {
+		uierrors.RenderUnauthorized(w, r, "/login")
+		return
+	}
+
 	if err := r.ParseForm(); err != nil {
 		h.ErrLog.LogBadRequest(w, r, "parse form failed", err, "Invalid form submission.", "/organizations")
 		return
@@ -102,7 +110,8 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		TimeZone:    tz,
 	}
 
-	if _, err := orgStore.Create(ctx, org); err != nil {
+	createdOrg, err := orgStore.Create(ctx, org)
+	if err != nil {
 		msg := "Database error while creating organization."
 		if err == organizationstore.ErrDuplicateOrganization {
 			msg = "An organization with that name already exists."
@@ -110,6 +119,9 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		renderWithError(msg)
 		return
 	}
+
+	// Audit log: organization created
+	h.AuditLog.OrgCreated(ctx, r, actorID, createdOrg.ID, actorRole, name)
 
 	// Redirect (honor return; fallback to /organizations)
 	ret := navigation.SafeBackURL(r, navigation.OrganizationsBackURL)

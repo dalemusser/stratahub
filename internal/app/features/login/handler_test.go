@@ -6,10 +6,13 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/features/login"
+	"github.com/dalemusser/stratahub/internal/app/store/audit"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
+	"github.com/dalemusser/stratahub/internal/app/system/auditlog"
 	"github.com/dalemusser/stratahub/internal/testutil"
 	"go.uber.org/zap"
 )
@@ -26,8 +29,15 @@ func newTestHandler(t *testing.T) (*login.Handler, *testutil.Fixtures) {
 		t.Fatalf("NewSessionManager failed: %v", err)
 	}
 
-	// Pass nil for mailer and empty baseURL since tests use trust auth (no email needed)
-	handler := login.NewHandler(db, sessionMgr, errLog, nil, "http://localhost:3000", logger)
+	// Create audit logger for testing
+	auditStore := audit.New(db)
+	auditConfig := auditlog.Config{Auth: "all", Admin: "all"}
+	auditLogger := auditlog.New(auditStore, logger, auditConfig)
+
+	// Pass nil for mailer, sessions, and empty baseURL since tests use trust auth (no email needed)
+	// Use 10 minutes for email verify expiry (the default)
+	// googleEnabled = false for tests (not testing OAuth flow)
+	handler := login.NewHandler(db, sessionMgr, errLog, nil, auditLogger, nil, "http://localhost:3000", 10*time.Minute, false, logger)
 	fixtures := testutil.NewFixtures(t, db)
 	return handler, fixtures
 }

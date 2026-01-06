@@ -21,7 +21,7 @@ func newTestHandler(t *testing.T) (*systemusers.Handler, *testutil.Fixtures) {
 	db := testutil.SetupTestDB(t)
 	logger := zap.NewNop()
 	errLog := uierrors.NewErrorLogger(logger)
-	handler := systemusers.NewHandler(db, errLog, logger)
+	handler := systemusers.NewHandler(db, errLog, nil, logger) // nil audit logger for tests
 	fixtures := testutil.NewFixtures(t, db)
 	return handler, fixtures
 }

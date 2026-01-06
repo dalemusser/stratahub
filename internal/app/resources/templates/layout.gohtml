@@ -235,6 +235,65 @@
           });
         }
       })();
+
+      {{ if .IsLoggedIn }}
+      // Activity heartbeat - sends pulse every 60 seconds for session tracking
+      (function() {
+        var heartbeatInterval = 60000; // 60 seconds
+        var heartbeatTimer = null;
+        var heartbeatUrl = '/api/heartbeat';
+
+        // Use sendBeacon for reliable delivery (doesn't block, survives page switch)
+        function sendHeartbeatBeacon() {
+          var data = JSON.stringify({page: window.location.pathname});
+          if (navigator.sendBeacon) {
+            navigator.sendBeacon(heartbeatUrl, new Blob([data], {type: 'application/json'}));
+          } else {
+            sendHeartbeatFetch();
+          }
+        }
+
+        // Use fetch for regular interval heartbeats
+        function sendHeartbeatFetch() {
+          fetch(heartbeatUrl, {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({page: window.location.pathname})
+          }).catch(function() {
+            // Silent fail - don't interrupt user experience
+          });
+        }
+
+        function startHeartbeat() {
+          if (heartbeatTimer) return;
+          sendHeartbeatBeacon(); // Send immediately using beacon for reliability
+          heartbeatTimer = setInterval(sendHeartbeatFetch, heartbeatInterval);
+        }
+
+        function stopHeartbeat() {
+          if (heartbeatTimer) {
+            clearInterval(heartbeatTimer);
+            heartbeatTimer = null;
+          }
+        }
+
+        // Start heartbeat when page loads
+        startHeartbeat();
+
+        // Pause when tab is hidden, resume when visible
+        document.addEventListener('visibilitychange', function() {
+          if (document.hidden) {
+            stopHeartbeat();
+          } else {
+            startHeartbeat();
+          }
+        });
+
+        // Stop heartbeat before page unload
+        window.addEventListener('beforeunload', stopHeartbeat);
+      })();
+      {{ end }}
     </script>
   </body>
 </html>

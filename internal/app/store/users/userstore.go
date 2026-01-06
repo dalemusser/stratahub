@@ -33,6 +33,23 @@ func (s *Store) GetByID(ctx context.Context, id primitive.ObjectID) (*models.Use
 	return &u, nil
 }
 
+// GetByIDs loads multiple users by their ObjectIDs.
+func (s *Store) GetByIDs(ctx context.Context, ids []primitive.ObjectID) ([]models.User, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	cur, err := s.c.Find(ctx, bson.M{"_id": bson.M{"$in": ids}})
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	var users []models.User
+	if err := cur.All(ctx, &users); err != nil {
+		return nil, err
+	}
+	return users, nil
+}
+
 // GetMemberByID loads a user by ObjectID, returning an error if the user
 // does not exist or is not a member role.
 func (s *Store) GetMemberByID(ctx context.Context, id primitive.ObjectID) (*models.User, error) {

@@ -33,7 +33,8 @@
           <p class="text-gray-900 dark:text-gray-100 font-medium">{{ .FileName }}</p>
         </div>
         <a href="/member/resources/{{ .ResourceID }}/download" target="_blank"
-           class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+           class="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+           onclick="trackResourceLaunch('{{ .ResourceID }}', '{{ .ResourceTitle }}')">
           Download
         </a>
       </div>
@@ -43,8 +44,9 @@
           <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Link</p>
           <p class="text-indigo-600 dark:text-indigo-400 text-sm truncate">{{ .DisplayURL }}</p>
         </div>
-        <a href="{{ .LaunchURL }}" target="_blank"
-           class="shrink-0 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700">
+        <a href="/member/resources/{{ .ResourceID }}/launch" target="_blank"
+           class="shrink-0 px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700"
+           onclick="trackResourceLaunch('{{ .ResourceID }}', '{{ .ResourceTitle }}')">
           Open
         </a>
       </div>
@@ -83,4 +85,57 @@
     </div>
   </div>
 </div>
+
+<script>
+// Track resource launch in localStorage for return detection
+function trackResourceLaunch(resourceId, resourceName) {
+  try {
+    localStorage.setItem('stratahub_resource_launch', JSON.stringify({
+      resource_id: resourceId,
+      resource_name: resourceName,
+      launch_time: Date.now()
+    }));
+  } catch (e) { /* localStorage not available */ }
+}
+
+// Check for pending resource return on page visibility change
+(function() {
+  function checkResourceReturn() {
+    try {
+      var launchData = localStorage.getItem('stratahub_resource_launch');
+      if (!launchData) return;
+
+      var data = JSON.parse(launchData);
+      var timeAwaySecs = Math.floor((Date.now() - data.launch_time) / 1000);
+
+      // Only report if away for at least 2 seconds (filter out accidental clicks)
+      if (timeAwaySecs >= 2) {
+        fetch('/api/heartbeat/return', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'same-origin',
+          body: JSON.stringify({
+            resource_id: data.resource_id,
+            resource_name: data.resource_name,
+            time_away_secs: timeAwaySecs
+          })
+        }).catch(function() { /* Silent fail */ });
+      }
+
+      // Clear the launch data
+      localStorage.removeItem('stratahub_resource_launch');
+    } catch (e) { /* Silent fail */ }
+  }
+
+  // Check on visibility change (when user returns to tab)
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') {
+      checkResourceReturn();
+    }
+  });
+
+  // Also check on page load in case user navigated back
+  checkResourceReturn();
+})();
+</script>
 {{ end }}

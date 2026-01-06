@@ -245,7 +245,8 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		doc.PasswordTemp = authResult.PasswordTemp
 	}
 
-	if _, err := us.Create(ctx, doc); err != nil {
+	createdUser, err := us.Create(ctx, doc)
+	if err != nil {
 		if wafflemongo.IsDup(err) {
 			h.reRenderNewWithError(w, r, echoData(), "A user with that login ID already exists.")
 			return
@@ -253,6 +254,9 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		h.ErrLog.LogServerError(w, r, "database error creating user", err, "A database error occurred.", "/members")
 		return
 	}
+
+	// Audit log: member created
+	h.AuditLog.UserCreated(ctx, r, uid, createdUser.ID, &orgID, role, "member", authm)
 
 	ret := navigation.SafeBackURL(r, navigation.MembersBackURL)
 	http.Redirect(w, r, ret, http.StatusSeeOther)

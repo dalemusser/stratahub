@@ -11,6 +11,7 @@ import (
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
 	membershipstore "github.com/dalemusser/stratahub/internal/app/store/memberships"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
@@ -21,6 +22,14 @@ import (
 
 // HandleAddMember adds a member to the group (via search list).
 func (h *Handler) HandleAddMember(w http.ResponseWriter, r *http.Request) {
+	actorRole, _, actorID, ok := authz.UserCtx(r)
+	if !ok {
+		uierrors.HTMXError(w, r, http.StatusUnauthorized, "Unauthorized.", func() {
+			uierrors.RenderUnauthorized(w, r, "/login")
+		})
+		return
+	}
+
 	gid := chi.URLParam(r, "id")
 	q := r.FormValue("q")
 	after := r.FormValue("after")
@@ -75,6 +84,9 @@ func (h *Handler) HandleAddMember(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Audit log: member added to group
+	h.AuditLog.MemberAddedToGroup(ctx, r, actorID, targetOID, group.ID, &group.OrganizationID, actorRole, "member")
+
 	data, err := h.buildPageData(r, gid, q, after, before)
 	if err != nil {
 		h.ErrLog.HTMXLogServerError(w, r, "error building group page data", err, "Failed to load group data.", "/groups")
@@ -119,6 +131,14 @@ func (h *Handler) HandleAddMember(w http.ResponseWriter, r *http.Request) {
 
 // HandleRemoveMember removes a member from the group.
 func (h *Handler) HandleRemoveMember(w http.ResponseWriter, r *http.Request) {
+	actorRole, _, actorID, ok := authz.UserCtx(r)
+	if !ok {
+		uierrors.HTMXError(w, r, http.StatusUnauthorized, "Unauthorized.", func() {
+			uierrors.RenderUnauthorized(w, r, "/login")
+		})
+		return
+	}
+
 	gid := chi.URLParam(r, "id")
 	q := r.FormValue("q")
 	after := r.FormValue("after")
@@ -159,6 +179,9 @@ func (h *Handler) HandleRemoveMember(w http.ResponseWriter, r *http.Request) {
 		h.ErrLog.HTMXLogBadRequest(w, r, "database error removing member from group", err, "Failed to remove member.", "/groups")
 		return
 	}
+
+	// Audit log: member removed from group
+	h.AuditLog.MemberRemovedFromGroup(ctx, r, actorID, targetOID, group.ID, &group.OrganizationID, actorRole)
 
 	data, err := h.buildPageData(r, gid, q, after, before)
 	if err != nil {

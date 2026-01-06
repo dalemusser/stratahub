@@ -3,7 +3,7 @@ module github.com/dalemusser/stratahub
 go 1.24.1
 
 require (
-	github.com/dalemusser/waffle v0.1.24
+	github.com/dalemusser/waffle v0.1.26
 	github.com/go-chi/chi/v5 v5.2.3
 	github.com/google/uuid v1.6.0
 	github.com/gorilla/securecookie v1.1.2
@@ -11,6 +11,7 @@ require (
 	github.com/microcosm-cc/bluemonday v1.0.27
 	go.mongodb.org/mongo-driver v1.17.6
 	go.uber.org/zap v1.27.1
+	golang.org/x/crypto v0.45.0
 )
 
 require (
@@ -105,7 +106,6 @@ require (
 	go.uber.org/multierr v1.10.0 // indirect
 	go.yaml.in/yaml/v2 v2.4.2 // indirect
 	go.yaml.in/yaml/v3 v3.0.4 // indirect
-	golang.org/x/crypto v0.45.0 // indirect
 	golang.org/x/net v0.47.0 // indirect
 	golang.org/x/oauth2 v0.33.0 // indirect
 	golang.org/x/sync v0.18.0 // indirect

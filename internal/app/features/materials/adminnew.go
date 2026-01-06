@@ -138,7 +138,7 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		fileSize = info.Size
 	}
 
-	_, uname, memberID, ok := authz.UserCtx(r)
+	actorRole, uname, actorID, ok := authz.UserCtx(r)
 
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
@@ -159,11 +159,12 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		DefaultInstructions: defaultInstructions,
 	}
 	if ok {
-		mat.CreatedByID = &memberID
+		mat.CreatedByID = &actorID
 		mat.CreatedByName = uname
 	}
 
-	if _, err := matStore.Create(ctx, mat); err != nil {
+	createdMat, err := matStore.Create(ctx, mat)
+	if err != nil {
 		msg := "Database error while creating material."
 		if errors.Is(err, materialstore.ErrDuplicateTitle) {
 			msg = "A material with that title already exists."
@@ -181,6 +182,9 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		reRender(msg)
 		return
 	}
+
+	// Audit log: material created
+	h.AuditLog.MaterialCreated(ctx, r, actorID, createdMat.ID, actorRole, title)
 
 	ret := navigation.SafeBackURL(r, navigation.MaterialsBackURL)
 	http.Redirect(w, r, ret, http.StatusSeeOther)

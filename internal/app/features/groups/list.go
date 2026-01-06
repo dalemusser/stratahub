@@ -86,6 +86,9 @@ func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
 
 	if authz.IsLeader(r) {
 		// Leaders see only groups they are assigned to as leaders; no org pane
+		// Initialize to non-nil empty slice to distinguish "leader with no groups" from "not a leader"
+		leaderGroupIDs = []primitive.ObjectID{}
+
 		cur, err := db.Collection("group_memberships").Find(ctx, bson.M{
 			"user_id": uid,
 			"role":    "leader",
@@ -203,7 +206,8 @@ func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
 
 // fetchGroupsList fetches the paginated groups list with counts using groupqueries.
 // scopeOrgIDs limits the results to groups in those orgs (for coordinators); nil means no restriction.
-// leaderGroupIDs limits the results to those specific groups (for leaders); takes precedence if non-empty.
+// leaderGroupIDs limits the results to those specific groups (for leaders).
+// nil = not a leader (use other filters), non-nil empty = leader with no groups (return empty result).
 func (h *Handler) fetchGroupsList(
 	ctx context.Context,
 	db *mongo.Database,
@@ -213,8 +217,15 @@ func (h *Handler) fetchGroupsList(
 ) ([]groupListItem, int, int64, string, string, bool, bool, error) {
 	// Build filter
 	var filter groupqueries.ListFilter
-	if len(leaderGroupIDs) > 0 {
-		// Leader - scope to their assigned groups only
+
+	// Handle leader-specific filtering
+	if leaderGroupIDs != nil {
+		// This is a leader - they can only see their assigned groups
+		if len(leaderGroupIDs) == 0 {
+			// Leader with no assigned groups - return empty result
+			return nil, 0, 0, "", "", false, false, nil
+		}
+		// Leader with assigned groups - filter to those groups
 		filter.GroupIDs = leaderGroupIDs
 	} else if selectedOrg != "" && selectedOrg != "all" {
 		if oid, err := primitive.ObjectIDFromHex(selectedOrg); err == nil {

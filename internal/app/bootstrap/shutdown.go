@@ -30,6 +30,11 @@ import (
 //
 // StrataHub disconnects the MongoDB client to release connection pool resources.
 func Shutdown(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, logger *zap.Logger) error {
+	// Stop background workers first
+	if deps.SessionCleanupWorker != nil {
+		deps.SessionCleanupWorker.Stop()
+	}
+
 	if deps.StrataHubMongoClient != nil {
 		logger.Info("disconnecting StrataHub MongoDB client")
 		if err := deps.StrataHubMongoClient.Disconnect(ctx); err != nil {

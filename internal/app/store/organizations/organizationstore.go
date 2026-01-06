@@ -56,6 +56,23 @@ func (s *Store) GetByID(ctx context.Context, id primitive.ObjectID) (models.Orga
 	return org, nil
 }
 
+// GetByIDs loads multiple organizations by their ObjectIDs.
+func (s *Store) GetByIDs(ctx context.Context, ids []primitive.ObjectID) ([]models.Organization, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+	cur, err := s.c.Find(ctx, bson.M{"_id": bson.M{"$in": ids}})
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	var orgs []models.Organization
+	if err := cur.All(ctx, &orgs); err != nil {
+		return nil, err
+	}
+	return orgs, nil
+}
+
 // Update modifies an organization's mutable fields and refreshes UpdatedAt.
 func (s *Store) Update(ctx context.Context, id primitive.ObjectID, org models.Organization) error {
 	set := bson.M{

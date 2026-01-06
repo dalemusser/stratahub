@@ -76,6 +76,9 @@ func MemberRoutes(h *MemberHandler, sm *auth.SessionManager) chi.Router {
 		// View a single resource (respecting assignment visibility windows).
 		pr.Get("/{resourceID}", h.ServeViewResource)
 
+		// Launch a URL-based resource (tracks activity, then redirects).
+		pr.Get("/{resourceID}/launch", h.HandleLaunch)
+
 		// Download a resource file (respecting assignment visibility windows).
 		pr.Get("/{resourceID}/download", h.HandleDownload)
 	})

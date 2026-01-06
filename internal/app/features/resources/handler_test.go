@@ -39,8 +39,8 @@ func newTestAdminHandler(t *testing.T) (*resources.AdminHandler, *testutil.Fixtu
 	db := testutil.SetupTestDB(t)
 	logger := zap.NewNop()
 	errLog := uierrors.NewErrorLogger(logger)
-	// Pass nil for storage since tests don't use file uploads
-	handler := resources.NewAdminHandler(db, nil, errLog, logger)
+	// Pass nil for storage and audit logger since tests don't use file uploads or audit
+	handler := resources.NewAdminHandler(db, nil, errLog, nil, logger)
 	fixtures := testutil.NewFixtures(t, db)
 	return handler, fixtures
 }
