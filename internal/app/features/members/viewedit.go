@@ -19,6 +19,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/txn"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -50,6 +51,13 @@ func (h *Handler) ServeView(w http.ResponseWriter, r *http.Request) {
 
 	u, err := h.Users.GetMemberByID(ctx, uid)
 	if err != nil {
+		uierrors.RenderNotFound(w, r, "Member not found.", httpnav.ResolveBackURL(r, "/members"))
+		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && (u.WorkspaceID == nil || *u.WorkspaceID != wsID) {
 		uierrors.RenderNotFound(w, r, "Member not found.", httpnav.ResolveBackURL(r, "/members"))
 		return
 	}
@@ -120,6 +128,13 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 
 	u, err := h.Users.GetMemberByID(ctx, uid)
 	if err != nil {
+		uierrors.RenderNotFound(w, r, "Member not found.", httpnav.ResolveBackURL(r, "/members"))
+		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && (u.WorkspaceID == nil || *u.WorkspaceID != wsID) {
 		uierrors.RenderNotFound(w, r, "Member not found.", httpnav.ResolveBackURL(r, "/members"))
 		return
 	}
@@ -230,6 +245,14 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		h.ErrLog.LogServerError(w, r, "database error loading member", err, "A database error occurred.", "/members")
 		return
 	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && (currentMember.WorkspaceID == nil || *currentMember.WorkspaceID != wsID) {
+		uierrors.RenderNotFound(w, r, "Member not found.", httpnav.ResolveBackURL(r, "/members"))
+		return
+	}
+
 	oldStatus := normalize.Status(currentMember.Status)
 
 	full := normalize.Name(r.FormValue("full_name"))
@@ -408,6 +431,18 @@ func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	if !canManage {
 		uierrors.RenderForbidden(w, r, "You don't have permission to delete this member.", httpnav.ResolveBackURL(r, "/members"))
+		return
+	}
+
+	// Fetch member to verify workspace ownership (prevent cross-workspace deletion)
+	member, err := h.Users.GetMemberByID(ctx, uid)
+	if err != nil {
+		h.ErrLog.LogServerError(w, r, "database error loading member", err, "A database error occurred.", "/members")
+		return
+	}
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && (member.WorkspaceID == nil || *member.WorkspaceID != wsID) {
+		uierrors.RenderNotFound(w, r, "Member not found.", httpnav.ResolveBackURL(r, "/members"))
 		return
 	}
 

@@ -28,8 +28,10 @@ import "time"
 // request handling, or shutdown should live here.
 type AppConfig struct {
 	// MongoDB connection configuration
-	MongoURI      string // MongoDB connection string (e.g., mongodb://localhost:27017)
-	MongoDatabase string // Database name within MongoDB
+	MongoURI         string // MongoDB connection string (e.g., mongodb://localhost:27017)
+	MongoDatabase    string // Database name within MongoDB
+	MongoMaxPoolSize uint64 // Maximum connections in pool (default: 100)
+	MongoMinPoolSize uint64 // Minimum connections to keep warm (default: 10)
 
 	// Session management configuration
 	SessionKey    string // Secret key for signing session cookies (must be strong in production)
@@ -71,4 +73,15 @@ type AppConfig struct {
 	// Google OAuth configuration
 	GoogleClientID     string // Google OAuth2 client ID
 	GoogleClientSecret string // Google OAuth2 client secret
+
+	// Multi-workspace configuration
+	MultiWorkspace bool   // true = subdomain-based workspaces, false = single workspace mode
+	PrimaryDomain  string // Apex domain (e.g., "adroit.games") for OAuth callbacks and workspace selector
+
+	// Default workspace configuration (used when bootstrapping first workspace)
+	DefaultWorkspaceName      string // Display name for default workspace (default: "Default")
+	DefaultWorkspaceSubdomain string // Subdomain for default workspace (default: "app")
+
+	// SuperAdmin bootstrap configuration
+	SuperAdminEmail string // Email of the superadmin user (if set, promotes/creates this user on startup)
 }

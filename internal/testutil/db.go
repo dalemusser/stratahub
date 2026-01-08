@@ -33,7 +33,16 @@ func getClient() (*mongo.Client, error) {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		client, clientErr = mongo.Connect(ctx, options.Client().ApplyURI(TestDBURI))
+		// Configure connection pool for parallel test execution
+		clientOpts := options.Client().
+			ApplyURI(TestDBURI).
+			SetMaxPoolSize(200).                    // Increase pool for parallel tests
+			SetMinPoolSize(10).                     // Keep some connections warm
+			SetMaxConnIdleTime(30 * time.Second).   // Release idle connections faster
+			SetConnectTimeout(10 * time.Second).    // Connection timeout
+			SetServerSelectionTimeout(10 * time.Second)
+
+		client, clientErr = mongo.Connect(ctx, clientOpts)
 		if clientErr != nil {
 			return
 		}

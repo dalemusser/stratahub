@@ -19,6 +19,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
 	"github.com/dalemusser/stratahub/internal/app/system/status"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
@@ -227,6 +228,11 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		Role:           "member",
 		Status:         stat,
 		OrganizationID: &orgPtr,
+	}
+
+	// Set workspace ID if in workspace context
+	if wsID := workspace.IDFromRequest(r); wsID != primitive.NilObjectID {
+		doc.WorkspaceID = &wsID
 	}
 
 	// Add optional email if provided

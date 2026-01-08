@@ -37,10 +37,10 @@ var EnabledAuthMethods = []AuthMethod{
 	{Value: "password", Label: "Password"},
 	{Value: "email", Label: "Email Verification"},
 	{Value: "google", Label: "Google"},
-	{Value: "microsoft", Label: "Microsoft"},
-	{Value: "clever", Label: "Clever"},
-	{Value: "classlink", Label: "Classlink"},
-	{Value: "schoology", Label: "Schoology"},
+	// {Value: "microsoft", Label: "Microsoft"},
+	// {Value: "clever", Label: "Clever"},
+	// {Value: "classlink", Label: "Classlink"},
+	// {Value: "schoology", Label: "Schoology"},
 }
 
 // IsValidAuthMethod checks if a value is a valid auth method.

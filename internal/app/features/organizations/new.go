@@ -14,6 +14,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/timezones"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
 )
@@ -103,6 +104,7 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	// Create organization via store (handles ID, CI fields, timestamps, and duplicate detection)
 	orgStore := organizationstore.New(db)
 	org := models.Organization{
+		WorkspaceID: workspace.IDFromRequest(r),
 		Name:        name,
 		City:        city,
 		State:       state,

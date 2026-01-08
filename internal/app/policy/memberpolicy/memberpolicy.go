@@ -52,7 +52,7 @@ func CanListMembers(r *http.Request) ListScope {
 	}
 
 	switch role {
-	case "admin":
+	case "superadmin", "admin":
 		return ListScope{CanList: true, AllOrgs: true}
 	case "coordinator":
 		orgIDs := authz.UserOrgIDs(r)
@@ -87,7 +87,7 @@ func CanViewMember(ctx context.Context, db *mongo.Database, r *http.Request, mem
 	}
 
 	switch role {
-	case "admin":
+	case "superadmin", "admin":
 		return true, nil
 	case "coordinator":
 		if memberOrgID == nil {

@@ -10,6 +10,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/waffle/pantry/templates"
 
 	"github.com/go-chi/chi/v5"
@@ -42,6 +43,16 @@ func (h *Handler) ServeView(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		uierrors.RenderNotFound(w, r, "User not found.", "/system-users")
 		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID {
+		// User has nil workspace_id (superadmin) OR different workspace
+		if u.WorkspaceID == nil || *u.WorkspaceID != wsID {
+			uierrors.RenderNotFound(w, r, "User not found.", "/system-users")
+			return
+		}
 	}
 
 	loginID := ""

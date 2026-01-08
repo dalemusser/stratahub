@@ -15,16 +15,17 @@ import (
 	orgstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
-	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
-	"github.com/dalemusser/waffle/pantry/query"
-	"github.com/dalemusser/waffle/pantry/text"
 	"github.com/dalemusser/waffle/pantry/httpnav"
+	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/dalemusser/waffle/pantry/text"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -61,6 +62,13 @@ func (h *AdminHandler) ServeAssign(w http.ResponseWriter, r *http.Request) {
 		}
 		h.Log.Error("error fetching material", zap.Error(err))
 		uierrors.RenderServerError(w, r, "Failed to load material.", "/materials")
+		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && mat.WorkspaceID != wsID {
+		uierrors.RenderNotFound(w, r, "Material not found.", "/materials")
 		return
 	}
 
@@ -282,6 +290,13 @@ func (h *AdminHandler) ServeAssignForm(w http.ResponseWriter, r *http.Request) {
 		}
 		h.Log.Error("error fetching material", zap.Error(err))
 		uierrors.RenderServerError(w, r, "Failed to load material.", "/materials")
+		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && mat.WorkspaceID != wsID {
+		uierrors.RenderNotFound(w, r, "Material not found.", "/materials")
 		return
 	}
 
@@ -525,6 +540,13 @@ func (h *AdminHandler) ServeAssignmentList(w http.ResponseWriter, r *http.Reques
 		}
 		h.Log.Error("error fetching material", zap.Error(err))
 		uierrors.RenderServerError(w, r, "Failed to load material.", "/materials")
+		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && mat.WorkspaceID != wsID {
+		uierrors.RenderNotFound(w, r, "Material not found.", "/materials")
 		return
 	}
 

@@ -1,0 +1,192 @@
+{{ define "workspace_list" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center justify-between mb-4">
+  <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Workspaces</h1>
+  <a href="/workspaces/new"
+     class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+    New Workspace
+  </a>
+</div>
+
+{{ if .Error }}
+<div class="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-4">
+  {{ .Error }}
+</div>
+{{ end }}
+
+<div class="bg-white dark:bg-gray-800 rounded shadow overflow-auto">
+  <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+    <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs">
+      <tr>
+        <th class="px-4 py-3">Name</th>
+        <th class="px-4 py-3">Subdomain</th>
+        <th class="px-4 py-3">Status</th>
+        <th class="px-4 py-3 text-center">Users</th>
+        <th class="px-4 py-3 text-center">Orgs</th>
+        <th class="px-4 py-3">Created</th>
+        <th class="px-4 py-3 text-right">Actions</th>
+      </tr>
+    </thead>
+    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+      {{ range .Rows }}
+      <tr>
+        <td class="px-4 py-3 font-medium">{{ .Name }}</td>
+        <td class="px-4 py-3">
+          <code class="text-xs bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">{{ .Subdomain }}</code>
+        </td>
+        <td class="px-4 py-3">
+          {{ if eq .Status "active" }}
+          <span class="px-2 py-1 text-xs rounded bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">Active</span>
+          {{ else if eq .Status "suspended" }}
+          <span class="px-2 py-1 text-xs rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">Suspended</span>
+          {{ else }}
+          <span class="px-2 py-1 text-xs rounded bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">{{ .Status }}</span>
+          {{ end }}
+        </td>
+        <td class="px-4 py-3 text-center">{{ .UserCount }}</td>
+        <td class="px-4 py-3 text-center">{{ .OrgCount }}</td>
+        <td class="px-4 py-3 text-gray-500 dark:text-gray-400 text-xs">
+          {{ .CreatedAt.Format "Jan 2, 2006" }}
+        </td>
+        <td class="px-4 py-3 text-right">
+          <form
+            method="get"
+            action="/workspaces/{{ .ID }}/manage_modal"
+            hx-get="/workspaces/{{ .ID }}/manage_modal"
+            hx-target="#modal-root"
+            hx-swap="innerHTML"
+            aria-label="Manage workspace"
+          >
+            <button
+              type="submit"
+              class="bg-indigo-600 text-white px-2 py-1 rounded text-xs md:text-sm hover:bg-indigo-700"
+              title="Manage {{ .Name }}"
+            >
+              Manage
+            </button>
+          </form>
+        </td>
+      </tr>
+      {{ else }}
+      <tr>
+        <td colspan="7" class="px-4 py-8 text-center text-gray-500 dark:text-gray-400">
+          No workspaces found. <a href="/workspaces/new" class="text-indigo-600 hover:underline">Create one</a>
+        </td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+</div>
+
+<!-- Pagination -->
+{{ if or .HasPrev .HasNext }}
+<div class="flex justify-between items-center mt-4">
+  <span class="text-sm text-gray-600 dark:text-gray-400">
+    {{ .Total }} workspace{{ if ne .Total 1 }}s{{ end }} total
+  </span>
+  <div class="flex gap-2">
+    {{ if .HasPrev }}
+    <a href="/workspaces?before={{ .PrevCursor }}"
+       class="px-3 py-1 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-700">
+      Previous
+    </a>
+    {{ end }}
+    {{ if .HasNext }}
+    <a href="/workspaces?after={{ .NextCursor }}"
+       class="px-3 py-1 text-sm border rounded hover:bg-gray-50 dark:hover:bg-gray-700">
+      Next
+    </a>
+    {{ end }}
+  </div>
+</div>
+{{ end }}
+
+<!-- Modal container -->
+<div id="modal-root"></div>
+{{ end }}
+
+{{ define "workspace_manage_modal" }}
+<div class="fixed inset-0 z-50 flex items-center justify-center">
+  <!-- Overlay -->
+  <div class="absolute inset-0 bg-black/40" onclick="document.getElementById('modal-root').innerHTML=''"></div>
+
+  <!-- Modal -->
+  <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-300 dark:border-gray-600 max-w-lg w-full p-4 space-y-4">
+    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Manage Workspace</h2>
+
+    <p class="text-sm text-gray-700 dark:text-gray-300">
+      {{ .Name }}
+      <span class="text-gray-500 dark:text-gray-400">
+        (<code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 rounded">{{ .Subdomain }}</code>)
+      </span>
+    </p>
+
+    <div class="flex flex-col gap-3 pt-2">
+      <!-- Action buttons - centered -->
+      <div class="flex flex-wrap gap-2 justify-center">
+        {{ if eq .Status "active" }}
+        {{ if .Domain }}
+        <a href="https://{{ .Subdomain }}.{{ .Domain }}" target="_blank"
+           class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+          Visit
+        </a>
+        {{ else }}
+        <a href="/" target="_blank"
+           class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+          Visit
+        </a>
+        {{ end }}
+        {{ end }}
+
+        <a href="/workspaces/{{ .ID }}/stats"
+           class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+          Stats
+        </a>
+
+        <a href="/workspaces/{{ .ID }}/settings"
+           class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+          Settings
+        </a>
+
+        {{ if eq .Status "active" }}
+        <form method="post" action="/workspaces/{{ .ID }}/status" class="inline"
+              onsubmit="return confirm('Suspend this workspace? Users will not be able to access it.');">
+          <input type="hidden" name="status" value="suspended">
+          <button type="submit"
+                  class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+            Suspend
+          </button>
+        </form>
+        {{ else if eq .Status "suspended" }}
+        <form method="post" action="/workspaces/{{ .ID }}/status" class="inline">
+          <input type="hidden" name="status" value="active">
+          <button type="submit"
+                  class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+            Activate
+          </button>
+        </form>
+        {{ end }}
+
+        <a href="/workspaces/{{ .ID }}/delete"
+           class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700">
+          Delete
+        </a>
+      </div>
+
+      <!-- Close button - bottom left -->
+      <div class="flex justify-start">
+        <button
+          type="button"
+          class="px-3 py-1 border rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+          onclick="document.getElementById('modal-root').innerHTML=''"
+        >
+          Close
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+{{ end }}

@@ -10,6 +10,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/dalemusser/waffle/pantry/text"
@@ -50,7 +51,7 @@ func (h *Handler) ServeOrgPicker(w http.ResponseWriter, r *http.Request) {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
-	if role != "admin" && role != "coordinator" && role != "leader" {
+	if role != "superadmin" && role != "admin" && role != "coordinator" && role != "leader" {
 		uierrors.RenderForbidden(w, r, "Access denied.", "/dashboard")
 		return
 	}
@@ -66,10 +67,11 @@ func (h *Handler) ServeOrgPicker(w http.ResponseWriter, r *http.Request) {
 	selectedID := normalize.QueryParam(query.Get(r, "selected"))
 	start := paging.ParseStart(r)
 
-	// Build filter for active organizations
+	// Build filter for active organizations with workspace scoping
 	filter := bson.M{
 		"status": "active",
 	}
+	workspace.Filter(r, filter)
 
 	// Coordinators can only see their assigned organizations
 	if role == "coordinator" {
@@ -99,6 +101,8 @@ func (h *Handler) ServeOrgPicker(w http.ResponseWriter, r *http.Request) {
 	countFilter := bson.M{
 		"status": "active",
 	}
+	workspace.Filter(r, countFilter)
+
 	// Coordinators can only see their assigned organizations
 	if role == "coordinator" {
 		orgIDs := authz.UserOrgIDs(r)

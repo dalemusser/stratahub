@@ -27,15 +27,18 @@ import (
 	systemusersfeature "github.com/dalemusser/stratahub/internal/app/features/systemusers"
 	uploadcsvfeature "github.com/dalemusser/stratahub/internal/app/features/uploadcsv"
 	userinfofeature "github.com/dalemusser/stratahub/internal/app/features/userinfo"
+	workspacesfeature "github.com/dalemusser/stratahub/internal/app/features/workspaces"
 	appresources "github.com/dalemusser/stratahub/internal/app/resources"
 	"github.com/dalemusser/stratahub/internal/app/store/activity"
 	"github.com/dalemusser/stratahub/internal/app/store/audit"
 	"github.com/dalemusser/stratahub/internal/app/store/oauthstate"
 	"github.com/dalemusser/stratahub/internal/app/store/sessions"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
+	workspacestore "github.com/dalemusser/stratahub/internal/app/store/workspaces"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/auditlog"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/waffle/config"
 	"github.com/dalemusser/waffle/pantry/fileserver"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -73,7 +76,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 
 	// Set up the UserFetcher so LoadSessionUser fetches fresh user data on each request.
 	// This ensures role changes, disabled accounts, and profile updates take effect immediately.
-	sessionMgr.SetUserFetcher(userstore.NewFetcher(deps.StrataHubMongoDatabase))
+	sessionMgr.SetUserFetcher(userstore.NewFetcher(deps.StrataHubMongoDatabase, logger))
 
 	// Initialize and boot the template engine once at startup.
 	// Dev mode enables template reloading for faster iteration.
@@ -102,6 +105,12 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	sessionsStore := sessions.New(deps.StrataHubMongoDatabase)
 
 	r := chi.NewRouter()
+
+	// Workspace middleware: extracts workspace context from host/subdomain.
+	// In single-workspace mode, uses the default workspace for all requests.
+	// In multi-workspace mode, extracts from subdomain (e.g., mhs.adroit.games).
+	wsStore := workspacestore.New(deps.StrataHubMongoDatabase)
+	r.Use(workspace.Middleware(appCfg.PrimaryDomain, wsStore, appCfg.MultiWorkspace, logger))
 
 	// Global auth middleware: loads SessionUser into context if logged in.
 	// This makes the current user available to all handlers via auth.CurrentUser(r).
@@ -138,7 +147,21 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 
 	// Authentication
 	googleEnabled := appCfg.GoogleClientID != "" && appCfg.GoogleClientSecret != ""
-	loginHandler := loginfeature.NewHandler(deps.StrataHubMongoDatabase, sessionMgr, errLog, deps.Mailer, auditLogger, sessionsStore, appCfg.BaseURL, appCfg.EmailVerifyExpiry, googleEnabled, logger)
+	loginHandler := loginfeature.NewHandler(
+		deps.StrataHubMongoDatabase,
+		sessionMgr,
+		errLog,
+		deps.Mailer,
+		auditLogger,
+		sessionsStore,
+		workspacestore.New(deps.StrataHubMongoDatabase),
+		appCfg.BaseURL,
+		appCfg.EmailVerifyExpiry,
+		googleEnabled,
+		appCfg.MultiWorkspace,
+		appCfg.PrimaryDomain,
+		logger,
+	)
 	r.Mount("/login", loginfeature.Routes(loginHandler))
 
 	logoutHandler := logoutfeature.NewHandler(sessionMgr, auditLogger, sessionsStore, logger)
@@ -154,9 +177,12 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 			auditLogger,
 			sessionsStore,
 			oauthStateStore,
+			workspacestore.New(deps.StrataHubMongoDatabase),
 			appCfg.GoogleClientID,
 			appCfg.GoogleClientSecret,
 			appCfg.BaseURL,
+			appCfg.MultiWorkspace,
+			appCfg.PrimaryDomain,
 			logger,
 		)
 		r.Mount("/auth/google", authgooglefeature.Routes(googleHandler))
@@ -166,7 +192,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	// User profile (any logged-in user)
 	profileHandler := profilefeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
 	r.Route("/profile", func(sr chi.Router) {
-		sr.Use(sessionMgr.RequireRole("admin", "analyst", "coordinator", "leader", "member"))
+		sr.Use(sessionMgr.RequireRole("superadmin", "admin", "analyst", "coordinator", "leader", "member"))
 		sr.Mount("/", profilefeature.Routes(profileHandler))
 	})
 
@@ -205,6 +231,10 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	auditLogHandler := auditlogfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
 	r.Mount("/audit", auditlogfeature.Routes(auditLogHandler, sessionMgr))
 
+	// Workspace management (superadmin only, apex domain)
+	workspacesHandler := workspacesfeature.NewHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, auditLogger, appCfg.PrimaryDomain, logger)
+	r.Mount("/workspaces", workspacesfeature.Routes(workspacesHandler, sessionMgr))
+
 	// Resource management (admin and member views)
 	adminResHandler := resourcesfeature.NewAdminHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, auditLogger, logger)
 	r.Mount("/resources", resourcesfeature.AdminRoutes(adminResHandler, sessionMgr))
@@ -224,10 +254,10 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	reportsHandler := reportsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
 	r.Mount("/reports", reportsfeature.Routes(reportsHandler, sessionMgr))
 
-	// Site Settings (admin only)
+	// Site Settings (admin and superadmin)
 	settingsHandler := settingsfeature.NewHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, logger)
 	r.Route("/settings", func(sr chi.Router) {
-		sr.Use(sessionMgr.RequireRole("admin"))
+		sr.Use(sessionMgr.RequireRole("superadmin", "admin"))
 		settingsHandler.MountRoutes(sr)
 	})
 

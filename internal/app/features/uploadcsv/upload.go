@@ -10,10 +10,11 @@ import (
 	"strings"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
-	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/features/uploadcsv/csvutil"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/query"
@@ -35,8 +36,8 @@ func (h *Handler) ServeUploadCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Only admin, coordinator, and leader can upload
-	if role != "admin" && role != "coordinator" && role != "leader" {
+	// Only superadmin, admin, coordinator, and leader can upload
+	if role != "superadmin" && role != "admin" && role != "coordinator" && role != "leader" {
 		uierrors.RenderForbidden(w, r, "You don't have permission to upload members.", "/")
 		return
 	}
@@ -111,8 +112,8 @@ func (h *Handler) HandleUploadCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Only admin, coordinator, and leader can upload
-	if role != "admin" && role != "coordinator" && role != "leader" {
+	// Only superadmin, admin, coordinator, and leader can upload
+	if role != "superadmin" && role != "admin" && role != "coordinator" && role != "leader" {
 		uierrors.RenderForbidden(w, r, "You don't have permission to upload members.", "/")
 		return
 	}
@@ -246,7 +247,9 @@ func (h *Handler) HandleUploadCSV(w http.ResponseWriter, r *http.Request) {
 	existingInOrg := make(map[string]bool)
 	existingInOtherOrg := make(map[string]primitive.ObjectID) // login_id -> org_id
 
-	cur, err := h.DB.Collection("users").Find(ctx, bson.M{"login_id": bson.M{"$in": loginIDs}})
+	userFilter := bson.M{"login_id": bson.M{"$in": loginIDs}}
+	workspace.Filter(r, userFilter)
+	cur, err := h.DB.Collection("users").Find(ctx, userFilter)
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "database error checking existing users", err, "A database error occurred.", uploadURL)
 		return
@@ -288,7 +291,9 @@ func (h *Handler) HandleUploadCSV(w http.ResponseWriter, r *http.Request) {
 			orgIDList = append(orgIDList, oid)
 		}
 		orgNames := make(map[primitive.ObjectID]string)
-		orgCur, err := h.DB.Collection("organizations").Find(ctx, bson.M{"_id": bson.M{"$in": orgIDList}})
+		orgFilter := bson.M{"_id": bson.M{"$in": orgIDList}}
+		workspace.Filter(r, orgFilter)
+		orgCur, err := h.DB.Collection("organizations").Find(ctx, orgFilter)
 		if err == nil {
 			defer orgCur.Close(ctx)
 			for orgCur.Next(ctx) {

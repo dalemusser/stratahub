@@ -11,6 +11,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/txn"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/waffle/pantry/urlutil"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -44,6 +45,13 @@ func (h *AdminHandler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	// Get resource to check for file
 	res, err := resStore.GetByID(ctx, oid)
 	if err != nil {
+		uierrors.RenderNotFound(w, r, "Resource not found.", "/resources")
+		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && res.WorkspaceID != wsID {
 		uierrors.RenderNotFound(w, r, "Resource not found.", "/resources")
 		return
 	}

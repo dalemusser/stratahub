@@ -28,8 +28,21 @@ func UserCtx(r *http.Request) (role string, name string, userID primitive.Object
 	return strings.ToLower(user.Role), user.Name, userID, true
 }
 
+// IsSuperAdmin reports whether the current request's user is a superadmin.
+func IsSuperAdmin(r *http.Request) bool {
+	user, ok := auth.CurrentUser(r)
+	return ok && user.IsSuperAdmin
+}
+
 // IsAdmin reports whether the current request's user is an admin.
+// Note: Superadmins are also considered admins for permission purposes.
 func IsAdmin(r *http.Request) bool {
+	role, _, _, ok := UserCtx(r)
+	return ok && (role == "admin" || role == "superadmin")
+}
+
+// IsAdminOnly reports whether the current request's user is specifically an admin (not superadmin).
+func IsAdminOnly(r *http.Request) bool {
 	role, _, _, ok := UserCtx(r)
 	return ok && role == "admin"
 }
@@ -90,7 +103,7 @@ func UserOrgIDs(r *http.Request) []primitive.ObjectID {
 }
 
 // CanManageMaterials reports whether the current user can create/edit/delete materials.
-// Admins always can. Coordinators can only if they have the CanManageMaterials permission.
+// Superadmins and admins always can. Coordinators can only if they have the CanManageMaterials permission.
 func CanManageMaterials(r *http.Request) bool {
 	user, ok := auth.CurrentUser(r)
 	if !ok {
@@ -99,8 +112,8 @@ func CanManageMaterials(r *http.Request) bool {
 
 	role := strings.ToLower(user.Role)
 
-	// Admins can always manage materials
-	if role == "admin" {
+	// Superadmins and admins can always manage materials
+	if role == "admin" || role == "superadmin" {
 		return true
 	}
 
@@ -113,7 +126,7 @@ func CanManageMaterials(r *http.Request) bool {
 }
 
 // CanManageResources reports whether the current user can create/edit/delete resources.
-// Admins always can. Coordinators can only if they have the CanManageResources permission.
+// Superadmins and admins always can. Coordinators can only if they have the CanManageResources permission.
 func CanManageResources(r *http.Request) bool {
 	user, ok := auth.CurrentUser(r)
 	if !ok {
@@ -122,8 +135,8 @@ func CanManageResources(r *http.Request) bool {
 
 	role := strings.ToLower(user.Role)
 
-	// Admins can always manage resources
-	if role == "admin" {
+	// Superadmins and admins can always manage resources
+	if role == "admin" || role == "superadmin" {
 		return true
 	}
 
@@ -136,7 +149,7 @@ func CanManageResources(r *http.Request) bool {
 }
 
 // CanAccessOrg reports whether the current user can access the given organization.
-// Admins can access all organizations.
+// Superadmins and admins can access all organizations.
 // Coordinators can access their assigned organizations.
 // Leaders/members can access only their single organization.
 // Analysts cannot access organizations directly.
@@ -148,8 +161,8 @@ func CanAccessOrg(r *http.Request, orgID primitive.ObjectID) bool {
 
 	role := strings.ToLower(user.Role)
 
-	// Admins can access all organizations
-	if role == "admin" {
+	// Superadmins and admins can access all organizations
+	if role == "admin" || role == "superadmin" {
 		return true
 	}
 

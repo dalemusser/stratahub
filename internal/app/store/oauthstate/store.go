@@ -14,6 +14,7 @@ import (
 type State struct {
 	State     string    `bson:"state"`
 	ReturnURL string    `bson:"return_url,omitempty"` // Where to redirect after auth
+	Workspace string    `bson:"workspace,omitempty"`  // Workspace subdomain (for multi-workspace OAuth)
 	ExpiresAt time.Time `bson:"expires_at"`
 	CreatedAt time.Time `bson:"created_at"`
 }
@@ -47,11 +48,12 @@ func (s *Store) EnsureIndexes(ctx context.Context) error {
 }
 
 // Save stores a state token with the given expiration time.
-// Optionally includes a return URL to redirect to after authentication.
-func (s *Store) Save(ctx context.Context, state, returnURL string, expiresAt time.Time) error {
+// Optionally includes a return URL and workspace subdomain for multi-workspace OAuth.
+func (s *Store) Save(ctx context.Context, state, returnURL, workspace string, expiresAt time.Time) error {
 	st := State{
 		State:     state,
 		ReturnURL: returnURL,
+		Workspace: workspace,
 		ExpiresAt: expiresAt,
 		CreatedAt: time.Now().UTC(),
 	}
@@ -60,9 +62,9 @@ func (s *Store) Save(ctx context.Context, state, returnURL string, expiresAt tim
 }
 
 // Validate checks if a state token exists and is not expired.
-// If valid, it deletes the token (one-time use) and returns the associated return URL.
-// Returns empty string and false if the state is invalid or expired.
-func (s *Store) Validate(ctx context.Context, state string) (returnURL string, valid bool, err error) {
+// If valid, it deletes the token (one-time use) and returns the associated return URL and workspace.
+// Returns empty strings and false if the state is invalid or expired.
+func (s *Store) Validate(ctx context.Context, state string) (returnURL, workspace string, valid bool, err error) {
 	var st State
 	err = s.c.FindOneAndDelete(ctx, bson.M{
 		"state":      state,
@@ -70,13 +72,13 @@ func (s *Store) Validate(ctx context.Context, state string) (returnURL string, v
 	}).Decode(&st)
 
 	if err == mongo.ErrNoDocuments {
-		return "", false, nil
+		return "", "", false, nil
 	}
 	if err != nil {
-		return "", false, err
+		return "", "", false, err
 	}
 
-	return st.ReturnURL, true, nil
+	return st.ReturnURL, st.Workspace, true, nil
 }
 
 // CleanupExpired removes expired state tokens.

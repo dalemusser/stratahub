@@ -12,6 +12,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -38,8 +39,9 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 
 	db := h.DB
 
-	// Build base filter
+	// Build base filter with workspace scoping
 	base := bson.M{}
+	workspace.Filter(r, base)
 
 	// Coordinators can only see their assigned organizations
 	if role == "coordinator" {
@@ -118,18 +120,22 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		orgIDs = append(orgIDs, o.ID)
 	}
 
-	leadersMap, err := orgutil.AggregateCountByField(ctx, db, "users", bson.M{
+	leadersFilter := bson.M{
 		"role":            "leader",
 		"organization_id": bson.M{"$in": orgIDs},
-	}, "organization_id")
+	}
+	workspace.Filter(r, leadersFilter)
+	leadersMap, err := orgutil.AggregateCountByField(ctx, db, "users", leadersFilter, "organization_id")
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "aggregate leader counts failed", err, "Unable to load organization data.", "")
 		return
 	}
 
-	groupsMap, err := orgutil.AggregateCountByField(ctx, db, "groups", bson.M{
+	groupsFilter := bson.M{
 		"organization_id": bson.M{"$in": orgIDs},
-	}, "organization_id")
+	}
+	workspace.Filter(r, groupsFilter)
+	groupsMap, err := orgutil.AggregateCountByField(ctx, db, "groups", groupsFilter, "organization_id")
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "aggregate group counts failed", err, "Unable to load organization data.", "")
 		return

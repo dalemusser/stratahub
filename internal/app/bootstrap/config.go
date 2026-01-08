@@ -18,6 +18,8 @@ import (
 var appConfigKeys = []config.AppKey{
 	{Name: "mongo_uri", Default: "mongodb://localhost:27017", Desc: "MongoDB connection URI"},
 	{Name: "mongo_database", Default: "strata_hub", Desc: "MongoDB database name"},
+	{Name: "mongo_max_pool_size", Default: 100, Desc: "MongoDB max connection pool size (default: 100)"},
+	{Name: "mongo_min_pool_size", Default: 10, Desc: "MongoDB min connection pool size (default: 10)"},
 	{Name: "session_key", Default: "dev-only-change-me-please-0123456789ABCDEF", Desc: "Session signing key (must be strong in production)"},
 	{Name: "session_name", Default: "stratahub-session", Desc: "Session cookie name"},
 	{Name: "session_domain", Default: "", Desc: "Session cookie domain (blank means current host)"},
@@ -56,6 +58,17 @@ var appConfigKeys = []config.AppKey{
 	// Google OAuth configuration
 	{Name: "google_client_id", Default: "", Desc: "Google OAuth2 client ID"},
 	{Name: "google_client_secret", Default: "", Desc: "Google OAuth2 client secret"},
+
+	// Multi-workspace configuration
+	{Name: "multi_workspace", Default: false, Desc: "Enable multi-workspace mode (subdomain-based tenancy)"},
+	{Name: "primary_domain", Default: "", Desc: "Primary domain for OAuth callbacks and workspace selector (e.g., adroit.games)"},
+
+	// Default workspace configuration
+	{Name: "default_workspace_name", Default: "Default", Desc: "Display name for default workspace"},
+	{Name: "default_workspace_subdomain", Default: "app", Desc: "Subdomain for default workspace"},
+
+	// SuperAdmin bootstrap
+	{Name: "superadmin_email", Default: "", Desc: "Email of the superadmin user (promotes/creates on startup)"},
 }
 
 // LoadConfig loads WAFFLE core config and app-specific config.
@@ -78,9 +91,11 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 	}
 
 	appCfg := AppConfig{
-		MongoURI:      appValues.String("mongo_uri"),
-		MongoDatabase: appValues.String("mongo_database"),
-		SessionKey:    appValues.String("session_key"),
+		MongoURI:         appValues.String("mongo_uri"),
+		MongoDatabase:    appValues.String("mongo_database"),
+		MongoMaxPoolSize: uint64(appValues.Int("mongo_max_pool_size")),
+		MongoMinPoolSize: uint64(appValues.Int("mongo_min_pool_size")),
+		SessionKey:       appValues.String("session_key"),
 		SessionName:   appValues.String("session_name"),
 		SessionDomain: appValues.String("session_domain"),
 
@@ -118,6 +133,25 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 		// Google OAuth
 		GoogleClientID:     appValues.String("google_client_id"),
 		GoogleClientSecret: appValues.String("google_client_secret"),
+
+		// Multi-workspace
+		MultiWorkspace: appValues.Bool("multi_workspace"),
+		PrimaryDomain:  appValues.String("primary_domain"),
+
+		// Default workspace
+		DefaultWorkspaceName:      appValues.String("default_workspace_name"),
+		DefaultWorkspaceSubdomain: appValues.String("default_workspace_subdomain"),
+
+		// SuperAdmin
+		SuperAdminEmail: appValues.String("superadmin_email"),
+	}
+
+	// Auto-derive session domain in multi-workspace mode if not explicitly set.
+	// For cross-subdomain cookies to work, domain must be ".adroit.games" (with leading dot).
+	if appCfg.MultiWorkspace && appCfg.SessionDomain == "" && appCfg.PrimaryDomain != "" {
+		appCfg.SessionDomain = "." + appCfg.PrimaryDomain
+		logger.Info("auto-derived session domain for multi-workspace mode",
+			zap.String("session_domain", appCfg.SessionDomain))
 	}
 
 	return coreCfg, appCfg, nil
@@ -136,6 +170,11 @@ func ValidateConfig(coreCfg *config.CoreConfig, appCfg AppConfig, logger *zap.Lo
 		logger.Error("invalid MongoDB URI", zap.Error(err))
 		return fmt.Errorf("invalid MongoDB URI: %w", err)
 	}
-	// Add any additional app-specific validation here.
+
+	// Multi-workspace mode requires primary_domain to be set
+	if appCfg.MultiWorkspace && appCfg.PrimaryDomain == "" {
+		return fmt.Errorf("multi_workspace mode requires primary_domain to be set (e.g., 'adroit.games')")
+	}
+
 	return nil
 }

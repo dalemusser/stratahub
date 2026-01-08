@@ -11,6 +11,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
+	"go.uber.org/zap"
 )
 
 // Fetcher implements auth.UserFetcher to load fresh user data on each request.
@@ -19,14 +20,18 @@ type Fetcher struct {
 	users            *mongo.Collection
 	orgs             *mongo.Collection
 	coordAssignments *mongo.Collection
+	workspaces       *mongo.Collection
+	logger           *zap.Logger
 }
 
 // NewFetcher creates a UserFetcher that queries the given database.
-func NewFetcher(db *mongo.Database) *Fetcher {
+func NewFetcher(db *mongo.Database, logger *zap.Logger) *Fetcher {
 	return &Fetcher{
 		users:            db.Collection("users"),
 		orgs:             db.Collection("organizations"),
 		coordAssignments: db.Collection("coordinator_assignments"),
+		workspaces:       db.Collection("workspaces"),
+		logger:           logger,
 	}
 }
 
@@ -49,9 +54,12 @@ func (f *Fetcher) FetchUser(ctx context.Context, userID string) *auth.SessionUse
 		"_id":                  1,
 		"full_name":            1,
 		"login_id":             1,
+		"login_id_ci":          1,
+		"auth_method":          1,
 		"role":                 1,
 		"status":               1,
 		"organization_id":      1,
+		"workspace_id":         1,
 		"can_manage_materials": 1,
 		"can_manage_resources": 1,
 	})
@@ -76,6 +84,22 @@ func (f *Fetcher) FetchUser(ctx context.Context, userID string) *auth.SessionUse
 		Name:    u.FullName,
 		LoginID: loginID,
 		Role:    normalize.Role(u.Role),
+	}
+
+	// Set workspace fields
+	if u.WorkspaceID != nil {
+		su.WorkspaceID = u.WorkspaceID.Hex()
+	}
+
+	// Check for superadmin role
+	if su.Role == "superadmin" {
+		su.IsSuperAdmin = true
+		// Superadmins can access all active workspaces
+		su.WorkspaceIDs = f.fetchAllActiveWorkspaceIDs(ctx)
+	} else {
+		// Regular users - find all workspaces where they have an account
+		// with the same login_id_ci and auth_method
+		su.WorkspaceIDs = f.fetchUserWorkspaceIDs(ctx, u.LoginIDCI, u.AuthMethod)
 	}
 
 	// If user has a single organization (leaders/members), fetch the org name
@@ -112,4 +136,62 @@ func (f *Fetcher) FetchUser(ctx context.Context, userID string) *auth.SessionUse
 	}
 
 	return su
+}
+
+// fetchAllActiveWorkspaceIDs returns all active workspace IDs for superadmins.
+func (f *Fetcher) fetchAllActiveWorkspaceIDs(ctx context.Context) []string {
+	var ids []string
+	cur, err := f.workspaces.Find(ctx, bson.M{"status": "active"}, options.Find().SetProjection(bson.M{"_id": 1}))
+	if err != nil {
+		f.logger.Warn("failed to fetch workspaces for superadmin", zap.Error(err))
+		return ids
+	}
+	defer cur.Close(ctx)
+
+	for cur.Next(ctx) {
+		var ws struct {
+			ID primitive.ObjectID `bson:"_id"`
+		}
+		if cur.Decode(&ws) == nil {
+			ids = append(ids, ws.ID.Hex())
+		}
+	}
+	return ids
+}
+
+// fetchUserWorkspaceIDs returns workspace IDs where the user has an account.
+// This allows users to have accounts in multiple workspaces with the same login credentials.
+func (f *Fetcher) fetchUserWorkspaceIDs(ctx context.Context, loginIDCI *string, authMethod string) []string {
+	var ids []string
+
+	if loginIDCI == nil || *loginIDCI == "" {
+		return ids
+	}
+
+	// Find all users with the same login_id_ci and auth_method (across workspaces)
+	cur, err := f.users.Find(ctx, bson.M{
+		"login_id_ci": *loginIDCI,
+		"auth_method": authMethod,
+		"status":      "active",
+	}, options.Find().SetProjection(bson.M{"workspace_id": 1}))
+	if err != nil {
+		f.logger.Warn("failed to fetch user workspaces", zap.Error(err), zap.Stringp("login_id_ci", loginIDCI))
+		return ids
+	}
+	defer cur.Close(ctx)
+
+	seen := make(map[string]bool)
+	for cur.Next(ctx) {
+		var u struct {
+			WorkspaceID *primitive.ObjectID `bson:"workspace_id"`
+		}
+		if cur.Decode(&u) == nil && u.WorkspaceID != nil {
+			wsID := u.WorkspaceID.Hex()
+			if !seen[wsID] {
+				seen[wsID] = true
+				ids = append(ids, wsID)
+			}
+		}
+	}
+	return ids
 }

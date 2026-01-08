@@ -10,9 +10,11 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/storage"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -68,10 +70,18 @@ func Init(store storage.Store) {
 func NewBaseVM(r *http.Request, db *mongo.Database, title, backDefault string) BaseVM {
 	role, name, _, signedIn := authz.UserCtx(r)
 
+	// Compute effective role for UI purposes
+	// When superadmin is on a workspace subdomain (not apex), show admin UI
+	effectiveRole := role
+	ws := workspace.FromRequest(r)
+	if role == "superadmin" && ws != nil && !ws.IsApex && !ws.ID.IsZero() {
+		effectiveRole = "admin"
+	}
+
 	vm := BaseVM{
 		SiteName:    models.DefaultSiteName,
 		IsLoggedIn:  signedIn,
-		Role:        role,
+		Role:        effectiveRole,
 		UserName:    name,
 		Title:       title,
 		BackURL:     httpnav.ResolveBackURL(r, backDefault),
@@ -87,13 +97,17 @@ func NewBaseVM(r *http.Request, db *mongo.Database, title, backDefault string) B
 		ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 		defer cancel()
 
-		store := settingsstore.New(db)
-		settings, err := store.Get(ctx)
-		if err == nil {
-			vm.SiteName = settings.SiteName
-			vm.FooterHTML = template.HTML(settings.FooterHTML)
-			if settings.HasLogo() && storageProvider != nil {
-				vm.LogoURL = storageProvider.URL(settings.LogoPath)
+		// Get workspace ID from context for workspace-scoped settings
+		wsID := workspace.IDFromRequest(r)
+		if wsID != primitive.NilObjectID {
+			store := settingsstore.New(db)
+			settings, err := store.Get(ctx, wsID)
+			if err == nil {
+				vm.SiteName = settings.SiteName
+				vm.FooterHTML = template.HTML(settings.FooterHTML)
+				if settings.HasLogo() && storageProvider != nil {
+					vm.LogoURL = storageProvider.URL(settings.LogoPath)
+				}
 			}
 		}
 	}
@@ -110,13 +124,13 @@ func LoadBase(r *http.Request, db *mongo.Database) BaseVM {
 }
 
 // GetSiteName returns the site name from settings, or the default if not available.
-func GetSiteName(ctx context.Context, db *mongo.Database) string {
-	if db == nil {
+func GetSiteName(ctx context.Context, db *mongo.Database, wsID primitive.ObjectID) string {
+	if db == nil || wsID == primitive.NilObjectID {
 		return models.DefaultSiteName
 	}
 
 	store := settingsstore.New(db)
-	settings, err := store.Get(ctx)
+	settings, err := store.Get(ctx, wsID)
 	if err != nil {
 		return models.DefaultSiteName
 	}
@@ -124,13 +138,13 @@ func GetSiteName(ctx context.Context, db *mongo.Database) string {
 }
 
 // GetSettings returns the full site settings, or defaults if not available.
-func GetSettings(ctx context.Context, db *mongo.Database) models.SiteSettings {
-	if db == nil {
+func GetSettings(ctx context.Context, db *mongo.Database, wsID primitive.ObjectID) models.SiteSettings {
+	if db == nil || wsID == primitive.NilObjectID {
 		return models.SiteSettings{SiteName: models.DefaultSiteName}
 	}
 
 	store := settingsstore.New(db)
-	settings, err := store.Get(ctx)
+	settings, err := store.Get(ctx, wsID)
 	if err != nil {
 		return models.SiteSettings{SiteName: models.DefaultSiteName}
 	}

@@ -64,6 +64,9 @@ func EnsureAll(ctx context.Context, db *mongo.Database) error {
 	if err := ensureOAuthStates(ctx, db); err != nil {
 		problems = append(problems, "oauth_states: "+err.Error())
 	}
+	if err := ensureSiteSettings(ctx, db); err != nil {
+		problems = append(problems, "site_settings: "+err.Error())
+	}
 
 	if len(problems) > 0 {
 		return errors.New(strings.Join(problems, "; "))
@@ -353,11 +356,24 @@ func ensureIndexSet(ctx context.Context, coll *mongo.Collection, models []mongo.
 func ensureUsers(ctx context.Context, db *mongo.Database) error {
 	c := db.Collection("users")
 	return ensureIndexSet(ctx, c, []mongo.IndexModel{
-		// 1) login_id_ci must be unique across all users (global, cross‑org)
-		//    This is the folded (case/diacritic-insensitive) version of login_id
+		// 1) Compound unique index for multi-workspace support:
+		//    Same login_id can exist in different workspaces with potentially different auth methods.
+		//    (workspace_id, login_id_ci, auth_method) must be unique.
+		//    Sparse to allow superadmins (nil workspace_id) to exist.
 		{
-			Keys:    bson.D{{Key: "login_id_ci", Value: 1}},
-			Options: options.Index().SetUnique(true).SetName("uniq_users_login_id_ci"),
+			Keys: bson.D{
+				{Key: "workspace_id", Value: 1},
+				{Key: "login_id_ci", Value: 1},
+				{Key: "auth_method", Value: 1},
+			},
+			Options: options.Index().SetUnique(true).SetSparse(true).SetName("uniq_users_workspace_login_auth"),
+		},
+
+		// 1b) Non-unique index on login_id_ci for cross-workspace user lookups
+		//     Used when finding all workspaces a user has access to
+		{
+			Keys:    bson.D{{Key: "login_id_ci", Value: 1}, {Key: "auth_method", Value: 1}},
+			Options: options.Index().SetName("idx_users_login_auth"),
 		},
 
 		// 2) Members lists (org-scoped): covers both with and without status filter.
@@ -413,24 +429,36 @@ func ensureUsers(ctx context.Context, db *mongo.Database) error {
 			Keys:    bson.D{{Key: "role", Value: 1}, {Key: "organization_id", Value: 1}},
 			Options: options.Index().SetName("idx_users_role_org"),
 		},
+
+		// 7) Workspace-scoped queries
+		{
+			Keys:    bson.D{{Key: "workspace_id", Value: 1}, {Key: "role", Value: 1}, {Key: "status", Value: 1}},
+			Options: options.Index().SetName("idx_users_workspace_role_status"),
+		},
 	})
 }
 
 func ensureOrganizations(ctx context.Context, db *mongo.Database) error {
 	c := db.Collection("organizations")
 	return ensureIndexSet(ctx, c, []mongo.IndexModel{
-		// Enforce global uniqueness of organization names (case/diacritics folded).
+		// Enforce uniqueness of organization names within a workspace (case/diacritics folded).
 		{
-			Keys:    bson.D{{Key: "name_ci", Value: 1}},
-			Options: options.Index().SetUnique(true).SetName("uniq_orgs_nameci"),
+			Keys:    bson.D{{Key: "workspace_id", Value: 1}, {Key: "name_ci", Value: 1}},
+			Options: options.Index().SetUnique(true).SetName("uniq_orgs_workspace_nameci"),
 		},
 
-		// Name prefix search + stable sort
+		// Workspace-scoped queries with status filter
+		{
+			Keys:    bson.D{{Key: "workspace_id", Value: 1}, {Key: "status", Value: 1}, {Key: "name_ci", Value: 1}, {Key: "_id", Value: 1}},
+			Options: options.Index().SetName("idx_orgs_workspace_status_nameci__id"),
+		},
+
+		// Name prefix search + stable sort (kept for backward compatibility)
 		{
 			Keys:    bson.D{{Key: "name_ci", Value: 1}, {Key: "_id", Value: 1}},
 			Options: options.Index().SetName("idx_orgs_nameci__id"),
 		},
-		// Filter by status, then name_ci sort
+		// Filter by status, then name_ci sort (kept for backward compatibility)
 		{
 			Keys:    bson.D{{Key: "status", Value: 1}, {Key: "name_ci", Value: 1}, {Key: "_id", Value: 1}},
 			Options: options.Index().SetName("idx_orgs_status_nameci__id"),
@@ -840,6 +868,21 @@ func ensureOAuthStates(ctx context.Context, db *mongo.Database) error {
 			Options: options.Index().
 				SetExpireAfterSeconds(0).
 				SetName("idx_oauth_expires_ttl"),
+		},
+	})
+}
+
+func ensureSiteSettings(ctx context.Context, db *mongo.Database) error {
+	c := db.Collection("site_settings")
+	return ensureIndexSet(ctx, c, []mongo.IndexModel{
+		// Unique workspace_id - each workspace has exactly one settings document
+		{
+			Keys: bson.D{
+				{Key: "workspace_id", Value: 1},
+			},
+			Options: options.Index().
+				SetUnique(true).
+				SetName("uniq_sitesettings_workspace"),
 		},
 	})
 }

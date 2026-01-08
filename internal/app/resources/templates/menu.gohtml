@@ -2,7 +2,9 @@
    Dynamic menu dispatcher – choose a role-specific sub-template at runtime
 ─────────────────────────────────────────────────────────────────────────────*/}}
 {{ define "menu" }}
-  {{ if eq .Role "admin" }}
+  {{ if eq .Role "superadmin" }}
+    {{ template "menu_superadmin" . }}
+  {{ else if eq .Role "admin" }}
     {{ template "menu_admin" . }}
   {{ else if eq .Role "analyst" }}
     {{ template "menu_analyst" . }}
@@ -15,6 +17,30 @@
   {{ else }}
     {{ template "menu_visitor" . }}
   {{ end }}
+{{ end }}
+
+{{/* ─────────────────────────────  SuperAdmin  ──────────────────────────────*/}}
+{{ define "menu_superadmin" }}
+<div class="mb-2">
+  <div class="flex flex-col items-center">
+    <h1 class="menu-header text-xl font-bold text-indigo-600 dark:text-indigo-400">StrataHub</h1>
+    <span class="text-xs text-gray-500 dark:text-gray-400">SuperAdmin</span>
+  </div>
+</div>
+
+<nav class="space-y-2 text-sm flex-1 pt-4 border-t border-gray-200 dark:border-gray-700">
+  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/dashboard" title="Dashboard"><span class="menu-icon mr-2">🎛️</span><span class="menu-text">Dashboard</span></a>
+  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/workspaces" title="Workspaces"><span class="menu-icon mr-2">🏠</span><span class="menu-text">Workspaces</span></a>
+  {{ template "menu_common" . }}
+</nav>
+
+{{ if .IsLoggedIn }}
+  <div class="menu-user-info mt-4 pt-4 pb-4 border-t border-gray-200 dark:border-gray-700 text-xs">
+    <div class="font-semibold truncate text-gray-700 dark:text-gray-300" title="{{ .UserName }}">{{ .UserName }}</div>
+    <div class="text-gray-500 dark:text-gray-500">{{ .Role }}</div>
+  </div>
+{{ end }}
+{{ template "menu_footer" }}
 {{ end }}
 
 {{/* ─────────────────────────────  Admin  ──────────────────────────────*/}}
@@ -199,7 +225,7 @@
 
   {{ if .IsLoggedIn }}
     <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/profile" title="Profile"><span class="menu-icon mr-2">👤</span><span class="menu-text">Profile</span></a>
-    {{ if eq .Role "admin" }}
+    {{ if or (eq .Role "admin") (eq .Role "superadmin") }}
       <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/settings" title="Site Settings"><span class="menu-icon mr-2">⚙️</span><span class="menu-text">Settings</span></a>
     {{ end }}
     <a class="menu-link flex items-center text-red-500 dark:text-red-400 hover:underline" href="/logout" title="Logout"><span class="menu-icon mr-2">🚪</span><span class="menu-text">Logout</span></a>

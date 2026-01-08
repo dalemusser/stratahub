@@ -11,6 +11,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/htmlsanitize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/waffle/pantry/storage"
 	"github.com/dalemusser/waffle/pantry/templates"
 
@@ -36,6 +37,13 @@ func (h *AdminHandler) ServeView(w http.ResponseWriter, r *http.Request) {
 	res, err := resStore.GetByID(ctx, oid)
 	if err != nil {
 		// Treat not found as a 404 to match other admin handlers
+		uierrors.RenderNotFound(w, r, "Resource not found.", "/resources")
+		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && res.WorkspaceID != wsID {
 		uierrors.RenderNotFound(w, r, "Resource not found.", "/resources")
 		return
 	}
@@ -79,6 +87,13 @@ func (h *AdminHandler) HandleDownload(w http.ResponseWriter, r *http.Request) {
 	resStore := resourcestore.New(h.DB)
 	res, err := resStore.GetByID(ctx, oid)
 	if err != nil {
+		uierrors.RenderNotFound(w, r, "Resource not found.", "/resources")
+		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && res.WorkspaceID != wsID {
 		uierrors.RenderNotFound(w, r, "Resource not found.", "/resources")
 		return
 	}

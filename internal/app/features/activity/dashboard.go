@@ -14,6 +14,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"go.mongodb.org/mongo-driver/bson"
@@ -244,8 +245,8 @@ func (h *Handler) fetchGroupsAndMembers(ctx context.Context, r *http.Request, se
 	var groupMap = make(map[primitive.ObjectID]string) // ID -> Name
 
 	switch role {
-	case "admin":
-		// Admin can see all groups (but we'll limit to some reasonable set)
+	case "superadmin", "admin":
+		// SuperAdmin/Admin can see all groups (but we'll limit to some reasonable set)
 		// For now, let's get groups from the selected org or all active groups
 		groups, err := h.fetchAllGroups(ctx, db)
 		if err != nil {
@@ -381,10 +382,12 @@ func (h *Handler) fetchGroupsByOrgs(ctx context.Context, db *mongo.Database, org
 		return nil, nil
 	}
 
-	cur, err := db.Collection("groups").Find(ctx, bson.M{
+	filter := bson.M{
 		"organization_id": bson.M{"$in": orgIDs},
 		"status":          "active",
-	})
+	}
+	workspace.FilterCtx(ctx, filter)
+	cur, err := db.Collection("groups").Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -406,7 +409,9 @@ func (h *Handler) fetchGroupsByOrgs(ctx context.Context, db *mongo.Database, org
 
 // fetchAllGroups gets all active groups (for admins).
 func (h *Handler) fetchAllGroups(ctx context.Context, db *mongo.Database) ([]leaderGroup, error) {
-	cur, err := db.Collection("groups").Find(ctx, bson.M{"status": "active"})
+	filter := bson.M{"status": "active"}
+	workspace.FilterCtx(ctx, filter)
+	cur, err := db.Collection("groups").Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}

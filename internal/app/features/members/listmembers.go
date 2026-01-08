@@ -4,11 +4,13 @@ package members
 import (
 	"context"
 	"maps"
+	"net/http"
 	"strings"
 
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/text"
 	"go.mongodb.org/mongo-driver/bson"
@@ -37,6 +39,7 @@ type memberListResult struct {
 // scopeOrgIDs limits members to those in the specified orgs (for coordinators); nil means all orgs.
 func (h *Handler) fetchMembersList(
 	ctx context.Context,
+	r *http.Request,
 	db *mongo.Database,
 	scopeOrg *primitive.ObjectID,
 	searchQuery, status, after, before string,
@@ -45,8 +48,9 @@ func (h *Handler) fetchMembersList(
 ) (memberListResult, error) {
 	var result memberListResult
 
-	// Build base filter
+	// Build base filter with workspace scoping
 	pbase := bson.M{"role": "member"}
+	workspace.Filter(r, pbase)
 	if status == "active" || status == "disabled" {
 		pbase["status"] = status
 	}

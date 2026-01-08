@@ -33,7 +33,16 @@ import (
 // StrataHub connects to MongoDB using the waffle/pantry/mongo helper,
 // which handles connection pooling and ping verification.
 func ConnectDB(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, logger *zap.Logger) (DBDeps, error) {
-	client, err := wafflemongo.Connect(ctx, appCfg.MongoURI, appCfg.MongoDatabase)
+	// Configure MongoDB connection pool
+	poolCfg := wafflemongo.DefaultPoolConfig()
+	if appCfg.MongoMaxPoolSize > 0 {
+		poolCfg.MaxPoolSize = appCfg.MongoMaxPoolSize
+	}
+	if appCfg.MongoMinPoolSize > 0 {
+		poolCfg.MinPoolSize = appCfg.MongoMinPoolSize
+	}
+
+	client, err := wafflemongo.ConnectWithPool(ctx, appCfg.MongoURI, appCfg.MongoDatabase, poolCfg)
 	if err != nil {
 		return DBDeps{}, err
 	}
@@ -42,6 +51,8 @@ func ConnectDB(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig
 
 	logger.Info("connected to MongoDB",
 		zap.String("database", appCfg.MongoDatabase),
+		zap.Uint64("max_pool_size", poolCfg.MaxPoolSize),
+		zap.Uint64("min_pool_size", poolCfg.MinPoolSize),
 	)
 
 	// Initialize file storage

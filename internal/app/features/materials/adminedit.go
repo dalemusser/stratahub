@@ -11,6 +11,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/htmlsanitize"
 	"github.com/dalemusser/stratahub/internal/app/system/inputval"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/urlutil"
 	"github.com/go-chi/chi/v5"
@@ -46,6 +47,13 @@ func (h *AdminHandler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 	matStore := materialstore.New(db)
 	mat, err := matStore.GetByID(ctx, oid)
 	if err != nil {
+		uierrors.RenderNotFound(w, r, "Material not found.", "/materials")
+		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && mat.WorkspaceID != wsID {
 		uierrors.RenderNotFound(w, r, "Material not found.", "/materials")
 		return
 	}
@@ -132,6 +140,13 @@ func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	matStore := materialstore.New(db)
 	existing, err := matStore.GetByID(ctx, mid)
 	if err != nil {
+		uierrors.RenderNotFound(w, r, "Material not found.", "/materials")
+		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && existing.WorkspaceID != wsID {
 		uierrors.RenderNotFound(w, r, "Material not found.", "/materials")
 		return
 	}

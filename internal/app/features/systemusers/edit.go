@@ -19,6 +19,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
@@ -62,6 +63,16 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u := *uptr
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID {
+		// User has nil workspace_id (superadmin) OR different workspace
+		if u.WorkspaceID == nil || *u.WorkspaceID != wsID {
+			uierrors.RenderNotFound(w, r, "User not found.", "/system-users")
+			return
+		}
+	}
 
 	isSelf := uid == u.ID
 	userRole := normalize.Role(u.Role)
@@ -153,6 +164,16 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		uierrors.RenderNotFound(w, r, "User not found.", "/system-users")
 		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID {
+		// User has nil workspace_id (superadmin) OR different workspace
+		if existingUser.WorkspaceID == nil || *existingUser.WorkspaceID != wsID {
+			uierrors.RenderNotFound(w, r, "User not found.", "/system-users")
+			return
+		}
 	}
 
 	full := normalize.Name(r.FormValue("full_name"))

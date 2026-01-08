@@ -11,6 +11,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/timezones"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/waffle/pantry/templates"
 
 	"github.com/go-chi/chi/v5"
@@ -44,6 +45,13 @@ func (h *Handler) ServeView(w http.ResponseWriter, r *http.Request) {
 	org, err := orgStore.GetByID(ctx, orgID)
 	if err != nil {
 		// Treat not-found as a normal 404; other errors as 500.
+		uierrors.RenderNotFound(w, r, "Organization not found.", "/organizations")
+		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && org.WorkspaceID != wsID {
 		uierrors.RenderNotFound(w, r, "Organization not found.", "/organizations")
 		return
 	}

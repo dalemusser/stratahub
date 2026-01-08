@@ -13,7 +13,7 @@ import (
 )
 
 // Store provides access to the site_settings collection.
-// There is only one document in this collection.
+// Each workspace has its own settings document (one document per workspace_id).
 type Store struct {
 	c *mongo.Collection
 }
@@ -23,15 +23,17 @@ func New(db *mongo.Database) *Store {
 	return &Store{c: db.Collection("site_settings")}
 }
 
-// Get returns the site settings.
-// If no settings exist, returns default settings with an empty ID.
-func (s *Store) Get(ctx context.Context) (models.SiteSettings, error) {
+// Get returns the site settings for a specific workspace.
+// If no settings exist for the workspace, returns default settings.
+func (s *Store) Get(ctx context.Context, workspaceID primitive.ObjectID) (models.SiteSettings, error) {
 	var settings models.SiteSettings
-	err := s.c.FindOne(ctx, bson.M{}).Decode(&settings)
+	filter := bson.M{"workspace_id": workspaceID}
+	err := s.c.FindOne(ctx, filter).Decode(&settings)
 	if err == mongo.ErrNoDocuments {
-		// Return default settings
+		// Return default settings for this workspace
 		return models.SiteSettings{
-			SiteName: models.DefaultSiteName,
+			WorkspaceID: workspaceID,
+			SiteName:    models.DefaultSiteName,
 		}, nil
 	}
 	if err != nil {
@@ -40,16 +42,18 @@ func (s *Store) Get(ctx context.Context) (models.SiteSettings, error) {
 	return settings, nil
 }
 
-// Save updates the site settings.
+// Save updates the site settings for a specific workspace.
 // Uses upsert so it works whether settings exist or not.
-func (s *Store) Save(ctx context.Context, settings models.SiteSettings) error {
+func (s *Store) Save(ctx context.Context, workspaceID primitive.ObjectID, settings models.SiteSettings) error {
 	now := time.Now().UTC()
 	settings.UpdatedAt = &now
+	settings.WorkspaceID = workspaceID
 
-	// Use upsert with an empty filter to update the single document or create it
-	filter := bson.M{}
+	// Use upsert with workspace_id filter
+	filter := bson.M{"workspace_id": workspaceID}
 	update := bson.M{
 		"$set": bson.M{
+			"workspace_id":    workspaceID,
 			"site_name":       settings.SiteName,
 			"logo_path":       settings.LogoPath,
 			"logo_name":       settings.LogoName,
@@ -68,11 +72,20 @@ func (s *Store) Save(ctx context.Context, settings models.SiteSettings) error {
 	return err
 }
 
-// Exists checks if settings have been saved.
-func (s *Store) Exists(ctx context.Context) (bool, error) {
-	count, err := s.c.CountDocuments(ctx, bson.M{})
+// Exists checks if settings have been saved for a specific workspace.
+func (s *Store) Exists(ctx context.Context, workspaceID primitive.ObjectID) (bool, error) {
+	filter := bson.M{"workspace_id": workspaceID}
+	count, err := s.c.CountDocuments(ctx, filter)
 	if err != nil {
 		return false, err
 	}
 	return count > 0, nil
+}
+
+// Delete removes settings for a specific workspace.
+// Used when deleting a workspace.
+func (s *Store) Delete(ctx context.Context, workspaceID primitive.ObjectID) error {
+	filter := bson.M{"workspace_id": workspaceID}
+	_, err := s.c.DeleteOne(ctx, filter)
+	return err
 }

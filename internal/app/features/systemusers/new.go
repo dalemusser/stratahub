@@ -19,8 +19,10 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 )
 
@@ -145,6 +147,11 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		Role:       userRole,
 		AuthMethod: authm,
 		Status:     "active",
+	}
+
+	// Set workspace ID (nil for superadmin, set for other system users)
+	if wsID := workspace.IDFromRequest(r); wsID != primitive.NilObjectID {
+		user.WorkspaceID = &wsID
 	}
 
 	// Add optional email if provided

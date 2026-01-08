@@ -15,6 +15,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -51,6 +52,13 @@ func (h *Handler) ServeGroupView(w http.ResponseWriter, r *http.Request) {
 	}
 	if err != nil {
 		h.ErrLog.LogForbidden(w, r, "database error loading group", err, "A database error occurred.", httpnav.ResolveBackURL(r, "/groups"))
+		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && group.WorkspaceID != wsID {
+		uierrors.RenderNotFound(w, r, "Group not found.", "/groups")
 		return
 	}
 
