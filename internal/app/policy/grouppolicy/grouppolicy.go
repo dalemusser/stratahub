@@ -37,7 +37,7 @@ func CanManageGroup(ctx context.Context, db *mongo.Database, r *http.Request, gr
 	if !ok {
 		return false, nil
 	}
-	if role == "admin" {
+	if role == "superadmin" || role == "admin" {
 		return true, nil
 	}
 	if role == "coordinator" {

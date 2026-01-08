@@ -116,7 +116,7 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch members list
-	members, err := h.fetchMembersList(ctx, db, scopeOrg, searchQuery, status, after, before, start, scopeOrgIDs)
+	members, err := h.fetchMembersList(ctx, r, db, scopeOrg, searchQuery, status, after, before, start, scopeOrgIDs)
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "database error fetching members list", err, "A database error occurred.", "/")
 		return
@@ -162,7 +162,7 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 
 		MemberRows: members.Rows,
 
-		AllowUpload: (base.Role == "admin" && selectedOrg != "all") || base.Role == "leader",
+		AllowUpload: ((base.Role == "superadmin" || base.Role == "admin") && selectedOrg != "all") || base.Role == "leader",
 		AllowAdd:    true,
 	})
 }

@@ -38,6 +38,29 @@ func (f *Fixtures) DB() *mongo.Database {
 	return f.db
 }
 
+// CreateWorkspace creates a test workspace with the given name and subdomain.
+func (f *Fixtures) CreateWorkspace(ctx context.Context, name, subdomain string) models.Workspace {
+	f.t.Helper()
+
+	now := time.Now().UTC()
+	ws := models.Workspace{
+		ID:        primitive.NewObjectID(),
+		Name:      name,
+		NameCI:    text.Fold(name),
+		Subdomain: subdomain,
+		Status:    "active",
+		CreatedAt: now,
+		UpdatedAt: now,
+	}
+
+	_, err := f.db.Collection("workspaces").InsertOne(ctx, ws)
+	if err != nil {
+		f.t.Fatalf("failed to create test workspace: %v", err)
+	}
+
+	return ws
+}
+
 // CreateOrganization creates a test organization with the given name.
 // Returns the created organization with its generated ID.
 func (f *Fixtures) CreateOrganization(ctx context.Context, name string) models.Organization {
@@ -56,6 +79,34 @@ func (f *Fixtures) CreateOrganization(ctx context.Context, name string) models.O
 		Status:    "active",
 		CreatedAt: now,
 		UpdatedAt: now,
+	}
+
+	_, err := f.db.Collection("organizations").InsertOne(ctx, org)
+	if err != nil {
+		f.t.Fatalf("failed to create test organization: %v", err)
+	}
+
+	return org
+}
+
+// CreateOrganizationInWorkspace creates a test organization in the given workspace.
+func (f *Fixtures) CreateOrganizationInWorkspace(ctx context.Context, name string, workspaceID primitive.ObjectID) models.Organization {
+	f.t.Helper()
+
+	now := time.Now().UTC()
+	org := models.Organization{
+		ID:          primitive.NewObjectID(),
+		WorkspaceID: workspaceID,
+		Name:        name,
+		NameCI:      text.Fold(name),
+		City:        "Test City",
+		CityCI:      text.Fold("Test City"),
+		State:       "TS",
+		StateCI:     text.Fold("TS"),
+		TimeZone:    "America/New_York",
+		Status:      "active",
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 
 	_, err := f.db.Collection("organizations").InsertOne(ctx, org)
@@ -117,6 +168,63 @@ func (f *Fixtures) CreateUser(ctx context.Context, fullName, email, role string,
 	_, err := f.db.Collection("users").InsertOne(ctx, user)
 	if err != nil {
 		f.t.Fatalf("failed to create test user: %v", err)
+	}
+
+	return user
+}
+
+// CreateUserInWorkspace creates a test user in the given workspace.
+func (f *Fixtures) CreateUserInWorkspace(ctx context.Context, fullName, email, role string, workspaceID primitive.ObjectID, orgID *primitive.ObjectID) models.User {
+	f.t.Helper()
+
+	now := time.Now().UTC()
+	loginIDCI := text.Fold(email)
+	user := models.User{
+		ID:             primitive.NewObjectID(),
+		WorkspaceID:    &workspaceID,
+		FullName:       fullName,
+		FullNameCI:     text.Fold(fullName),
+		LoginID:        &email,
+		LoginIDCI:      &loginIDCI,
+		AuthMethod:     "trust",
+		Role:           role,
+		Status:         "active",
+		OrganizationID: orgID,
+		CreatedAt:      now,
+		UpdatedAt:      now,
+	}
+
+	_, err := f.db.Collection("users").InsertOne(ctx, user)
+	if err != nil {
+		f.t.Fatalf("failed to create test user: %v", err)
+	}
+
+	return user
+}
+
+// CreateSuperAdmin creates a test superadmin user (no workspace_id).
+func (f *Fixtures) CreateSuperAdmin(ctx context.Context, fullName, email string) models.User {
+	f.t.Helper()
+
+	now := time.Now().UTC()
+	loginIDCI := text.Fold(email)
+	user := models.User{
+		ID:          primitive.NewObjectID(),
+		WorkspaceID: nil, // Superadmins have no workspace
+		FullName:    fullName,
+		FullNameCI:  text.Fold(fullName),
+		LoginID:     &email,
+		LoginIDCI:   &loginIDCI,
+		AuthMethod:  "trust",
+		Role:        "superadmin",
+		Status:      "active",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	_, err := f.db.Collection("users").InsertOne(ctx, user)
+	if err != nil {
+		f.t.Fatalf("failed to create test superadmin: %v", err)
 	}
 
 	return user

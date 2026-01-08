@@ -6,6 +6,7 @@ import (
 
 	"github.com/dalemusser/stratahub/internal/app/store/queries/reportqueries"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/text"
@@ -113,8 +114,9 @@ func (h *Handler) fetchReportGroupsPane(
 		result.NextCursor = wafflemongo.EncodeCursor(text.Fold(glist[len(glist)-1].Name), glist[len(glist)-1].ID)
 	}
 
-	// Count total members in this org (respecting memberStatus)
+	// Count total members in this org (respecting memberStatus, with workspace scoping)
 	ocond := bson.M{"role": "member", "organization_id": scopeOrg}
+	workspace.FilterCtx(ctx, ocond)
 	if memberStatus == "active" || memberStatus == "disabled" {
 		ocond["status"] = memberStatus
 	}

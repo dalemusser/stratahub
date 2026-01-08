@@ -17,6 +17,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/txn"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
@@ -50,6 +51,14 @@ func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 		uierrors.RenderNotFound(w, r, "Organization not found.", "/organizations")
 		return
 	}
+
+	// Verify workspace ownership (prevent cross-workspace deletion)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && org.WorkspaceID != wsID {
+		uierrors.RenderNotFound(w, r, "Organization not found.", "/organizations")
+		return
+	}
+
 	orgName := org.Name
 
 	// Use txn.Run for atomic cascading delete with automatic fallback.

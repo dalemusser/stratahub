@@ -13,9 +13,10 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/policy/reportpolicy"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
-	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/stratahub/internal/app/system/search"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
+	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/text"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -72,6 +73,7 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 
 	// ----- Load all members in scope (users.role=member) -----
 	userFilter := bson.M{"role": "member"}
+	workspace.Filter(r, userFilter)
 	if scopeOrg != nil {
 		userFilter["organization_id"] = *scopeOrg
 	}
@@ -177,6 +179,7 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 
 	// Preload group names
 	groupFilter := bson.M{}
+	workspace.Filter(r, groupFilter)
 	if scopeOrg != nil {
 		groupFilter["organization_id"] = *scopeOrg
 	}

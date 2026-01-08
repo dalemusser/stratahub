@@ -9,6 +9,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
@@ -36,6 +37,13 @@ func (h *Handler) ServeView(w http.ResponseWriter, r *http.Request) {
 
 	var usr models.User
 	if err := h.DB.Collection("users").FindOne(ctx, bson.M{"_id": uid, "role": "leader"}).Decode(&usr); err != nil {
+		uierrors.RenderNotFound(w, r, "Leader not found.", "/leaders")
+		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && (usr.WorkspaceID == nil || *usr.WorkspaceID != wsID) {
 		uierrors.RenderNotFound(w, r, "Leader not found.", "/leaders")
 		return
 	}

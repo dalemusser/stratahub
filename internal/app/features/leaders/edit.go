@@ -14,6 +14,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -71,6 +72,13 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 
 	var usr models.User
 	if err := h.DB.Collection("users").FindOne(ctx, bson.M{"_id": uid, "role": "leader"}).Decode(&usr); err != nil {
+		uierrors.RenderNotFound(w, r, "Leader not found.", "/leaders")
+		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && (usr.WorkspaceID == nil || *usr.WorkspaceID != wsID) {
 		uierrors.RenderNotFound(w, r, "Leader not found.", "/leaders")
 		return
 	}
@@ -246,6 +254,13 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		} else {
 			h.ErrLog.LogServerError(w, r, "database error loading leader", err, "A database error occurred.", "/leaders")
 		}
+		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && (currentLeader.WorkspaceID == nil || *currentLeader.WorkspaceID != wsID) {
+		uierrors.RenderNotFound(w, r, "Leader not found.", "/leaders")
 		return
 	}
 	oldStatus := normalize.Status(currentLeader.Status)

@@ -5,18 +5,16 @@ import (
 	"context"
 
 	"github.com/dalemusser/stratahub/internal/app/store/pages"
-	"github.com/dalemusser/stratahub/internal/app/store/settings"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )
 
 // SeedAll seeds default data if not already present.
+// Note: Settings are workspace-scoped and default values are returned by the store
+// when no settings exist for a workspace, so no seeding is needed.
 func SeedAll(ctx context.Context, db *mongo.Database, logger *zap.Logger) error {
 	if err := seedPages(ctx, db, logger); err != nil {
-		return err
-	}
-	if err := seedSettings(ctx, db, logger); err != nil {
 		return err
 	}
 	return nil
@@ -91,30 +89,6 @@ func seedPages(ctx context.Context, db *mongo.Database, logger *zap.Logger) erro
 			}
 			logger.Info("seeded default page", zap.String("slug", page.Slug))
 		}
-	}
-
-	return nil
-}
-
-// seedSettings creates default settings if they don't exist.
-func seedSettings(ctx context.Context, db *mongo.Database, logger *zap.Logger) error {
-	store := settingsstore.New(db)
-
-	exists, err := store.Exists(ctx)
-	if err != nil {
-		logger.Error("failed to check if settings exist", zap.Error(err))
-		return err
-	}
-
-	if !exists {
-		settings := models.SiteSettings{
-			SiteName: models.DefaultSiteName,
-		}
-		if err := store.Save(ctx, settings); err != nil {
-			logger.Error("failed to seed settings", zap.Error(err))
-			return err
-		}
-		logger.Info("seeded default site settings", zap.String("site_name", settings.SiteName))
 	}
 
 	return nil

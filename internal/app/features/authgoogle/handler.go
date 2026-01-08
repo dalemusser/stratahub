@@ -14,15 +14,18 @@ import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/store/oauthstate"
 	"github.com/dalemusser/stratahub/internal/app/store/sessions"
+	workspacestore "github.com/dalemusser/stratahub/internal/app/store/workspaces"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/auditlog"
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/urlutil"
 	"github.com/gorilla/securecookie"
 	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 	"golang.org/x/oauth2"
@@ -38,11 +41,16 @@ type Handler struct {
 	AuditLog   *auditlog.Logger
 	Sessions   *sessions.Store // Activity session tracking
 	StateStore *oauthstate.Store
+	Workspaces *workspacestore.Store
 
 	// OAuth configuration
 	ClientID     string
 	ClientSecret string
 	RedirectURL  string // e.g., "https://stratahub.com/auth/google/callback"
+
+	// Multi-workspace configuration
+	MultiWorkspace bool   // true = subdomain-based workspaces
+	PrimaryDomain  string // Apex domain for redirects (e.g., "adroit.games")
 }
 
 // NewHandler creates a new Google OAuth handler.
@@ -53,20 +61,26 @@ func NewHandler(
 	audit *auditlog.Logger,
 	sessStore *sessions.Store,
 	stateStore *oauthstate.Store,
+	wsStore *workspacestore.Store,
 	clientID, clientSecret, baseURL string,
+	multiWorkspace bool,
+	primaryDomain string,
 	logger *zap.Logger,
 ) *Handler {
 	return &Handler{
-		DB:           db,
-		Log:          logger,
-		SessionMgr:   sessionMgr,
-		ErrLog:       errLog,
-		AuditLog:     audit,
-		Sessions:     sessStore,
-		StateStore:   stateStore,
-		ClientID:     clientID,
-		ClientSecret: clientSecret,
-		RedirectURL:  baseURL + "/auth/google/callback",
+		DB:             db,
+		Log:            logger,
+		SessionMgr:     sessionMgr,
+		ErrLog:         errLog,
+		AuditLog:       audit,
+		Sessions:       sessStore,
+		StateStore:     stateStore,
+		Workspaces:     wsStore,
+		ClientID:       clientID,
+		ClientSecret:   clientSecret,
+		RedirectURL:    baseURL + "/auth/google/callback",
+		MultiWorkspace: multiWorkspace,
+		PrimaryDomain:  primaryDomain,
 	}
 }
 
@@ -113,12 +127,18 @@ func (h *Handler) ServeLogin(w http.ResponseWriter, r *http.Request) {
 	// Get return URL from query params
 	returnURL := query.Get(r, "return")
 
-	// Store state with 10-minute expiry
+	// Get workspace subdomain from context (set by workspace middleware)
+	wsSubdomain := ""
+	if ws := workspace.FromRequest(r); ws != nil && !ws.IsApex {
+		wsSubdomain = ws.Subdomain
+	}
+
+	// Store state with 10-minute expiry (including workspace for redirect)
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 
 	expiresAt := time.Now().UTC().Add(10 * time.Minute)
-	if err := h.StateStore.Save(ctx, state, returnURL, expiresAt); err != nil {
+	if err := h.StateStore.Save(ctx, state, returnURL, wsSubdomain, expiresAt); err != nil {
 		h.Log.Error("failed to save OAuth state", zap.Error(err))
 		http.Redirect(w, r, "/login?error=internal", http.StatusSeeOther)
 		return
@@ -129,7 +149,8 @@ func (h *Handler) ServeLogin(w http.ResponseWriter, r *http.Request) {
 
 	h.Log.Debug("initiating Google OAuth flow",
 		zap.String("redirect_url", url),
-		zap.String("return_url", returnURL))
+		zap.String("return_url", returnURL),
+		zap.String("workspace", wsSubdomain))
 
 	http.Redirect(w, r, url, http.StatusTemporaryRedirect)
 }
@@ -164,7 +185,7 @@ func (h *Handler) ServeCallback(w http.ResponseWriter, r *http.Request) {
 	ctxTimeout, cancel := context.WithTimeout(ctx, timeouts.Short())
 	defer cancel()
 
-	returnURL, valid, err := h.StateStore.Validate(ctxTimeout, state)
+	returnURL, wsSubdomain, valid, err := h.StateStore.Validate(ctxTimeout, state)
 	if err != nil {
 		h.Log.Error("failed to validate OAuth state", zap.Error(err))
 		http.Redirect(w, r, "/login?error=internal", http.StatusSeeOther)
@@ -202,34 +223,57 @@ func (h *Handler) ServeCallback(w http.ResponseWriter, r *http.Request) {
 	h.Log.Debug("Google user info fetched",
 		zap.String("google_id", googleUser.ID),
 		zap.String("email", googleUser.Email),
-		zap.String("name", googleUser.Name))
+		zap.String("name", googleUser.Name),
+		zap.String("workspace", wsSubdomain))
+
+	// Determine workspace ID for user lookup
+	var workspaceID *primitive.ObjectID
+	if h.MultiWorkspace && wsSubdomain != "" {
+		// Multi-workspace mode: look up workspace by subdomain
+		ws, err := h.Workspaces.GetBySubdomain(ctxTimeout, wsSubdomain)
+		if err != nil {
+			h.Log.Warn("workspace not found for OAuth callback",
+				zap.String("subdomain", wsSubdomain),
+				zap.Error(err))
+			http.Redirect(w, r, "/login?error=workspace_not_found", http.StatusSeeOther)
+			return
+		}
+		workspaceID = &ws.ID
+	} else if !h.MultiWorkspace {
+		// Single workspace mode: get default workspace
+		ws, err := h.Workspaces.GetFirst(ctxTimeout)
+		if err == nil {
+			workspaceID = &ws.ID
+		}
+	}
 
 	// Look up user in database by Google ID (stored in auth_return_id) or email
-	user, err := h.findUser(ctx, r, googleUser)
+	user, err := h.findUserInWorkspace(ctx, r, googleUser, workspaceID)
 	if err != nil {
 		if err == errUserNotFound {
 			h.Log.Info("Google OAuth: user not found",
 				zap.String("google_id", googleUser.ID),
-				zap.String("email", googleUser.Email))
+				zap.String("email", googleUser.Email),
+				zap.String("workspace", wsSubdomain))
 			h.AuditLog.LoginFailedUserNotFound(ctx, r, googleUser.Email)
-			http.Redirect(w, r, "/login?error=no_account", http.StatusSeeOther)
+			h.redirectToLogin(w, r, wsSubdomain, "no_account")
 			return
 		}
 		if err == errUserDisabled {
 			h.Log.Info("Google OAuth: user disabled",
 				zap.String("google_id", googleUser.ID),
 				zap.String("email", googleUser.Email))
-			// Note: Audit logging is done in findUser where we have the user object
-			http.Redirect(w, r, "/login?error=account_disabled", http.StatusSeeOther)
+			// Note: Audit logging is done in findUserInWorkspace where we have the user object
+			h.redirectToLogin(w, r, wsSubdomain, "account_disabled")
 			return
 		}
 		h.Log.Error("failed to look up user", zap.Error(err))
-		http.Redirect(w, r, "/login?error=internal", http.StatusSeeOther)
+		h.redirectToLogin(w, r, wsSubdomain, "internal")
 		return
 	}
 
 	// Create session and redirect
-	h.createSessionAndRedirect(w, r, user, returnURL)
+	h.createSessionAndRedirect(w, r, user, wsSubdomain, returnURL)
 }
 
 /*─────────────────────────────────────────────────────────────────────────────*
@@ -275,20 +319,32 @@ func fetchGoogleUserInfo(ctx context.Context, token *oauth2.Token) (*googleUserI
 	return &info, nil
 }
 
-// findUser looks up a user by Google ID or email.
+// findUserInWorkspace looks up a user by Google ID or email within a specific workspace.
 // For Google auth, users are identified by:
-// 1. auth_return_id = Google's user ID (if already linked)
-// 2. login_id (email) + auth_method = "google"
-func (h *Handler) findUser(ctx context.Context, r *http.Request, googleUser *googleUserInfo) (*models.User, error) {
+// 1. auth_return_id = Google's user ID (if already linked) + workspace_id
+// 2. login_id (email) + auth_method = "google" + workspace_id
+func (h *Handler) findUserInWorkspace(ctx context.Context, r *http.Request, googleUser *googleUserInfo, workspaceID *primitive.ObjectID) (*models.User, error) {
 	userColl := h.DB.Collection("users")
 
 	var u models.User
 
+	// Build base filter with workspace constraint
+	baseFilter := bson.M{
+		"auth_method": "google",
+	}
+	if workspaceID != nil {
+		baseFilter["workspace_id"] = *workspaceID
+	}
+
 	// First, try to find by Google ID (auth_return_id for existing Google users)
-	err := userColl.FindOne(ctx, bson.M{
+	googleIDFilter := bson.M{
 		"auth_return_id": googleUser.ID,
-		"auth_method":    "google",
-	}).Decode(&u)
+	}
+	for k, v := range baseFilter {
+		googleIDFilter[k] = v
+	}
+
+	err := userColl.FindOne(ctx, googleIDFilter).Decode(&u)
 
 	if err == nil {
 		// Found by Google ID
@@ -304,10 +360,14 @@ func (h *Handler) findUser(ctx context.Context, r *http.Request, googleUser *goo
 	}
 
 	// Not found by Google ID - try by email (login_id) with auth_method = google
-	err = userColl.FindOne(ctx, bson.M{
-		"login_id_ci":  strings.ToLower(googleUser.Email),
-		"auth_method": "google",
-	}).Decode(&u)
+	emailFilter := bson.M{
+		"login_id_ci": strings.ToLower(googleUser.Email),
+	}
+	for k, v := range baseFilter {
+		emailFilter[k] = v
+	}
+
+	err = userColl.FindOne(ctx, emailFilter).Decode(&u)
 
 	if err == nil {
 		// Found by email - update auth_return_id if not set
@@ -338,12 +398,26 @@ func (h *Handler) findUser(ctx context.Context, r *http.Request, googleUser *goo
 	return nil, errUserNotFound
 }
 
+// redirectToLogin redirects to the login page, handling multi-workspace subdomain routing.
+func (h *Handler) redirectToLogin(w http.ResponseWriter, r *http.Request, wsSubdomain, errorCode string) {
+	loginURL := "/login?error=" + errorCode
+
+	if h.MultiWorkspace && wsSubdomain != "" {
+		// Redirect to the workspace's subdomain
+		dest := fmt.Sprintf("https://%s.%s%s", wsSubdomain, h.PrimaryDomain, loginURL)
+		http.Redirect(w, r, dest, http.StatusSeeOther)
+		return
+	}
+
+	http.Redirect(w, r, loginURL, http.StatusSeeOther)
+}
+
 /*─────────────────────────────────────────────────────────────────────────────*
 | Session creation                                                             |
 *─────────────────────────────────────────────────────────────────────────────*/
 
 // createSessionAndRedirect creates an authenticated session and redirects to the destination.
-func (h *Handler) createSessionAndRedirect(w http.ResponseWriter, r *http.Request, u *models.User, returnURL string) {
+func (h *Handler) createSessionAndRedirect(w http.ResponseWriter, r *http.Request, u *models.User, wsSubdomain, returnURL string) {
 	sess, err := h.SessionMgr.GetSession(r)
 	if err != nil {
 		if scErr, ok := err.(securecookie.Error); ok && scErr.IsDecode() {
@@ -382,7 +456,7 @@ func (h *Handler) createSessionAndRedirect(w http.ResponseWriter, r *http.Reques
 
 	if err := sess.Save(r, w); err != nil {
 		h.Log.Error("save session failed", zap.Error(err), zap.String("login_id", loginID))
-		http.Redirect(w, r, "/login?error=session", http.StatusSeeOther)
+		h.redirectToLogin(w, r, wsSubdomain, "session")
 		return
 	}
 
@@ -391,24 +465,39 @@ func (h *Handler) createSessionAndRedirect(w http.ResponseWriter, r *http.Reques
 
 	h.Log.Info("user logged in via Google OAuth",
 		zap.String("user_id", u.ID.Hex()),
-		zap.String("login_id", loginID))
+		zap.String("login_id", loginID),
+		zap.String("workspace", wsSubdomain))
 
-	// Set theme preference cookie
+	// Set theme preference cookie (needs to work across subdomains)
 	themePref := u.ThemePreference
 	if themePref == "" {
 		themePref = "system"
 	}
-	http.SetCookie(w, &http.Cookie{
+	themeCookie := &http.Cookie{
 		Name:     "theme_pref",
 		Value:    themePref,
 		Path:     "/",
 		MaxAge:   60,
 		HttpOnly: false,
 		SameSite: http.SameSiteLaxMode,
-	})
+	}
+	// Set domain for cross-subdomain access in multi-workspace mode
+	if h.MultiWorkspace && h.PrimaryDomain != "" {
+		themeCookie.Domain = "." + h.PrimaryDomain
+	}
+	http.SetCookie(w, themeCookie)
 
-	dest := urlutil.SafeReturn(returnURL, "", "/dashboard")
-	http.Redirect(w, r, dest, http.StatusSeeOther)
+	// Build destination URL
+	safePath := urlutil.SafeReturn(returnURL, "", "/dashboard")
+
+	// In multi-workspace mode with a subdomain, redirect to the subdomain
+	if h.MultiWorkspace && wsSubdomain != "" {
+		dest := fmt.Sprintf("https://%s.%s%s", wsSubdomain, h.PrimaryDomain, safePath)
+		http.Redirect(w, r, dest, http.StatusSeeOther)
+		return
+	}
+
+	http.Redirect(w, r, safePath, http.StatusSeeOther)
 }
 
 /*─────────────────────────────────────────────────────────────────────────────*

@@ -180,6 +180,11 @@ type SessionUser struct {
 	// Coordinator-specific permissions (only relevant when Role == "coordinator")
 	CanManageMaterials bool
 	CanManageResources bool
+
+	// Multi-workspace support
+	WorkspaceID  string   // User's primary workspace (empty for superadmin)
+	WorkspaceIDs []string // All workspaces user has access to
+	IsSuperAdmin bool     // Quick check for superadmin role
 }
 
 type ctxKey string
@@ -306,6 +311,7 @@ func (sm *SessionManager) RequireSignedIn(next http.Handler) http.Handler {
 
 // RequireRole returns middleware that ensures there is a user with the required role.
 // If not authorized, it redirects to HTML pages (or sets HX-Redirect) instead of writing a blank error.
+// Note: superadmin always passes role checks - they have access to everything.
 func (sm *SessionManager) RequireRole(allowed ...string) func(http.Handler) http.Handler {
 	set := make(map[string]struct{}, len(allowed))
 	for _, role := range allowed {
@@ -338,8 +344,15 @@ func (sm *SessionManager) RequireRole(allowed ...string) func(http.Handler) http
 				return
 			}
 
-			// 2) Signed in but wrong role → 403 semantics
-			if _, has := set[normalize.Role(u.Role)]; !has {
+			// 2) Superadmin always passes - they have access to everything
+			userRole := normalize.Role(u.Role)
+			if userRole == "superadmin" {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// 3) Signed in but wrong role → 403 semantics
+			if _, has := set[userRole]; !has {
 				// HTMX: redirect (so the full page swaps)
 				if r.Header.Get("HX-Request") == "true" {
 					dest := "/forbidden"

@@ -17,6 +17,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/txn"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
@@ -41,7 +42,7 @@ func (h *Handler) ServeNewGroup(w http.ResponseWriter, r *http.Request) {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
-	if role != "admin" && role != "coordinator" && role != "leader" {
+	if role != "superadmin" && role != "admin" && role != "coordinator" && role != "leader" {
 		uierrors.RenderForbidden(w, r, "You do not have access to create groups.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
@@ -53,8 +54,8 @@ func (h *Handler) ServeNewGroup(w http.ResponseWriter, r *http.Request) {
 	var data newGroupData
 	formutil.SetBase(&data.Base, r, h.DB, "Add Group", "/groups")
 
-	if role == "admin" || role == "coordinator" {
-		// Admin/Coordinator: org can be passed via URL query param (optional - can select via picker)
+	if role == "superadmin" || role == "admin" || role == "coordinator" {
+		// SuperAdmin/Admin/Coordinator: org can be passed via URL query param (optional - can select via picker)
 		selectedOrg := normalize.QueryParam(r.URL.Query().Get("org"))
 		if selectedOrg != "" && selectedOrg != "all" {
 			orgID, orgName, err := orgutil.ResolveActiveOrgFromHex(ctx, db, selectedOrg)
@@ -120,7 +121,7 @@ func (h *Handler) HandleCreateGroup(w http.ResponseWriter, r *http.Request) {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
-	if role != "admin" && role != "coordinator" && role != "leader" {
+	if role != "superadmin" && role != "admin" && role != "coordinator" && role != "leader" {
 		uierrors.RenderForbidden(w, r, "You do not have access to create groups.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
@@ -151,7 +152,7 @@ func (h *Handler) HandleCreateGroup(w http.ResponseWriter, r *http.Request) {
 	// Resolve org
 	var orgID primitive.ObjectID
 	var err error
-	if role == "admin" || role == "coordinator" {
+	if role == "superadmin" || role == "admin" || role == "coordinator" {
 		orgHex := normalize.QueryParam(r.FormValue("orgID"))
 		orgID, err = primitive.ObjectIDFromHex(orgHex)
 		if err != nil {
@@ -213,6 +214,7 @@ func (h *Handler) HandleCreateGroup(w http.ResponseWriter, r *http.Request) {
 
 	doc := models.Group{
 		ID:             primitive.NewObjectID(),
+		WorkspaceID:    workspace.IDFromRequest(r),
 		Name:           name,
 		NameCI:         text.Fold(name),
 		Description:    desc,
@@ -281,8 +283,8 @@ func (h *Handler) reRenderNewWithError(w http.ResponseWriter, r *http.Request, d
 	defer cancel()
 	db := h.DB
 
-	if data.Role == "admin" || data.Role == "coordinator" {
-		// Admin/Coordinator: reload the org name if an org was selected
+	if data.Role == "superadmin" || data.Role == "admin" || data.Role == "coordinator" {
+		// SuperAdmin/Admin/Coordinator: reload the org name if an org was selected
 		if data.OrgHex != "" {
 			orgID, err := primitive.ObjectIDFromHex(data.OrgHex)
 			if err == nil {

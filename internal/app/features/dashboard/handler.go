@@ -6,6 +6,7 @@ import (
 	"strings"
 
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )
@@ -26,6 +27,21 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 	role, _, _, ok := authz.UserCtx(r)
 	if !ok {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+
+	// Check workspace context for superadmins
+	// If superadmin is on a workspace subdomain (not apex), show admin dashboard
+	// so they can manage that workspace with the standard admin tools
+	ws := workspace.FromRequest(r)
+	if strings.ToLower(strings.TrimSpace(role)) == "superadmin" {
+		if ws != nil && !ws.IsApex && ws.ID.IsZero() == false {
+			// Superadmin on workspace subdomain - show admin view
+			h.ServeAdmin(w, r)
+			return
+		}
+		// Superadmin on apex domain - show superadmin view
+		h.ServeSuperAdmin(w, r)
 		return
 	}
 

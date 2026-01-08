@@ -4,12 +4,14 @@ package leaders
 import (
 	"context"
 	"maps"
+	"net/http"
 	"strings"
 
 	membershipstore "github.com/dalemusser/stratahub/internal/app/store/memberships"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/text"
 	"go.mongodb.org/mongo-driver/bson"
@@ -22,6 +24,7 @@ import (
 // fetchLeadersList fetches a paginated list of leaders with optional filtering.
 // scopeOrgIDs limits leaders to those in the specified orgs (for coordinators); nil means all orgs.
 func (h *Handler) fetchLeadersList(
+	r *http.Request,
 	ctx context.Context,
 	db *mongo.Database,
 	scopeOrg *primitive.ObjectID,
@@ -31,8 +34,9 @@ func (h *Handler) fetchLeadersList(
 ) (leaderListResult, error) {
 	var result leaderListResult
 
-	// Build base filter
+	// Build base filter with workspace scoping
 	base := bson.M{"role": "leader"}
+	workspace.Filter(r, base)
 	if status == "active" || status == "disabled" {
 		base["status"] = status
 	}

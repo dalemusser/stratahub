@@ -7,6 +7,7 @@ import (
 
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/text"
 	"go.mongodb.org/mongo-driver/bson"
@@ -27,8 +28,10 @@ func (h *Handler) fetchReportOrgPane(
 ) (orgPaneResult, error) {
 	var result orgPaneResult
 
-	// Build base filter for search
+	// Build base filter for search with workspace scoping
 	orgBase := bson.M{}
+	workspace.FilterCtx(ctx, orgBase)
+
 	if orgQ != "" {
 		q := text.Fold(orgQ)
 		hi := q + text.High
@@ -50,6 +53,8 @@ func (h *Handler) fetchReportOrgPane(
 
 	// Count all members (for "All" row), respecting memberStatus and scope
 	allFilter := bson.M{"role": "member"}
+	workspace.FilterCtx(ctx, allFilter)
+
 	if memberStatus == "active" || memberStatus == "disabled" {
 		allFilter["status"] = memberStatus
 	}

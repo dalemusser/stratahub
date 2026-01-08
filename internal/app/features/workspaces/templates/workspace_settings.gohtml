@@ -1,0 +1,206 @@
+{{ define "workspace_settings" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="max-w-2xl mx-auto">
+  <div class="flex items-center mb-6">
+    <a href="/workspaces/{{ .WorkspaceID }}/stats"
+       class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
+       title="Go back">
+      &larr; Back
+    </a>
+    <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Workspace Settings</h1>
+  </div>
+
+  <div class="bg-white dark:bg-gray-800 rounded shadow p-4 mb-4">
+    <p class="text-sm text-gray-600 dark:text-gray-400">
+      Configuring settings for workspace: <strong class="text-gray-900 dark:text-gray-100">{{ .WorkspaceName }}</strong>
+    </p>
+  </div>
+
+  {{ if .Error }}
+    <div class="mb-3 p-2 border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded">
+      {{ .Error }}
+    </div>
+  {{ end }}
+
+  <form method="post" action="/workspaces/{{ .WorkspaceID }}/settings" enctype="multipart/form-data" class="space-y-4 bg-white dark:bg-gray-800 p-4 rounded shadow">
+
+    <div>
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Workspace Name</label>
+      <input name="workspace_name" type="text" value="{{ .WorkspaceName }}" required
+             class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm" />
+      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">The display name for this workspace (shown in the workspace list).</p>
+    </div>
+
+    <div class="border-t dark:border-gray-700 pt-4">
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Site Name</label>
+      <input name="site_name" type="text" value="{{ .SiteName }}" required
+             class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm" />
+      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">This name appears in the menu header for this workspace.</p>
+    </div>
+
+    <div class="border-t dark:border-gray-700 pt-4">
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Logo</label>
+      {{ if .HasLogo }}
+        <div class="mb-3 p-3 bg-gray-50 dark:bg-gray-700 rounded border dark:border-gray-600">
+          <div class="flex items-center gap-4">
+            <img src="{{ .LogoURL }}" alt="Current logo" class="h-12 w-auto rounded">
+            <div class="flex-1">
+              <p class="text-sm text-gray-700 dark:text-gray-300">{{ .LogoName }}</p>
+              <div class="flex gap-3 mt-1">
+                <a href="{{ .LogoURL }}" target="_blank" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">View</a>
+                <a href="{{ .LogoURL }}" download="{{ .LogoName }}" class="text-xs text-indigo-600 dark:text-indigo-400 hover:underline">Download</a>
+              </div>
+            </div>
+          </div>
+          <div class="mt-3 pt-3 border-t dark:border-gray-600">
+            <label class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Replace Logo</label>
+            <input name="logo" type="file" accept="image/*"
+                   class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm">
+            <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Upload a new image to replace the current logo.</p>
+          </div>
+          <div class="mt-3">
+            <label class="flex items-center text-sm text-gray-700 dark:text-gray-300">
+              <input type="checkbox" name="remove_logo" value="1" class="mr-2">
+              Remove logo
+            </label>
+          </div>
+        </div>
+      {{ else }}
+        <input name="logo" type="file" accept="image/*"
+               class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm">
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Upload an image file for this workspace's logo.</p>
+      {{ end }}
+    </div>
+
+    <div class="border-t dark:border-gray-700 pt-4">
+      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Footer HTML</label>
+      <input type="hidden" name="footer_html" id="footer_html" value="{{ .FooterHTML }}">
+      <div class="tiptap-container">
+        <!-- Toolbar -->
+        <div class="tiptap-toolbar" id="editor-toolbar">
+          <button type="button" data-action="bold" title="Bold (Ctrl+B)"><b>B</b></button>
+          <button type="button" data-action="italic" title="Italic (Ctrl+I)"><i>I</i></button>
+          <button type="button" data-action="underline" title="Underline (Ctrl+U)"><u>U</u></button>
+          <button type="button" data-action="strike" title="Strikethrough"><s>S</s></button>
+          <span class="tiptap-toolbar-divider"></span>
+          <button type="button" data-action="heading1" title="Heading 1">H1</button>
+          <button type="button" data-action="heading2" title="Heading 2">H2</button>
+          <button type="button" data-action="heading3" title="Heading 3">H3</button>
+          <button type="button" data-action="paragraph" title="Paragraph">P</button>
+          <span class="tiptap-toolbar-divider"></span>
+          <button type="button" data-action="bulletList" title="Bullet List">&#8226;</button>
+          <button type="button" data-action="orderedList" title="Numbered List">1.</button>
+          <button type="button" data-action="blockquote" title="Quote">"</button>
+          <button type="button" data-action="codeBlock" title="Code Block">&lt;/&gt;</button>
+          <span class="tiptap-toolbar-divider"></span>
+          <button type="button" data-action="link" title="Add Link">&#128279;+</button>
+          <button type="button" data-action="unlink" title="Remove Link">&#128279;&#10005;</button>
+          <span class="tiptap-toolbar-break"></span>
+          <button type="button" data-action="insertTable" title="Insert Table">&#9638;</button>
+          <button type="button" data-action="addColumnBefore" title="Add Column Before">&larr;|</button>
+          <button type="button" data-action="addColumnAfter" title="Add Column After">|&rarr;</button>
+          <button type="button" data-action="deleteColumn" title="Delete Column">|&#10005;</button>
+          <button type="button" data-action="addRowBefore" title="Add Row Above">&uarr;&ndash;</button>
+          <button type="button" data-action="addRowAfter" title="Add Row Below">&darr;&ndash;</button>
+          <button type="button" data-action="deleteRow" title="Delete Row">&ndash;&#10005;</button>
+          <button type="button" data-action="deleteTable" title="Delete Table">&#9638;&#10005;</button>
+          <span class="tiptap-toolbar-divider"></span>
+          <button type="button" data-action="undo" title="Undo (Ctrl+Z)">&#8630;</button>
+          <button type="button" data-action="redo" title="Redo (Ctrl+Y)">&#8631;</button>
+        </div>
+        <!-- Editor -->
+        <div id="editor"></div>
+      </div>
+      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Custom HTML that appears in the footer of every page for this workspace.</p>
+    </div>
+
+    <div class="flex gap-3 pt-4 border-t dark:border-gray-700">
+      <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+        Save Settings
+      </button>
+      <a href="/workspaces/{{ .WorkspaceID }}/stats" class="px-4 py-2 border dark:border-gray-600 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700">
+        Cancel
+      </a>
+    </div>
+  </form>
+</div>
+
+<script src="/assets/js/tiptap.min.js"></script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const initialContent = document.getElementById('footer_html').value || '';
+  const editor = window.TiptapEditor.create('editor', 'footer_html', initialContent);
+
+  if (!editor) return;
+
+  // Toolbar button handlers
+  const toolbar = document.getElementById('editor-toolbar');
+  toolbar.addEventListener('click', function(e) {
+    const btn = e.target.closest('button');
+    if (!btn) return;
+
+    const action = btn.dataset.action;
+    switch(action) {
+      case 'bold': editor.chain().focus().toggleBold().run(); break;
+      case 'italic': editor.chain().focus().toggleItalic().run(); break;
+      case 'underline': editor.chain().focus().toggleUnderline().run(); break;
+      case 'strike': editor.chain().focus().toggleStrike().run(); break;
+      case 'heading1': editor.chain().focus().toggleHeading({ level: 1 }).run(); break;
+      case 'heading2': editor.chain().focus().toggleHeading({ level: 2 }).run(); break;
+      case 'heading3': editor.chain().focus().toggleHeading({ level: 3 }).run(); break;
+      case 'paragraph': editor.chain().focus().setParagraph().run(); break;
+      case 'bulletList': editor.chain().focus().toggleBulletList().run(); break;
+      case 'orderedList': editor.chain().focus().toggleOrderedList().run(); break;
+      case 'blockquote': editor.chain().focus().toggleBlockquote().run(); break;
+      case 'codeBlock': editor.chain().focus().toggleCodeBlock().run(); break;
+      case 'link':
+        const url = prompt('Enter URL:');
+        if (url) editor.chain().focus().setLink({ href: url }).run();
+        break;
+      case 'unlink': editor.chain().focus().unsetLink().run(); break;
+      case 'insertTable': editor.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(); break;
+      case 'addColumnBefore': editor.chain().focus().addColumnBefore().run(); break;
+      case 'addColumnAfter': editor.chain().focus().addColumnAfter().run(); break;
+      case 'deleteColumn': editor.chain().focus().deleteColumn().run(); break;
+      case 'addRowBefore': editor.chain().focus().addRowBefore().run(); break;
+      case 'addRowAfter': editor.chain().focus().addRowAfter().run(); break;
+      case 'deleteRow': editor.chain().focus().deleteRow().run(); break;
+      case 'deleteTable': editor.chain().focus().deleteTable().run(); break;
+      case 'undo': editor.chain().focus().undo().run(); break;
+      case 'redo': editor.chain().focus().redo().run(); break;
+    }
+    updateToolbarState();
+  });
+
+  // Update toolbar button states
+  function updateToolbarState() {
+    toolbar.querySelectorAll('button[data-action]').forEach(btn => {
+      const action = btn.dataset.action;
+      let isActive = false;
+      switch(action) {
+        case 'bold': isActive = editor.isActive('bold'); break;
+        case 'italic': isActive = editor.isActive('italic'); break;
+        case 'underline': isActive = editor.isActive('underline'); break;
+        case 'strike': isActive = editor.isActive('strike'); break;
+        case 'heading1': isActive = editor.isActive('heading', { level: 1 }); break;
+        case 'heading2': isActive = editor.isActive('heading', { level: 2 }); break;
+        case 'heading3': isActive = editor.isActive('heading', { level: 3 }); break;
+        case 'paragraph': isActive = editor.isActive('paragraph'); break;
+        case 'bulletList': isActive = editor.isActive('bulletList'); break;
+        case 'orderedList': isActive = editor.isActive('orderedList'); break;
+        case 'blockquote': isActive = editor.isActive('blockquote'); break;
+        case 'codeBlock': isActive = editor.isActive('codeBlock'); break;
+        case 'link': isActive = editor.isActive('link'); break;
+      }
+      btn.classList.toggle('is-active', isActive);
+    });
+  }
+
+  editor.on('selectionUpdate', updateToolbarState);
+  editor.on('update', updateToolbarState);
+});
+</script>
+{{ end }}

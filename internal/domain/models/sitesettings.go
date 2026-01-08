@@ -7,10 +7,13 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
-// SiteSettings holds site-wide configuration that can be edited by admins.
-// There is only one document in the site_settings collection.
+// SiteSettings holds workspace-specific configuration that can be edited by admins.
+// Each workspace has its own settings document (one document per workspace_id).
 type SiteSettings struct {
 	ID primitive.ObjectID `bson:"_id,omitempty" json:"id,omitempty"`
+
+	// Workspace scoping - each workspace has its own settings
+	WorkspaceID primitive.ObjectID `bson:"workspace_id" json:"workspace_id"`
 
 	// Display settings
 	SiteName string `bson:"site_name" json:"site_name"` // Name shown in menu header

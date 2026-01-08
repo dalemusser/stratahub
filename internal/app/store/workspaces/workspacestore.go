@@ -150,6 +150,29 @@ func (s *Store) GetFirst(ctx context.Context) (models.Workspace, error) {
 	return ws, nil
 }
 
+// EnsureIndexes creates indexes for the workspaces collection.
+func (s *Store) EnsureIndexes(ctx context.Context) error {
+	indexes := []mongo.IndexModel{
+		// Unique subdomain for URL routing
+		{
+			Keys:    bson.D{{Key: "subdomain", Value: 1}},
+			Options: options.Index().SetUnique(true).SetName("idx_workspace_subdomain"),
+		},
+		// Case-insensitive name for sorting
+		{
+			Keys:    bson.D{{Key: "name_ci", Value: 1}},
+			Options: options.Index().SetName("idx_workspace_name_ci"),
+		},
+		// Status filter
+		{
+			Keys:    bson.D{{Key: "status", Value: 1}},
+			Options: options.Index().SetName("idx_workspace_status"),
+		},
+	}
+	_, err := s.c.Indexes().CreateMany(ctx, indexes)
+	return err
+}
+
 // EnsureDefault creates a default workspace if none exists.
 // Returns the existing or newly created workspace.
 func (s *Store) EnsureDefault(ctx context.Context, name, subdomain string) (models.Workspace, error) {

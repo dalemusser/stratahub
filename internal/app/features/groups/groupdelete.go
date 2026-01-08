@@ -14,6 +14,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/txn"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -28,8 +29,8 @@ func (h *Handler) HandleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
-	// Admin and coordinator can delete groups (coordinators are restricted to their orgs via policy check below)
-	if role != "admin" && role != "coordinator" {
+	// SuperAdmin, Admin, and Coordinator can delete groups (coordinators are restricted to their orgs via policy check below)
+	if role != "superadmin" && role != "admin" && role != "coordinator" {
 		uierrors.RenderForbidden(w, r, "You do not have access to delete groups.", httpnav.ResolveBackURL(r, "/groups"))
 		return
 	}
@@ -55,6 +56,13 @@ func (h *Handler) HandleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 		}
 		h.Log.Warn("GetByID(delete)", zap.Error(err))
 		uierrors.RenderForbidden(w, r, "A database error occurred.", httpnav.ResolveBackURL(r, "/groups"))
+		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace deletion)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && group.WorkspaceID != wsID {
+		uierrors.RenderNotFound(w, r, "Group not found.", "/groups")
 		return
 	}
 

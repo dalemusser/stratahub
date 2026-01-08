@@ -1,4 +1,4 @@
-.PHONY: build test test-v test-cover test-store test-handlers test-auth test-safe test-fresh test-e2e test-e2e-setup test-e2e-headed test-e2e-slow css css-watch css-prod clean tidy run help setup setup-tailwind
+.PHONY: build build-linux test test-v test-cover test-store test-handlers test-auth test-safe test-fresh test-e2e test-e2e-setup test-e2e-headed test-e2e-slow css css-watch css-prod clean tidy run help setup setup-tailwind
 
 # Build variables
 BINARY_NAME=stratahub
@@ -11,6 +11,10 @@ all: build
 # Build the application
 build:
 	go build -o $(BUILD_DIR)/$(BINARY_NAME) $(CMD_PATH)
+
+# Build for Linux 386 (production server)
+build-linux:
+	GOOS=linux GOARCH=386 go build -o $(BUILD_DIR)/$(BINARY_NAME)-linux-386 $(CMD_PATH)
 
 # Run the application
 run:
@@ -146,6 +150,7 @@ help:
 	@echo ""
 	@echo "Build & Run:"
 	@echo "  build           - Build the application"
+	@echo "  build-linux     - Build for Linux 386 (production server)"
 	@echo "  run             - Run the application"
 	@echo ""
 	@echo "Testing:"

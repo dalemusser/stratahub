@@ -11,6 +11,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -32,8 +33,10 @@ func (h *AdminHandler) ServeList(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 	db := h.DB
 
-	// Build base filter
+	// Build base filter with workspace scoping
 	base := bson.M{}
+	workspace.Filter(r, base)
+
 	var searchOr []bson.M
 	if lo, hi := text.PrefixRange(q); lo != "" {
 		searchOr = []bson.M{

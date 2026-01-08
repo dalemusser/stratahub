@@ -50,7 +50,7 @@ func (h *Handler) ServeSummary(w http.ResponseWriter, r *http.Request) {
 	var groupMap = make(map[primitive.ObjectID]string)
 
 	switch role {
-	case "admin":
+	case "superadmin", "admin":
 		groups, err := h.fetchAllGroups(ctx, db)
 		if err != nil {
 			h.ErrLog.LogServerError(w, r, "failed to fetch groups", err, "A database error occurred.", "/activity")

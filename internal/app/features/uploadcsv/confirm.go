@@ -15,6 +15,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"go.mongodb.org/mongo-driver/bson"
@@ -30,8 +31,8 @@ func (h *Handler) HandleConfirm(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Only admin, coordinator, and leader can upload
-	if role != "admin" && role != "coordinator" && role != "leader" {
+	// Only superadmin, admin, coordinator, and leader can upload
+	if role != "superadmin" && role != "admin" && role != "coordinator" && role != "leader" {
 		uierrors.RenderForbidden(w, r, "You don't have permission to upload members.", "/")
 		return
 	}
@@ -219,7 +220,9 @@ func (h *Handler) batchFetchUsersByLoginID(ctx context.Context, loginIDs []strin
 		return make(map[string]*models.User), nil
 	}
 
-	cur, err := h.DB.Collection("users").Find(ctx, bson.M{"login_id": bson.M{"$in": loginIDs}})
+	filter := bson.M{"login_id": bson.M{"$in": loginIDs}}
+	workspace.FilterCtx(ctx, filter)
+	cur, err := h.DB.Collection("users").Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}

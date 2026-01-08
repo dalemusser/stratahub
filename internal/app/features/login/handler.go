@@ -13,6 +13,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/store/emailverify"
 	"github.com/dalemusser/stratahub/internal/app/store/sessions"
 	settingsstore "github.com/dalemusser/stratahub/internal/app/store/settings"
+	workspacestore "github.com/dalemusser/stratahub/internal/app/store/workspaces"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/auditlog"
 	"github.com/dalemusser/stratahub/internal/app/system/authutil"
@@ -20,6 +21,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -41,9 +43,14 @@ type Handler struct {
 	Mailer        *mailer.Mailer
 	EmailVerify   *emailverify.Store
 	AuditLog      *auditlog.Logger
-	Sessions      *sessions.Store // Activity session tracking
-	BaseURL       string          // Base URL for magic links (e.g., "https://stratahub.com")
-	GoogleEnabled bool            // True if Google OAuth is configured
+	Sessions      *sessions.Store      // Activity session tracking
+	Workspaces    *workspacestore.Store // Workspace lookups for multi-workspace mode
+	BaseURL       string               // Base URL for magic links (e.g., "https://stratahub.com")
+	GoogleEnabled bool                 // True if Google OAuth is configured
+
+	// Multi-workspace configuration
+	MultiWorkspace bool   // true = subdomain-based workspaces
+	PrimaryDomain  string // Apex domain for redirects (e.g., "adroit.games")
 }
 
 /*─────────────────────────────────────────────────────────────────────────────*
@@ -104,18 +111,35 @@ func formatExpiryDuration(d time.Duration) string {
 	return fmt.Sprintf("%d hours", hours)
 }
 
-func NewHandler(db *mongo.Database, sessionMgr *auth.SessionManager, errLog *uierrors.ErrorLogger, mail *mailer.Mailer, audit *auditlog.Logger, sessStore *sessions.Store, baseURL string, emailVerifyExpiry time.Duration, googleEnabled bool, logger *zap.Logger) *Handler {
+func NewHandler(
+	db *mongo.Database,
+	sessionMgr *auth.SessionManager,
+	errLog *uierrors.ErrorLogger,
+	mail *mailer.Mailer,
+	audit *auditlog.Logger,
+	sessStore *sessions.Store,
+	wsStore *workspacestore.Store,
+	baseURL string,
+	emailVerifyExpiry time.Duration,
+	googleEnabled bool,
+	multiWorkspace bool,
+	primaryDomain string,
+	logger *zap.Logger,
+) *Handler {
 	return &Handler{
-		DB:            db,
-		Log:           logger,
-		SessionMgr:    sessionMgr,
-		ErrLog:        errLog,
-		Mailer:        mail,
-		EmailVerify:   emailverify.New(db, emailVerifyExpiry),
-		AuditLog:      audit,
-		Sessions:      sessStore,
-		BaseURL:       baseURL,
-		GoogleEnabled: googleEnabled,
+		DB:             db,
+		Log:            logger,
+		SessionMgr:     sessionMgr,
+		ErrLog:         errLog,
+		Mailer:         mail,
+		EmailVerify:    emailverify.New(db, emailVerifyExpiry),
+		AuditLog:       audit,
+		Sessions:       sessStore,
+		Workspaces:     wsStore,
+		BaseURL:        baseURL,
+		GoogleEnabled:  googleEnabled,
+		MultiWorkspace: multiWorkspace,
+		PrimaryDomain:  primaryDomain,
 	}
 }
 
@@ -155,6 +179,20 @@ func (h *Handler) HandleLoginPost(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 
+	// Determine workspace ID for user lookup
+	var workspaceID *primitive.ObjectID
+	if h.MultiWorkspace {
+		if ws := workspace.FromRequest(r); ws != nil && !ws.IsApex {
+			workspaceID = &ws.ID
+		}
+	} else if h.Workspaces != nil {
+		// Single workspace mode: get default workspace
+		ws, err := h.Workspaces.GetFirst(ctx)
+		if err == nil {
+			workspaceID = &ws.ID
+		}
+	}
+
 	var u models.User
 	userColl := h.DB.Collection("users")
 
@@ -167,13 +205,21 @@ func (h *Handler) HandleLoginPost(w http.ResponseWriter, r *http.Request) {
 		"status":          1, // needed for disabled check
 	})
 
-	// Fold input for case/diacritic-insensitive matching via login_id_ci index
+	// Build filter with case/diacritic-insensitive login_id matching
 	loginIDCI := text.Fold(loginID)
-	err := userColl.FindOne(
-		ctx,
-		bson.M{"login_id_ci": loginIDCI},
-		proj,
-	).Decode(&u)
+	filter := bson.M{"login_id_ci": loginIDCI}
+
+	// Add workspace filtering if available
+	// Also allow users without workspace_id (superadmins can log in from any workspace)
+	if workspaceID != nil {
+		filter["$or"] = []bson.M{
+			{"workspace_id": *workspaceID},
+			{"workspace_id": bson.M{"$exists": false}},
+			{"workspace_id": nil},
+		}
+	}
+
+	err := userColl.FindOne(ctx, filter, proj).Decode(&u)
 
 	switch err {
 	case mongo.ErrNoDocuments:
@@ -410,11 +456,14 @@ func (h *Handler) createSessionAndRenderMagicSuccess(w http.ResponseWriter, r *h
 	// Get site name for branding
 	siteName := "StrataHub"
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
-	settings, err := settingsstore.New(h.DB).Get(ctx)
-	cancel()
-	if err == nil && settings.SiteName != "" {
-		siteName = settings.SiteName
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID {
+		settings, err := settingsstore.New(h.DB).Get(ctx, wsID)
+		if err == nil && settings.SiteName != "" {
+			siteName = settings.SiteName
+		}
 	}
+	cancel()
 
 	dest := urlutil.SafeReturn(returnURL, "", "/dashboard")
 	templates.Render(w, r, "login_magic_link_success", magicLinkSuccessData{
@@ -752,9 +801,12 @@ func (h *Handler) startEmailFlow(w http.ResponseWriter, r *http.Request, u *mode
 
 	// Get site name from settings
 	siteName := "StrataHub" // default
-	settings, err := settingsstore.New(h.DB).Get(ctx)
-	if err == nil && settings.SiteName != "" {
-		siteName = settings.SiteName
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID {
+		settings, err := settingsstore.New(h.DB).Get(ctx, wsID)
+		if err == nil && settings.SiteName != "" {
+			siteName = settings.SiteName
+		}
 	}
 
 	// Build magic link
@@ -1031,9 +1083,12 @@ func (h *Handler) HandleResendCode(w http.ResponseWriter, r *http.Request) {
 
 	// Get site name from settings
 	siteName := "StrataHub"
-	settings, err := settingsstore.New(h.DB).Get(ctx)
-	if err == nil && settings.SiteName != "" {
-		siteName = settings.SiteName
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID {
+		settings, err := settingsstore.New(h.DB).Get(ctx, wsID)
+		if err == nil && settings.SiteName != "" {
+			siteName = settings.SiteName
+		}
 	}
 
 	// Build magic link

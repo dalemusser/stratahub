@@ -61,7 +61,7 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch leaders list
-	leaders, err := h.fetchLeadersList(ctx, db, scopeOrg, search, status, after, before, start, scopeOrgIDs)
+	leaders, err := h.fetchLeadersList(r, ctx, db, scopeOrg, search, status, after, before, start, scopeOrgIDs)
 	if err != nil {
 		uierrors.RenderServerError(w, r, "A database error occurred.", "/leaders")
 		return

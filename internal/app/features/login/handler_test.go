@@ -34,10 +34,10 @@ func newTestHandler(t *testing.T) (*login.Handler, *testutil.Fixtures) {
 	auditConfig := auditlog.Config{Auth: "all", Admin: "all"}
 	auditLogger := auditlog.New(auditStore, logger, auditConfig)
 
-	// Pass nil for mailer, sessions, and empty baseURL since tests use trust auth (no email needed)
+	// Pass nil for mailer, sessions, workspaces and empty baseURL since tests use trust auth (no email needed)
 	// Use 10 minutes for email verify expiry (the default)
-	// googleEnabled = false for tests (not testing OAuth flow)
-	handler := login.NewHandler(db, sessionMgr, errLog, nil, auditLogger, nil, "http://localhost:3000", 10*time.Minute, false, logger)
+	// googleEnabled = false, multiWorkspace = false for tests (not testing OAuth flow)
+	handler := login.NewHandler(db, sessionMgr, errLog, nil, auditLogger, nil, nil, "http://localhost:3000", 10*time.Minute, false, false, "", logger)
 	fixtures := testutil.NewFixtures(t, db)
 	return handler, fixtures
 }

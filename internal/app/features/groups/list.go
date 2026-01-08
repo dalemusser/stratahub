@@ -12,6 +12,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
@@ -161,7 +162,7 @@ func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// --- build right-side groups table ---
-	groups, shown, total, prevCur, nextCur, hasPrev, hasNext, err := h.fetchGroupsList(ctx, db, selectedOrg, search, after, before, scopeOrgIDs, leaderGroupIDs)
+	groups, shown, total, prevCur, nextCur, hasPrev, hasNext, err := h.fetchGroupsList(ctx, r, db, selectedOrg, search, after, before, scopeOrgIDs, leaderGroupIDs)
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "database error fetching groups list", err, "A database error occurred.", "/groups")
 		return
@@ -210,13 +211,18 @@ func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
 // nil = not a leader (use other filters), non-nil empty = leader with no groups (return empty result).
 func (h *Handler) fetchGroupsList(
 	ctx context.Context,
+	r *http.Request,
 	db *mongo.Database,
 	selectedOrg, search, after, before string,
 	scopeOrgIDs []primitive.ObjectID,
 	leaderGroupIDs []primitive.ObjectID,
 ) ([]groupListItem, int, int64, string, string, bool, bool, error) {
-	// Build filter
+	// Build filter with workspace scoping
 	var filter groupqueries.ListFilter
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID {
+		filter.WorkspaceID = &wsID
+	}
 
 	// Handle leader-specific filtering
 	if leaderGroupIDs != nil {

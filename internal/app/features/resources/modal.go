@@ -26,8 +26,8 @@ func (h *AdminHandler) ServeManageModal(w http.ResponseWriter, r *http.Request) 
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
-	// Admin and coordinator can access; others are forbidden
-	if role != "admin" && role != "coordinator" {
+	// SuperAdmin, Admin, and Coordinator can access; others are forbidden
+	if role != "superadmin" && role != "admin" && role != "coordinator" {
 		uierrors.HTMXForbidden(w, r, "You do not have access to manage resources.", "/resources")
 		return
 	}

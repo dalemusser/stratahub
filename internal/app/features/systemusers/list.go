@@ -10,6 +10,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/dalemusser/waffle/pantry/text"
@@ -46,9 +47,11 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Base filter: system users (admin/analyst/coordinator).
+	// Base filter: system users (admin/analyst/coordinator) with workspace scoping.
 	roleSet := []string{"admin", "analyst", "coordinator"}
 	base := bson.M{"role": bson.M{"$in": roleSet}}
+	workspace.Filter(r, base)
+
 	if status == "active" || status == "disabled" {
 		base["status"] = status
 	}

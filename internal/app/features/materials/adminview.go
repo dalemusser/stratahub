@@ -12,6 +12,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/storage"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -36,6 +37,13 @@ func (h *AdminHandler) ServeView(w http.ResponseWriter, r *http.Request) {
 	matStore := materialstore.New(db)
 	mat, err := matStore.GetByID(ctx, oid)
 	if err != nil {
+		uierrors.RenderNotFound(w, r, "Material not found.", "/materials")
+		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && mat.WorkspaceID != wsID {
 		uierrors.RenderNotFound(w, r, "Material not found.", "/materials")
 		return
 	}
@@ -89,6 +97,15 @@ func (h *AdminHandler) ServeManageModal(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && mat.WorkspaceID != wsID {
+		uierrors.HTMXError(w, r, http.StatusNotFound, "Material not found.", func() {
+			uierrors.RenderNotFound(w, r, "Material not found.", "/materials")
+		})
+		return
+	}
+
 	// Check if user can edit materials (admin or coordinator with permission)
 	canEdit := authz.CanManageMaterials(r)
 
@@ -124,6 +141,13 @@ func (h *AdminHandler) HandleDownload(w http.ResponseWriter, r *http.Request) {
 	matStore := materialstore.New(h.DB)
 	mat, err := matStore.GetByID(ctx, oid)
 	if err != nil {
+		uierrors.RenderNotFound(w, r, "Material not found.", "/materials")
+		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && mat.WorkspaceID != wsID {
 		uierrors.RenderNotFound(w, r, "Material not found.", "/materials")
 		return
 	}

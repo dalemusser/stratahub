@@ -1,0 +1,136 @@
+{{ define "workspace_stats" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="max-w-2xl mx-auto">
+  <div class="flex items-center mb-6">
+    <a href="/workspaces"
+       class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
+       title="Go back">
+      ← Back
+    </a>
+    <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200">Workspace Statistics</h1>
+  </div>
+
+  <div class="bg-white dark:bg-gray-800 rounded shadow p-6 mb-6">
+    <div class="flex items-center justify-between mb-4">
+      <div>
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">{{ .WorkspaceName }}</h2>
+        <p class="text-sm text-gray-500 dark:text-gray-400">
+          <code class="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded">{{ .Subdomain }}</code>
+        </p>
+      </div>
+      <div>
+        {{ if eq .Status "active" }}
+        <span class="px-3 py-1 text-sm rounded bg-green-100 text-green-800 dark:bg-green-800 dark:text-green-100">Active</span>
+        {{ else if eq .Status "suspended" }}
+        <span class="px-3 py-1 text-sm rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-800 dark:text-yellow-100">Suspended</span>
+        {{ else }}
+        <span class="px-3 py-1 text-sm rounded bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">{{ .Status }}</span>
+        {{ end }}
+      </div>
+    </div>
+    <p class="text-sm text-gray-500 dark:text-gray-400">
+      Created: {{ .CreatedAt.Format "January 2, 2006 at 3:04 PM" }}
+    </p>
+  </div>
+
+  <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+    <!-- Totals -->
+    <div class="bg-white dark:bg-gray-800 rounded shadow overflow-hidden">
+      <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+        <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs">
+          <tr>
+            <th class="px-4 py-2" colspan="2">Totals</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+          <tr>
+            <td class="px-4 py-2">Users</td>
+            <td class="px-4 py-2 text-right font-medium">{{ .UserCount }}</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-2">Organizations</td>
+            <td class="px-4 py-2 text-right font-medium">{{ .OrgCount }}</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-2">Groups</td>
+            <td class="px-4 py-2 text-right font-medium">{{ .GroupCount }}</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-2">Resources</td>
+            <td class="px-4 py-2 text-right font-medium">{{ .ResourceCount }}</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-2">Materials</td>
+            <td class="px-4 py-2 text-right font-medium">{{ .MaterialCount }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Users by Role -->
+    <div class="bg-white dark:bg-gray-800 rounded shadow overflow-hidden">
+      <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+        <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs">
+          <tr>
+            <th class="px-4 py-2" colspan="2">Users by Role</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+          <tr>
+            <td class="px-4 py-2">Admins</td>
+            <td class="px-4 py-2 text-right font-medium">{{ .AdminCount }}</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-2">Analysts</td>
+            <td class="px-4 py-2 text-right font-medium">{{ .AnalystCount }}</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-2">Coordinators</td>
+            <td class="px-4 py-2 text-right font-medium">{{ .CoordCount }}</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-2">Leaders</td>
+            <td class="px-4 py-2 text-right font-medium">{{ .LeaderCount }}</td>
+          </tr>
+          <tr>
+            <td class="px-4 py-2">Members</td>
+            <td class="px-4 py-2 text-right font-medium">{{ .MemberCount }}</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="mt-6 flex gap-2">
+    <a href="/workspaces/{{ .WorkspaceID }}/settings"
+       class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+      Settings
+    </a>
+    {{ if eq .Status "active" }}
+    <form method="post" action="/workspaces/{{ .WorkspaceID }}/status">
+      <input type="hidden" name="status" value="suspended">
+      <button type="submit"
+              onclick="return confirm('Suspend this workspace? Users will not be able to access it.')"
+              class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+        Suspend Workspace
+      </button>
+    </form>
+    {{ else if eq .Status "suspended" }}
+    <form method="post" action="/workspaces/{{ .WorkspaceID }}/status">
+      <input type="hidden" name="status" value="active">
+      <button type="submit"
+              class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+        Activate Workspace
+      </button>
+    </form>
+    {{ end }}
+    <a href="/workspaces/{{ .WorkspaceID }}/delete"
+       class="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700">
+      Delete Workspace
+    </a>
+  </div>
+</div>
+{{ end }}

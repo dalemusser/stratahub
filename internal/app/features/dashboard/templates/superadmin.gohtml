@@ -1,0 +1,60 @@
+{{ define "superadmin_dashboard" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="mb-3">
+  <h1 class="text-2xl font-semibold text-gray-800 dark:text-gray-200">SuperAdmin Dashboard</h1>
+  <p class="text-gray-500 dark:text-gray-400 text-sm">Cross-workspace administration</p>
+</div>
+
+<!-- Stats row -->
+<div class="grid grid-cols-1 sm:grid-cols-3 gap-2 mb-4">
+
+  <!-- Workspaces -->
+  <a
+    href="/workspaces"
+    class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center hover:bg-indigo-50 dark:hover:bg-gray-700 transition block"
+  >
+    <div class="text-gray-500 dark:text-gray-400 text-xs">Workspaces</div>
+    <div class="text-indigo-600 dark:text-indigo-400 text-2xl font-bold">{{ .WorkspacesCount }}</div>
+  </a>
+
+  <!-- Total Users -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+    <div class="text-gray-500 dark:text-gray-400 text-xs">Total Users</div>
+    <div class="text-indigo-600 dark:text-indigo-400 text-2xl font-bold">{{ .UsersCount }}</div>
+  </div>
+
+  <!-- Total Organizations -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 text-center">
+    <div class="text-gray-500 dark:text-gray-400 text-xs">Total Organizations</div>
+    <div class="text-indigo-600 dark:text-indigo-400 text-2xl font-bold">{{ .OrgsCount }}</div>
+  </div>
+
+</div>
+
+<!-- Quick Actions -->
+<div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+  <h2 class="text-base font-semibold text-gray-800 dark:text-gray-200 mb-3">Workspace Management</h2>
+
+  <div class="flex flex-wrap gap-2">
+    <a
+      href="/workspaces"
+      class="px-3 py-2 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700 inline-block"
+    >
+      View All Workspaces
+    </a>
+    <a
+      href="/workspaces/new"
+      class="px-3 py-2 bg-green-600 text-white text-sm rounded hover:bg-green-700 inline-block"
+    >
+      Create New Workspace
+    </a>
+  </div>
+
+  <p class="text-sm text-gray-500 dark:text-gray-400 mt-4">
+    To manage a specific workspace, visit the workspace list and click "Visit" to navigate to that workspace.
+  </p>
+</div>
+{{ end }}

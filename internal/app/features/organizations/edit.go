@@ -14,6 +14,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/timezones"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/dalemusser/waffle/pantry/text"
@@ -57,6 +58,13 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 	orgStore := organizationstore.New(db)
 	org, err := orgStore.GetByID(ctx, oid)
 	if err != nil {
+		uierrors.RenderNotFound(w, r, "Organization not found.", "/organizations")
+		return
+	}
+
+	// Verify workspace ownership (prevent cross-workspace access)
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && org.WorkspaceID != wsID {
 		uierrors.RenderNotFound(w, r, "Organization not found.", "/organizations")
 		return
 	}
@@ -123,8 +131,14 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 
 	orgStore := organizationstore.New(db)
 
-	// Ensure the organization exists
-	if _, err := orgStore.GetByID(ctx, oid); err != nil {
+	// Ensure the organization exists and belongs to current workspace
+	existingOrg, err := orgStore.GetByID(ctx, oid)
+	if err != nil {
+		uierrors.RenderNotFound(w, r, "Organization not found.", "/organizations")
+		return
+	}
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID && existingOrg.WorkspaceID != wsID {
 		uierrors.RenderNotFound(w, r, "Organization not found.", "/organizations")
 		return
 	}

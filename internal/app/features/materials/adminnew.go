@@ -13,6 +13,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/inputval"
 	"github.com/dalemusser/stratahub/internal/app/system/navigation"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/urlutil"
 	"go.uber.org/zap"
@@ -147,6 +148,7 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	// Create material via store (handles ID, CI fields, timestamps)
 	matStore := materialstore.New(db)
 	mat := models.Material{
+		WorkspaceID:         workspace.IDFromRequest(r),
 		Title:               title,
 		Subject:             subject,
 		Description:         description,

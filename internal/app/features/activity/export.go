@@ -14,6 +14,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -292,8 +293,9 @@ func (h *Handler) fetchOrgsAndGroups(ctx context.Context, r *http.Request, role,
 	var orgs []orgOption
 	var groups []groupOption
 
-	// Fetch organizations
+	// Fetch organizations with workspace scoping
 	orgFilter := bson.M{}
+	workspace.Filter(r, orgFilter)
 	if role == "coordinator" {
 		// Coordinator sees their assigned orgs
 		orgIDs := authz.UserOrgIDs(r)
@@ -326,8 +328,9 @@ func (h *Handler) fetchOrgsAndGroups(ctx context.Context, r *http.Request, role,
 		}
 	}
 
-	// Fetch groups
+	// Fetch groups with workspace scoping
 	groupFilter := bson.M{}
+	workspace.Filter(r, groupFilter)
 	if selectedOrg != "" {
 		if oid, err := primitive.ObjectIDFromHex(selectedOrg); err == nil {
 			groupFilter["organization_id"] = oid

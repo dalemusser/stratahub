@@ -42,7 +42,7 @@ func CanViewMembersReport(r *http.Request) ReportScope {
 	}
 
 	switch role {
-	case "admin", "analyst":
+	case "superadmin", "admin", "analyst":
 		return ReportScope{CanView: true, AllOrgs: true}
 	case "coordinator":
 		orgIDs := authz.UserOrgIDs(r)

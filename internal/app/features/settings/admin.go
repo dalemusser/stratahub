@@ -15,10 +15,12 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/htmlsanitize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/storage"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/google/uuid"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 )
 
@@ -31,11 +33,19 @@ type settingsVM struct {
 
 // ServeSettings displays the settings form.
 func (h *Handler) ServeSettings(w http.ResponseWriter, r *http.Request) {
+	// Get workspace ID from context
+	wsID := workspace.IDFromRequest(r)
+	if wsID == primitive.NilObjectID {
+		// Superadmin on apex domain - redirect to workspaces management
+		http.Redirect(w, r, "/workspaces", http.StatusSeeOther)
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 
 	store := settingsstore.New(h.DB)
-	settings, err := store.Get(ctx)
+	settings, err := store.Get(ctx, wsID)
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "load settings failed", err, "Failed to load settings.", "/dashboard")
 		return
@@ -52,6 +62,14 @@ func (h *Handler) ServeSettings(w http.ResponseWriter, r *http.Request) {
 
 // HandleSettings processes the settings form submission.
 func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
+	// Get workspace ID from context
+	wsID := workspace.IDFromRequest(r)
+	if wsID == primitive.NilObjectID {
+		// Superadmin on apex domain - redirect to workspaces management
+		http.Redirect(w, r, "/workspaces", http.StatusSeeOther)
+		return
+	}
+
 	// Parse multipart form for file uploads (8MB max for logo)
 	if err := r.ParseMultipartForm(8 << 20); err != nil {
 		h.ErrLog.LogBadRequest(w, r, "parse form failed", err, "Invalid form data.", "/settings")
@@ -64,7 +82,7 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 
 	// Validation
 	if siteName == "" {
-		h.renderWithError(w, r, "Site name is required.")
+		h.renderWithError(w, r, wsID, "Site name is required.")
 		return
 	}
 
@@ -72,7 +90,7 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	defer cancel()
 
 	store := settingsstore.New(h.DB)
-	current, err := store.Get(ctx)
+	current, err := store.Get(ctx, wsID)
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "load settings failed", err, "Failed to load settings.", "/settings")
 		return
@@ -102,7 +120,7 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 		// Validate file type (only images)
 		contentType := header.Header.Get("Content-Type")
 		if !strings.HasPrefix(contentType, "image/") {
-			h.renderWithError(w, r, "Logo must be an image file.")
+			h.renderWithError(w, r, wsID, "Logo must be an image file.")
 			return
 		}
 
@@ -117,7 +135,7 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 		info, err := uploadLogo(ctx, h.Storage, header.Filename, file, header.Size, contentType)
 		if err != nil {
 			h.Log.Error("logo upload failed", zap.Error(err))
-			h.renderWithError(w, r, "Failed to upload logo. Please try again.")
+			h.renderWithError(w, r, wsID, "Failed to upload logo. Please try again.")
 			return
 		}
 		logoPath = info.Path
@@ -137,9 +155,9 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 		UpdatedByName: uname,
 	}
 
-	if err := store.Save(ctx, settings); err != nil {
+	if err := store.Save(ctx, wsID, settings); err != nil {
 		h.Log.Error("failed to save settings", zap.Error(err))
-		h.renderWithError(w, r, "Failed to save settings.")
+		h.renderWithError(w, r, wsID, "Failed to save settings.")
 		return
 	}
 
@@ -150,12 +168,12 @@ func (h *Handler) render(w http.ResponseWriter, r *http.Request, vm settingsVM) 
 	templates.Render(w, r, "settings", vm)
 }
 
-func (h *Handler) renderWithError(w http.ResponseWriter, r *http.Request, errMsg string) {
+func (h *Handler) renderWithError(w http.ResponseWriter, r *http.Request, wsID primitive.ObjectID, errMsg string) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 
 	store := settingsstore.New(h.DB)
-	settings, _ := store.Get(ctx)
+	settings, _ := store.Get(ctx, wsID)
 
 	vm := settingsVM{
 		BaseVM:   viewdata.NewBaseVM(r, h.DB, "Settings", "/dashboard"),

@@ -55,7 +55,7 @@ func (h *Handler) ServeLeaderPicker(w http.ResponseWriter, r *http.Request) {
 		uierrors.RenderUnauthorized(w, r, "/login")
 		return
 	}
-	if role != "admin" && role != "coordinator" && role != "leader" {
+	if role != "superadmin" && role != "admin" && role != "coordinator" && role != "leader" {
 		uierrors.RenderForbidden(w, r, "Access denied.", "/dashboard")
 		return
 	}
