@@ -11,6 +11,12 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
+// Session creation sources
+const (
+	CreatedByLogin     = "login"     // User explicitly logged in
+	CreatedByHeartbeat = "heartbeat" // Session recreated by heartbeat after timeout
+)
+
 // Session tracks a user's login session for activity monitoring.
 type Session struct {
 	ID             primitive.ObjectID  `bson:"_id,omitempty"`
@@ -24,6 +30,9 @@ type Session struct {
 
 	// Current activity
 	CurrentPage string `bson:"current_page,omitempty"` // Current page path the user is viewing
+
+	// How was session created?
+	CreatedBy string `bson:"created_by,omitempty"` // "login" or "heartbeat"
 
 	// How did session end?
 	EndReason string `bson:"end_reason,omitempty"` // "logout", "expired", "inactive", ""
@@ -69,20 +78,59 @@ func (s *Store) EnsureIndexes(ctx context.Context) error {
 	return err
 }
 
-// Create starts a new session for a user login.
-func (s *Store) Create(ctx context.Context, userID primitive.ObjectID, orgID *primitive.ObjectID, ip, userAgent string) (Session, error) {
+// Create starts a new session for a user.
+// It first closes any existing open sessions for the user.
+// The createdBy parameter indicates how the session was created ("login" or "heartbeat").
+func (s *Store) Create(ctx context.Context, userID primitive.ObjectID, orgID *primitive.ObjectID, ip, userAgent, createdBy string) (Session, error) {
 	now := time.Now().UTC()
+
+	// Close any existing open sessions for this user
+	// (sessions without a logout_at timestamp)
+	_, _ = s.c.UpdateMany(ctx,
+		bson.M{
+			"user_id":   userID,
+			"logout_at": nil,
+		},
+		bson.M{
+			"$set": bson.M{
+				"logout_at":  now,
+				"end_reason": "inactive",
+			},
+		},
+	)
+
+	// Calculate duration for closed sessions (separate update to use login_at)
+	cursor, err := s.c.Find(ctx, bson.M{
+		"user_id":       userID,
+		"logout_at":     now,
+		"duration_secs": bson.M{"$exists": false},
+	})
+	if err == nil {
+		defer cursor.Close(ctx)
+		for cursor.Next(ctx) {
+			var sess Session
+			if err := cursor.Decode(&sess); err == nil {
+				duration := int64(now.Sub(sess.LoginAt).Seconds())
+				_, _ = s.c.UpdateOne(ctx,
+					bson.M{"_id": sess.ID},
+					bson.M{"$set": bson.M{"duration_secs": duration}},
+				)
+			}
+		}
+	}
+
 	sess := Session{
 		ID:             primitive.NewObjectID(),
 		UserID:         userID,
 		OrganizationID: orgID,
 		LoginAt:        now,
 		LastActiveAt:   now,
+		CreatedBy:      createdBy,
 		IP:             ip,
 		UserAgent:      userAgent,
 	}
 
-	_, err := s.c.InsertOne(ctx, sess)
+	_, err = s.c.InsertOne(ctx, sess)
 	if err != nil {
 		return Session{}, err
 	}

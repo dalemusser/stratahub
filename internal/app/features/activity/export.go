@@ -63,7 +63,6 @@ func (h *Handler) ServeExport(w http.ResponseWriter, r *http.Request) {
 	_ = userName // used for logging
 
 	totalDurationMins := int(stats.TotalDurationSecs / 60)
-	totalResourceMins := int(stats.TotalResourceSecs / 60)
 
 	data := exportData{
 		BaseVM:        viewdata.NewBaseVM(r, h.DB, "Data Export", "/activity/export"),
@@ -77,9 +76,7 @@ func (h *Handler) ServeExport(w http.ResponseWriter, r *http.Request) {
 		TotalSessions:    stats.TotalSessions,
 		TotalUsers:       stats.TotalUsers,
 		TotalDurationStr: formatMinutes(totalDurationMins),
-		TotalResourceStr: formatMinutes(totalResourceMins),
 		AvgSessionMins:   h.safeDiv(int(stats.TotalDurationSecs/60), stats.TotalSessions),
-		AvgResourceMins:  h.safeDiv(int(stats.TotalResourceSecs/60), stats.TotalUsers),
 		PeakHour:         h.findPeakHour(stats.SessionsByHour),
 		MostActiveDay:    h.findMostActiveDay(stats.SessionsByDay),
 	}
@@ -645,41 +642,6 @@ func (h *Handler) computeAggregateStats(ctx context.Context, scopeFilter bson.M,
 	}
 
 	stats.TotalUsers = len(userSet)
-
-	// Compute total resource time from activity events
-	eventFilter := bson.M{
-		"timestamp":  bson.M{"$gte": startDate, "$lte": endDate},
-		"event_type": "resource_return",
-	}
-	if orgID, ok := scopeFilter["organization_id"]; ok {
-		eventFilter["organization_id"] = orgID
-	}
-	if userIDFilter != nil {
-		eventFilter["user_id"] = userIDFilter
-	}
-
-	eventCur, err := h.DB.Collection("activity_events").Find(ctx, eventFilter)
-	if err != nil {
-		h.Log.Warn("fetch events for stats failed", zap.Error(err))
-		return stats
-	}
-	defer eventCur.Close(ctx)
-
-	for eventCur.Next(ctx) {
-		var e struct {
-			Details map[string]interface{} `bson:"details"`
-		}
-		if err := eventCur.Decode(&e); err != nil {
-			continue
-		}
-		if secs, ok := e.Details["time_away_secs"].(int64); ok {
-			stats.TotalResourceSecs += secs
-		} else if secs, ok := e.Details["time_away_secs"].(int32); ok {
-			stats.TotalResourceSecs += int64(secs)
-		} else if secs, ok := e.Details["time_away_secs"].(float64); ok {
-			stats.TotalResourceSecs += int64(secs)
-		}
-	}
 
 	return stats
 }

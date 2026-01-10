@@ -27,6 +27,9 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 		// Student detail view
 		pr.Get("/member/{memberID}", h.ServeMemberDetail)
 
+		// HTMX partial for refreshing member detail content
+		pr.Get("/member/{memberID}/content", h.ServeMemberDetailContent)
+
 		// HTMX partial for refreshing the online status table
 		pr.Get("/online-table", h.ServeOnlineTable)
 	})

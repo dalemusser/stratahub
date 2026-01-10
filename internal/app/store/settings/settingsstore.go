@@ -53,14 +53,15 @@ func (s *Store) Save(ctx context.Context, workspaceID primitive.ObjectID, settin
 	filter := bson.M{"workspace_id": workspaceID}
 	update := bson.M{
 		"$set": bson.M{
-			"workspace_id":    workspaceID,
-			"site_name":       settings.SiteName,
-			"logo_path":       settings.LogoPath,
-			"logo_name":       settings.LogoName,
-			"footer_html":     settings.FooterHTML,
-			"updated_at":      settings.UpdatedAt,
-			"updated_by_id":   settings.UpdatedByID,
-			"updated_by_name": settings.UpdatedByName,
+			"workspace_id":         workspaceID,
+			"site_name":            settings.SiteName,
+			"logo_path":            settings.LogoPath,
+			"logo_name":            settings.LogoName,
+			"footer_html":          settings.FooterHTML,
+			"enabled_auth_methods": settings.EnabledAuthMethods,
+			"updated_at":           settings.UpdatedAt,
+			"updated_by_id":        settings.UpdatedByID,
+			"updated_by_name":      settings.UpdatedByName,
 		},
 		"$setOnInsert": bson.M{
 			"_id": primitive.NewObjectID(),

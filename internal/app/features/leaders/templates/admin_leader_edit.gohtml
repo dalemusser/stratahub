@@ -18,6 +18,12 @@
   </div>
 {{ end }}
 
+{{ if .AuthMethodDisabled }}
+  <div class="mb-3 p-3 border border-yellow-400 dark:border-yellow-600 bg-yellow-50 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200 rounded max-w-xl">
+    <strong>Warning:</strong> This user's current authentication method ({{ .AuthMethodDisabledLabel }}) is no longer enabled for this workspace. You must select a different auth method to save changes.
+  </div>
+{{ end }}
+
 <!-- Edit form -->
 <form action="/leaders/{{ .ID }}/edit" method="POST" class="space-y-3 max-w-xl bg-white dark:bg-gray-800 p-4 rounded border dark:border-gray-700 mb-6">
   <input type="hidden" name="return" value="{{ .BackURL }}">

@@ -27,11 +27,13 @@ import (
 
 type workspaceSettingsVM struct {
 	viewdata.BaseVM
-	WorkspaceID   string
-	WorkspaceName string
-	HasLogo       bool
-	LogoName      string
-	Error         string
+	WorkspaceID        string
+	WorkspaceName      string
+	HasLogo            bool
+	LogoName           string
+	AllAuthMethods     []models.AuthMethod
+	EnabledAuthMethods map[string]bool
+	Error              string
 }
 
 // ServeSettings displays the settings form for a specific workspace.
@@ -62,12 +64,27 @@ func (h *Handler) ServeSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Build enabled auth methods map for checkbox state
+	enabledMap := make(map[string]bool)
+	if len(settings.EnabledAuthMethods) == 0 {
+		// Default: all methods enabled
+		for _, m := range models.AllAuthMethods {
+			enabledMap[m.Value] = true
+		}
+	} else {
+		for _, m := range settings.EnabledAuthMethods {
+			enabledMap[m] = true
+		}
+	}
+
 	vm := workspaceSettingsVM{
-		BaseVM:        viewdata.NewBaseVM(r, h.DB, "Workspace Settings", "/workspaces"),
-		WorkspaceID:   wsID.Hex(),
-		WorkspaceName: ws.Name,
-		HasLogo:       settings.HasLogo(),
-		LogoName:      settings.LogoName,
+		BaseVM:             viewdata.NewBaseVM(r, h.DB, "Workspace Settings", "/workspaces"),
+		WorkspaceID:        wsID.Hex(),
+		WorkspaceName:      ws.Name,
+		HasLogo:            settings.HasLogo(),
+		LogoName:           settings.LogoName,
+		AllAuthMethods:     models.AllAuthMethods,
+		EnabledAuthMethods: enabledMap,
 	}
 
 	templates.Render(w, r, "workspace_settings", vm)
@@ -92,6 +109,7 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	siteName := strings.TrimSpace(r.FormValue("site_name"))
 	footerHTML := htmlsanitize.Sanitize(strings.TrimSpace(r.FormValue("footer_html")))
 	removeLogo := r.FormValue("remove_logo") != ""
+	authMethods := r.Form["auth_methods"]
 
 	// Validation
 	if workspaceName == "" {
@@ -100,6 +118,10 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if siteName == "" {
 		h.renderSettingsWithError(w, r, wsID, "Site name is required.")
+		return
+	}
+	if len(authMethods) == 0 {
+		h.renderSettingsWithError(w, r, wsID, "At least one authentication method must be selected.")
 		return
 	}
 
@@ -164,12 +186,13 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 
 	// Save settings
 	settings := models.SiteSettings{
-		SiteName:      siteName,
-		LogoPath:      logoPath,
-		LogoName:      logoName,
-		FooterHTML:    footerHTML,
-		UpdatedByID:   &memberID,
-		UpdatedByName: uname,
+		SiteName:           siteName,
+		LogoPath:           logoPath,
+		LogoName:           logoName,
+		FooterHTML:         footerHTML,
+		EnabledAuthMethods: authMethods,
+		UpdatedByID:        &memberID,
+		UpdatedByName:      uname,
 	}
 
 	if err := store.Save(ctx, wsID, settings); err != nil {
@@ -205,13 +228,28 @@ func (h *Handler) renderSettingsWithError(w http.ResponseWriter, r *http.Request
 	store := settingsstore.New(h.DB)
 	settings, _ := store.Get(ctx, wsID)
 
+	// Build enabled auth methods map for checkbox state
+	enabledMap := make(map[string]bool)
+	if len(settings.EnabledAuthMethods) == 0 {
+		// Default: all methods enabled
+		for _, m := range models.AllAuthMethods {
+			enabledMap[m.Value] = true
+		}
+	} else {
+		for _, m := range settings.EnabledAuthMethods {
+			enabledMap[m] = true
+		}
+	}
+
 	vm := workspaceSettingsVM{
-		BaseVM:        viewdata.NewBaseVM(r, h.DB, "Workspace Settings", "/workspaces"),
-		WorkspaceID:   wsID.Hex(),
-		WorkspaceName: ws.Name,
-		HasLogo:       settings.HasLogo(),
-		LogoName:      settings.LogoName,
-		Error:         errMsg,
+		BaseVM:             viewdata.NewBaseVM(r, h.DB, "Workspace Settings", "/workspaces"),
+		WorkspaceID:        wsID.Hex(),
+		WorkspaceName:      ws.Name,
+		HasLogo:            settings.HasLogo(),
+		LogoName:           settings.LogoName,
+		AllAuthMethods:     models.AllAuthMethods,
+		EnabledAuthMethods: enabledMap,
+		Error:              errMsg,
 	}
 
 	templates.Render(w, r, "workspace_settings", vm)

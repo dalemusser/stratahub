@@ -16,6 +16,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
+	"github.com/dalemusser/stratahub/internal/app/system/wsauth"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"go.mongodb.org/mongo-driver/bson"
@@ -183,6 +184,7 @@ func (h *Handler) HandleConfirm(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Show summary
+	enabledMethods := wsauth.GetEnabledAuthMethods(ctx, r, h.DB)
 	summaryData := UploadData{
 		BaseVM:         viewdata.NewBaseVM(r, h.DB, "Upload CSV - Complete", returnURL),
 		OrgHex:         uc.OrgID.Hex(),
@@ -193,7 +195,7 @@ func (h *Handler) HandleConfirm(w http.ResponseWriter, r *http.Request) {
 		GroupName:      uc.GroupName,
 		GroupLocked:    true,
 		ReturnURL:      returnURL,
-		CSVAuthMethods: models.GetEnabledAuthMethodsForCSV(),
+		CSVAuthMethods: models.GetAuthMethodsForCSV(enabledMethods),
 		ShowSummary:    true,
 		Created:        result.Created,
 		Updated:        result.Updated,

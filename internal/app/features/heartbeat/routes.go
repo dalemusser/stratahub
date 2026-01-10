@@ -14,7 +14,6 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 	r.Use(sm.RequireSignedIn)
 
 	r.Post("/", h.ServeHeartbeat)
-	r.Post("/return", h.ServeResourceReturn)
 
 	return r
 }

@@ -82,14 +82,13 @@ type dashboardData struct {
 
 // summaryRow represents a member in the weekly summary view.
 type summaryRow struct {
-	ID              string
-	Name            string
-	Email           string
-	GroupName       string
-	SessionCount    int
-	TotalTimeStr    string // Pre-formatted "Xh Ym" or "X min"
-	ResourceTimeStr string // Pre-formatted "Xh Ym" or "X min"
-	OutsideClass    int    // Sessions at unusual times
+	ID           string
+	Name         string
+	Email        string
+	GroupName    string
+	SessionCount int
+	TotalTimeStr string // Pre-formatted "Xh Ym" or "X min"
+	OutsideClass int    // Sessions at unusual times
 }
 
 // summaryData is the view model for the weekly summary view.
@@ -112,7 +111,6 @@ type activityEvent struct {
 	TimeLabel   string
 	EventType   string
 	Description string
-	Duration    string // For resource_return events
 }
 
 // sessionBlock represents a session in the student detail view.
@@ -170,14 +168,12 @@ type exportData struct {
 	EndDate       string
 
 	// Aggregated stats (for the summary section)
-	TotalSessions     int
-	TotalUsers        int
-	TotalDurationStr  string // Pre-formatted "Xh Ym" or "X min"
-	TotalResourceStr  string // Pre-formatted "Xh Ym" or "X min"
-	AvgSessionMins    int
-	AvgResourceMins   int
-	PeakHour          string
-	MostActiveDay     string
+	TotalSessions    int
+	TotalUsers       int
+	TotalDurationStr string // Pre-formatted "Xh Ym" or "X min"
+	AvgSessionMins   int
+	PeakHour         string
+	MostActiveDay    string
 }
 
 // orgOption represents an organization for the filter dropdown.
@@ -217,7 +213,6 @@ type aggregateStats struct {
 	TotalSessions     int
 	TotalUsers        int
 	TotalDurationSecs int64
-	TotalResourceSecs int64
 	SessionsByHour    map[int]int    // hour -> count
 	SessionsByDay     map[string]int // weekday -> count
 }

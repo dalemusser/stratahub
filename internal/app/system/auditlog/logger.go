@@ -193,6 +193,24 @@ func (l *Logger) LoginFailedUserDisabled(ctx context.Context, r *http.Request, u
 	})
 }
 
+// LoginFailedAuthMethodDisabled logs a failed login due to auth method not enabled for workspace.
+func (l *Logger) LoginFailedAuthMethodDisabled(ctx context.Context, r *http.Request, userID primitive.ObjectID, orgID *primitive.ObjectID, loginID, authMethod string) {
+	l.Log(ctx, audit.Event{
+		Category:       audit.CategoryAuth,
+		EventType:      audit.EventLoginFailedAuthMethodDisabled,
+		UserID:         &userID,
+		OrganizationID: orgID,
+		IP:             getClientIP(r),
+		UserAgent:      r.UserAgent(),
+		Success:        false,
+		FailureReason:  "auth method disabled for workspace",
+		Details: map[string]string{
+			"login_id":    loginID,
+			"auth_method": authMethod,
+		},
+	})
+}
+
 // LoginFailedRateLimit logs a failed login due to rate limiting.
 func (l *Logger) LoginFailedRateLimit(ctx context.Context, r *http.Request, userID primitive.ObjectID, orgID *primitive.ObjectID, loginID, limitType string) {
 	l.Log(ctx, audit.Event{

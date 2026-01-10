@@ -79,8 +79,8 @@ func (h *Handler) ServeHeartbeat(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Record page view event if page changed
-	if result.Updated && req.Page != "" && req.Page != result.PreviousPage && h.Activity != nil {
+	// Record page view event if page changed (but not on first heartbeat when PreviousPage is empty)
+	if result.Updated && req.Page != "" && result.PreviousPage != "" && req.Page != result.PreviousPage && h.Activity != nil {
 		userIDStr, _ := sess.Values["user_id"].(string)
 		if userOID, err := primitive.ObjectIDFromHex(userIDStr); err == nil {
 			// Get optional org ID
@@ -125,7 +125,7 @@ func (h *Handler) ServeHeartbeat(w http.ResponseWriter, r *http.Request) {
 		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
 			ip = xff
 		}
-		newSess, err := h.Sessions.Create(ctx, userOID, orgOID, ip, r.UserAgent())
+		newSess, err := h.Sessions.Create(ctx, userOID, orgOID, ip, r.UserAgent(), sessions.CreatedByHeartbeat)
 		if err != nil {
 			h.Log.Warn("failed to create new activity session after timeout",
 				zap.Error(err),
@@ -144,84 +144,6 @@ func (h *Handler) ServeHeartbeat(w http.ResponseWriter, r *http.Request) {
 		h.Log.Info("created new activity session after inactivity timeout",
 			zap.String("user_id", userIDStr),
 			zap.String("new_session_id", newSess.ID.Hex()))
-	}
-
-	w.WriteHeader(http.StatusOK)
-}
-
-// resourceReturnRequest is the JSON body for the resource return endpoint.
-type resourceReturnRequest struct {
-	ResourceID   string `json:"resource_id"`
-	ResourceName string `json:"resource_name"`
-	TimeAwaySecs int64  `json:"time_away_secs"`
-}
-
-// ServeResourceReturn handles POST /api/heartbeat/return.
-// Records when a user returns from an external resource.
-func (h *Handler) ServeResourceReturn(w http.ResponseWriter, r *http.Request) {
-	// Get activity session ID from the session cookie
-	sess, err := h.SessionMgr.GetSession(r)
-	if err != nil {
-		w.WriteHeader(http.StatusOK) // Silent fail
-		return
-	}
-
-	activitySessionID, ok := sess.Values["activity_session_id"].(string)
-	if !ok || activitySessionID == "" {
-		w.WriteHeader(http.StatusOK) // Silent fail
-		return
-	}
-
-	sessionOID, err := primitive.ObjectIDFromHex(activitySessionID)
-	if err != nil {
-		w.WriteHeader(http.StatusOK) // Silent fail
-		return
-	}
-
-	// Get user ID from session
-	userIDStr, ok := sess.Values["user_id"].(string)
-	if !ok || userIDStr == "" {
-		w.WriteHeader(http.StatusOK) // Silent fail
-		return
-	}
-
-	userOID, err := primitive.ObjectIDFromHex(userIDStr)
-	if err != nil {
-		w.WriteHeader(http.StatusOK) // Silent fail
-		return
-	}
-
-	// Parse request body
-	var req resourceReturnRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		w.WriteHeader(http.StatusOK) // Silent fail
-		return
-	}
-
-	resourceOID, err := primitive.ObjectIDFromHex(req.ResourceID)
-	if err != nil {
-		w.WriteHeader(http.StatusOK) // Silent fail
-		return
-	}
-
-	// Get org ID from session (optional)
-	var orgOID *primitive.ObjectID
-	if orgIDStr, ok := sess.Values["org_id"].(string); ok && orgIDStr != "" {
-		if oid, err := primitive.ObjectIDFromHex(orgIDStr); err == nil {
-			orgOID = &oid
-		}
-	}
-
-	// Record the return event
-	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-	defer cancel()
-
-	if h.Activity != nil {
-		if err := h.Activity.RecordResourceReturn(ctx, userOID, sessionOID, orgOID, resourceOID, req.ResourceName, req.TimeAwaySecs); err != nil {
-			h.Log.Warn("failed to record resource return",
-				zap.Error(err),
-				zap.String("resource_id", req.ResourceID))
-		}
 	}
 
 	w.WriteHeader(http.StatusOK)

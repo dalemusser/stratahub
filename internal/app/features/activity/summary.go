@@ -221,12 +221,6 @@ func (h *Handler) fetchWeeklySummary(ctx context.Context, groupIDs []primitive.O
 		return nil, err
 	}
 
-	// Get resource time for the week
-	resourceTime, err := h.getWeeklyResourceTime(ctx, userIDs, weekStart, weekEnd)
-	if err != nil {
-		return nil, err
-	}
-
 	// Build summary rows
 	var members []summaryRow
 	for _, m := range memberMap {
@@ -239,17 +233,15 @@ func (h *Handler) fetchWeeklySummary(ctx context.Context, groupIDs []primitive.O
 		}
 
 		stats := sessionStats[m.UserID]
-		resTime := resourceTime[m.UserID]
 
 		members = append(members, summaryRow{
-			ID:              m.UserID.Hex(),
-			Name:            m.Name,
-			Email:           m.Email,
-			GroupName:       groupName,
-			SessionCount:    stats.SessionCount,
-			TotalTimeStr:    formatMins(stats.TotalMins),
-			ResourceTimeStr: formatMins(resTime),
-			OutsideClass:    stats.OutsideClass,
+			ID:           m.UserID.Hex(),
+			Name:         m.Name,
+			Email:        m.Email,
+			GroupName:    groupName,
+			SessionCount: stats.SessionCount,
+			TotalTimeStr: formatMins(stats.TotalMins),
+			OutsideClass: stats.OutsideClass,
 		})
 	}
 
@@ -339,49 +331,6 @@ func (h *Handler) getWeeklySessionStats(ctx context.Context, userIDs []primitive
 			TotalMins:    int(doc.TotalMins),
 			OutsideClass: doc.OutsideClass,
 		}
-	}
-
-	return result, nil
-}
-
-// getWeeklyResourceTime calculates time spent in resources for users in a week.
-func (h *Handler) getWeeklyResourceTime(ctx context.Context, userIDs []primitive.ObjectID, weekStart, weekEnd time.Time) (map[primitive.ObjectID]int, error) {
-	if len(userIDs) == 0 || h.Activity == nil {
-		return nil, nil
-	}
-
-	// Sum time_away_secs from resource_return events
-	pipeline := []bson.M{
-		{"$match": bson.M{
-			"user_id":    bson.M{"$in": userIDs},
-			"event_type": "resource_return",
-			"timestamp": bson.M{
-				"$gte": weekStart,
-				"$lt":  weekEnd,
-			},
-		}},
-		{"$group": bson.M{
-			"_id":        "$user_id",
-			"total_secs": bson.M{"$sum": "$details.time_away_secs"},
-		}},
-	}
-
-	cur, err := h.DB.Collection("activity_events").Aggregate(ctx, pipeline)
-	if err != nil {
-		return nil, err
-	}
-	defer cur.Close(ctx)
-
-	result := make(map[primitive.ObjectID]int)
-	for cur.Next(ctx) {
-		var doc struct {
-			ID        primitive.ObjectID `bson:"_id"`
-			TotalSecs int64              `bson:"total_secs"`
-		}
-		if err := cur.Decode(&doc); err != nil {
-			return nil, err
-		}
-		result[doc.ID] = int(doc.TotalSecs / 60)
 	}
 
 	return result, nil

@@ -22,6 +22,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
+	"github.com/dalemusser/stratahub/internal/app/system/wsauth"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -248,10 +249,26 @@ func (h *Handler) HandleLoginPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	/*── check auth method and route accordingly ────────────────────────────*/
+	/*── check auth method is enabled for this workspace ────────────────────*/
+
+	authMethod := normalize.AuthMethod(u.AuthMethod)
+
+	// SuperAdmins are exempt from workspace auth method restrictions
+	// (they can log in to any workspace using any globally valid auth method)
+	if normalize.Role(u.Role) != "superadmin" && !wsauth.IsAuthMethodEnabled(ctx, r, h.DB, authMethod) {
+		h.AuditLog.LoginFailedAuthMethodDisabled(ctx, r, u.ID, u.OrganizationID, loginID, authMethod)
+		h.renderFormWithError(
+			w,
+			r,
+			"Your authentication method is not available for this workspace. Please contact an administrator.",
+			loginID,
+		)
+		return
+	}
+
+	/*── route to appropriate auth flow ─────────────────────────────────────*/
 
 	ret := strings.TrimSpace(r.FormValue("return"))
-	authMethod := normalize.AuthMethod(u.AuthMethod)
 
 	switch authMethod {
 	case "trust":
@@ -321,7 +338,7 @@ func (h *Handler) createSessionAndRedirect(w http.ResponseWriter, r *http.Reques
 		defer cancel()
 
 		ip := extractIP(r)
-		activitySess, err := h.Sessions.Create(ctx, u.ID, u.OrganizationID, ip, r.UserAgent())
+		activitySess, err := h.Sessions.Create(ctx, u.ID, u.OrganizationID, ip, r.UserAgent(), sessions.CreatedByLogin)
 		if err != nil {
 			h.Log.Warn("failed to create activity session", zap.Error(err), zap.String("user_id", u.ID.Hex()))
 		} else {
@@ -420,7 +437,7 @@ func (h *Handler) createSessionAndRenderMagicSuccess(w http.ResponseWriter, r *h
 		defer cancel()
 
 		ip := extractIP(r)
-		activitySess, err := h.Sessions.Create(ctx, u.ID, u.OrganizationID, ip, r.UserAgent())
+		activitySess, err := h.Sessions.Create(ctx, u.ID, u.OrganizationID, ip, r.UserAgent(), sessions.CreatedByLogin)
 		if err != nil {
 			h.Log.Warn("failed to create activity session", zap.Error(err), zap.String("user_id", u.ID.Hex()))
 		} else {

@@ -130,7 +130,11 @@
             <div class="truncate text-xs" title="{{ .EventType }}">{{ .EventType }}</div>
           </td>
           <td class="px-2 py-2 align-middle">
+            {{ if .ActorName }}
             <div class="truncate" title="{{ .ActorName }}">{{ .ActorName }}</div>
+            {{ else if index .Details "attempted_login_id" }}
+            <div class="truncate text-gray-500 dark:text-gray-400 italic" title="{{ index .Details "attempted_login_id" }} (not found)">{{ index .Details "attempted_login_id" }}</div>
+            {{ end }}
           </td>
           <td class="px-2 py-2 align-middle">
             <div class="truncate" title="{{ .TargetName }}">{{ .TargetName }}</div>

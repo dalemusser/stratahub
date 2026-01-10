@@ -39,17 +39,6 @@
 
 <!-- Filters -->
 <div class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-1 flex flex-wrap items-center gap-4">
-  <!-- Refresh controls -->
-  <div class="flex items-center gap-2 mr-2">
-    <button id="refresh-btn"
-            type="button"
-            class="text-sm px-2 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
-            title="Refresh now">
-      Refresh
-    </button>
-    <span id="countdown" class="text-xs text-gray-500 dark:text-gray-400 w-8 text-center">30s</span>
-  </div>
-
   <input id="search-filter"
          type="text"
          name="search"
@@ -94,6 +83,17 @@
       <option value="idle" {{ if eq .StatusFilter "idle" }}selected{{ end }}>Idle</option>
       <option value="offline" {{ if eq .StatusFilter "offline" }}selected{{ end }}>Offline</option>
     </select>
+  </div>
+
+  <!-- Refresh controls -->
+  <div class="flex items-center gap-2 ml-auto">
+    <button id="refresh-btn"
+            type="button"
+            class="text-sm px-2 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+            title="Refresh now">
+      Refresh
+    </button>
+    <span id="countdown" class="text-xs text-gray-500 dark:text-gray-400 w-8 text-center">30s</span>
   </div>
 </div>
 

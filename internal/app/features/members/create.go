@@ -20,6 +20,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/status"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
+	"github.com/dalemusser/stratahub/internal/app/system/wsauth"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
@@ -49,7 +50,7 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 
 	selectedOrg := normalize.QueryParam(r.URL.Query().Get("org"))
 	data := newData{
-		AuthMethods: models.EnabledAuthMethods,
+		AuthMethods: wsauth.GetEnabledAuthMethods(ctx, r, db),
 		Auth:        "trust",
 		Status:      status.Active,
 	}
@@ -270,13 +271,13 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 
 // Helper to re-render form with an inline error message and keep org options for admins.
 func (h *Handler) reRenderNewWithError(w http.ResponseWriter, r *http.Request, data newData, msg string) {
-	formutil.SetBase(&data.Base, r, h.DB, "Add Member", "/members")
-	data.AuthMethods = models.EnabledAuthMethods
-	data.SetError(msg)
-
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 	db := h.DB
+
+	formutil.SetBase(&data.Base, r, db, "Add Member", "/members")
+	data.AuthMethods = wsauth.GetEnabledAuthMethods(ctx, r, db)
+	data.SetError(msg)
 
 	// Org is always locked now, populate OrgName so the template shows the name
 	if data.OrgHex != "" {
