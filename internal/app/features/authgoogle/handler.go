@@ -446,7 +446,7 @@ func (h *Handler) createSessionAndRedirect(w http.ResponseWriter, r *http.Reques
 		defer cancel()
 
 		ip := extractIP(r)
-		activitySess, err := h.Sessions.Create(ctx, u.ID, u.OrganizationID, ip, r.UserAgent())
+		activitySess, err := h.Sessions.Create(ctx, u.ID, u.OrganizationID, ip, r.UserAgent(), sessions.CreatedByLogin)
 		if err != nil {
 			h.Log.Warn("failed to create activity session", zap.Error(err), zap.String("user_id", u.ID.Hex()))
 		} else {

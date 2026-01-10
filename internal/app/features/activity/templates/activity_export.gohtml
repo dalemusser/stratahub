@@ -57,7 +57,7 @@
 </div>
 
 <!-- Aggregated Stats -->
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+<div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
   <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
     <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Total Sessions</p>
     <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ .TotalSessions }}</p>
@@ -71,19 +71,8 @@
     <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ .TotalDurationStr }}</p>
   </div>
   <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-    <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Resource Time</p>
-    <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ .TotalResourceStr }}</p>
-  </div>
-</div>
-
-<div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-  <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
     <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Avg Session</p>
     <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ .AvgSessionMins }} min</p>
-  </div>
-  <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
-    <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Avg Resource/User</p>
-    <p class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ .AvgResourceMins }} min</p>
   </div>
   <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-4">
     <p class="text-xs uppercase tracking-wide text-gray-500 dark:text-gray-400 mb-1">Peak Hour</p>
@@ -128,7 +117,7 @@
     <div class="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
       <h4 class="font-medium text-gray-900 dark:text-gray-100 mb-2">Activity Events</h4>
       <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">
-        Resource launches, returns, and time-on-resource data.
+        Resource launches and page view events.
       </p>
       <div class="flex gap-2">
         <a href="/activity/export/events.csv?org={{ .SelectedOrg }}&group={{ .SelectedGroup }}&start={{ .StartDate }}&end={{ .EndDate }}"
@@ -183,7 +172,7 @@
           <tr><td class="py-1 text-gray-500 dark:text-gray-400">user_name</td><td class="py-1 text-gray-700 dark:text-gray-300">User's full name</td></tr>
           <tr><td class="py-1 text-gray-500 dark:text-gray-400">session_id</td><td class="py-1 text-gray-700 dark:text-gray-300">Associated session ID</td></tr>
           <tr><td class="py-1 text-gray-500 dark:text-gray-400">timestamp</td><td class="py-1 text-gray-700 dark:text-gray-300">Event timestamp (ISO 8601)</td></tr>
-          <tr><td class="py-1 text-gray-500 dark:text-gray-400">event_type</td><td class="py-1 text-gray-700 dark:text-gray-300">resource_launch or resource_return</td></tr>
+          <tr><td class="py-1 text-gray-500 dark:text-gray-400">event_type</td><td class="py-1 text-gray-700 dark:text-gray-300">resource_launch, resource_view, or page_view</td></tr>
           <tr><td class="py-1 text-gray-500 dark:text-gray-400">resource_name</td><td class="py-1 text-gray-700 dark:text-gray-300">Name of the resource</td></tr>
           <tr><td class="py-1 text-gray-500 dark:text-gray-400">details</td><td class="py-1 text-gray-700 dark:text-gray-300">JSON object with additional data</td></tr>
         </tbody>

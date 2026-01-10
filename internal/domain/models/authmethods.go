@@ -87,12 +87,17 @@ type EnabledAuthMethodsForCSV struct {
 
 // GetEnabledAuthMethodsForCSV returns enabled auth methods grouped by CSV format category.
 func GetEnabledAuthMethodsForCSV() EnabledAuthMethodsForCSV {
+	return GetAuthMethodsForCSV(EnabledAuthMethods)
+}
+
+// GetAuthMethodsForCSV returns auth methods grouped by CSV format category for a given list.
+func GetAuthMethodsForCSV(methods []AuthMethod) EnabledAuthMethodsForCSV {
 	result := EnabledAuthMethodsForCSV{}
 
 	emailLoginSet := map[string]bool{"email": true, "google": true, "microsoft": true}
 	ssoSet := map[string]bool{"clever": true, "classlink": true, "schoology": true}
 
-	for _, m := range EnabledAuthMethods {
+	for _, m := range methods {
 		if emailLoginSet[m.Value] {
 			result.EmailLoginMethods = append(result.EmailLoginMethods, m.Value)
 		} else if m.Value == "password" {

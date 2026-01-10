@@ -17,6 +17,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
+	"github.com/dalemusser/stratahub/internal/app/system/wsauth"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -69,7 +70,7 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 
 	var data newData
 	formutil.SetBase(&data.Base, r, h.DB, "New Leader", "/leaders")
-	data.AuthMethods = models.EnabledAuthMethods
+	data.AuthMethods = wsauth.GetEnabledAuthMethods(ctx, r, h.DB)
 	data.Auth = "trust" // default auth method
 
 	// Org can be passed via URL param (optional - can select via picker)
@@ -230,7 +231,7 @@ func (h *Handler) renderNewWithError(w http.ResponseWriter, r *http.Request, msg
 
 	var data newData
 	formutil.SetBase(&data.Base, r, h.DB, "New Leader", "/leaders")
-	data.AuthMethods = models.EnabledAuthMethods
+	data.AuthMethods = wsauth.GetEnabledAuthMethods(ctx, r, h.DB)
 	data.SetError(msg)
 
 	if len(echo) > 0 {

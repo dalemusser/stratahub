@@ -15,6 +15,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
+	"github.com/dalemusser/stratahub/internal/app/system/wsauth"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/query"
@@ -79,6 +80,9 @@ func (h *Handler) ServeUploadCSV(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Get workspace-specific enabled auth methods
+	enabledMethods := wsauth.GetEnabledAuthMethods(ctx, r, h.DB)
+
 	data := UploadData{
 		BaseVM:         viewdata.NewBaseVM(r, h.DB, "Upload CSV", returnURL),
 		OrgHex:         uc.OrgID.Hex(),
@@ -89,7 +93,7 @@ func (h *Handler) ServeUploadCSV(w http.ResponseWriter, r *http.Request) {
 		GroupName:      uc.GroupName,
 		GroupLocked:    uc.GroupLocked,
 		ReturnURL:      returnURL,
-		CSVAuthMethods: models.GetEnabledAuthMethodsForCSV(),
+		CSVAuthMethods: models.GetAuthMethodsForCSV(enabledMethods),
 	}
 
 	// Clear hex if ID is nil
@@ -198,6 +202,10 @@ func (h *Handler) HandleUploadCSV(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get workspace-specific enabled auth methods
+	enabledMethods := wsauth.GetEnabledAuthMethods(ctx, r, h.DB)
+	enabledMethodMap := wsauth.GetEnabledAuthMethodMap(ctx, r, h.DB)
+
 	// Helper to render error on the form
 	renderFormError := func(errHTML interface{}) {
 		data := UploadData{
@@ -210,7 +218,7 @@ func (h *Handler) HandleUploadCSV(w http.ResponseWriter, r *http.Request) {
 			GroupName:      uc.GroupName,
 			GroupLocked:    uc.GroupLocked,
 			ReturnURL:      returnURL,
-			CSVAuthMethods: models.GetEnabledAuthMethodsForCSV(),
+			CSVAuthMethods: models.GetAuthMethodsForCSV(enabledMethods),
 		}
 		if uc.GroupID == primitive.NilObjectID {
 			data.GroupID = ""
@@ -235,6 +243,21 @@ func (h *Handler) HandleUploadCSV(w http.ResponseWriter, r *http.Request) {
 	// Check for empty file
 	if len(parsed.Members) == 0 {
 		renderFormError("CSV file contains no valid members.")
+		return
+	}
+
+	// Validate auth methods against workspace-enabled methods
+	var authMethodErrors []csvutil.RowError
+	for i, m := range parsed.Members {
+		if !enabledMethodMap[m.AuthMethod] {
+			authMethodErrors = append(authMethodErrors, csvutil.RowError{
+				Line:   i + 2, // +2 for 1-based and header row
+				Reason: "auth method '" + m.AuthMethod + "' is not enabled for this workspace",
+			})
+		}
+	}
+	if len(authMethodErrors) > 0 {
+		renderFormError(authMethodErrors)
 		return
 	}
 
@@ -381,7 +404,7 @@ func (h *Handler) HandleUploadCSV(w http.ResponseWriter, r *http.Request) {
 		GroupName:      uc.GroupName,
 		GroupLocked:    true, // Always locked in preview
 		ReturnURL:      returnURL,
-		CSVAuthMethods: models.GetEnabledAuthMethodsForCSV(),
+		CSVAuthMethods: models.GetAuthMethodsForCSV(enabledMethods),
 		ShowPreview:    true,
 		PreviewRows:    previewRows,
 		PreviewJSON:    string(previewJSON),

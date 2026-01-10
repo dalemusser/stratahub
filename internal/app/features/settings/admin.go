@@ -26,9 +26,12 @@ import (
 
 type settingsVM struct {
 	viewdata.BaseVM
-	HasLogo  bool
-	LogoName string
-	Error    string
+	HasLogo            bool
+	LogoName           string
+	AllAuthMethods     []models.AuthMethod
+	EnabledAuthMethods map[string]bool
+	CurrentUserMethod  string // Current user's auth method (for protection)
+	Error              string
 }
 
 // ServeSettings displays the settings form.
@@ -38,6 +41,12 @@ func (h *Handler) ServeSettings(w http.ResponseWriter, r *http.Request) {
 	if wsID == primitive.NilObjectID {
 		// Superadmin on apex domain - redirect to workspaces management
 		http.Redirect(w, r, "/workspaces", http.StatusSeeOther)
+		return
+	}
+
+	_, _, userID, ok := authz.UserCtx(r)
+	if !ok {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
 
@@ -51,10 +60,35 @@ func (h *Handler) ServeSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get current user's auth method for protection
+	var currentUserMethod string
+	var user struct {
+		AuthMethod string `bson:"auth_method"`
+	}
+	if err := h.DB.Collection("users").FindOne(ctx, map[string]interface{}{"_id": userID}).Decode(&user); err == nil {
+		currentUserMethod = user.AuthMethod
+	}
+
+	// Build enabled auth methods map for checkbox state
+	enabledMap := make(map[string]bool)
+	if len(settings.EnabledAuthMethods) == 0 {
+		// Default: all methods enabled
+		for _, m := range models.AllAuthMethods {
+			enabledMap[m.Value] = true
+		}
+	} else {
+		for _, m := range settings.EnabledAuthMethods {
+			enabledMap[m] = true
+		}
+	}
+
 	vm := settingsVM{
-		BaseVM:   viewdata.NewBaseVM(r, h.DB, "Settings", "/dashboard"),
-		HasLogo:  settings.HasLogo(),
-		LogoName: settings.LogoName,
+		BaseVM:             viewdata.NewBaseVM(r, h.DB, "Settings", "/dashboard"),
+		HasLogo:            settings.HasLogo(),
+		LogoName:           settings.LogoName,
+		AllAuthMethods:     models.AllAuthMethods,
+		EnabledAuthMethods: enabledMap,
+		CurrentUserMethod:  currentUserMethod,
 	}
 
 	h.render(w, r, vm)
@@ -79,15 +113,45 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	siteName := strings.TrimSpace(r.FormValue("site_name"))
 	footerHTML := htmlsanitize.Sanitize(strings.TrimSpace(r.FormValue("footer_html")))
 	removeLogo := r.FormValue("remove_logo") != ""
+	authMethods := r.Form["auth_methods"]
 
 	// Validation
 	if siteName == "" {
 		h.renderWithError(w, r, wsID, "Site name is required.")
 		return
 	}
+	if len(authMethods) == 0 {
+		h.renderWithError(w, r, wsID, "At least one authentication method must be selected.")
+		return
+	}
+
+	// Get current user's auth method for protection check
+	_, _, userID, _ := authz.UserCtx(r)
 
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Long())
 	defer cancel()
+
+	// Check if current user's auth method is in the selected list
+	var currentUserMethod string
+	var user struct {
+		AuthMethod string `bson:"auth_method"`
+	}
+	if err := h.DB.Collection("users").FindOne(ctx, map[string]interface{}{"_id": userID}).Decode(&user); err == nil {
+		currentUserMethod = user.AuthMethod
+	}
+	if currentUserMethod != "" {
+		found := false
+		for _, m := range authMethods {
+			if m == currentUserMethod {
+				found = true
+				break
+			}
+		}
+		if !found {
+			h.renderWithError(w, r, wsID, "You cannot disable the authentication method you are currently using.")
+			return
+		}
+	}
 
 	store := settingsstore.New(h.DB)
 	current, err := store.Get(ctx, wsID)
@@ -147,12 +211,13 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 
 	// Save settings
 	settings := models.SiteSettings{
-		SiteName:      siteName,
-		LogoPath:      logoPath,
-		LogoName:      logoName,
-		FooterHTML:    footerHTML,
-		UpdatedByID:   &memberID,
-		UpdatedByName: uname,
+		SiteName:           siteName,
+		LogoPath:           logoPath,
+		LogoName:           logoName,
+		FooterHTML:         footerHTML,
+		EnabledAuthMethods: authMethods,
+		UpdatedByID:        &memberID,
+		UpdatedByName:      uname,
 	}
 
 	if err := store.Save(ctx, wsID, settings); err != nil {
@@ -172,14 +237,41 @@ func (h *Handler) renderWithError(w http.ResponseWriter, r *http.Request, wsID p
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 
+	_, _, userID, _ := authz.UserCtx(r)
+
 	store := settingsstore.New(h.DB)
 	settings, _ := store.Get(ctx, wsID)
 
+	// Get current user's auth method for protection
+	var currentUserMethod string
+	var user struct {
+		AuthMethod string `bson:"auth_method"`
+	}
+	if err := h.DB.Collection("users").FindOne(ctx, map[string]interface{}{"_id": userID}).Decode(&user); err == nil {
+		currentUserMethod = user.AuthMethod
+	}
+
+	// Build enabled auth methods map for checkbox state
+	enabledMap := make(map[string]bool)
+	if len(settings.EnabledAuthMethods) == 0 {
+		// Default: all methods enabled
+		for _, m := range models.AllAuthMethods {
+			enabledMap[m.Value] = true
+		}
+	} else {
+		for _, m := range settings.EnabledAuthMethods {
+			enabledMap[m] = true
+		}
+	}
+
 	vm := settingsVM{
-		BaseVM:   viewdata.NewBaseVM(r, h.DB, "Settings", "/dashboard"),
-		HasLogo:  settings.HasLogo(),
-		LogoName: settings.LogoName,
-		Error:    errMsg,
+		BaseVM:             viewdata.NewBaseVM(r, h.DB, "Settings", "/dashboard"),
+		HasLogo:            settings.HasLogo(),
+		LogoName:           settings.LogoName,
+		AllAuthMethods:     models.AllAuthMethods,
+		EnabledAuthMethods: enabledMap,
+		CurrentUserMethod:  currentUserMethod,
+		Error:              errMsg,
 	}
 
 	h.render(w, r, vm)

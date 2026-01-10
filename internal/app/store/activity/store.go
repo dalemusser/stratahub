@@ -14,7 +14,6 @@ import (
 // Event types for activity tracking.
 const (
 	EventResourceLaunch = "resource_launch" // User launched/opened a resource
-	EventResourceReturn = "resource_return" // User returned from a resource
 	EventResourceView   = "resource_view"   // User viewed resource detail page
 	EventPageView       = "page_view"       // User viewed a page
 )
@@ -98,25 +97,6 @@ func (s *Store) RecordResourceLaunch(ctx context.Context, userID, sessionID prim
 		EventType:      EventResourceLaunch,
 		ResourceID:     &resourceID,
 		ResourceName:   resourceName,
-	}
-	_, err := s.c.InsertOne(ctx, event)
-	return err
-}
-
-// RecordResourceReturn records when a user returns from a resource.
-func (s *Store) RecordResourceReturn(ctx context.Context, userID, sessionID primitive.ObjectID, orgID *primitive.ObjectID, resourceID primitive.ObjectID, resourceName string, timeAwaySecs int64) error {
-	event := Event{
-		ID:             primitive.NewObjectID(),
-		UserID:         userID,
-		SessionID:      sessionID,
-		OrganizationID: orgID,
-		Timestamp:      time.Now().UTC(),
-		EventType:      EventResourceReturn,
-		ResourceID:     &resourceID,
-		ResourceName:   resourceName,
-		Details: map[string]any{
-			"time_away_secs": timeAwaySecs,
-		},
 	}
 	_, err := s.c.InsertOne(ctx, event)
 	return err

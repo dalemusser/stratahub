@@ -119,6 +119,10 @@ type editData struct {
 	Status  string
 
 	IsEdit bool // true for edit forms
+
+	// Legacy method warning: shown when user's current auth method is disabled for workspace
+	AuthMethodDisabled      bool
+	AuthMethodDisabledLabel string
 }
 
 // Template helper methods for auth field visibility

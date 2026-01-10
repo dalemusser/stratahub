@@ -1,6 +1,6 @@
-# Activity Tracking Plan
+# Activity Tracking
 
-This document describes the plan for implementing user activity tracking in StrataHub to support teacher visibility into student engagement and researcher data collection.
+This document describes the user activity tracking system in StrataHub that supports teacher visibility into student engagement and researcher data collection.
 
 ## Overview
 
@@ -80,7 +80,7 @@ type ActivityEvent struct {
 | Event Type | When | Details |
 |------------|------|---------|
 | `resource_launch` | User clicks to launch a game/resource | `resource_id`, `resource_name` |
-| `resource_return` | User returns from external resource | `resource_id`, `time_away_secs` |
+| `resource_view` | User views a resource detail page | `resource_id`, `resource_name` |
 | `page_view` | User navigates to a page | `page_path` |
 
 ### Indexes
@@ -108,23 +108,29 @@ type ActivityEvent struct {
 - Track "last active" time for online status
 - Detect browser close/tab close (session abandonment)
 - Efficient: only stores latest timestamp, not every heartbeat
+- Record page views when user navigates
 
 ### Implementation
 
-Browser-side (JavaScript):
+Browser-side (JavaScript in layout template):
 ```javascript
 // Send heartbeat every 60 seconds while page is open
 setInterval(function() {
-    fetch('/api/heartbeat', { method: 'POST', credentials: 'same-origin' });
+    fetch('/api/heartbeat', {
+        method: 'POST',
+        credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ page: window.location.pathname })
+    });
 }, 60000);
 ```
 
 Server-side:
 ```go
 // POST /api/heartbeat
-func (h *Handler) Heartbeat(w http.ResponseWriter, r *http.Request) {
+func (h *Handler) ServeHeartbeat(w http.ResponseWriter, r *http.Request) {
     // Update session.LastActiveAt = time.Now()
-    // No new record created - just update existing session
+    // Record page_view event if page changed since last heartbeat
 }
 ```
 
@@ -165,7 +171,7 @@ Background job (or lazy evaluation) closes stale sessions:
 
 ## Teacher Dashboard
 
-### "My Class Right Now" View
+### Real-Time Dashboard View
 
 Real-time view of current class status:
 
@@ -188,32 +194,31 @@ Real-time view of current class status:
 - ⚪ Offline: No active session or heartbeat > 10 minutes
 
 **Current Activity:**
-- Shows most recent `resource_launch` event if in a resource
+- Shows most recent `resource_launch` event if user launched a resource
 - Shows "Dashboard" or page name otherwise
 
-### "Weekly Summary" View
+### Weekly Summary View
 
 Aggregated view of student activity:
 
 ```
 ┌──────────────────────────────────────────────────────────────────────┐
 │ Week of Jan 13, 2025                                                 │
-├───────────────┬──────────┬────────────┬───────────────┬──────────────┤
-│ Student       │ Sessions │ Total Time │ Resource Time │ Outside Class│
-├───────────────┼──────────┼────────────┼───────────────┼──────────────┤
-│ Alice B.      │ 5        │ 2h 15m     │ 1h 45m        │ 3 sessions   │
-│ Bob C.        │ 4        │ 1h 50m     │ 1h 20m        │ 0 sessions   │
-│ Carol D.      │ 3        │ 1h 10m     │ 0h 55m        │ 1 session    │
-└───────────────┴──────────┴────────────┴───────────────┴──────────────┘
+├───────────────┬──────────┬────────────┬──────────────────────────────┤
+│ Student       │ Sessions │ Total Time │ Outside Class                │
+├───────────────┼──────────┼────────────┼──────────────────────────────┤
+│ Alice B.      │ 5        │ 2h 15m     │ 3 sessions                   │
+│ Bob C.        │ 4        │ 1h 50m     │ 0 sessions                   │
+│ Carol D.      │ 3        │ 1h 10m     │ 1 session                    │
+└───────────────┴──────────┴────────────┴──────────────────────────────┘
 ```
 
 **Metrics:**
 - Sessions: Number of login sessions
 - Total Time: Sum of session durations
-- Resource Time: Time between `resource_launch` and `resource_return` events
 - Outside Class: Sessions at unusual times (teacher interprets what this means)
 
-### "Student Detail" View
+### Member Detail View
 
 Individual student timeline:
 
@@ -224,7 +229,6 @@ Individual student timeline:
 │ Jan 15, 2025                                                     │
 │ ├─ 9:15 AM  Logged in                                           │
 │ ├─ 9:16 AM  Launched "Math Quest"                               │
-│ ├─ 9:48 AM  Returned from "Math Quest" (32 min)                 │
 │ ├─ 9:50 AM  Logged out                                          │
 │                                                                  │
 │ Jan 14, 2025                                                     │
@@ -238,59 +242,59 @@ Individual student timeline:
 
 ### Export Format
 
-CSV or JSON export with:
+CSV or JSON export with date range and organization/group filtering.
 
 **Sessions export:**
 ```csv
-user_id,user_name,organization,group,login_at,logout_at,end_reason,duration_secs,ip
-abc123,Alice B.,Lincoln Elementary,Period 3 Math,2025-01-15T09:15:00Z,2025-01-15T09:50:00Z,logout,2100,192.168.1.50
+user_id,user_name,email,organization,group,login_at,logout_at,end_reason,duration_secs,ip
+abc123,Alice B.,alice@example.com,Lincoln Elementary,Period 3 Math,2025-01-15T09:15:00Z,2025-01-15T09:50:00Z,logout,2100,192.168.1.50
 ```
 
 **Activity export:**
 ```csv
 user_id,user_name,session_id,timestamp,event_type,resource_name,details
 abc123,Alice B.,sess456,2025-01-15T09:16:00Z,resource_launch,Math Quest,{}
-abc123,Alice B.,sess456,2025-01-15T09:48:00Z,resource_return,Math Quest,{"time_away_secs":1920}
+abc123,Alice B.,sess456,2025-01-15T09:20:00Z,resource_view,Math Quest,{}
+abc123,Alice B.,sess456,2025-01-15T09:45:00Z,page_view,,{"page_path":"/member/resources"}
 ```
 
 ### Aggregated Metrics
 
-For research analysis:
-- Average session duration per user
-- Average time-on-resource per user
-- Session frequency (daily, weekly)
-- Active days per user
-- Peak usage times
+The Data Export page displays:
+- Total Sessions
+- Unique Users
+- Total Time (sum of all session durations)
+- Avg Session (average session duration)
+- Peak Hour (hour with most logins)
+- Most Active Day (weekday with most logins)
 
-## Implementation Phases
+## File Structure
 
-### Phase 1: Session Tracking
-1. Create `sessions` collection and store
-2. Record session on login (create record)
-3. Update session on logout (set LogoutAt, calculate duration)
-4. Add session_id to user's session cookie
-
-### Phase 2: Heartbeat System
-1. Add `/api/heartbeat` endpoint
-2. Add JavaScript heartbeat on all authenticated pages
-3. Update `LastActiveAt` on each heartbeat
-4. Background job to close stale sessions
-
-### Phase 3: Activity Events
-1. Create `activity_events` collection
-2. Track resource launch events
-3. Track resource return events (if detectable)
-4. Track page views (optional, may be verbose)
-
-### Phase 4: Teacher Dashboard
-1. "Who's online" real-time view
-2. Weekly summary view
-3. Student detail view
-
-### Phase 5: Researcher Tools
-1. Data export (CSV, JSON)
-2. Date range filtering
-3. Aggregated reports
+```
+internal/app/
+├── store/
+│   ├── sessions/
+│   │   └── store.go           # Session CRUD, heartbeat updates
+│   └── activity/
+│       └── store.go           # Activity events (launch, view, page_view)
+├── features/
+│   ├── activity/
+│   │   ├── handler.go         # Dashboard endpoints
+│   │   ├── dashboard.go       # Real-time dashboard logic
+│   │   ├── summary.go         # Weekly summary logic
+│   │   ├── detail.go          # Member detail view logic
+│   │   ├── export.go          # Data export (CSV, JSON)
+│   │   ├── routes.go
+│   │   ├── types.go           # View models
+│   │   └── templates/
+│   │       ├── activity_dashboard.gohtml
+│   │       ├── activity_summary.gohtml
+│   │       ├── activity_member_detail.gohtml
+│   │       └── activity_export.gohtml
+│   └── heartbeat/
+│       ├── handler.go         # POST /api/heartbeat
+│       └── routes.go
+```
 
 ## Data Retention
 
@@ -305,25 +309,7 @@ For research analysis:
 - Parental consent obtained for all student participants
 - Data subject to deletion requests per research agreements
 - IP addresses stored but not displayed to teachers (only researchers/admins)
-- No tracking of content within launched resources (handled separately)
-
-## File Structure
-
-```
-internal/app/
-├── store/
-│   ├── sessions/
-│   │   └── store.go       # Session CRUD
-│   └── activity/
-│       └── store.go       # Activity events
-├── features/
-│   └── activity/
-│       ├── handler.go     # Heartbeat, dashboard endpoints
-│       ├── routes.go
-│       └── templates/
-│           ├── dashboard.gohtml
-│           └── student_detail.gohtml
-```
+- No tracking of content within launched resources (handled by separate game logging server)
 
 ## See Also
 

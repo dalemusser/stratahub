@@ -762,11 +762,11 @@ func (h *Handler) getCurrentResourcesForUsers(ctx context.Context, userIDs []pri
 	}
 
 	// Get the most recent resource event for each user
-	// Include view, launch, and return events
+	// Include view and launch events
 	pipeline := []bson.M{
 		{"$match": bson.M{
 			"user_id":    bson.M{"$in": userIDs},
-			"event_type": bson.M{"$in": bson.A{"resource_launch", "resource_return", "resource_view"}},
+			"event_type": bson.M{"$in": bson.A{"resource_launch", "resource_view"}},
 			"timestamp":  bson.M{"$gte": time.Now().UTC().Add(-1 * time.Hour)}, // Within last hour
 		}},
 		{"$sort": bson.M{"timestamp": -1}},
@@ -774,10 +774,6 @@ func (h *Handler) getCurrentResourcesForUsers(ctx context.Context, userIDs []pri
 			"_id":           "$user_id",
 			"event_type":    bson.M{"$first": "$event_type"},
 			"resource_name": bson.M{"$first": "$resource_name"},
-		}},
-		// Exclude return events (user is no longer in resource)
-		{"$match": bson.M{
-			"event_type": bson.M{"$ne": "resource_return"},
 		}},
 	}
 

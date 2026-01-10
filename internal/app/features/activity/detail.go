@@ -5,12 +5,14 @@ import (
 	"context"
 	"fmt"
 	"net/http"
+	"slices"
 	"strings"
 	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/policy/memberpolicy"
 	activitystore "github.com/dalemusser/stratahub/internal/app/store/activity"
+	sessionsstore "github.com/dalemusser/stratahub/internal/app/store/sessions"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -113,7 +115,12 @@ func (h *Handler) ServeMemberDetail(w http.ResponseWriter, r *http.Request) {
 	totalSessions := len(sessions)
 	var totalMins, resourceLaunches int
 	for _, s := range sessions {
-		totalMins += int(s.DurationSecs / 60)
+		if s.DurationSecs > 0 {
+			totalMins += int(s.DurationSecs / 60)
+		} else if s.LogoutAt == nil {
+			// Active session - calculate duration from login to now
+			totalMins += int(time.Since(s.LoginAt).Minutes())
+		}
 	}
 	for _, e := range events {
 		if e.EventType == activitystore.EventResourceLaunch {
@@ -130,11 +137,11 @@ func (h *Handler) ServeMemberDetail(w http.ResponseWriter, r *http.Request) {
 	sessionBlocks := h.buildSessionBlocks(sessions, events, loc)
 
 	// Get timezone abbreviation for display
-	tzLabel := ""
-	if tzName != "" {
-		// Get the abbreviation for the current time in that timezone
-		tzLabel = time.Now().In(loc).Format("MST")
+	// Always show timezone - default to UTC if org has no timezone set
+	if tzName == "" {
+		tzName = "UTC"
 	}
+	tzLabel := time.Now().In(loc).Format("MST")
 
 	data := memberDetailData{
 		BaseVM:           viewdata.NewBaseVM(r, h.DB, "Member Activity", "/activity"),
@@ -154,6 +161,118 @@ func (h *Handler) ServeMemberDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	templates.Render(w, r, "activity_member_detail", data)
+}
+
+// ServeMemberDetailContent renders just the refreshable content portion (HTMX partial).
+// GET /activity/member/{memberID}/content
+func (h *Handler) ServeMemberDetailContent(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
+	defer cancel()
+
+	memberIDStr := chi.URLParam(r, "memberID")
+	memberID, err := primitive.ObjectIDFromHex(memberIDStr)
+	if err != nil {
+		http.Error(w, "Invalid member ID", http.StatusBadRequest)
+		return
+	}
+
+	db := h.DB
+
+	// Check authorization
+	_, canAccess, err := memberpolicy.CheckMemberAccess(ctx, db, r, memberID)
+	if err != nil || !canAccess {
+		http.Error(w, "Forbidden", http.StatusForbidden)
+		return
+	}
+
+	// Get organization timezone
+	var member struct {
+		OrgID *primitive.ObjectID `bson:"organization_id"`
+	}
+	if err := db.Collection("users").FindOne(ctx, bson.M{"_id": memberID}).Decode(&member); err != nil {
+		http.Error(w, "Member not found", http.StatusNotFound)
+		return
+	}
+
+	var tzName string
+	var loc *time.Location = time.UTC
+	if member.OrgID != nil {
+		var org struct {
+			TimeZone string `bson:"time_zone"`
+		}
+		if err := db.Collection("organizations").FindOne(ctx, bson.M{"_id": member.OrgID}).Decode(&org); err == nil {
+			tzName = org.TimeZone
+			if org.TimeZone != "" {
+				if parsedLoc, err := time.LoadLocation(org.TimeZone); err == nil {
+					loc = parsedLoc
+				}
+			}
+		}
+	}
+
+	// Get session history (last 30 days)
+	thirtyDaysAgo := time.Now().UTC().AddDate(0, 0, -30)
+	sessions, err := h.getMemberSessions(ctx, memberID, thirtyDaysAgo)
+	if err != nil {
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	// Get activity events for these sessions
+	var sessionIDs []primitive.ObjectID
+	for _, s := range sessions {
+		sessionIDs = append(sessionIDs, s.ID)
+	}
+
+	events, err := h.getEventsForSessions(ctx, sessionIDs, memberID, thirtyDaysAgo)
+	if err != nil {
+		http.Error(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+
+	// Calculate stats
+	totalSessions := len(sessions)
+	var totalMins, resourceLaunches int
+	for _, s := range sessions {
+		if s.DurationSecs > 0 {
+			totalMins += int(s.DurationSecs / 60)
+		} else if s.LogoutAt == nil {
+			// Active session - calculate duration from login to now
+			totalMins += int(time.Since(s.LoginAt).Minutes())
+		}
+	}
+	for _, e := range events {
+		if e.EventType == activitystore.EventResourceLaunch {
+			resourceLaunches++
+		}
+	}
+
+	avgSessionMins := 0
+	if totalSessions > 0 {
+		avgSessionMins = totalMins / totalSessions
+	}
+
+	// Build session blocks
+	sessionBlocks := h.buildSessionBlocks(sessions, events, loc)
+
+	// Get timezone label
+	if tzName == "" {
+		tzName = "UTC"
+	}
+	tzLabel := time.Now().In(loc).Format("MST")
+
+	data := memberDetailData{
+		MemberID:         memberIDStr,
+		TimezoneName:     tzName,
+		TimezoneLabel:    tzLabel,
+		TotalSessions:    totalSessions,
+		TotalTimeStr:     formatDuration(int64(totalMins) * 60),
+		AvgSessionMins:   avgSessionMins,
+		ResourceLaunches: resourceLaunches,
+		Sessions:         sessionBlocks,
+	}
+
+	templates.RenderSnippet(w, "activity_member_detail_content", data)
 }
 
 // getMemberGroupNames returns a comma-separated list of group names for a member.
@@ -195,12 +314,20 @@ type sessionRecord struct {
 	ID           primitive.ObjectID `bson:"_id"`
 	LoginAt      time.Time          `bson:"login_at"`
 	LogoutAt     *time.Time         `bson:"logout_at"`
+	LastActiveAt time.Time          `bson:"last_active_at"`
+	CreatedBy    string             `bson:"created_by"`
 	EndReason    string             `bson:"end_reason"`
 	DurationSecs int64              `bson:"duration_secs"`
 }
 
 // getMemberSessions gets sessions for a member since the given time.
+// It also closes any stale sessions (open but inactive for more than 10 minutes).
 func (h *Handler) getMemberSessions(ctx context.Context, memberID primitive.ObjectID, since time.Time) ([]sessionRecord, error) {
+	// First, close any stale sessions for this user
+	// A session is stale if it has no logout_at and last_active_at is > 10 minutes ago
+	staleThreshold := time.Now().UTC().Add(-10 * time.Minute)
+	h.closeStaleSessionsForUser(ctx, memberID, staleThreshold)
+
 	opts := options.Find().
 		SetSort(bson.D{{Key: "login_at", Value: -1}}).
 		SetLimit(100) // Limit to last 100 sessions
@@ -224,6 +351,41 @@ func (h *Handler) getMemberSessions(ctx context.Context, memberID primitive.Obje
 	}
 
 	return sessions, nil
+}
+
+// closeStaleSessionsForUser closes sessions that are open but inactive.
+func (h *Handler) closeStaleSessionsForUser(ctx context.Context, userID primitive.ObjectID, threshold time.Time) {
+	cur, err := h.DB.Collection("sessions").Find(ctx, bson.M{
+		"user_id":        userID,
+		"logout_at":      nil,
+		"last_active_at": bson.M{"$lt": threshold},
+	})
+	if err != nil {
+		return
+	}
+	defer cur.Close(ctx)
+
+	for cur.Next(ctx) {
+		var s struct {
+			ID           primitive.ObjectID `bson:"_id"`
+			LoginAt      time.Time          `bson:"login_at"`
+			LastActiveAt time.Time          `bson:"last_active_at"`
+		}
+		if err := cur.Decode(&s); err != nil {
+			continue
+		}
+
+		// Close the session - use last_active_at as the logout time
+		duration := int64(s.LastActiveAt.Sub(s.LoginAt).Seconds())
+		_, _ = h.DB.Collection("sessions").UpdateOne(ctx,
+			bson.M{"_id": s.ID},
+			bson.M{"$set": bson.M{
+				"logout_at":     s.LastActiveAt,
+				"end_reason":    "inactive",
+				"duration_secs": duration,
+			}},
+		)
+	}
 }
 
 // getEventsForSessions gets activity events for the given sessions.
@@ -332,6 +494,21 @@ func (h *Handler) buildSessionBlocks(sessions []sessionRecord, events []activity
 
 		// Build events for this session
 		var activityEvents []activityEvent
+
+		// Add login/resumed event at the start
+		loginDesc := "Logged in"
+		loginEventType := "login"
+		if s.CreatedBy == sessionsstore.CreatedByHeartbeat {
+			loginDesc = "Session resumed"
+			loginEventType = "resumed"
+		}
+		activityEvents = append(activityEvents, activityEvent{
+			Time:        s.LoginAt,
+			TimeLabel:   loginLocal.Format("3:04 PM"),
+			EventType:   loginEventType,
+			Description: loginDesc,
+		})
+
 		for _, e := range eventsBySession[s.ID] {
 			ae := activityEvent{
 				Time:      e.Timestamp,
@@ -342,13 +519,6 @@ func (h *Handler) buildSessionBlocks(sessions []sessionRecord, events []activity
 			switch e.EventType {
 			case activitystore.EventResourceLaunch:
 				ae.Description = fmt.Sprintf("Launched \"%s\"", e.ResourceName)
-			case activitystore.EventResourceReturn:
-				ae.Description = fmt.Sprintf("Returned from \"%s\"", e.ResourceName)
-				if secs, ok := e.Details["time_away_secs"].(int64); ok {
-					ae.Duration = formatDuration(secs)
-				} else if secs, ok := e.Details["time_away_secs"].(float64); ok {
-					ae.Duration = formatDuration(int64(secs))
-				}
 			case activitystore.EventResourceView:
 				ae.Description = fmt.Sprintf("Viewed \"%s\"", e.ResourceName)
 			case activitystore.EventPageView:
@@ -367,12 +537,37 @@ func (h *Handler) buildSessionBlocks(sessions []sessionRecord, events []activity
 				logoutDesc = "Session timed out"
 			}
 			activityEvents = append(activityEvents, activityEvent{
-				Time:      *s.LogoutAt,
-				TimeLabel: s.LogoutAt.In(loc).Format("3:04 PM"),
-				EventType: "logout",
+				Time:        *s.LogoutAt,
+				TimeLabel:   s.LogoutAt.In(loc).Format("3:04 PM"),
+				EventType:   "logout",
 				Description: logoutDesc,
 			})
 		}
+
+		// For active sessions, add idle status if no recent activity events
+		if s.LogoutAt == nil {
+			// Find the latest activity event (excluding login/resumed)
+			var lastEventTime time.Time
+			for _, e := range eventsBySession[s.ID] {
+				if e.Timestamp.After(lastEventTime) {
+					lastEventTime = e.Timestamp
+				}
+			}
+			// If no events, use login time as the idle start
+			if lastEventTime.IsZero() {
+				lastEventTime = s.LoginAt
+			}
+			// Add idle event showing when they became idle
+			activityEvents = append(activityEvents, activityEvent{
+				Time:        lastEventTime,
+				TimeLabel:   lastEventTime.In(loc).Format("3:04 PM"),
+				EventType:   "idle",
+				Description: fmt.Sprintf("Idle since %s", lastEventTime.In(loc).Format("3:04 PM")),
+			})
+		}
+
+		// Reverse events so newest are first (consistent with session ordering)
+		slices.Reverse(activityEvents)
 
 		blocks = append(blocks, sessionBlock{
 			Date:       date,

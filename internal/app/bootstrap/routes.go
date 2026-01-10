@@ -40,6 +40,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/waffle/config"
+	"github.com/dalemusser/waffle/middleware"
 	"github.com/dalemusser/waffle/pantry/fileserver"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
@@ -105,6 +106,10 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	sessionsStore := sessions.New(deps.StrataHubMongoDatabase)
 
 	r := chi.NewRouter()
+
+	// CORS middleware: must be early in the chain to handle preflight requests.
+	// Only active when enable_cors=true in config.
+	r.Use(middleware.CORSFromConfig(coreCfg))
 
 	// Workspace middleware: extracts workspace context from host/subdomain.
 	// In single-workspace mode, uses the default workspace for all requests.

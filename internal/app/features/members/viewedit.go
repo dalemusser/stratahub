@@ -20,6 +20,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/txn"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
+	"github.com/dalemusser/stratahub/internal/app/system/wsauth"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -183,18 +184,42 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 		authReturnID = *u.AuthReturnID
 	}
 
+	// Get workspace's enabled auth methods
+	enabledMethods := wsauth.GetEnabledAuthMethods(ctx, r, h.DB)
+	enabledMap := wsauth.GetEnabledAuthMethodMap(ctx, r, h.DB)
+
+	// Check if user's current auth method is enabled
+	var authMethodDisabled bool
+	var authMethodDisabledLabel string
+	currentAuth := normalize.AuthMethod(u.AuthMethod)
+	if currentAuth != "" && !enabledMap[currentAuth] {
+		authMethodDisabled = true
+		// Find the label for this method
+		for _, m := range models.AllAuthMethods {
+			if m.Value == currentAuth {
+				authMethodDisabledLabel = m.Label
+				break
+			}
+		}
+		if authMethodDisabledLabel == "" {
+			authMethodDisabledLabel = currentAuth
+		}
+	}
+
 	data := editData{
-		AuthMethods:  models.EnabledAuthMethods,
-		ID:           u.ID.Hex(),
-		FullName:     u.FullName,
-		LoginID:      loginID,
-		Email:        email,
-		AuthReturnID: authReturnID,
-		Auth:         u.AuthMethod,
-		OrgID:        orgHex,  // hidden input will carry this
-		OrgName:      orgName, // read-only display
-		Status:       u.Status,
-		IsEdit:       true,
+		AuthMethods:             enabledMethods,
+		ID:                      u.ID.Hex(),
+		FullName:                u.FullName,
+		LoginID:                 loginID,
+		Email:                   email,
+		AuthReturnID:            authReturnID,
+		Auth:                    u.AuthMethod,
+		OrgID:                   orgHex,  // hidden input will carry this
+		OrgName:                 orgName, // read-only display
+		Status:                  u.Status,
+		IsEdit:                  true,
+		AuthMethodDisabled:      authMethodDisabled,
+		AuthMethodDisabledLabel: authMethodDisabledLabel,
 	}
 	formutil.SetBase(&data.Base, r, h.DB, "Edit Member", "/members")
 
@@ -288,7 +313,7 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 
 	reRender := func(msg string) {
 		data := editData{
-			AuthMethods:  models.EnabledAuthMethods,
+			AuthMethods:  wsauth.GetEnabledAuthMethods(ctx, r, h.DB),
 			ID:           uidHex,
 			FullName:     full,
 			LoginID:      loginID,

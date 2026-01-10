@@ -20,17 +20,18 @@ const (
 
 // Auth event types
 const (
-	EventLoginSuccess              = "login_success"
-	EventLoginFailedUserNotFound   = "login_failed_user_not_found"
-	EventLoginFailedWrongPassword  = "login_failed_wrong_password"
-	EventLoginFailedUserDisabled   = "login_failed_user_disabled"
-	EventLoginFailedRateLimit      = "login_failed_rate_limit"
-	EventLogout                    = "logout"
-	EventPasswordChanged           = "password_changed"
-	EventVerificationCodeSent      = "verification_code_sent"
-	EventVerificationCodeResent    = "verification_code_resent"
-	EventVerificationCodeFailed    = "verification_code_failed"
-	EventMagicLinkUsed             = "magic_link_used"
+	EventLoginSuccess                    = "login_success"
+	EventLoginFailedUserNotFound         = "login_failed_user_not_found"
+	EventLoginFailedWrongPassword        = "login_failed_wrong_password"
+	EventLoginFailedUserDisabled         = "login_failed_user_disabled"
+	EventLoginFailedAuthMethodDisabled   = "login_failed_auth_method_disabled"
+	EventLoginFailedRateLimit            = "login_failed_rate_limit"
+	EventLogout                          = "logout"
+	EventPasswordChanged                 = "password_changed"
+	EventVerificationCodeSent            = "verification_code_sent"
+	EventVerificationCodeResent          = "verification_code_resent"
+	EventVerificationCodeFailed          = "verification_code_failed"
+	EventMagicLinkUsed                   = "magic_link_used"
 )
 
 // Admin event types
@@ -272,6 +273,7 @@ func (s *Store) GetFailedLogins(ctx context.Context, since time.Time, limit int6
 				EventLoginFailedUserNotFound,
 				EventLoginFailedWrongPassword,
 				EventLoginFailedUserDisabled,
+				EventLoginFailedAuthMethodDisabled,
 				EventLoginFailedRateLimit,
 			},
 		},
