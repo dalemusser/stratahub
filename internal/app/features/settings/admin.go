@@ -1,6 +1,10 @@
 // internal/app/features/settings/admin.go
 package settings
 
+// Terminology: User Identifiers
+//   - UserID / userID / user_id: The MongoDB ObjectID (_id) that uniquely identifies a user record
+//   - LoginID / loginID / login_id: The human-readable string users type to log in
+
 import (
 	"context"
 	"fmt"
@@ -28,6 +32,8 @@ type settingsVM struct {
 	viewdata.BaseVM
 	HasLogo            bool
 	LogoName           string
+	LandingTitle       string // Title for landing page
+	LandingContent     string // HTML content for landing page
 	AllAuthMethods     []models.AuthMethod
 	EnabledAuthMethods map[string]bool
 	CurrentUserMethod  string // Current user's auth method (for protection)
@@ -82,10 +88,18 @@ func (h *Handler) ServeSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Use default landing title if empty so admin has something to work with
+	landingTitle := settings.LandingTitle
+	if landingTitle == "" {
+		landingTitle = models.DefaultLandingTitle
+	}
+
 	vm := settingsVM{
 		BaseVM:             viewdata.NewBaseVM(r, h.DB, "Settings", "/dashboard"),
 		HasLogo:            settings.HasLogo(),
 		LogoName:           settings.LogoName,
+		LandingTitle:       landingTitle,
+		LandingContent:     settings.LandingContent,
 		AllAuthMethods:     models.AllAuthMethods,
 		EnabledAuthMethods: enabledMap,
 		CurrentUserMethod:  currentUserMethod,
@@ -111,6 +125,8 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	siteName := strings.TrimSpace(r.FormValue("site_name"))
+	landingTitle := strings.TrimSpace(r.FormValue("landing_title"))
+	landingContent := htmlsanitize.Sanitize(strings.TrimSpace(r.FormValue("landing_content")))
 	footerHTML := htmlsanitize.Sanitize(strings.TrimSpace(r.FormValue("footer_html")))
 	removeLogo := r.FormValue("remove_logo") != ""
 	authMethods := r.Form["auth_methods"]
@@ -214,6 +230,8 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 		SiteName:           siteName,
 		LogoPath:           logoPath,
 		LogoName:           logoName,
+		LandingTitle:       landingTitle,
+		LandingContent:     landingContent,
 		FooterHTML:         footerHTML,
 		EnabledAuthMethods: authMethods,
 		UpdatedByID:        &memberID,
@@ -264,10 +282,18 @@ func (h *Handler) renderWithError(w http.ResponseWriter, r *http.Request, wsID p
 		}
 	}
 
+	// Use default landing title if empty so admin has something to work with
+	landingTitle := settings.LandingTitle
+	if landingTitle == "" {
+		landingTitle = models.DefaultLandingTitle
+	}
+
 	vm := settingsVM{
 		BaseVM:             viewdata.NewBaseVM(r, h.DB, "Settings", "/dashboard"),
 		HasLogo:            settings.HasLogo(),
 		LogoName:           settings.LogoName,
+		LandingTitle:       landingTitle,
+		LandingContent:     settings.LandingContent,
 		AllAuthMethods:     models.AllAuthMethods,
 		EnabledAuthMethods: enabledMap,
 		CurrentUserMethod:  currentUserMethod,

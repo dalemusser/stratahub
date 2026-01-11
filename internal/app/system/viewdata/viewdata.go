@@ -44,6 +44,9 @@ type BaseVM struct {
 	UserName   string
 	UserOrg    string // Organization name for leaders/members
 
+	// Workspace context
+	IsApex bool // true if on apex domain (no workspace)
+
 	// Page context
 	Title       string
 	BackURL     string
@@ -78,11 +81,15 @@ func NewBaseVM(r *http.Request, db *mongo.Database, title, backDefault string) B
 		effectiveRole = "admin"
 	}
 
+	// Determine if we're on apex domain
+	isApex := ws != nil && ws.IsApex
+
 	vm := BaseVM{
 		SiteName:    models.DefaultSiteName,
 		IsLoggedIn:  signedIn,
 		Role:        effectiveRole,
 		UserName:    name,
+		IsApex:      isApex,
 		Title:       title,
 		BackURL:     httpnav.ResolveBackURL(r, backDefault),
 		CurrentPath: httpnav.CurrentPath(r),

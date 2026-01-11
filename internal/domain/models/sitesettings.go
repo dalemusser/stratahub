@@ -22,6 +22,10 @@ type SiteSettings struct {
 	LogoPath string `bson:"logo_path,omitempty" json:"logo_path,omitempty"` // Storage path for uploaded logo
 	LogoName string `bson:"logo_name,omitempty" json:"logo_name,omitempty"` // Original filename
 
+	// Landing page (the "/" route)
+	LandingTitle   string `bson:"landing_title,omitempty" json:"landing_title,omitempty"`     // Title shown on landing page
+	LandingContent string `bson:"landing_content,omitempty" json:"landing_content,omitempty"` // HTML content for landing page
+
 	// Footer
 	FooterHTML string `bson:"footer_html,omitempty" json:"footer_html,omitempty"` // Custom HTML for footer
 
@@ -77,3 +81,10 @@ func (s *SiteSettings) IsAuthMethodEnabled(method string) bool {
 
 // DefaultSiteName is the default site name used when settings don't exist.
 const DefaultSiteName = "StrataHub"
+
+// DefaultLandingTitle is the default landing page title.
+const DefaultLandingTitle = "🏠 Welcome"
+
+// DefaultLandingContent is the default landing page content.
+const DefaultLandingContent = `<p>Welcome to our platform. This page can be customized by an administrator.</p>
+<p>Use the Edit button to update this content with information about your organization.</p>`

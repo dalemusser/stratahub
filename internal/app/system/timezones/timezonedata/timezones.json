@@ -38,6 +38,46 @@
     "region": "Americas"
   },
   {
+    "id": "America/Indiana/Indianapolis",
+    "label": "Indiana Eastern (America/Indiana/Indianapolis)",
+    "region": "Americas"
+  },
+  {
+    "id": "America/Indiana/Knox",
+    "label": "Indiana Starke County (America/Indiana/Knox)",
+    "region": "Americas"
+  },
+  {
+    "id": "America/Indiana/Marengo",
+    "label": "Indiana Crawford County (America/Indiana/Marengo)",
+    "region": "Americas"
+  },
+  {
+    "id": "America/Indiana/Petersburg",
+    "label": "Indiana Pike County (America/Indiana/Petersburg)",
+    "region": "Americas"
+  },
+  {
+    "id": "America/Indiana/Tell_City",
+    "label": "Indiana Perry County (America/Indiana/Tell_City)",
+    "region": "Americas"
+  },
+  {
+    "id": "America/Indiana/Vevay",
+    "label": "Indiana Switzerland County (America/Indiana/Vevay)",
+    "region": "Americas"
+  },
+  {
+    "id": "America/Indiana/Vincennes",
+    "label": "Indiana Knox County (America/Indiana/Vincennes)",
+    "region": "Americas"
+  },
+  {
+    "id": "America/Indiana/Winamac",
+    "label": "Indiana Pulaski County (America/Indiana/Winamac)",
+    "region": "Americas"
+  },
+  {
     "id": "America/Toronto",
     "label": "Canada Eastern (America/Toronto)",
     "region": "Americas"

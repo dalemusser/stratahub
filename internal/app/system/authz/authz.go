@@ -1,6 +1,10 @@
 // internal/app/system/authz/authz.go
 package authz
 
+// Terminology: User Identifiers
+//   - UserID / userID / user_id: The MongoDB ObjectID (_id) that uniquely identifies a user record
+//   - LoginID / loginID / login_id: The human-readable string users type to log in
+
 import (
 	"net/http"
 	"strings"

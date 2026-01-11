@@ -1,6 +1,10 @@
 // internal/app/features/auditlog/list.go
 package auditlog
 
+// Terminology: User Identifiers
+//   - UserID / userID / user_id: The MongoDB ObjectID (_id) that uniquely identifies a user record
+//   - LoginID / loginID / login_id: The human-readable string users type to log in
+
 import (
 	"net/http"
 	"strconv"
@@ -14,6 +18,7 @@ import (
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/timezones"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -78,11 +83,13 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		}
 		if len(orgIDs) == 0 {
 			// No orgs assigned - show empty result
+			tzGroups, _ := timezones.Groups()
 			templates.RenderAutoMap(w, r, "audit_list", nil, listData{
-				BaseVM:     viewdata.NewBaseVM(r, h.DB, "Audit Log", "/dashboard"),
-				Categories: allCategories(),
-				Page:       1,
-				TotalPages: 1,
+				BaseVM:         viewdata.NewBaseVM(r, h.DB, "Audit Log", "/dashboard"),
+				Categories:     allCategories(),
+				TimezoneGroups: tzGroups,
+				Page:           1,
+				TotalPages:     1,
 			})
 			return
 		}
@@ -210,22 +217,26 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 	// Get event types for selected category (or all if no category selected)
 	eventTypes := eventTypesForCategory(category)
 
+	// Get timezone groups for selector
+	tzGroups, _ := timezones.Groups()
+
 	templates.RenderAutoMap(w, r, "audit_list", nil, listData{
-		BaseVM:     viewdata.NewBaseVM(r, h.DB, "Audit Log", "/dashboard"),
-		Items:      items,
-		Category:   category,
-		EventType:  eventType,
-		StartDate:  startDate,
-		EndDate:    endDate,
-		Categories: allCategories(),
-		EventTypes: eventTypes,
-		Page:       page,
-		TotalPages: totalPages,
-		Total:      total,
-		Shown:      len(items),
-		HasPrev:    page > 1,
-		HasNext:    page < totalPages,
-		PrevPage:   prevPage,
-		NextPage:   nextPage,
+		BaseVM:         viewdata.NewBaseVM(r, h.DB, "Audit Log", "/dashboard"),
+		Items:          items,
+		Category:       category,
+		EventType:      eventType,
+		StartDate:      startDate,
+		EndDate:        endDate,
+		Categories:     allCategories(),
+		EventTypes:     eventTypes,
+		TimezoneGroups: tzGroups,
+		Page:           page,
+		TotalPages:     totalPages,
+		Total:          total,
+		Shown:          len(items),
+		HasPrev:        page > 1,
+		HasNext:        page < totalPages,
+		PrevPage:       prevPage,
+		NextPage:       nextPage,
 	})
 }

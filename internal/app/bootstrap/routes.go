@@ -121,6 +121,12 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	// This makes the current user available to all handlers via auth.CurrentUser(r).
 	r.Use(sessionMgr.LoadSessionUser)
 
+	// Apex domain protection: redirect non-superadmins to their workspace domain.
+	// This prevents workspace users from accidentally accessing apex via shared cookies.
+	if appCfg.MultiWorkspace {
+		r.Use(workspace.RedirectNonSuperadminFromApex(wsStore, appCfg.PrimaryDomain, logger))
+	}
+
 	// Health check endpoint for load balancers and orchestrators
 	healthHandler := healthfeature.NewHandler(deps.StrataHubMongoClient, logger)
 	r.Mount("/health", healthfeature.Routes(healthHandler))
@@ -142,13 +148,17 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	homeHandler := homefeature.NewHandler(deps.StrataHubMongoDatabase, logger)
 	r.Mount("/", homefeature.Routes(homeHandler))
 
-	// Dynamic content pages (about, contact, terms, privacy)
+	// Dynamic content pages (about, contact, terms, privacy) - require workspace context
+	// These pages show workspace-specific content, so they shouldn't be accessible from apex
 	pagesHandler := pagesfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
-	r.Mount("/about", pagesHandler.AboutRouter())
-	r.Mount("/contact", pagesHandler.ContactRouter())
-	r.Mount("/terms", pagesHandler.TermsRouter())
-	r.Mount("/privacy", pagesHandler.PrivacyRouter())
-	r.Mount("/pages", pagesfeature.EditRoutes(pagesHandler, sessionMgr))
+	r.Group(func(pr chi.Router) {
+		pr.Use(workspace.RequireWorkspace)
+		pr.Mount("/about", pagesHandler.AboutRouter())
+		pr.Mount("/contact", pagesHandler.ContactRouter())
+		pr.Mount("/terms", pagesHandler.TermsRouter())
+		pr.Mount("/privacy", pagesHandler.PrivacyRouter())
+		pr.Mount("/pages", pagesfeature.EditRoutes(pagesHandler, sessionMgr))
+	})
 
 	// Authentication
 	googleEnabled := appCfg.GoogleClientID != "" && appCfg.GoogleClientSecret != ""
@@ -205,76 +215,84 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	errorsHandler := errorsfeature.NewHandler()
 	r.Get("/forbidden", errorsHandler.Forbidden)
 	r.Get("/unauthorized", errorsHandler.Unauthorized)
+	r.Get("/apex-denied", errorsHandler.ApexDenied)
 
-	// Role-based dashboards
-	dashboardHandler := dashboardfeature.NewHandler(deps.StrataHubMongoDatabase, logger)
-	r.Mount("/dashboard", dashboardfeature.Routes(dashboardHandler, sessionMgr))
-
-	// Organization management
-	orgHandler := organizationsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, auditLogger, logger)
-	r.Mount("/organizations", organizationsfeature.Routes(orgHandler, sessionMgr))
-
-	// Group management
-	groupsHandler := groupsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, auditLogger, logger)
-	r.Mount("/groups", groupsfeature.Routes(groupsHandler, sessionMgr))
-
-	// User management
-	leadersHandler := leadersfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, auditLogger, logger)
-	r.Mount("/leaders", leadersfeature.Routes(leadersHandler, sessionMgr))
-
-	membersHandler := membersfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, auditLogger, logger)
-	r.Mount("/members", membersfeature.Routes(membersHandler, sessionMgr))
-
-	// CSV upload (standalone feature accessible from members, groups, organizations)
-	uploadCSVHandler := &uploadcsvfeature.Handler{DB: deps.StrataHubMongoDatabase, Log: logger, ErrLog: errLog}
-	r.Mount("/upload_csv", uploadcsvfeature.Routes(uploadCSVHandler, sessionMgr))
-
-	sysUsersHandler := systemusersfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, auditLogger, logger)
-	r.Mount("/system-users", systemusersfeature.Routes(sysUsersHandler, sessionMgr))
-
-	// Audit log (admin and coordinator access)
-	auditLogHandler := auditlogfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
-	r.Mount("/audit", auditlogfeature.Routes(auditLogHandler, sessionMgr))
-
-	// Workspace management (superadmin only, apex domain)
+	// Workspace management (superadmin only, apex domain - no workspace required)
 	workspacesHandler := workspacesfeature.NewHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, auditLogger, appCfg.PrimaryDomain, logger)
 	r.Mount("/workspaces", workspacesfeature.Routes(workspacesHandler, sessionMgr))
 
-	// Resource management (admin and member views)
-	adminResHandler := resourcesfeature.NewAdminHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, auditLogger, logger)
-	r.Mount("/resources", resourcesfeature.AdminRoutes(adminResHandler, sessionMgr))
-
-	activityStore := activity.New(deps.StrataHubMongoDatabase)
-	memberResHandler := resourcesfeature.NewMemberHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, activityStore, sessionMgr, logger)
-	r.Mount("/member/resources", resourcesfeature.MemberRoutes(memberResHandler, sessionMgr))
-
-	// Material management (admin and leader views)
-	adminMatHandler := materialsfeature.NewAdminHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, auditLogger, logger)
-	r.Mount("/materials", materialsfeature.AdminRoutes(adminMatHandler, sessionMgr))
-
-	leaderMatHandler := materialsfeature.NewLeaderHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, logger)
-	r.Mount("/leader/materials", materialsfeature.LeaderRoutes(leaderMatHandler, sessionMgr))
-
-	// Reports
-	reportsHandler := reportsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
-	r.Mount("/reports", reportsfeature.Routes(reportsHandler, sessionMgr))
-
-	// Site Settings (admin and superadmin)
-	settingsHandler := settingsfeature.NewHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, logger)
-	r.Route("/settings", func(sr chi.Router) {
-		sr.Use(sessionMgr.RequireRole("superadmin", "admin"))
-		settingsHandler.MountRoutes(sr)
-	})
-
-	// User info API (for games to identify the current player)
+	// User info API (for games to identify the current player - no workspace required for backward compat)
 	userInfoHandler := userinfofeature.NewHandler()
 	userinfofeature.MountRoutes(r, userInfoHandler)
 
-	// Activity dashboard (for leaders to monitor student activity)
-	activityHandler := activityfeature.NewHandler(deps.StrataHubMongoDatabase, sessionsStore, activityStore, sessionMgr, errLog, logger)
-	r.Mount("/activity", activityfeature.Routes(activityHandler, sessionMgr))
+	// Activity store - used by multiple features
+	activityStore := activity.New(deps.StrataHubMongoDatabase)
 
-	// Heartbeat API (for activity tracking)
+	// Workspace-scoped features - require workspace context (redirects to /workspaces if on apex)
+	r.Group(func(wsr chi.Router) {
+		wsr.Use(workspace.RequireWorkspace)
+
+		// Role-based dashboards
+		dashboardHandler := dashboardfeature.NewHandler(deps.StrataHubMongoDatabase, logger)
+		wsr.Mount("/dashboard", dashboardfeature.Routes(dashboardHandler, sessionMgr))
+
+		// Organization management
+		orgHandler := organizationsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, auditLogger, logger)
+		wsr.Mount("/organizations", organizationsfeature.Routes(orgHandler, sessionMgr))
+
+		// Group management
+		groupsHandler := groupsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, auditLogger, logger)
+		wsr.Mount("/groups", groupsfeature.Routes(groupsHandler, sessionMgr))
+
+		// User management
+		leadersHandler := leadersfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, auditLogger, logger)
+		wsr.Mount("/leaders", leadersfeature.Routes(leadersHandler, sessionMgr))
+
+		membersHandler := membersfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, auditLogger, logger)
+		wsr.Mount("/members", membersfeature.Routes(membersHandler, sessionMgr))
+
+		// CSV upload (standalone feature accessible from members, groups, organizations)
+		uploadCSVHandler := &uploadcsvfeature.Handler{DB: deps.StrataHubMongoDatabase, Log: logger, ErrLog: errLog}
+		wsr.Mount("/upload_csv", uploadcsvfeature.Routes(uploadCSVHandler, sessionMgr))
+
+		sysUsersHandler := systemusersfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, auditLogger, logger)
+		wsr.Mount("/system-users", systemusersfeature.Routes(sysUsersHandler, sessionMgr))
+
+		// Audit log (admin and coordinator access)
+		auditLogHandler := auditlogfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
+		wsr.Mount("/audit", auditlogfeature.Routes(auditLogHandler, sessionMgr))
+
+		// Resource management (admin and member views)
+		adminResHandler := resourcesfeature.NewAdminHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, auditLogger, logger)
+		wsr.Mount("/resources", resourcesfeature.AdminRoutes(adminResHandler, sessionMgr))
+
+		memberResHandler := resourcesfeature.NewMemberHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, activityStore, sessionMgr, logger)
+		wsr.Mount("/member/resources", resourcesfeature.MemberRoutes(memberResHandler, sessionMgr))
+
+		// Material management (admin and leader views)
+		adminMatHandler := materialsfeature.NewAdminHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, auditLogger, logger)
+		wsr.Mount("/materials", materialsfeature.AdminRoutes(adminMatHandler, sessionMgr))
+
+		leaderMatHandler := materialsfeature.NewLeaderHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, logger)
+		wsr.Mount("/leader/materials", materialsfeature.LeaderRoutes(leaderMatHandler, sessionMgr))
+
+		// Reports
+		reportsHandler := reportsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
+		wsr.Mount("/reports", reportsfeature.Routes(reportsHandler, sessionMgr))
+
+		// Site Settings (admin and superadmin)
+		settingsHandler := settingsfeature.NewHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, logger)
+		wsr.Route("/settings", func(sr chi.Router) {
+			sr.Use(sessionMgr.RequireRole("superadmin", "admin"))
+			settingsHandler.MountRoutes(sr)
+		})
+
+		// Activity dashboard (for leaders to monitor student activity)
+		activityHandler := activityfeature.NewHandler(deps.StrataHubMongoDatabase, sessionsStore, activityStore, sessionMgr, errLog, logger)
+		wsr.Mount("/activity", activityfeature.Routes(activityHandler, sessionMgr))
+	})
+
+	// Heartbeat API (for activity tracking - no workspace required for cross-domain tracking)
 	heartbeatHandler := heartbeatfeature.NewHandler(sessionsStore, activityStore, sessionMgr, logger)
 	r.Mount("/api/heartbeat", heartbeatfeature.Routes(heartbeatHandler, sessionMgr))
 

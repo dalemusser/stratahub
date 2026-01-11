@@ -3,39 +3,17 @@
 {{ end }}
 
 {{ define "content" }}
-<!-- Heading outside the white box -->
-<div class="mb-4">
-  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
-    ℹ️ Home
-  </h1>
+<div class="mb-4 flex items-center justify-between">
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">{{ .LandingTitle }}</h1>
+  {{ if .CanEdit }}
+  <a href="/settings"
+     class="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700">
+    Edit
+  </a>
+  {{ end }}
 </div>
 
-<!-- White box with paragraphs -->
-<div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 leading-relaxed text-sm">
-  <p class="mb-2">
-    Adroit Games are a collection of educational video games developed 
-    by <a href="https://adroit.missouri.edu/" target="_blank" class="text-indigo-600 hover:underline">
-      Adroit Studios
-    </a> 
-    at the University of Missouri. By blending inventive technology, 
-    captivating storytelling, and rigorous academic research, 
-    we aim to seamlessly bridge the worlds of learning and entertainment.
-  </p>
-  
-  <p class="mb-2">
-    Our mission is to push the boundaries of interactive storytelling and 
-    immersive gameplay while fostering a dynamic, collaborative environment 
-    for students, faculty, and industry professionals. Through hands-on 
-    development and real-world research, we empower members to gain new 
-    perspectives and develop valuable skills.
-  </p>
-  
-  <p>
-    Guided by a commitment to creativity, innovation, and scholarship, 
-    Adroit Games delivers compelling experiences that educate, entertain, 
-    and inspire. Whether you’re an aspiring developer, an inquisitive 
-    learner, or a passionate gamer, we invite you to join us on this 
-    journey as we redefine what games can achieve in education and beyond.
-  </p>
+<div class="p-4 bg-white dark:bg-gray-800 rounded shadow tiptap-content">
+  {{ .Content }}
 </div>
 {{ end }}

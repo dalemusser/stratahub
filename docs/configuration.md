@@ -534,15 +534,13 @@ For cost optimization:
 
 ## Environment Variables
 
-Configuration can be overridden using environment variables:
-
-- **Waffle core settings:** Use `WAFFLE_` prefix (e.g., `WAFFLE_HTTP_PORT`, `WAFFLE_LOG_LEVEL`)
-- **StrataHub app settings:** Use `STRATAHUB_` prefix (e.g., `STRATAHUB_MONGO_URI`)
+Configuration can be overridden using environment variables. StrataHub uses a **unified prefix** — all environment variables use the `STRATAHUB_` prefix for both core (HTTP, TLS, logging) and application settings (MongoDB, sessions, etc.).
 
 Examples:
 ```bash
-export WAFFLE_HTTP_PORT=3000
-export WAFFLE_LOG_LEVEL=debug
+export STRATAHUB_HTTP_PORT=3000
+export STRATAHUB_LOG_LEVEL=debug
+export STRATAHUB_ENV=prod
 export STRATAHUB_MONGO_URI="mongodb://user:pass@dbserver:27017"
 export STRATAHUB_SESSION_KEY="your-production-secret-key"
 ```
@@ -648,12 +646,13 @@ When deploying to production:
 ### Example Production Environment Variables
 
 ```bash
-export WAFFLE_ENV=prod
-export WAFFLE_LOG_LEVEL=info
-export WAFFLE_USE_HTTPS=true
-export WAFFLE_USE_LETS_ENCRYPT=true
-export WAFFLE_LETS_ENCRYPT_EMAIL=admin@yourdomain.com
-export WAFFLE_DOMAIN=yourdomain.com
+# All settings use the STRATAHUB_ prefix
+export STRATAHUB_ENV=prod
+export STRATAHUB_LOG_LEVEL=info
+export STRATAHUB_USE_HTTPS=true
+export STRATAHUB_USE_LETS_ENCRYPT=true
+export STRATAHUB_LETS_ENCRYPT_EMAIL=admin@yourdomain.com
+export STRATAHUB_DOMAIN=yourdomain.com
 
 export STRATAHUB_MONGO_URI="mongodb://user:password@mongo.yourdomain.com:27017/strata_hub?authSource=admin"
 export STRATAHUB_SESSION_KEY="$(openssl rand -hex 32)"

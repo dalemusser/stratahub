@@ -24,14 +24,14 @@
 <div class="mb-2">
   <div class="flex flex-col items-center">
     <h1 class="menu-header text-xl font-bold text-indigo-600 dark:text-indigo-400">StrataHub</h1>
-    <span class="text-xs text-gray-500 dark:text-gray-400">SuperAdmin</span>
+    <span class="menu-text text-xs text-gray-500 dark:text-gray-400">SuperAdmin</span>
   </div>
 </div>
 
 <nav class="space-y-2 text-sm flex-1 pt-4 border-t border-gray-200 dark:border-gray-700">
-  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/dashboard" title="Dashboard"><span class="menu-icon mr-2">🎛️</span><span class="menu-text">Dashboard</span></a>
   <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/workspaces" title="Workspaces"><span class="menu-icon mr-2">🏠</span><span class="menu-text">Workspaces</span></a>
-  {{ template "menu_common" . }}
+  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/profile" title="Profile"><span class="menu-icon mr-2">👤</span><span class="menu-text">Profile</span></a>
+  <a class="menu-link flex items-center text-red-500 dark:text-red-400 hover:underline" href="/logout" title="Logout"><span class="menu-icon mr-2">🚪</span><span class="menu-text">Logout</span></a>
 </nav>
 
 {{ if .IsLoggedIn }}
@@ -48,7 +48,7 @@
 <div class="mb-2">
   <div class="flex flex-col items-center">
     {{ if .LogoURL }}
-      <img src="{{ .LogoURL }}" alt="{{ .SiteName }}" class="h-10 w-auto">
+      <img src="{{ .LogoURL }}" alt="{{ .SiteName }}" class="menu-logo h-10 w-auto object-contain">
     {{ end }}
     <h1 class="menu-header text-xl font-bold text-indigo-600 dark:text-indigo-400">{{ if .SiteName }}{{ .SiteName }}{{ else }}StrataHub{{ end }}</h1>
   </div>
@@ -84,7 +84,7 @@
 <div class="mb-2">
   <div class="flex flex-col items-center">
     {{ if .LogoURL }}
-      <img src="{{ .LogoURL }}" alt="{{ .SiteName }}" class="h-10 w-auto">
+      <img src="{{ .LogoURL }}" alt="{{ .SiteName }}" class="menu-logo h-10 w-auto object-contain">
     {{ end }}
     <h1 class="menu-header text-xl font-bold text-indigo-600 dark:text-indigo-400">{{ if .SiteName }}{{ .SiteName }}{{ else }}StrataHub{{ end }}</h1>
   </div>
@@ -110,7 +110,7 @@
 <div class="mb-2">
   <div class="flex flex-col items-center">
     {{ if .LogoURL }}
-      <img src="{{ .LogoURL }}" alt="{{ .SiteName }}" class="h-10 w-auto">
+      <img src="{{ .LogoURL }}" alt="{{ .SiteName }}" class="menu-logo h-10 w-auto object-contain">
     {{ end }}
     <h1 class="menu-header text-xl font-bold text-indigo-600 dark:text-indigo-400">{{ if .SiteName }}{{ .SiteName }}{{ else }}StrataHub{{ end }}</h1>
   </div>
@@ -145,7 +145,7 @@
 <div class="mb-2">
   <div class="flex flex-col items-center">
     {{ if .LogoURL }}
-      <img src="{{ .LogoURL }}" alt="{{ .SiteName }}" class="h-10 w-auto">
+      <img src="{{ .LogoURL }}" alt="{{ .SiteName }}" class="menu-logo h-10 w-auto object-contain">
     {{ end }}
     <h1 class="menu-header text-xl font-bold text-indigo-600 dark:text-indigo-400">{{ if .SiteName }}{{ .SiteName }}{{ else }}StrataHub{{ end }}</h1>
   </div>
@@ -176,7 +176,7 @@
 <div class="mb-2">
   <div class="flex flex-col items-center">
     {{ if .LogoURL }}
-      <img src="{{ .LogoURL }}" alt="{{ .SiteName }}" class="h-10 w-auto">
+      <img src="{{ .LogoURL }}" alt="{{ .SiteName }}" class="menu-logo h-10 w-auto object-contain">
     {{ end }}
     <h1 class="menu-header text-xl font-bold text-indigo-600 dark:text-indigo-400">{{ if .SiteName }}{{ .SiteName }}{{ else }}StrataHub{{ end }}</h1>
   </div>
@@ -203,9 +203,10 @@
 <div class="mb-2">
   <div class="flex flex-col items-center">
     {{ if .LogoURL }}
-      <img src="{{ .LogoURL }}" alt="{{ .SiteName }}" class="h-10 w-auto">
+      <img src="{{ .LogoURL }}" alt="{{ .SiteName }}" class="menu-logo h-10 w-auto object-contain">
     {{ end }}
     <h1 class="menu-header text-xl font-bold text-indigo-600 dark:text-indigo-400">{{ if .SiteName }}{{ .SiteName }}{{ else }}StrataHub{{ end }}</h1>
+    {{ if .IsApex }}<span class="menu-text text-xs text-gray-500 dark:text-gray-400">Workspace Management</span>{{ end }}
   </div>
 </div>
 
@@ -218,14 +219,18 @@
 
 {{/* ───────────────────────────── Shared links  ───────────────────────*/}}
 {{ define "menu_common" }}
-  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/about" title="About"><span class="menu-icon mr-2">ℹ️</span><span class="menu-text">About</span></a>
-  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/contact" title="Contact"><span class="menu-icon mr-2">📧</span><span class="menu-text">Contact</span></a>
-  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/terms" title="Terms of Service"><span class="menu-icon mr-2">📜</span><span class="menu-text">Terms</span></a>
-  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/privacy" title="Privacy Policy"><span class="menu-icon mr-2">🔒</span><span class="menu-text">Privacy</span></a>
+  {{/* Workspace-scoped content pages - hide on apex domain */}}
+  {{ if not .IsApex }}
+    <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/about" title="About"><span class="menu-icon mr-2">ℹ️</span><span class="menu-text">About</span></a>
+    <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/contact" title="Contact"><span class="menu-icon mr-2">📧</span><span class="menu-text">Contact</span></a>
+    <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/terms" title="Terms of Service"><span class="menu-icon mr-2">📜</span><span class="menu-text">Terms</span></a>
+    <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/privacy" title="Privacy Policy"><span class="menu-icon mr-2">🔒</span><span class="menu-text">Privacy</span></a>
+  {{ end }}
 
   {{ if .IsLoggedIn }}
     <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/profile" title="Profile"><span class="menu-icon mr-2">👤</span><span class="menu-text">Profile</span></a>
-    {{ if or (eq .Role "admin") (eq .Role "superadmin") }}
+    {{/* Settings only for admin on workspace (not apex) */}}
+    {{ if and (eq .Role "admin") (not .IsApex) }}
       <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/settings" title="Site Settings"><span class="menu-icon mr-2">⚙️</span><span class="menu-text">Settings</span></a>
     {{ end }}
     <a class="menu-link flex items-center text-red-500 dark:text-red-400 hover:underline" href="/logout" title="Logout"><span class="menu-icon mr-2">🚪</span><span class="menu-text">Logout</span></a>

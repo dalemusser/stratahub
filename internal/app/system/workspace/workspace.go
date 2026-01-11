@@ -1,11 +1,16 @@
 // Package workspace provides workspace context extraction and validation for multi-tenant operations.
 package workspace
 
+// Terminology: User Identifiers
+//   - UserID / userID / user_id: The MongoDB ObjectID (_id) that uniquely identifies a user record
+//   - LoginID / loginID / login_id: The human-readable string users type to log in
+
 import (
 	"context"
 	"net/http"
 	"strings"
 
+	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -206,10 +211,26 @@ func withWorkspace(r *http.Request, ws *Info) *http.Request {
 
 // RequireWorkspace returns middleware that ensures a workspace context exists.
 // Requests without workspace context (apex domain in multi-workspace mode) are rejected.
+// For HTML requests, redirects to /workspaces. For API/HTMX requests, returns an error.
 func RequireWorkspace(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		ws := FromRequest(r)
 		if ws == nil || ws.IsApex {
+			// For HTMX requests, use HX-Redirect
+			if r.Header.Get("HX-Request") == "true" {
+				w.Header().Set("HX-Redirect", "/workspaces")
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+
+			// For HTML requests, redirect to workspaces
+			accept := r.Header.Get("Accept")
+			if strings.Contains(accept, "text/html") || accept == "" {
+				http.Redirect(w, r, "/workspaces", http.StatusSeeOther)
+				return
+			}
+
+			// For API requests, return error
 			http.Error(w, "Workspace required", http.StatusBadRequest)
 			return
 		}
@@ -229,6 +250,85 @@ func RequireApex(next http.Handler) http.Handler {
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// WorkspaceLookup defines the interface for looking up workspace info.
+type WorkspaceLookup interface {
+	GetByID(ctx context.Context, id primitive.ObjectID) (models.Workspace, error)
+}
+
+// RedirectNonSuperadminFromApex returns middleware that redirects logged-in
+// non-superadmin users to their workspace domain. This prevents workspace users
+// from accidentally accessing the apex domain via shared session cookies.
+// Superadmins and visitors (not logged in) are allowed through.
+//
+// If the user has a WorkspaceID in their session, they are redirected to their
+// workspace subdomain. Otherwise, they are redirected to the apex-denied page.
+func RedirectNonSuperadminFromApex(store WorkspaceLookup, primaryDomain string, logger *zap.Logger) func(http.Handler) http.Handler {
+	return func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			ws := FromRequest(r)
+			if ws == nil || !ws.IsApex {
+				// Not on apex, allow through
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Allow certain paths to prevent redirect loops and ensure assets load
+			path := r.URL.Path
+			if path == "/apex-denied" || path == "/logout" ||
+				strings.HasPrefix(path, "/static/") ||
+				strings.HasPrefix(path, "/assets/") {
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// On apex - check if logged in
+			user, ok := auth.CurrentUser(r)
+			if !ok {
+				// Not logged in, allow through (visitor)
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Logged in - check role
+			if user.Role == "superadmin" {
+				// Superadmin allowed at apex
+				next.ServeHTTP(w, r)
+				return
+			}
+
+			// Non-superadmin at apex - try to redirect to their workspace
+			redirectURL := "/apex-denied" // fallback
+			if user.WorkspaceID != "" {
+				wsID, err := primitive.ObjectIDFromHex(user.WorkspaceID)
+				if err == nil {
+					ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
+					defer cancel()
+					if userWS, err := store.GetByID(ctx, wsID); err == nil && userWS.Subdomain != "" {
+						// Build redirect URL to user's workspace
+						redirectURL = "https://" + userWS.Subdomain + "." + primaryDomain + r.URL.Path
+						if r.URL.RawQuery != "" {
+							redirectURL += "?" + r.URL.RawQuery
+						}
+						logger.Debug("redirecting user to their workspace",
+							zap.String("user_id", user.ID),
+							zap.String("workspace", userWS.Subdomain),
+							zap.String("redirect", redirectURL))
+					}
+				}
+			}
+
+			// For HTMX requests, use HX-Redirect
+			if r.Header.Get("HX-Request") == "true" {
+				w.Header().Set("HX-Redirect", redirectURL)
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+
+			http.Redirect(w, r, redirectURL, http.StatusSeeOther)
+		})
+	}
 }
 
 /*─────────────────────────────────────────────────────────────────────────────*

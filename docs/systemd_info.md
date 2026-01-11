@@ -38,7 +38,7 @@ StartLimitIntervalSec=60
 StartLimitBurst=3
 
 # Environment
-Environment=WAFFLE_ENV=prod
+Environment=STRATAHUB_ENV=prod
 EnvironmentFile=-/opt/stratahub/.env
 
 # Security hardening
@@ -126,15 +126,15 @@ With `StartLimitBurst=3` and `StartLimitIntervalSec=60`:
 
 Example inline variables:
 ```ini
-Environment=WAFFLE_ENV=prod
-Environment=WAFFLE_LOG_LEVEL=info
+Environment=STRATAHUB_ENV=prod
+Environment=STRATAHUB_LOG_LEVEL=info
 Environment=STRATAHUB_MONGO_URI=mongodb://localhost:27017
 ```
 
 Example environment file (`/opt/stratahub/.env`):
 ```bash
-WAFFLE_ENV=prod
-WAFFLE_LOG_LEVEL=info
+STRATAHUB_ENV=prod
+STRATAHUB_LOG_LEVEL=info
 STRATAHUB_MONGO_URI=mongodb://user:password@localhost:27017/strata_hub
 STRATAHUB_SESSION_KEY=your-production-secret-key
 STRATAHUB_MAIL_SMTP_HOST=email-smtp.us-east-1.amazonaws.com

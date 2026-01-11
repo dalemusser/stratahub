@@ -32,8 +32,10 @@ func (s *Store) Get(ctx context.Context, workspaceID primitive.ObjectID) (models
 	if err == mongo.ErrNoDocuments {
 		// Return default settings for this workspace
 		return models.SiteSettings{
-			WorkspaceID: workspaceID,
-			SiteName:    models.DefaultSiteName,
+			WorkspaceID:    workspaceID,
+			SiteName:       models.DefaultSiteName,
+			LandingTitle:   models.DefaultLandingTitle,
+			LandingContent: models.DefaultLandingContent,
 		}, nil
 	}
 	if err != nil {
@@ -57,6 +59,8 @@ func (s *Store) Save(ctx context.Context, workspaceID primitive.ObjectID, settin
 			"site_name":            settings.SiteName,
 			"logo_path":            settings.LogoPath,
 			"logo_name":            settings.LogoName,
+			"landing_title":        settings.LandingTitle,
+			"landing_content":      settings.LandingContent,
 			"footer_html":          settings.FooterHTML,
 			"enabled_auth_methods": settings.EnabledAuthMethods,
 			"updated_at":           settings.UpdatedAt,
