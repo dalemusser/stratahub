@@ -25,3 +25,9 @@ func (h *Handler) Forbidden(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) Unauthorized(w http.ResponseWriter, r *http.Request) {
 	RenderUnauthorized(w, r, "/login")
 }
+
+// ApexDenied renders a page telling non-superadmin users to use their workspace domain.
+// GET /apex-denied
+func (h *Handler) ApexDenied(w http.ResponseWriter, r *http.Request) {
+	RenderApexDenied(w, r)
+}

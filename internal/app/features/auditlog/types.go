@@ -1,10 +1,15 @@
 // internal/app/features/auditlog/types.go
 package auditlog
 
+// Terminology: User Identifiers
+//   - UserID / userID / user_id: The MongoDB ObjectID (_id) that uniquely identifies a user record
+//   - LoginID / loginID / login_id: The human-readable string users type to log in
+
 import (
 	"time"
 
 	"github.com/dalemusser/stratahub/internal/app/store/audit"
+	"github.com/dalemusser/stratahub/internal/app/system/timezones"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 )
 
@@ -37,6 +42,9 @@ type listData struct {
 	// Filter options
 	Categories []categoryOption
 	EventTypes []string
+
+	// Timezone selector
+	TimezoneGroups []timezones.ZoneGroup
 
 	// Pagination
 	Page       int

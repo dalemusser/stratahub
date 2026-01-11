@@ -3,6 +3,7 @@
 {{ end }}
 
 {{ define "content" }}
+<div class="flex flex-col h-full">
 <div class="flex items-center mb-4">
   <a href="{{ if eq .Slug "about" }}/about{{ else if eq .Slug "contact" }}/contact{{ else if eq .Slug "terms-of-service" }}/terms{{ else if eq .Slug "privacy-policy" }}/privacy{{ else }}/{{ end }}"
      class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2 no-loader"
@@ -14,12 +15,12 @@
 </div>
 
 {{ if .Error }}
-  <div class="mb-3 p-2 border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded max-w-4xl">
+  <div class="mb-3 p-2 border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 rounded">
     {{ .Error }}
   </div>
 {{ end }}
 
-<form method="post" action="/pages/{{ .Slug }}/edit" class="space-y-4 max-w-4xl bg-white dark:bg-gray-800 p-4 rounded shadow">
+<form method="post" action="/pages/{{ .Slug }}/edit" class="space-y-4 bg-white dark:bg-gray-800 p-4 rounded shadow flex-1 mb-2 flex flex-col">
 
   <div>
     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Page Title</label>
@@ -28,10 +29,10 @@
     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">The title displayed at the top of the page.</p>
   </div>
 
-  <div>
+  <div class="flex-1 flex flex-col">
     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Content</label>
     <input type="hidden" name="content" id="page_content" value="{{ .Content }}">
-    <div class="tiptap-container">
+    <div class="tiptap-container flex-1 flex flex-col">
       <!-- Toolbar -->
       <div class="tiptap-toolbar" id="editor-toolbar">
         <button type="button" data-action="bold" title="Bold (Ctrl+B)"><b>B</b></button>
@@ -65,7 +66,7 @@
         <button type="button" data-action="redo" title="Redo (Ctrl+Y)">&#8631;</button>
       </div>
       <!-- Editor -->
-      <div id="editor"></div>
+      <div id="editor" class="flex-1"></div>
     </div>
   </div>
 
@@ -78,6 +79,7 @@
        onclick="return confirm('Discard unsaved changes?');">Cancel</a>
   </div>
 </form>
+</div>
 
 <script src="/assets/js/tiptap.min.js"></script>
 <script>

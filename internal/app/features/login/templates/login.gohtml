@@ -3,18 +3,19 @@
 {{ end }}
 
 {{ define "content" }}
+<div class="flex flex-col h-full">
 <div class="mb-4">
-  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Login</h1>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">🔐 Login</h1>
 </div>
 
-<div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm max-w-md">
+<div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm flex-1 mb-2">
   {{ if .Error }}
-    <div class="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 p-2 rounded mb-4">
+    <div class="bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 p-2 rounded mb-4 max-w-md">
       {{ .Error }}
     </div>
   {{ end }}
 
-  <form method="POST" action="/login" class="space-y-3">
+  <form method="POST" action="/login" class="space-y-3 max-w-md">
     <input type="hidden" name="return" value="{{ .ReturnURL }}">
     <!-- Login ID Field -->
     <div>
@@ -37,5 +38,6 @@
       Login
     </button>
   </form>
+</div>
 </div>
 {{ end }}

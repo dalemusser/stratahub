@@ -25,6 +25,10 @@ type pageData struct {
 	SiteName   string
 	LogoURL    string
 	FooterHTML string
+	IsApex     bool
+
+	// Additional fields for specific error pages
+	ActualRole string // The user's actual role (for display when Role is overridden for menu)
 }
 
 // ErrorLogger provides error logging with context for HTTP handlers.
@@ -47,6 +51,24 @@ func (el *ErrorLogger) logError(r *http.Request, context string, err error) {
 		zap.Error(err),
 		zap.String("path", r.URL.Path),
 		zap.String("method", r.Method))
+}
+
+// RenderApexDenied shows a page telling non-superadmin users they need to use their workspace domain.
+func RenderApexDenied(w http.ResponseWriter, r *http.Request) {
+	role, name, _, signed := authz.UserCtx(r)
+
+	data := pageData{
+		Title:      "Wrong Domain",
+		IsLoggedIn: signed,
+		Role:       "visitor", // Force visitor menu to show minimal options
+		UserName:   name,
+		SiteName:   models.DefaultSiteName,
+		IsApex:     true,
+		ActualRole: role,
+	}
+
+	w.WriteHeader(http.StatusForbidden)
+	templates.Render(w, r, "error_apex_denied", data)
 }
 
 // RenderUnauthorized shows a friendly "sign in required" page.

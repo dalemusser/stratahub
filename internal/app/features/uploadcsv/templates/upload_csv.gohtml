@@ -10,7 +10,7 @@
     <- Back
   </a>
   <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">
-    {{ if .GroupMode }}Upload CSV to Group{{ else }}Upload CSV{{ end }}
+    📤 {{ if .GroupMode }}Upload CSV to Group{{ else }}Upload CSV{{ end }}
   </h1>
 </div>
 
@@ -20,7 +20,7 @@
 
 {{ if .ShowPreview }}
   <!-- Preview Mode: Show what will happen -->
-  <div class="max-w-4xl">
+  <div>
     {{ if and .GroupMode .GroupID }}
     <!-- Selected context (read-only in preview) -->
     <div class="text-sm text-gray-700 dark:text-gray-300 mb-3">
@@ -70,7 +70,7 @@
 
 {{ else if .ShowSummary }}
   <!-- Summary Mode: Show results after import -->
-  <div class="max-w-4xl">
+  <div>
     {{ if and .GroupMode .GroupID }}
     <!-- Selected context (read-only in summary) -->
     <div class="text-sm text-gray-700 dark:text-gray-300 mb-3">
@@ -136,7 +136,7 @@
   {{ end }}
 
   <form id="upload-form" method="post" action="/upload_csv" enctype="multipart/form-data"
-        class="space-y-3 max-w-xl bg-white dark:bg-gray-800 p-4 rounded border dark:border-gray-700">
+        class="space-y-3 bg-white dark:bg-gray-800 p-4 rounded border dark:border-gray-700">
 
     <input type="hidden" name="return" value="{{ .ReturnURL }}">
     <input type="hidden" name="groupMode" value="{{ .GroupMode }}">

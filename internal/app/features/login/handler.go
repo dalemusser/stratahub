@@ -1,6 +1,10 @@
 // internal/app/features/login/handler.go
 package login
 
+// Terminology: User Identifiers
+//   - UserID / userID / user_id: The MongoDB ObjectID (_id) that uniquely identifies a user record
+//   - LoginID / loginID / login_id: The human-readable string users type to log in
+
 import (
 	"context"
 	"errors"
@@ -247,6 +251,23 @@ func (h *Handler) HandleLoginPost(w http.ResponseWriter, r *http.Request) {
 			loginID,
 		)
 		return
+	}
+
+	/*── check apex domain: only superadmins can login at apex ──────────────*/
+
+	if h.MultiWorkspace {
+		ws := workspace.FromRequest(r)
+		if ws != nil && ws.IsApex && normalize.Role(u.Role) != "superadmin" {
+			// Non-superadmin trying to login at apex domain
+			h.AuditLog.LoginFailedUserNotFound(ctx, r, loginID) // Log as not found for security
+			h.renderFormWithError(
+				w,
+				r,
+				"Please login at your workspace domain.",
+				loginID,
+			)
+			return
+		}
 	}
 
 	/*── check auth method is enabled for this workspace ────────────────────*/

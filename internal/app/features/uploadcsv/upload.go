@@ -1,6 +1,10 @@
 // internal/app/features/uploadcsv/upload.go
 package uploadcsv
 
+// Terminology: User Identifiers
+//   - UserID / userID / user_id: The MongoDB ObjectID (_id) that uniquely identifies a user record
+//   - LoginID / loginID / login_id: The human-readable string users type to log in
+
 import (
 	"context"
 	"encoding/json"

@@ -29,8 +29,11 @@ type workspaceSettingsVM struct {
 	viewdata.BaseVM
 	WorkspaceID        string
 	WorkspaceName      string
+	WSSiteName         string // Workspace-specific site name (different from BaseVM.SiteName which is apex context)
 	HasLogo            bool
+	LogoURL            string
 	LogoName           string
+	FooterHTML         string
 	AllAuthMethods     []models.AuthMethod
 	EnabledAuthMethods map[string]bool
 	Error              string
@@ -77,12 +80,21 @@ func (h *Handler) ServeSettings(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Generate logo URL if exists
+	var logoURL string
+	if settings.HasLogo() {
+		logoURL = h.Storage.URL(settings.LogoPath)
+	}
+
 	vm := workspaceSettingsVM{
 		BaseVM:             viewdata.NewBaseVM(r, h.DB, "Workspace Settings", "/workspaces"),
 		WorkspaceID:        wsID.Hex(),
 		WorkspaceName:      ws.Name,
+		WSSiteName:         settings.SiteName,
 		HasLogo:            settings.HasLogo(),
+		LogoURL:            logoURL,
 		LogoName:           settings.LogoName,
+		FooterHTML:         settings.FooterHTML,
 		AllAuthMethods:     models.AllAuthMethods,
 		EnabledAuthMethods: enabledMap,
 	}
@@ -241,12 +253,21 @@ func (h *Handler) renderSettingsWithError(w http.ResponseWriter, r *http.Request
 		}
 	}
 
+	// Generate logo URL if exists
+	var logoURL string
+	if settings.HasLogo() {
+		logoURL = h.Storage.URL(settings.LogoPath)
+	}
+
 	vm := workspaceSettingsVM{
 		BaseVM:             viewdata.NewBaseVM(r, h.DB, "Workspace Settings", "/workspaces"),
 		WorkspaceID:        wsID.Hex(),
 		WorkspaceName:      ws.Name,
+		WSSiteName:         settings.SiteName,
 		HasLogo:            settings.HasLogo(),
+		LogoURL:            logoURL,
 		LogoName:           settings.LogoName,
+		FooterHTML:         settings.FooterHTML,
 		AllAuthMethods:     models.AllAuthMethods,
 		EnabledAuthMethods: enabledMap,
 		Error:              errMsg,
