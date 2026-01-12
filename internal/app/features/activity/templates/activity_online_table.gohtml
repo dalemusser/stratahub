@@ -10,25 +10,25 @@
   </div>
   <div class="flex items-center gap-2">
     {{ if .HasPrev }}
-      <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap cursor-pointer"
+      <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap cursor-pointer"
          hx-get="/activity/online-table?group={{ .SelectedGroup }}&status={{ .StatusFilter }}&search={{ .SearchQuery }}&sort={{ .SortBy }}&dir={{ .SortDir }}&page={{ .PrevPage }}"
          hx-target="#online-table"
          hx-swap="innerHTML">Prev</a>
     {{ else }}
-      <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
+      <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
     {{ end }}
     {{ if .HasNext }}
-      <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap cursor-pointer"
+      <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap cursor-pointer"
          hx-get="/activity/online-table?group={{ .SelectedGroup }}&status={{ .StatusFilter }}&search={{ .SearchQuery }}&sort={{ .SortBy }}&dir={{ .SortDir }}&page={{ .NextPage }}"
          hx-target="#online-table"
          hx-swap="innerHTML">Next</a>
     {{ else }}
-      <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
+      <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
     {{ end }}
   </div>
 </div>
 
-<div class="bg-white dark:bg-gray-800 rounded shadow overflow-auto" style="max-height: calc(100vh - 19rem); min-height: 10rem;">
+<div class="p-4 bg-white dark:bg-gray-800 rounded shadow overflow-auto" style="max-height: calc(100vh - 19rem); min-height: 10rem;">
   {{ if eq (len .Members) 0 }}
   <div class="p-8 text-center text-gray-500 dark:text-gray-400">
     No students found matching the selected filters.
@@ -36,7 +36,7 @@
   {{ else }}
   <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
     <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs sticky top-0 z-10">
-      <tr>
+      <tr class="border-b border-gray-300 dark:border-gray-600">
         <th class="px-4 py-2 w-1/4">
           <a hx-get="/activity/online-table?group={{ $.SelectedGroup }}&status={{ $.StatusFilter }}&search={{ $.SearchQuery }}&sort=name&dir={{ if and (eq $.SortBy "name") (eq $.SortDir "asc") }}desc{{ else }}asc{{ end }}&page=1"
              hx-target="#online-table"
@@ -81,9 +81,9 @@
         <th class="px-4 py-2 w-20 text-right">Actions</th>
       </tr>
     </thead>
-    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+    <tbody>
       {{ range .Members }}
-      <tr class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
+      <tr class="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900/50">
         <td class="px-4 py-2 align-middle" title="{{ .OrgName }}{{ if and .OrgName .Email }}&#10;{{ end }}{{ .Email }}">
           <div class="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">{{ .Name }}</div>
           <div class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ .LoginID }}</div>

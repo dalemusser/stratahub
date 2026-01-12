@@ -3,114 +3,108 @@
 {{ end }}
 
 {{ define "content" }}
-<div class="flex items-center justify-between mb-2">
-  <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200">🏢 Organizations</h1>
-</div>
-
-<form
-  id="orgs-search-form"
-  action="/organizations"
-  method="GET"
-  class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-1 flex flex-col md:flex-row gap-2 md:items-center"
-  hx-get="/organizations"
-  hx-target="#orgs-table-wrap"
-  hx-swap="outerHTML"
-  hx-push-url="true"
-  hx-trigger="keyup changed delay:300ms from:#q"
->
-  <input
-    id="q"
-    name="q"
-    type="text"
-    placeholder="Search by name, city, or state..."
-    value="{{ .Q }}"
-    class="flex-1 px-4 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
-  />
-
-
-  <div class="ml-auto flex gap-2">
-    <a
-      href="/organizations"
-      class="px-4 py-2 border rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700 {{ if eq .Role "admin" }}mr-6{{ end }}"
-    >
-      Clear
-    </a>
-
+<div class="flex flex-col h-full">
+  <div class="mb-4 flex items-center justify-between">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">🏢 Organizations</h1>
     {{ if eq .Role "admin" }}
     <a href="/organizations/new"
-       class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+       class="px-3 py-1 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700">
       Add Organization
     </a>
     {{ end }}
   </div>
-</form>
 
-{{ template "organizations_table" . }}
+  <section class="flex-1 min-w-0 flex flex-col">
+    <form
+      id="orgs-search-form"
+      action="/organizations"
+      method="GET"
+      class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-1 flex flex-wrap items-center gap-2"
+      hx-get="/organizations"
+      hx-target="#orgs-table-wrap"
+      hx-swap="outerHTML"
+      hx-push-url="true"
+      hx-trigger="keyup changed delay:300ms from:#q"
+    >
+      <input
+        id="q"
+        name="q"
+        type="text"
+        placeholder="Search by name, city, or state..."
+        value="{{ .Q }}"
+        class="flex-1 px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+      />
 
-  <div id="modal-root"></div>
+      <a
+        href="/organizations"
+        class="px-4 py-2 border rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700"
+      >
+        Clear
+      </a>
+    </form>
+
+    {{ template "organizations_table" . }}
+  </section>
+</div>
+<div id="modal-root"></div>
 {{ end }}
 
 {{ define "organizations_table" }}
-<!-- Top pager -->
-<div id="orgs-table-wrap">
-<div class="flex items-center justify-between mb-1">
-  <div class="text-gray-600 dark:text-gray-400 text-sm">
-    {{ if .Total }}{{ .RangeStart }}–{{ .RangeEnd }} of {{ .Total }} shown{{ else }}0 of 0 shown{{ end }}
+<div id="orgs-table-wrap" class="flex-1 flex flex-col">
+  <!-- Top pager -->
+  <div class="flex items-center justify-between mb-1">
+    <div class="text-gray-600 dark:text-gray-400 text-sm">
+      {{ if .Total }}{{ .RangeStart }}–{{ .RangeEnd }} of {{ .Total }} shown{{ else }}0 of 0 shown{{ end }}
+    </div>
+    <div class="flex items-center gap-2">
+      {{ if .HasPrev }}
+        <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+           href="/organizations?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}before={{ .PrevCursor }}&start={{ .PrevStart }}"
+           hx-get="/organizations?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}before={{ .PrevCursor }}&start={{ .PrevStart }}"
+           hx-target="#orgs-table-wrap" hx-swap="outerHTML" hx-push-url="true">Prev</a>
+      {{ else }}
+        <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
+      {{ end }}
+      {{ if .HasNext }}
+        <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+           href="/organizations?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}after={{ .NextCursor }}&start={{ .NextStart }}"
+           hx-get="/organizations?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}after={{ .NextCursor }}&start={{ .NextStart }}"
+           hx-target="#orgs-table-wrap" hx-swap="outerHTML" hx-push-url="true">Next</a>
+      {{ else }}
+        <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
+      {{ end }}
+    </div>
   </div>
-  <div class="flex items-center gap-2">
-    {{ if .HasPrev }}
-      <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
-         href="/organizations?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}before={{ .PrevCursor }}&start={{ .PrevStart }}"
-         hx-get="/organizations?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}before={{ .PrevCursor }}&start={{ .PrevStart }}"
-         hx-target="#orgs-table-wrap" hx-swap="outerHTML" hx-push-url="true">Prev</a>
-    {{ else }}
-      <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
-    {{ end }}
-    {{ if .HasNext }}
-      <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
-         href="/organizations?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}after={{ .NextCursor }}&start={{ .NextStart }}"
-         hx-get="/organizations?{{ if .Q }}q={{ .Q | urlquery }}&{{ end }}after={{ .NextCursor }}&start={{ .NextStart }}"
-         hx-target="#orgs-table-wrap" hx-swap="outerHTML" hx-push-url="true">Next</a>
-    {{ else }}
-      <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
-    {{ end }}
-  </div>
-</div>
 
-<div class="bg-white dark:bg-gray-800 rounded shadow overflow-auto" style="max-height: calc(100vh - 13.5rem); min-height: 10rem;">
-  <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
-    <!-- set consistent column widths so header & rows line up -->
-    <colgroup>
-      <col class="w-2/5" />  <!-- Organization -->
-      <col class="w-1/5" />  <!-- City -->
-      <col class="w-16"  />  <!-- State -->
-      <col class="w-20"  />  <!-- # Leaders -->
-      <col class="w-20"  />  <!-- # Groups -->
-      <col class="w-36"  />  <!-- Actions -->
-    </colgroup>
-
-    <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs sticky top-0 z-10">
-      <tr>
-        <th class="px-2 py-2">Organization</th>
-        <th class="px-2 py-2">City</th>
-        <th class="px-2 py-2">State</th>
-        <th class="px-2 py-2">Leaders</th>
-        <th class="px-2 py-2">Groups</th>
-        <th class="px-2 py-2 text-right">Actions</th>
-      </tr>
-    </thead>
-
-    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-      {{ range .Items }}
-      <tr>
-        <td class="px-2 py-2">{{ .Name }}</td>
-        <td class="px-2 py-2">{{ .City }}</td>
-        <td class="px-2 py-2">{{ .State }}</td>
-        <td class="px-2 py-2 text-center">{{ .LeadersCount }}</td>
-        <td class="px-2 py-2 text-center">{{ .GroupsCount }}</td>
-        <!-- right-align actions; span fills cell so buttons hug the right -->
-        <td class="px-2 py-2 text-right">
-          <span class="inline-flex justify-end gap-2 w-full">
+  <div class="p-4 bg-white dark:bg-gray-800 rounded shadow flex-1 mb-2 overflow-auto">
+    <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+      <colgroup>
+        <col style="width: 30%;" />
+        <col style="width: 20%;" />
+        <col style="width: 10%;" />
+        <col style="width: 12%;" />
+        <col style="width: 12%;" />
+        <col style="width: 10rem;" />
+      </colgroup>
+      <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs">
+        <tr class="border-b border-gray-300 dark:border-gray-600">
+          <th class="px-2 py-2">Organization</th>
+          <th class="px-2 py-2">City</th>
+          <th class="px-2 py-2">State</th>
+          <th class="px-2 py-2 text-center">Leaders</th>
+          <th class="px-2 py-2 text-center">Groups</th>
+          <th class="px-2 py-2 text-right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ range .Items }}
+        <tr class="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900/50">
+          <td class="px-2 py-2 align-middle">{{ .Name }}</td>
+          <td class="px-2 py-2 align-middle">{{ .City }}</td>
+          <td class="px-2 py-2 align-middle">{{ .State }}</td>
+          <td class="px-2 py-2 align-middle text-center">{{ .LeadersCount }}</td>
+          <td class="px-2 py-2 align-middle text-center">{{ .GroupsCount }}</td>
+          <td class="px-2 py-2 align-middle text-right">
             <form
               method="get"
               action="/organizations/{{ .ID.Hex }}/manage_modal"
@@ -121,26 +115,24 @@
             >
               <button
                 type="submit"
-                class="bg-indigo-600 text-white px-2 py-1 rounded hover:bg-indigo-700 text-xs md:text-sm"
+                class="bg-indigo-600 text-white px-2 py-1 rounded text-xs hover:bg-indigo-700"
                 title="Manage {{ .Name }}"
               >
                 Manage
               </button>
             </form>
-          </span>
-        </td>
-      </tr>
-      {{ else }}
-      <tr>
-        <td colspan="6" class="px-2 py-6 text-center text-gray-500 dark:text-gray-400">
-          No organizations found.
-        </td>
-      </tr>
-      {{ end }}
-    </tbody>
-  </table>
-  <div class="w-full border-t border-gray-300 dark:border-gray-600"></div>
-</div>
+          </td>
+        </tr>
+        {{ else }}
+        <tr>
+          <td colspan="6" class="px-2 py-6 text-center text-gray-500 dark:text-gray-400">
+            No organizations found.
+          </td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
 </div>
 {{ end }}
 
@@ -151,24 +143,31 @@
     <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Manage Organization</h2>
     <p class="text-sm text-gray-700 dark:text-gray-300">{{ .Name }}</p>
 
-    <div class="flex flex-col gap-3 pt-2">
-      <div class="flex justify-center gap-2">
-        <a
-          href="/organizations/{{ .ID }}/view?return={{ .BackURL | urlquery }}"
-          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
-        >View</a>
+    <div class="flex justify-center gap-2">
+      <a
+        href="/organizations/{{ .ID }}/view?return={{ .BackURL | urlquery }}"
+        class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
+      >View</a>
 
-        <a
-          href="/organizations/{{ .ID }}/edit?return={{ .BackURL | urlquery }}"
-          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
-        >Edit</a>
+      <a
+        href="/organizations/{{ .ID }}/edit?return={{ .BackURL | urlquery }}"
+        class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
+      >Edit</a>
 
-        <a
-          href="/upload_csv?org={{ .ID }}&allowGroup=true&return={{ .BackURL | urlquery }}"
-          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
-        >CSV</a>
+      <a
+        href="/upload_csv?org={{ .ID }}&allowGroup=true&return={{ .BackURL | urlquery }}"
+        class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
+      >CSV</a>
+    </div>
 
-        {{ if eq .Role "admin" }}
+    {{ if eq .Role "admin" }}
+    <!-- Danger Zone -->
+    <div class="p-3 border border-red-300 dark:border-red-700 rounded bg-red-50 dark:bg-red-900/20">
+      <div class="flex items-center justify-between gap-4">
+        <div>
+          <div class="text-sm font-semibold text-red-800 dark:text-red-300">Danger Zone</div>
+          <p class="text-xs text-red-700 dark:text-red-400">Permanently delete this organization.</p>
+        </div>
         <form
           method="post"
           action="/organizations/{{ .ID }}/delete"
@@ -181,18 +180,18 @@
             Delete
           </button>
         </form>
-        {{ end }}
       </div>
+    </div>
+    {{ end }}
 
-      <div class="flex justify-start">
-        <button
-          type="button"
-          class="px-3 py-1 border rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-          onclick="document.getElementById('modal-root').innerHTML=''"
-        >
-          Close
-        </button>
-      </div>
+    <div class="flex justify-start">
+      <button
+        type="button"
+        class="px-3 py-1 border rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+        onclick="document.getElementById('modal-root').innerHTML=''"
+      >
+        Close
+      </button>
     </div>
   </div>
 </div>

@@ -3,161 +3,175 @@
 {{ end }}
 
 {{ define "content" }}
-<div class="flex items-center mb-2">
-  <a href="{{ .BackURL }}"
-     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
-     title="Go back">
-    <- Back
-  </a>
-  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📎 View Material</h1>
-</div>
-
-<div class="bg-white dark:bg-gray-800 rounded shadow p-4 max-w-xl space-y-4">
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
-    <input type="text" value="{{ .MaterialTitle }}" class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm" readonly />
+<div class="flex flex-col h-full">
+  <div class="mb-4 flex items-center">
+    <a href="{{ .BackURL }}"
+       class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2 no-loader"
+       title="Go back">
+      ← Back
+    </a>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📎 View Material</h1>
   </div>
 
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
-    <input type="text" value="{{ .Type }}" class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm" readonly />
-  </div>
+  <div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm flex-1 mb-2">
+    <div class="space-y-3 max-w-xl">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+        <input type="text" value="{{ .MaterialTitle }}" readonly
+               class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
+      </div>
 
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subject</label>
-    <input type="text" value="{{ .Subject }}" class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm" readonly />
-  </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+        <input type="text" value="{{ .Type }}" readonly
+               class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
+      </div>
 
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-    <textarea class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm" rows="4" readonly>{{ .Description }}</textarea>
-  </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subject</label>
+        <input type="text" value="{{ .Subject }}" readonly
+               class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
+      </div>
 
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
-    <input type="text" value="{{ .Status }}" class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm" readonly />
-  </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+        <textarea readonly rows="4"
+                  class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm">{{ .Description }}</textarea>
+      </div>
 
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Content</label>
-    {{ if .HasFile }}
-      <div class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm flex items-center justify-between">
-        <span>
-          <span class="font-medium">File:</span> {{ .FileName }}
-          {{ if .FileSize }}<span class="text-gray-500 dark:text-gray-400">({{ .FileSize }} bytes)</span>{{ end }}
-        </span>
-        <a href="/materials/{{ .ID }}/download" target="_blank"
-           class="ml-2 px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 whitespace-nowrap">
-          Download
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+        <input type="text" value="{{ .Status }}" readonly
+               class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Content</label>
+        {{ if .HasFile }}
+          <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm flex items-center justify-between">
+            <span>
+              <span class="font-medium">File:</span> {{ .FileName }}
+              {{ if .FileSize }}<span class="text-gray-500 dark:text-gray-400">({{ .FileSize }} bytes)</span>{{ end }}
+            </span>
+            <a href="/materials/{{ .ID }}/download" target="_blank"
+               class="ml-2 px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 whitespace-nowrap">
+              Download
+            </a>
+          </div>
+        {{ else if .LaunchURL }}
+          <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm break-all flex items-center justify-between">
+            <span>
+              <span class="font-medium">URL:</span>
+              <a href="{{ .LaunchURL }}" target="_blank" class="text-green-600 dark:text-green-400 hover:underline">{{ .LaunchURL }}</a>
+            </span>
+            <a href="{{ .LaunchURL }}" target="_blank"
+               class="ml-2 px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 whitespace-nowrap">
+              Open Link
+            </a>
+          </div>
+        {{ else }}
+          <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm text-gray-500 dark:text-gray-400">
+            No content specified
+          </div>
+        {{ end }}
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Instructions</label>
+        <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm tiptap-content min-h-[100px]">{{ .DefaultInstructions }}</div>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Assignments</label>
+        <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm">
+          {{ .AssignmentCount }} assignment(s)
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 flex gap-2">
+        {{ if .CanEdit }}
+        <a
+          href="/materials/{{ .ID }}/edit?return={{ .BackURL | urlquery }}"
+          class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
+        >
+          Edit Material
+        </a>
+        {{ end }}
+
+        <a
+          href="/materials/{{ .ID }}/assign"
+          class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
+        >
+          Assign
+        </a>
+
+        <a
+          href="/materials/{{ .ID }}/assignments"
+          class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
+        >
+          Assignments
         </a>
       </div>
-    {{ else if .LaunchURL }}
-      <div class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm break-all flex items-center justify-between">
-        <span>
-          <span class="font-medium">URL:</span>
-          <a href="{{ .LaunchURL }}" target="_blank" class="text-indigo-600 hover:underline">{{ .LaunchURL }}</a>
-        </span>
-        <a href="{{ .LaunchURL }}" target="_blank"
-           class="ml-2 px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 whitespace-nowrap">
-          Open Link
-        </a>
-      </div>
-    {{ else }}
-      <div class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm text-gray-500 dark:text-gray-400">
-        No content specified
-      </div>
-    {{ end }}
-  </div>
+    </div>
 
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Instructions</label>
-    <div class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm tiptap-content min-h-[100px]">{{ .DefaultInstructions }}</div>
-  </div>
+    <!-- Help text -->
+    <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 max-w-xl">
+      <div class="text-xs text-gray-600 dark:text-gray-400 space-y-2">
+        <p>
+          <span class="font-semibold">Status</span> –
+          <span class="font-semibold">Active</span>: the material is available to leaders. Any leader assigned to this material (directly or via their organization) will see it in their Materials list and can open it normally.
+          <span class="font-semibold">Disabled</span>: the material is hidden from all leaders, even if assigned. Admins can still see and manage it, and assignments remain intact, but leaders cannot see or open the material until it is re-activated.
+        </p>
+        <p>
+          <span class="font-semibold">Assignments</span> – Materials can be assigned to an entire Organization (all current and future leaders in that org) or to individual Leaders. Each assignment can have its own visibility dates (Visible From / Visible Until) and custom directions.
+        </p>
+      </div>
 
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Assignments</label>
-    <div class="flex items-center gap-4">
-      <span class="text-sm text-gray-600 dark:text-gray-400">{{ .AssignmentCount }} assignment(s)</span>
-      <a href="/materials/{{ .ID }}/assignments" class="text-sm text-indigo-600 hover:underline">View Assignments</a>
+      <div class="mt-3 text-xs text-gray-600 dark:text-gray-400">
+        <table class="w-full border border-gray-200 dark:border-gray-600 border-collapse">
+          <thead class="bg-gray-50 dark:bg-gray-700">
+            <tr>
+              <th class="border border-gray-200 dark:border-gray-600 px-2 py-1 text-left">Setting</th>
+              <th class="border border-gray-200 dark:border-gray-600 px-2 py-1 text-left">Value</th>
+              <th class="border border-gray-200 dark:border-gray-600 px-2 py-1 text-left">Leaders see it?</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Status</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Active</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Yes, if assigned to them or their organization, and within visibility dates.</td>
+            </tr>
+            <tr>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Status</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Disabled</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">No, hidden from all leaders even if assigned.</td>
+            </tr>
+            <tr>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Visible From</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Set</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Only after the specified date/time.</td>
+            </tr>
+            <tr>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Visible From</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Empty</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">No, assignment is not yet available.</td>
+            </tr>
+            <tr>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Visible Until</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Set</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Only until the specified date/time.</td>
+            </tr>
+            <tr>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Visible Until</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Empty</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">No expiration, remains visible indefinitely.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
     </div>
   </div>
-
-  <div class="pt-3 flex gap-2">
-    {{ if .CanEdit }}
-    <a
-      href="/materials/{{ .ID }}/edit?return={{ .BackURL | urlquery }}"
-      class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-    >
-      Edit Material
-    </a>
-    {{ end }}
-
-    <a
-      href="/materials/{{ .ID }}/assign"
-      class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-    >
-      Assign
-    </a>
-
-    <a
-      href="/materials/{{ .ID }}/assignments"
-      class="inline-flex items-center px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-    >
-      Assignments
-    </a>
-  </div>
-</div>
-
-<div class="mt-4 text-xs text-gray-600 dark:text-gray-400 space-y-2 max-w-xl">
-  <p>
-    <span class="font-semibold">Status</span> &ndash;
-    <span class="font-semibold">Active</span>: the material is available to leaders. Any leader assigned to this material (directly or via their organization) will see it in their Materials list and can open it normally.
-    <span class="font-semibold">Disabled</span>: the material is hidden from all leaders, even if assigned. Admins can still see and manage it, and assignments remain intact, but leaders cannot see or open the material until it is re-activated.
-  </p>
-  <p>
-    <span class="font-semibold">Assignments</span> &ndash; Materials can be assigned to an entire Organization (all current and future leaders in that org) or to individual Leaders. Each assignment can have its own visibility dates (Visible From / Visible Until) and custom directions.
-  </p>
-
-  <table class="mt-2 w-full border-collapse text-xs">
-    <thead>
-      <tr class="bg-gray-100 dark:bg-gray-700">
-        <th class="border px-2 py-1 text-left">Setting</th>
-        <th class="border px-2 py-1 text-left">Value</th>
-        <th class="border px-2 py-1 text-left">Leaders see it?</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td class="border px-2 py-1">Status</td>
-        <td class="border px-2 py-1">Active</td>
-        <td class="border px-2 py-1">Yes, if assigned to them or their organization, and within visibility dates.</td>
-      </tr>
-      <tr>
-        <td class="border px-2 py-1">Status</td>
-        <td class="border px-2 py-1">Disabled</td>
-        <td class="border px-2 py-1">No, hidden from all leaders even if assigned.</td>
-      </tr>
-      <tr>
-        <td class="border px-2 py-1">Visible From</td>
-        <td class="border px-2 py-1">Set</td>
-        <td class="border px-2 py-1">Only after the specified date/time.</td>
-      </tr>
-      <tr>
-        <td class="border px-2 py-1">Visible From</td>
-        <td class="border px-2 py-1">Empty</td>
-        <td class="border px-2 py-1">No, assignment is not yet available.</td>
-      </tr>
-      <tr>
-        <td class="border px-2 py-1">Visible Until</td>
-        <td class="border px-2 py-1">Set</td>
-        <td class="border px-2 py-1">Only until the specified date/time.</td>
-      </tr>
-      <tr>
-        <td class="border px-2 py-1">Visible Until</td>
-        <td class="border px-2 py-1">Empty</td>
-        <td class="border px-2 py-1">No expiration, remains visible indefinitely.</td>
-      </tr>
-    </tbody>
-  </table>
 </div>
 {{ end }}

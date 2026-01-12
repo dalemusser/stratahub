@@ -220,6 +220,14 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 	// Get timezone groups for selector
 	tzGroups, _ := timezones.Groups()
 
+	// Calculate range for display
+	rangeStart := (page-1)*pageSize + 1
+	rangeEnd := rangeStart + len(items) - 1
+	if len(items) == 0 {
+		rangeStart = 0
+		rangeEnd = 0
+	}
+
 	templates.RenderAutoMap(w, r, "audit_list", nil, listData{
 		BaseVM:         viewdata.NewBaseVM(r, h.DB, "Audit Log", "/dashboard"),
 		Items:          items,
@@ -234,6 +242,8 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		TotalPages:     totalPages,
 		Total:          total,
 		Shown:          len(items),
+		RangeStart:     rangeStart,
+		RangeEnd:       rangeEnd,
 		HasPrev:        page > 1,
 		HasNext:        page < totalPages,
 		PrevPage:       prevPage,

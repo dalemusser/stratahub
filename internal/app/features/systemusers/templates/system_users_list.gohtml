@@ -3,78 +3,78 @@
 {{ end }}
 
 {{ define "content" }}
-<div class="flex items-center justify-between mb-2">
-  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">🧑‍💻 System Users</h1>
-</div>
+<div class="flex flex-col h-full">
+  <div class="mb-4 flex items-center justify-between">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">🧑‍💻 System Users</h1>
+    <a href="/system-users/new?return={{ .CurrentPath | urlquery }}"
+       class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Add User</a>
+  </div>
 
-<section class="flex-1 min-w-0">
-  <!-- Controls -->
-  <form
-    hx-get="/system-users"
-    hx-target="#content"
-    hx-swap="innerHTML"
-    hx-push-url="true"
-    hx-trigger="submit, keyup changed delay:300ms from:#su-q, change from:#su-status, change from:#su-role"
-    class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-1 flex flex-wrap items-center gap-2"
-  >
-    <input
-      id="su-q" name="search" type="text"
-      value="{{ .SearchQuery }}"
-      placeholder="Search by name"
-      class="px-3 py-2 border rounded flex-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
-
-    <select id="su-role" name="role" class="px-3 py-2 border rounded text-sm">
-      <option value="" {{ if not .URole }}selected{{ end }}>All Roles</option>
-      <option value="admin"   {{ if eq .URole "admin" }}selected{{ end }}>Admin</option>
-      <option value="analyst" {{ if eq .URole "analyst" }}selected{{ end }}>Analyst</option>
-      <option value="coordinator" {{ if eq .URole "coordinator" }}selected{{ end }}>Coordinator</option>
-    </select>
-
-    <select id="su-status" name="status" class="px-3 py-2 border rounded text-sm">
-      <option value="" {{ if not .Status }}selected{{ end }}>All Statuses</option>
-      <option value="active"   {{ if eq .Status "active" }}selected{{ end }}>Active</option>
-      <option value="disabled" {{ if eq .Status "disabled" }}selected{{ end }}>Disabled</option>
-    </select>
-
-    <!-- Clear: resets search, role, status -->
-    <a
-      href="/system-users?search=&role=&status="
+  <section class="flex-1 min-w-0 flex flex-col">
+    <!-- Controls -->
+    <form
       hx-get="/system-users"
-      hx-vals='{"search":"","role":"","status":""}'
       hx-target="#content"
       hx-swap="innerHTML"
       hx-push-url="true"
-      class="px-4 py-2 border rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700 mr-6"
-    >Clear</a>
+      hx-trigger="submit, keyup changed delay:300ms from:#su-q, change from:#su-status, change from:#su-role"
+      class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-1 flex flex-wrap items-center gap-2"
+    >
+      <input
+        id="su-q" name="search" type="text"
+        value="{{ .SearchQuery }}"
+        placeholder="Search by name"
+        class="px-3 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded flex-1 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
 
-    <a href="/system-users/new?return={{ .CurrentPath | urlquery }}"
-       class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Add User</a>
-  </form>
+      <select id="su-role" name="role" class="px-3 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded text-sm">
+        <option value="" {{ if not .URole }}selected{{ end }}>All Roles</option>
+        <option value="admin"   {{ if eq .URole "admin" }}selected{{ end }}>Admin</option>
+        <option value="analyst" {{ if eq .URole "analyst" }}selected{{ end }}>Analyst</option>
+        <option value="coordinator" {{ if eq .URole "coordinator" }}selected{{ end }}>Coordinator</option>
+      </select>
+
+      <select id="su-status" name="status" class="px-3 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded text-sm">
+        <option value="" {{ if not .Status }}selected{{ end }}>All Statuses</option>
+        <option value="active"   {{ if eq .Status "active" }}selected{{ end }}>Active</option>
+        <option value="disabled" {{ if eq .Status "disabled" }}selected{{ end }}>Disabled</option>
+      </select>
+
+      <!-- Clear: resets search, role, status -->
+      <a
+        href="/system-users?search=&role=&status="
+        hx-get="/system-users"
+        hx-vals='{"search":"","role":"","status":""}'
+        hx-target="#content"
+        hx-swap="innerHTML"
+        hx-push-url="true"
+        class="px-4 py-2 border dark:border-gray-600 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700"
+      >Clear</a>
+    </form>
 
   <!-- Top pager -->
   <div class="flex items-center justify-between mb-1">
     <div class="text-gray-600 dark:text-gray-400 text-sm">{{ if .Total }}{{ .RangeStart }}–{{ .RangeEnd }} of {{ .Total }} shown{{ else }}0 of 0 shown{{ end }}</div>
     <div class="flex items-center gap-2">
       {{ if .HasPrev }}
-        <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+        <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
            href="/system-users?search={{ .SearchQuery }}&role={{ .URole }}&status={{ .Status }}&before={{ .PrevCursor }}&start={{ .PrevStart }}"
            hx-get="/system-users?search={{ .SearchQuery }}&role={{ .URole }}&status={{ .Status }}&before={{ .PrevCursor }}&start={{ .PrevStart }}"
            hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Prev</a>
       {{ else }}
-        <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
+        <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
       {{ end }}
       {{ if .HasNext }}
-        <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+        <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
            href="/system-users?search={{ .SearchQuery }}&role={{ .URole }}&status={{ .Status }}&after={{ .NextCursor }}&start={{ .NextStart }}"
            hx-get="/system-users?search={{ .SearchQuery }}&role={{ .URole }}&status={{ .Status }}&after={{ .NextCursor }}&start={{ .NextStart }}"
            hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Next</a>
       {{ else }}
-        <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
+        <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
       {{ end }}
     </div>
   </div>
 
-  <div class="bg-white dark:bg-gray-800 rounded shadow overflow-auto" style="max-height: calc(100vh - 12rem); min-height: 10rem;">
+  <div class="p-4 bg-white dark:bg-gray-800 rounded shadow flex-1 mb-2 overflow-auto">
     <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
       <colgroup>
         <col style="width: 28%;" />
@@ -85,7 +85,7 @@
         <col style="width: 12rem;" />
       </colgroup>
       <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs sticky top-0 z-10">
-        <tr>
+        <tr class="border-b border-gray-300 dark:border-gray-600">
           <th class="px-2 py-2">Full Name</th>
           <th class="px-2 py-2">Login ID</th>
           <th class="px-2 py-2">Role</th>
@@ -94,9 +94,9 @@
           <th class="px-2 py-2 text-right">Actions</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+      <tbody>
         {{ range .Rows }}
-        <tr>
+        <tr class="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900/50">
           <td class="px-2 py-2 align-middle"><div class="truncate" title="{{ .FullName }}">{{ .FullName }}</div></td>
           <td class="px-2 py-2 align-middle"><div class="truncate" title="{{ .LoginID }}">{{ .LoginID }}</div></td>
           <td class="px-2 py-2 align-middle">
@@ -157,8 +157,9 @@
     </table>
     <div class="w-full border-t border-gray-300 dark:border-gray-600"></div>
   </div>
-</section>
-<div id="modal-root"></div>
+  </section>
+  <div id="modal-root"></div>
+</div>
 {{ end }}
 
 {{ define "system_user_manage_modal" }}
@@ -170,25 +171,41 @@
     <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Manage System User</h2>
 
     <p class="text-sm text-gray-700 dark:text-gray-300">
-      {{ .FullName }} <span class="text-gray-500 dark:text-gray-400">({{ .LoginID }})</span><br/>
+      {{ .FullName }}
+    </p>
+    <p class="text-xs text-gray-500 dark:text-gray-400">
+      {{ .LoginID }}<br/>
       <span class="capitalize">{{ .Role }}</span> · {{ .Auth }} · {{ .Status }}
     </p>
 
-    <div class="flex flex-col gap-3 pt-2">
-      <div class="flex justify-center gap-2">
-        <!-- View -->
-        <a
-          href="/system-users/{{ .ID }}/view?return={{ .BackURL | urlquery }}"
-          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
-        >View</a>
+    <div class="text-sm text-gray-700 dark:text-gray-300">
+      <p>Use the actions below to view or edit this user.</p>
+    </div>
 
-        <!-- Edit -->
-        <a
-          href="/system-users/{{ .ID }}/edit?return={{ .BackURL | urlquery }}"
-          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
-        >Edit</a>
+    <!-- Action buttons -->
+    <div class="flex gap-2">
+      <a
+        href="/system-users/{{ .ID }}/view?return={{ .BackURL | urlquery }}"
+        class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
+      >View</a>
+      <a
+        href="/system-users/{{ .ID }}/edit?return={{ .BackURL | urlquery }}"
+        class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
+      >Edit</a>
+      <button
+        type="button"
+        class="px-3 py-1 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+        onclick="document.getElementById('modal-root').innerHTML=''"
+      >Close</button>
+    </div>
 
-        <!-- Delete -->
+    <!-- Danger Zone -->
+    <div class="pt-4 mt-2 border-t border-gray-200 dark:border-gray-700">
+      <div class="p-4 border border-red-300 dark:border-red-700 rounded bg-red-50 dark:bg-red-900/20">
+        <h3 class="text-sm font-semibold text-red-800 dark:text-red-300 mb-2">Danger Zone</h3>
+        <p class="text-xs text-red-700 dark:text-red-400 mb-3">
+          Permanently delete this system user. This action cannot be undone.
+        </p>
         <form
           method="post"
           action="/system-users/{{ .ID }}/delete"
@@ -198,20 +215,8 @@
           <button
             type="submit"
             class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-          >
-            Delete
-          </button>
+          >Delete User</button>
         </form>
-      </div>
-
-      <div class="flex justify-start">
-        <button
-          type="button"
-          class="px-3 py-1 border rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-          onclick="document.getElementById('modal-root').innerHTML=''"
-        >
-          Close
-        </button>
       </div>
     </div>
   </div>

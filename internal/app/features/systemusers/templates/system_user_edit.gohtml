@@ -3,49 +3,52 @@
 {{ end }}
 
 {{ define "content" }}
-<div class="flex items-center mb-2">
-  <a href="{{ .BackURL }}"
-     class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
-     title="Go back">
-    ← Back
-  </a>
-  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">🧑‍💻 Edit System User</h1>
-</div>
-
-{{ if .Error }}
-  <div class="mb-3 p-2 border border-red-300 bg-red-50 text-red-700 rounded">
-    {{ .Error }}
-  </div>
-{{ end }}
-
-<form method="post" action="/system-users/{{ .ID }}/edit" class="space-y-3 max-w-xl bg-white dark:bg-gray-800 p-4 rounded border dark:border-gray-700" id="edit-user-form" onsubmit="return confirmRoleChange()">
-  <input type="hidden" name="return" value="{{ .BackURL }}">
-  <input type="hidden" name="previous_role" value="{{ .PreviousRole }}">
-
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
-    <input name="full_name" type="text" value="{{ .FullName }}" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm" required />
+<div class="flex flex-col h-full">
+  <div class="mb-4 flex items-center">
+    <a href="{{ .BackURL }}"
+       class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2 no-loader"
+       title="Go back">
+      ← Back
+    </a>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">🧑‍💻 Edit System User</h1>
   </div>
 
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
-    <select
-      name="role"
-      id="role-select"
-      class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm"
-      {{ if .IsSelf }}disabled{{ end }}
-      onchange="handleRoleChange(this.value)"
-    >
-      <option value="admin"       {{ if eq .UserRole "admin" }}selected{{ end }}>admin</option>
-      <option value="analyst"     {{ if eq .UserRole "analyst" }}selected{{ end }}>analyst</option>
-      <option value="coordinator" {{ if eq .UserRole "coordinator" }}selected{{ end }}>coordinator</option>
-    </select>
-    {{ if .IsSelf }}
-      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">You can't change your own role. Ask another admin to make this change.</p>
-    {{ else }}
-      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Coordinators can manage leaders and members in their assigned organizations.</p>
+  <div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm flex-1 mb-2">
+    {{ if .Error }}
+      <div class="mb-4 p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded max-w-xl">
+        {{ .Error }}
+      </div>
     {{ end }}
-  </div>
+
+    <form method="post" action="/system-users/{{ .ID }}/edit" class="space-y-3 max-w-xl" id="edit-user-form" onsubmit="return confirmRoleChange()">
+      <input type="hidden" name="return" value="{{ .BackURL }}">
+      <input type="hidden" name="previous_role" value="{{ .PreviousRole }}">
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
+        <input name="full_name" type="text" value="{{ .FullName }}" required
+               class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Role</label>
+        <select
+          name="role"
+          id="role-select"
+          {{ if .IsSelf }}disabled{{ end }}
+          onchange="handleRoleChange(this.value)"
+          class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        >
+          <option value="admin"       {{ if eq .UserRole "admin" }}selected{{ end }}>admin</option>
+          <option value="analyst"     {{ if eq .UserRole "analyst" }}selected{{ end }}>analyst</option>
+          <option value="coordinator" {{ if eq .UserRole "coordinator" }}selected{{ end }}>coordinator</option>
+        </select>
+        {{ if .IsSelf }}
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">You can't change your own role. Ask another admin to make this change.</p>
+        {{ else }}
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">Coordinators can manage leaders and members in their assigned organizations.</p>
+        {{ end }}
+      </div>
 
   <!-- Role change warning (shown when changing from coordinator) -->
   <div id="role-change-warning" class="hidden p-3 border border-amber-300 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-700 text-amber-800 dark:text-amber-300 rounded text-sm">
@@ -108,43 +111,53 @@
 
   {{ template "auth_fields" . }}
 
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
-    <select
-      name="status"
-      class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm"
-      {{ if .IsSelf }}disabled{{ end }}
-    >
-      <option value="active"   {{ if eq .Status "active" }}selected{{ end }}>Active</option>
-      <option value="disabled" {{ if eq .Status "disabled" }}selected{{ end }}>Disabled</option>
-    </select>
-    {{ if .IsSelf }}
-      <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">You can't change your own status. Ask another admin to make this change.</p>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+        <select
+          name="status"
+          {{ if .IsSelf }}disabled{{ end }}
+          class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        >
+          <option value="active"   {{ if eq .Status "active" }}selected{{ end }}>Active</option>
+          <option value="disabled" {{ if eq .Status "disabled" }}selected{{ end }}>Disabled</option>
+        </select>
+        {{ if .IsSelf }}
+          <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">You can't change your own status. Ask another admin to make this change.</p>
+        {{ end }}
+      </div>
+
+      <div class="flex gap-2 pt-2">
+        <button type="submit" class="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700">Update System User</button>
+        <a href="{{ .BackURL }}" class="px-3 py-1 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</a>
+      </div>
+    </form>
+
+    {{ if and (eq .Role "admin") (not .IsSelf) }}
+    <!-- Danger Zone -->
+    <div class="max-w-xl mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+      <div class="p-4 border border-red-300 dark:border-red-700 rounded bg-red-50 dark:bg-red-900/20">
+        <h3 class="text-sm font-semibold text-red-800 dark:text-red-300 mb-2">Danger Zone</h3>
+        <p class="text-xs text-red-700 dark:text-red-400 mb-3">
+          Permanently delete this system user.{{ if eq .UserRole "coordinator" }} This will also remove all organization assignments.{{ end }} This action cannot be undone.
+        </p>
+        <form method="post" action="/system-users/{{ .ID }}/delete">
+          <input type="hidden" name="return" value="{{ .BackURL }}">
+          <button
+            type="submit"
+            class="bg-red-600 text-white px-3 py-1 rounded text-sm hover:bg-red-700"
+            onclick="return confirm('Delete this system user?{{ if eq .UserRole "coordinator" }} This will also remove all organization assignments.{{ end }}');"
+          >
+            Delete System User
+          </button>
+        </form>
+      </div>
+    </div>
     {{ end }}
   </div>
 
-  <div class="flex gap-2 pt-2">
-    <button class="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Update System User</button>
-    <a href="{{ .BackURL }}" class="px-3 py-1 border rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600">Cancel</a>
-  </div>
-</form>
-
-{{ if and (eq .Role "admin") (not .IsSelf) }}
-<!-- Danger zone: Delete System User -->
-<form method="post" action="/system-users/{{ .ID }}/delete" class="max-w-xl mt-4">
-  <input type="hidden" name="return" value="{{ .BackURL }}">
-  <button
-    type="submit"
-    class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700"
-    onclick="return confirm('Delete this system user?{{ if eq .UserRole "coordinator" }} This will also remove all organization assignments.{{ end }}');"
-  >
-    Delete System User
-  </button>
-</form>
-{{ end }}
-
-<!-- Modal container for org picker -->
-<div id="org-picker-root"></div>
+  <!-- Modal container for org picker -->
+  <div id="org-picker-root"></div>
+</div>
 
 <script>
 (function() {

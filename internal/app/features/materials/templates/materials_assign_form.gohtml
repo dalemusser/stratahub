@@ -3,82 +3,84 @@
 {{ end }}
 
 {{ define "content" }}
-<div class="flex items-center mb-4">
-  <a href="{{ .BackURL }}"
-     class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
-     title="Go back">
-    <- Back
-  </a>
-  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📎 Complete Material Assignment</h1>
-</div>
-
-{{ if .Error }}
-  <div class="mb-3 p-2 border border-red-300 bg-red-50 text-red-700 rounded">
-    {{ .Error }}
-  </div>
-{{ end }}
-
-<div class="max-w-2xl">
-  <!-- Assignment Summary -->
-  <div class="bg-white dark:bg-gray-800 rounded shadow p-4 mb-4">
-    <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Assignment Details</h2>
-
-    <div class="space-y-2 text-sm">
-      <div class="flex items-center justify-between">
-        <div>
-          <span class="font-medium text-gray-700 dark:text-gray-300">Material:</span>
-          <span class="text-gray-900 dark:text-gray-100">{{ .MaterialTitle }}</span>
-        </div>
-        {{ if .HasFile }}
-          <a href="/materials/{{ .MaterialID }}/download" target="_blank"
-             class="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 whitespace-nowrap">
-            Download
-          </a>
-        {{ else if .LaunchURL }}
-          <a href="{{ .LaunchURL }}" target="_blank"
-             class="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 whitespace-nowrap">
-            Open Link
-          </a>
-        {{ end }}
-      </div>
-      <div>
-        <span class="font-medium text-gray-700 dark:text-gray-300">Assign to:</span>
-        {{ if .IsOrgWide }}
-          <span class="text-gray-900 dark:text-gray-100">All leaders in {{ .TargetName }}</span>
-          <span class="ml-2 px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded">Organization</span>
-        {{ else }}
-          <span class="text-gray-900 dark:text-gray-100">{{ .TargetName }}</span>
-          <span class="ml-2 px-2 py-0.5 text-xs bg-blue-100 text-blue-700 rounded">Leader</span>
-        {{ end }}
-      </div>
-    </div>
+<div class="flex flex-col h-full">
+  <div class="mb-4 flex items-center">
+    <a href="{{ .BackURL }}"
+       class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2 no-loader"
+       title="Go back">
+      ← Back
+    </a>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📎 Complete Material Assignment</h1>
   </div>
 
-  <!-- Assignment Form -->
-  <form method="post" action="/materials/{{ .MaterialID }}/assign" class="bg-white dark:bg-gray-800 rounded shadow p-4 space-y-4">
-    <input type="hidden" name="org" value="{{ .OrgID }}">
-    {{ if .LeaderID }}
-    <input type="hidden" name="leader" value="{{ .LeaderID }}">
+  <div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm flex-1 mb-2">
+    {{ if .Error }}
+      <div class="mb-4 p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded max-w-2xl">
+        {{ .Error }}
+      </div>
     {{ end }}
-    <input type="hidden" name="return" value="{{ .BackURL }}">
 
-    <div>
-      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Visible From</label>
-      <input type="datetime-local" name="visible_from" value="{{ .VisibleFrom }}"
-             class="w-full border dark:border-gray-600 p-2 rounded text-sm dark:bg-gray-700" />
-      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Leaders can access this material starting from this date and time. Defaults to now for immediate access.</p>
-    </div>
+    <div class="max-w-2xl space-y-4">
+      <!-- Assignment Summary -->
+      <div class="border dark:border-gray-600 rounded p-4">
+        <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3">Assignment Details</h2>
 
-    <div>
-      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Visible Until (optional)</label>
-      <input type="datetime-local" name="visible_until" value="{{ .VisibleUntil }}"
-             class="w-full border dark:border-gray-600 p-2 rounded text-sm dark:bg-gray-700" />
-      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Leaders can no longer access this material after this date and time. Leave empty for no expiration.</p>
-    </div>
+        <div class="space-y-2 text-sm">
+          <div class="flex items-center justify-between">
+            <div>
+              <span class="font-medium text-gray-700 dark:text-gray-300">Material:</span>
+              <span class="text-gray-900 dark:text-gray-100">{{ .MaterialTitle }}</span>
+            </div>
+            {{ if .HasFile }}
+              <a href="/materials/{{ .MaterialID }}/download" target="_blank"
+                 class="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 whitespace-nowrap">
+                Download
+              </a>
+            {{ else if .LaunchURL }}
+              <a href="{{ .LaunchURL }}" target="_blank"
+                 class="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 whitespace-nowrap">
+                Open Link
+              </a>
+            {{ end }}
+          </div>
+          <div>
+            <span class="font-medium text-gray-700 dark:text-gray-300">Assign to:</span>
+            {{ if .IsOrgWide }}
+              <span class="text-gray-900 dark:text-gray-100">All leaders in {{ .TargetName }}</span>
+              <span class="ml-2 px-2 py-0.5 text-xs bg-purple-100 dark:bg-purple-900/50 text-purple-700 dark:text-purple-300 rounded">Organization</span>
+            {{ else }}
+              <span class="text-gray-900 dark:text-gray-100">{{ .TargetName }}</span>
+              <span class="ml-2 px-2 py-0.5 text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 rounded">Leader</span>
+            {{ end }}
+          </div>
+        </div>
+      </div>
 
-    <p class="text-xs text-gray-500 dark:text-gray-400">
-      {{ if .TimeZone }}Time zone: {{ .TimeZone }} (organization timezone){{ else }}Time zone: server default{{ end }}
-    </p>
+      <!-- Assignment Form -->
+      <form method="post" action="/materials/{{ .MaterialID }}/assign" class="space-y-4">
+        <input type="hidden" name="org" value="{{ .OrgID }}">
+        {{ if .LeaderID }}
+        <input type="hidden" name="leader" value="{{ .LeaderID }}">
+        {{ end }}
+        <input type="hidden" name="return" value="{{ .BackURL }}">
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Visible From</label>
+          <input type="datetime-local" name="visible_from" value="{{ .VisibleFrom }}"
+                 class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Leaders can access this material starting from this date and time. Defaults to now for immediate access.</p>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Visible Until (optional)</label>
+          <input type="datetime-local" name="visible_until" value="{{ .VisibleUntil }}"
+                 class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Leaders can no longer access this material after this date and time. Leave empty for no expiration.</p>
+        </div>
+
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+          {{ if .TimeZone }}Time zone: {{ .TimeZone }} (organization timezone){{ else }}Time zone: server default{{ end }}
+        </p>
 
     <div>
       <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Directions</label>
@@ -122,15 +124,72 @@
       <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Custom directions for this assignment. Pre-filled from material's default instructions.</p>
     </div>
 
-    <div class="pt-4 flex gap-3">
-      <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700">
-        Assign Material
-      </button>
-      <a href="{{ .BackURL }}" class="px-4 py-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
-        Cancel
-      </a>
+        <div class="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 flex gap-2">
+          <button type="submit" class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700">
+            Assign Material
+          </button>
+          <a href="{{ .BackURL }}" class="px-3 py-1 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">
+            Cancel
+          </a>
+        </div>
+      </form>
+
     </div>
-  </form>
+
+    <!-- Help text -->
+    <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 max-w-2xl">
+      <div class="text-xs text-gray-600 dark:text-gray-400 space-y-2">
+        <p>
+          <span class="font-semibold">Organization Assignment</span> – When assigned to an organization, all current and future leaders in that organization will have access to this material.
+        </p>
+        <p>
+          <span class="font-semibold">Leader Assignment</span> – When assigned to a specific leader, only that individual leader will have access to this material.
+        </p>
+        <p>
+          <span class="font-semibold">Visibility Dates</span> – Control when the assignment becomes visible and when it expires. The material's Status must also be Active for leaders to see it.
+        </p>
+      </div>
+
+      <div class="mt-3 text-xs text-gray-600 dark:text-gray-400">
+        <table class="w-full border border-gray-200 dark:border-gray-600 border-collapse">
+          <thead class="bg-gray-50 dark:bg-gray-700">
+            <tr>
+              <th class="border border-gray-200 dark:border-gray-600 px-2 py-1 text-left">Setting</th>
+              <th class="border border-gray-200 dark:border-gray-600 px-2 py-1 text-left">Value</th>
+              <th class="border border-gray-200 dark:border-gray-600 px-2 py-1 text-left">Effect</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Visible From</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Set to a date/time</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Leaders can access starting from that date/time.</td>
+            </tr>
+            <tr>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Visible From</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Empty</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Assignment is not yet available to leaders.</td>
+            </tr>
+            <tr>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Visible Until</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Set to a date/time</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Leaders can no longer access after that date/time.</td>
+            </tr>
+            <tr>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Visible Until</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Empty</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">No expiration; remains visible indefinitely.</td>
+            </tr>
+            <tr>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Material Status</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Disabled</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1">Assignment exists but leaders cannot see the material.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 
 <script src="/assets/js/tiptap.min.js"></script>
@@ -208,53 +267,4 @@ document.addEventListener('DOMContentLoaded', function() {
   editor.on('update', updateToolbarState);
 });
 </script>
-
-<div class="mt-4 text-xs text-gray-600 dark:text-gray-400 space-y-2 max-w-2xl">
-  <p>
-    <span class="font-semibold">Organization Assignment</span> &ndash; When assigned to an organization, all current and future leaders in that organization will have access to this material.
-  </p>
-  <p>
-    <span class="font-semibold">Leader Assignment</span> &ndash; When assigned to a specific leader, only that individual leader will have access to this material.
-  </p>
-  <p>
-    <span class="font-semibold">Visibility Dates</span> &ndash; Control when the assignment becomes visible and when it expires. The material's Status must also be Active for leaders to see it.
-  </p>
-
-  <table class="mt-2 w-full border-collapse text-xs">
-    <thead>
-      <tr class="bg-gray-100 dark:bg-gray-700">
-        <th class="border dark:border-gray-600 px-2 py-1 text-left">Setting</th>
-        <th class="border dark:border-gray-600 px-2 py-1 text-left">Value</th>
-        <th class="border dark:border-gray-600 px-2 py-1 text-left">Effect</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td class="border dark:border-gray-600 px-2 py-1">Visible From</td>
-        <td class="border dark:border-gray-600 px-2 py-1">Set to a date/time</td>
-        <td class="border dark:border-gray-600 px-2 py-1">Leaders can access starting from that date/time.</td>
-      </tr>
-      <tr>
-        <td class="border dark:border-gray-600 px-2 py-1">Visible From</td>
-        <td class="border dark:border-gray-600 px-2 py-1">Empty</td>
-        <td class="border dark:border-gray-600 px-2 py-1">Assignment is not yet available to leaders.</td>
-      </tr>
-      <tr>
-        <td class="border dark:border-gray-600 px-2 py-1">Visible Until</td>
-        <td class="border dark:border-gray-600 px-2 py-1">Set to a date/time</td>
-        <td class="border dark:border-gray-600 px-2 py-1">Leaders can no longer access after that date/time.</td>
-      </tr>
-      <tr>
-        <td class="border dark:border-gray-600 px-2 py-1">Visible Until</td>
-        <td class="border dark:border-gray-600 px-2 py-1">Empty</td>
-        <td class="border dark:border-gray-600 px-2 py-1">No expiration; remains visible indefinitely.</td>
-      </tr>
-      <tr>
-        <td class="border dark:border-gray-600 px-2 py-1">Material Status</td>
-        <td class="border dark:border-gray-600 px-2 py-1">Disabled</td>
-        <td class="border dark:border-gray-600 px-2 py-1">Assignment exists but leaders cannot see the material.</td>
-      </tr>
-    </tbody>
-  </table>
-</div>
 {{ end }}
