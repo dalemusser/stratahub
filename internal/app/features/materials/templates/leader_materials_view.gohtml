@@ -76,7 +76,7 @@
         <div class="flex-1">
           <p class="text-sm text-gray-700 dark:text-gray-300 break-all">
             <span class="font-medium">URL:</span>
-            <span class="text-indigo-600 dark:text-indigo-400">{{ .DisplayURL }}</span>
+            <a href="{{ .LaunchURL }}" target="_blank" class="text-green-600 dark:text-green-400 hover:underline">{{ .DisplayURL }}</a>
           </p>
           <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Opens in a new tab.</p>
         </div>

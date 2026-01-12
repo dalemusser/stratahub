@@ -3,52 +3,58 @@
 {{ end }}
 
 {{ define "content" }}
-<div class="flex items-center mb-2">
-  <a href="{{ .BackURL }}"
-     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
-     title="Go back">
-    ← Back
-  </a>
-  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">👑 View Leader</h1>
+<div class="flex flex-col h-full">
+  <div class="mb-4 flex items-center">
+    <a href="{{ .BackURL }}"
+       class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2 no-loader"
+       title="Go back">
+      ← Back
+    </a>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">👑 View Leader</h1>
+  </div>
+
+  <div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm flex-1 mb-2">
+    <div class="space-y-3 max-w-xl">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
+        <input type="text" value="{{ .FullName }}" readonly
+               class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Email</label>
+        <input type="text" value="{{ .Email }}" readonly
+               class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Organization</label>
+        <input type="text" value="{{ .OrgName }}" readonly
+               class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Auth Method</label>
+        <input type="text" value="{{ .Auth }}" readonly
+               class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
+      </div>
+
+      {{ if .Status }}
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+        <input type="text" value="{{ .Status }}" readonly
+               class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
+      </div>
+      {{ end }}
+
+      <!-- Action button -->
+      <div class="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
+        <a href="/leaders/{{ .ID }}/edit?return={{ .BackURL | urlquery }}"
+           class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700">
+          Edit Leader
+        </a>
+      </div>
+    </div>
+  </div>
 </div>
-
-<div class="bg-white dark:bg-gray-800 rounded shadow p-4">
-  <div class="mb-4">
-    <label class="block text-sm font-semibold mb-1">Full Name</label>
-    <input type="text" class="w-full border rounded px-3 py-2 bg-gray-50 dark:bg-gray-700 text-sm" value="{{ .FullName }}" disabled>
-  </div>
-
-  <div class="mb-4">
-    <label class="block text-sm font-semibold mb-1">Email</label>
-    <input type="text" class="w-full border rounded px-3 py-2 bg-gray-50 dark:bg-gray-700 text-sm" value="{{ .Email }}" disabled>
-  </div>
-
-  <div class="mb-4">
-    <label class="block text-sm font-semibold mb-1">Organization</label>
-    <input type="text" class="w-full border rounded px-3 py-2 bg-gray-50 dark:bg-gray-700 text-sm" value="{{ .OrgName }}" disabled>
-  </div>
-
-  <div class="mb-4">
-    <label class="block text-sm font-semibold mb-1">Auth Method</label>
-    <input type="text" class="w-full border rounded px-3 py-2 bg-gray-50 dark:bg-gray-700 text-sm" value="{{ .Auth }}" disabled>
-  </div>
-
-  {{ if .Status }}
-  <div class="mb-2">
-    <label class="block text-sm font-semibold mb-1">Status</label>
-    <input type="text" class="w-full border rounded px-3 py-2 bg-gray-50 dark:bg-gray-700 text-sm" value="{{ .Status }}" disabled>
-  </div>
-  {{ end }}
-</div>
-
-<!-- Actions -->
-<div class="mt-4">
-  <a
-    href="/leaders/{{ .ID }}/edit?return={{ .BackURL | urlquery }}"
-    class="inline-block bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
-  >
-    Edit Leader
-  </a>
-</div>
-
 {{ end }}

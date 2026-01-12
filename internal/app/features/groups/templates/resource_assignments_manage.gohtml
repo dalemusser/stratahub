@@ -6,103 +6,111 @@
 {{ end }}
 
 {{ define "content" }}
-<div class="flex items-center mb-2">
-  <a href="{{ .BackURL }}"
-     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 mr-2"
-     title="Go back">
-    ← Back
-  </a>
-  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100" aria-live="polite">👥 Assign Resources in {{ .GroupName }}</h1>
-</div>
+<div class="flex flex-col h-full">
+  <div class="mb-4 flex items-center">
+    <a href="{{ .BackURL }}"
+       class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2 no-loader"
+       title="Go back">
+      ← Back
+    </a>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100" aria-live="polite">👥 Assign Resources in {{ .GroupName }}</h1>
+  </div>
 
-{{ if .Flash }}
-  <div class="mb-3 text-xs text-green-800 bg-green-100 px-2 py-1 rounded">{{ .Flash }}</div>
-{{ end }}
+  <div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm flex-1 mb-2 overflow-hidden">
+    {{ if .Flash }}
+      <div class="mb-4 p-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded">{{ .Flash }}</div>
+    {{ end }}
 
-<!-- ASSIGNED -->
-<div class="flex items-baseline gap-2 mb-1">
-  <h2 class="font-semibold">Assigned Resources</h2>
-  <span class="text-xs text-gray-600 dark:text-gray-400">{{ len .Assigned }} assigned</span>
-</div>
-<div class="bg-white dark:bg-gray-800 rounded shadow overflow-y-auto mb-4 text-sm" style="max-height: 15rem; scrollbar-gutter: stable;">
-  <table class="min-w-full text-left text-gray-700 dark:text-gray-300">
-    <caption class="sr-only">List of resources already assigned to this group</caption>
-    <colgroup>
-      <col class="w-2/6" />
-      <col class="w-1/6" />
-      <col class="w-1/6" />
-      <col class="w-1/6" />
-      <col class="w-1/6" />
-      <col class="w-1/6" />
-    </colgroup>
-    <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs sticky top-0 z-10">
-      <tr>
-        <th class="px-2 py-2">Title</th>
-        <th class="px-2 py-2">Availability</th>
-        <th class="px-2 py-2">Subject</th>
-        <th class="px-2 py-2">Type</th>
-        <th class="px-2 py-2">Status</th>
-        <th class="px-2 py-2">Action</th>
-      </tr>
-    </thead>
-    <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-      {{ if .Assigned }}
-        {{ range .Assigned }}
-        <tr>
-          <td class="px-2 py-2">{{ .Title }}</td>
-          <td class="px-2 py-2" title="{{ .AvailabilityTitle }}">
-            {{ if .Availability }}{{ .Availability }}{{ else }}<span class="text-gray-400">—</span>{{ end }}
-          </td>
-          <td class="px-2 py-2">{{ if .Subject }}{{ .Subject }}{{ else }}<span class="text-gray-400">—</span>{{ end }}</td>
-          <td class="px-2 py-2">{{ if .Type }}{{ .Type }}{{ else }}<span class="text-gray-400">—</span>{{ end }}</td>
-          <td class="px-2 py-2">
-            {{ if eq .Status "active" }}
-              <span class="px-2 py-1 text-xs bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 rounded">Active</span>
-            {{ else if eq .Status "disabled" }}
-              <span class="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded">Disabled</span>
-            {{ else if .Status }}
-              <span class="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400 rounded">{{ .Status }}</span>
-            {{ else }}
-              <span class="text-gray-400">—</span>
+    <!-- ASSIGNED -->
+    <div>
+      <div class="flex items-baseline gap-2 mb-1">
+        <h2 class="font-semibold text-gray-900 dark:text-gray-100">Assigned Resources</h2>
+        <span class="text-xs text-gray-600 dark:text-gray-400">{{ len .Assigned }} assigned</span>
+      </div>
+      <div class="rounded border dark:border-gray-700 overflow-y-auto mb-4" style="max-height: 15rem; scrollbar-gutter: stable;">
+      <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+        <caption class="sr-only">List of resources already assigned to this group</caption>
+        <colgroup>
+          <col class="w-2/6" />
+          <col class="w-1/6" />
+          <col class="w-1/6" />
+          <col class="w-1/6" />
+          <col class="w-1/6" />
+          <col class="w-1/6" />
+        </colgroup>
+        <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs sticky top-0 z-10">
+          <tr class="border-b border-gray-300 dark:border-gray-600">
+            <th class="px-2 py-2">Title</th>
+            <th class="px-2 py-2">Availability</th>
+            <th class="px-2 py-2">Subject</th>
+            <th class="px-2 py-2">Type</th>
+            <th class="px-2 py-2">Status</th>
+            <th class="px-2 py-2">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ if .Assigned }}
+            {{ range .Assigned }}
+            <tr class="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900/50">
+              <td class="px-2 py-2 align-middle">{{ .Title }}</td>
+              <td class="px-2 py-2 align-middle" title="{{ .AvailabilityTitle }}">
+                {{ if .Availability }}{{ .Availability }}{{ else }}<span class="text-gray-400">—</span>{{ end }}
+              </td>
+              <td class="px-2 py-2 align-middle">{{ if .Subject }}{{ .Subject }}{{ else }}<span class="text-gray-400">—</span>{{ end }}</td>
+              <td class="px-2 py-2 align-middle">{{ if .Type }}{{ .Type }}{{ else }}<span class="text-gray-400">—</span>{{ end }}</td>
+              <td class="px-2 py-2 align-middle">
+                {{ if eq .Status "active" }}
+                  <span class="px-2 py-1 text-xs bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 rounded">Active</span>
+                {{ else if eq .Status "disabled" }}
+                  <span class="px-2 py-1 text-xs bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded">Disabled</span>
+                {{ else if .Status }}
+                  <span class="px-2 py-1 text-xs bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-400 rounded">{{ .Status }}</span>
+                {{ else }}
+                  <span class="text-gray-400">—</span>
+                {{ end }}
+              </td>
+              <td class="px-2 py-2 align-middle">
+                <form method="get" action="/groups/{{ $.GroupID }}/assign_resources/new"
+                      hx-get="/groups/{{ $.GroupID }}/assign_resources/new"
+                      hx-target="#modal-root"
+                      hx-swap="innerHTML"
+                      aria-label="Manage assignment">
+                  <input type="hidden" name="assignmentID" value="{{ .AssignmentID }}">
+                  <input type="hidden" name="resourceID" value="{{ .ResourceID }}">
+                  <input type="hidden" name="return" value="{{ $.BackURL }}">
+                  <input type="hidden" name="mode" value="manage">
+                  <button type="submit" class="bg-indigo-600 text-white px-2 py-1 text-xs rounded hover:bg-indigo-700" title="Manage {{ .Title }}">Manage</button>
+                </form>
+              </td>
+            </tr>
             {{ end }}
-          </td>
-          <td class="px-2 py-2">
-          <form method="get" action="/groups/{{ $.GroupID }}/assign_resources/new"
-                hx-get="/groups/{{ $.GroupID }}/assign_resources/new"
-                hx-target="#modal-root"
-                hx-swap="innerHTML"
-                aria-label="Manage assignment">
-            <input type="hidden" name="assignmentID" value="{{ .AssignmentID }}">
-            <input type="hidden" name="resourceID" value="{{ .ResourceID }}">
-            <input type="hidden" name="return" value="{{ $.BackURL }}">
-            <input type="hidden" name="mode" value="manage">
-            <button type="submit" class="bg-indigo-600 text-white px-2 py-1 text-xs md:text-sm rounded hover:bg-indigo-700" title="Manage {{ .Title }}">Manage</button>
-          </form>
-          </td>
-        </tr>
-        {{ end }}
-      {{ else }}
-        <tr><td class="px-2 py-2 text-gray-500 dark:text-gray-400" colspan="6">No resources assigned.</td></tr>
-      {{ end }}
-    </tbody>
-  </table>
-</div>
+          {{ else }}
+            <tr>
+              <td class="px-2 py-6 text-center text-gray-500 dark:text-gray-400" colspan="6">No resources assigned.</td>
+            </tr>
+          {{ end }}
+          </tbody>
+        </table>
+      </div>
+    </div>
 
-<!-- AVAILABLE -->
-{{ template "group_available_resources_block" . }}
-<div id="modal-root"></div>
+    <!-- AVAILABLE -->
+    {{ template "group_available_resources_block" . }}
+  </div>
+  <div id="modal-root"></div>
+</div>
 {{ end }}
 
 {{/* ──────────────── Available Resources reusable block (for HTMX) ──────────────── */}}
 {{ define "group_available_resources_block" }}
 <div id="available-resources-block">
   <div class="flex items-baseline gap-2 mb-1">
-    <h2 class="font-semibold">Available Resources</h2>
+    <h2 class="font-semibold text-gray-900 dark:text-gray-100">Available Resources</h2>
     <span class="text-xs text-gray-600 dark:text-gray-400">{{ if .AvailableTotal }}{{ .AvailableRangeStart }}–{{ .AvailableRangeEnd }} of {{ .AvailableTotal }} shown{{ else }}0 of 0 shown{{ end }}</span>
   </div>
 
   <!-- Controls row: search left, pager right -->
-  <div class="flex items-center justify-between mt-2 mb-2 gap-3 text-sm">
+  <div class="flex flex-wrap items-center justify-between mt-2 mb-2 gap-3 text-sm">
     <form
       id="resource-search-form"
       hx-get="/groups/{{ .GroupID }}/assign_resources/search-resources"
@@ -110,7 +118,7 @@
       hx-swap="outerHTML"
       hx-push-url="true"
       hx-trigger="submit, keyup changed delay:300ms from:#resourceSearch, change from:#resourceType"
-      class="flex items-center gap-2"
+      class="flex flex-wrap items-center gap-2"
     >
       <label for="resourceSearch">Search Resources:</label>
       <input
@@ -118,7 +126,7 @@
         name="q"
         type="text"
         value="{{ .Query }}"
-        class="border p-1 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+        class="border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
         hx-on="input: (function(){
           const f=document.getElementById('resource-search-form');
           f.querySelector('input[name=after]').value='';
@@ -126,7 +134,7 @@
         })()"
       >
       <label for="resourceType">Type:</label>
-      <select id="resourceType" name="type" class="border p-1 text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100"
+      <select id="resourceType" name="type" class="border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
         hx-on="change: (function(){
           const f=document.getElementById('resource-search-form');
           if (!f) return;
@@ -136,17 +144,17 @@
           if (b) b.value='';
         })()"
       >
-      <option value="" {{ if not .TypeFilter }}selected{{ end }}>all types</option>
-      {{ range .TypeOptions }}
-        <option value="{{ . }}" {{ if eq $.TypeFilter . }}selected{{ end }}>{{ . }}</option>
-      {{ end }}
+        <option value="" {{ if not .TypeFilter }}selected{{ end }}>all types</option>
+        {{ range .TypeOptions }}
+          <option value="{{ . }}" {{ if eq $.TypeFilter . }}selected{{ end }}>{{ . }}</option>
+        {{ end }}
       </select>
       <input type="hidden" name="after" value="{{ .CurrentAfter }}">
       <input type="hidden" name="before" value="{{ .CurrentBefore }}">
       <input type="hidden" name="return" value="{{ .BackURL }}">
       <button
         type="button"
-        class="bg-gray-200 text-gray-800 px-2 py-1 text-xs md:text-sm rounded hover:bg-gray-300 dark:bg-gray-600 dark:text-gray-200 dark:hover:bg-gray-500"
+        class="px-2 py-1 border dark:border-gray-600 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700"
         hx-get="/groups/{{ .GroupID }}/assign_resources/search-resources?q=&type=&return={{ .BackURL | urlquery }}"
         hx-target="#available-resources-block"
         hx-swap="outerHTML"
@@ -160,27 +168,27 @@
           href="/groups/{{ .GroupID }}/assign_resources/search-resources?before={{ .PrevCursor }}&q={{ .Query }}&type={{ .TypeFilter }}&start={{ .PrevStart }}&return={{ .BackURL | urlquery }}"
           hx-get="/groups/{{ .GroupID }}/assign_resources/search-resources?before={{ .PrevCursor }}&q={{ .Query }}&type={{ .TypeFilter }}&start={{ .PrevStart }}&return={{ .BackURL | urlquery }}"
           hx-target="#available-resources-block" hx-swap="outerHTML" hx-push-url="true"
-          class="px-2 py-1 text-xs border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600"
+          class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
         >Prev</a>
       {{ else }}
-        <span class="px-2 py-1 text-xs text-gray-400 border rounded cursor-not-allowed dark:border-gray-600">Prev</span>
+        <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
       {{ end }}
       {{ if .HasNext }}
         <a
           href="/groups/{{ .GroupID }}/assign_resources/search-resources?after={{ .NextCursor }}&q={{ .Query }}&type={{ .TypeFilter }}&start={{ .NextStart }}&return={{ .BackURL | urlquery }}"
           hx-get="/groups/{{ .GroupID }}/assign_resources/search-resources?after={{ .NextCursor }}&q={{ .Query }}&type={{ .TypeFilter }}&start={{ .NextStart }}&return={{ .BackURL | urlquery }}"
           hx-target="#available-resources-block" hx-swap="outerHTML" hx-push-url="true"
-          class="px-2 py-1 text-xs border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600"
+          class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
         >Next</a>
       {{ else }}
-        <span class="px-2 py-1 text-xs text-gray-400 border rounded cursor-not-allowed dark:border-gray-600">Next</span>
+        <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
       {{ end }}
     </div>
   </div>
 
-  <!-- Table with viewport-based max-height that adjusts with window size -->
-  <div class="bg-white dark:bg-gray-800 rounded shadow overflow-auto text-sm" style="max-height: calc(100vh - 31rem); min-height: 8rem; scrollbar-gutter: stable;">
-    <table class="min-w-full text-left text-gray-700 dark:text-gray-300">
+  <!-- Table with viewport-based height -->
+  <div class="rounded border dark:border-gray-700 overflow-auto" style="max-height: calc(100vh - 32rem); min-height: 8rem; scrollbar-gutter: stable;">
+    <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
       <caption class="sr-only">List of resources available to assign to this group</caption>
       <colgroup>
         <col class="w-2/6" />
@@ -191,7 +199,7 @@
         <col class="w-1/6" />
       </colgroup>
       <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs sticky top-0 z-10">
-        <tr>
+        <tr class="border-b border-gray-300 dark:border-gray-600">
           <th class="px-2 py-2">Title</th>
           <th class="px-2 py-2"></th>
           <th class="px-2 py-2">Subject</th>
@@ -200,17 +208,17 @@
           <th class="px-2 py-2">Action</th>
         </tr>
       </thead>
-      <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+      <tbody>
         {{ if .Available }}
           {{ range .Available }}
-          <tr>
-            <td class="px-2 py-2">{{ .Title }}</td>
-            <td class="px-2 py-2"></td>
-            <td class="px-2 py-2">
+          <tr class="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900/50">
+            <td class="px-2 py-2 align-middle">{{ .Title }}</td>
+            <td class="px-2 py-2 align-middle"></td>
+            <td class="px-2 py-2 align-middle">
               {{ if .Subject }}{{ .Subject }}{{ else }}<span class="text-gray-400">—</span>{{ end }}
             </td>
-            <td class="px-2 py-2">{{ if .Type }}{{ .Type }}{{ else }}<span class="text-gray-400">—</span>{{ end }}</td>
-            <td class="px-2 py-2">
+            <td class="px-2 py-2 align-middle">{{ if .Type }}{{ .Type }}{{ else }}<span class="text-gray-400">—</span>{{ end }}</td>
+            <td class="px-2 py-2 align-middle">
               {{ if eq .Status "active" }}
                 <span class="px-2 py-1 text-xs bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400 rounded">Active</span>
               {{ else if eq .Status "disabled" }}
@@ -221,10 +229,10 @@
                 <span class="text-gray-400">—</span>
               {{ end }}
             </td>
-            <td class="px-2 py-2">
+            <td class="px-2 py-2 align-middle">
               <a
                 href="/groups/{{ $.GroupID }}/assign_resources/create?resourceID={{ .ResourceID }}&return={{ $.BackURL | urlquery }}"
-                class="inline-flex items-center bg-indigo-600 text-white px-2 py-1 text-xs md:text-sm rounded hover:bg-indigo-700"
+                class="inline-flex items-center bg-indigo-600 text-white px-2 py-1 text-xs rounded hover:bg-indigo-700"
                 title="Assign {{ .Title }}"
               >
                 Assign
@@ -233,7 +241,9 @@
           </tr>
           {{ end }}
         {{ else }}
-          <tr><td colspan="6" class="px-2 py-2 text-gray-500 dark:text-gray-400">No resources available to add.</td></tr>
+          <tr>
+            <td colspan="6" class="px-2 py-6 text-center text-gray-500 dark:text-gray-400">No resources available to add.</td>
+          </tr>
         {{ end }}
       </tbody>
     </table>

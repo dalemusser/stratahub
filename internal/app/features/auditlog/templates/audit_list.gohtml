@@ -3,23 +3,23 @@
 {{ end }}
 
 {{ define "content" }}
-<div class="flex items-center justify-between mb-2">
-  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📋 Audit Log</h1>
-  <div class="flex items-center gap-2">
-    <label for="tz-select" class="text-sm text-gray-600 dark:text-gray-400">Timezone:</label>
-    <select id="tz-select" class="text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1">
-      {{ range .TimezoneGroups }}
-      <optgroup label="{{ .Region }}">
-        {{ range .Zones }}
-        <option value="{{ .ID }}">{{ .Label }}</option>
+<div class="flex flex-col h-full">
+  <div class="mb-4 flex items-center justify-between">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📋 Audit Log</h1>
+    <div class="flex items-center gap-2">
+      <label for="tz-select" class="text-sm text-gray-600 dark:text-gray-400">Timezone:</label>
+      <select id="tz-select" class="text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+        {{ range .TimezoneGroups }}
+        <optgroup label="{{ .Region }}">
+          {{ range .Zones }}
+          <option value="{{ .ID }}">{{ .Label }}</option>
+          {{ end }}
+        </optgroup>
         {{ end }}
-      </optgroup>
-      {{ end }}
-    </select>
+      </select>
+    </div>
   </div>
-</div>
 
-<section class="flex-1 min-w-0">
   <!-- Filter Controls -->
   <form
     hx-get="/audit"
@@ -27,16 +27,16 @@
     hx-swap="innerHTML"
     hx-push-url="true"
     hx-trigger="submit, change from:#audit-category, change from:#audit-event-type"
-    class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-1 flex flex-wrap items-center gap-2"
+    class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-2 flex flex-wrap items-center gap-2"
   >
-    <select id="audit-category" name="category" class="px-3 py-2 border rounded text-sm">
+    <select id="audit-category" name="category" class="px-3 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
       <option value="" {{ if not .Category }}selected{{ end }}>All Categories</option>
       {{ range .Categories }}
       <option value="{{ .Value }}" {{ if eq $.Category .Value }}selected{{ end }}>{{ .Label }}</option>
       {{ end }}
     </select>
 
-    <select id="audit-event-type" name="event_type" class="px-3 py-2 border rounded text-sm">
+    <select id="audit-event-type" name="event_type" class="px-3 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
       <option value="" {{ if not .EventType }}selected{{ end }}>All Events</option>
       {{ range .EventTypes }}
       <option value="{{ . }}" {{ if eq $.EventType . }}selected{{ end }}>{{ . }}</option>
@@ -48,7 +48,7 @@
       name="start_date"
       value="{{ .StartDate }}"
       placeholder="Start date"
-      class="px-3 py-2 border rounded text-sm"
+      class="px-3 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
     />
 
     <input
@@ -56,7 +56,7 @@
       name="end_date"
       value="{{ .EndDate }}"
       placeholder="End date"
-      class="px-3 py-2 border rounded text-sm"
+      class="px-3 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
     />
 
     <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
@@ -69,63 +69,64 @@
       hx-target="#content"
       hx-swap="innerHTML"
       hx-push-url="true"
-      class="px-4 py-2 border rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700"
+      class="px-4 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
     >Clear</a>
   </form>
 
-  <!-- Pagination -->
-  <div class="flex items-center justify-between mb-1">
-    <div class="text-gray-600 dark:text-gray-400 text-sm">
-      {{ if .Total }}Page {{ .Page }} of {{ .TotalPages }} ({{ .Total }} total){{ else }}No events found{{ end }}
+  <div class="p-4 bg-white dark:bg-gray-800 rounded shadow flex-1 mb-2 overflow-auto">
+    <!-- Pagination -->
+    <div class="flex items-center justify-between mb-2">
+      <div class="text-gray-600 dark:text-gray-400 text-sm">
+        {{ if .Total }}{{ .RangeStart }}–{{ .RangeEnd }} of {{ .Total }} shown{{ else }}0 of 0 shown{{ end }}
+      </div>
+      <div class="flex items-center gap-2">
+        {{ if .HasPrev }}
+          <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+             href="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&page={{ .PrevPage }}"
+             hx-get="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&page={{ .PrevPage }}"
+             hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Prev</a>
+        {{ else }}
+          <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
+        {{ end }}
+        {{ if .HasNext }}
+          <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+             href="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&page={{ .NextPage }}"
+             hx-get="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&page={{ .NextPage }}"
+             hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Next</a>
+        {{ else }}
+          <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
+        {{ end }}
+      </div>
     </div>
-    <div class="flex items-center gap-2">
-      {{ if .HasPrev }}
-        <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
-           href="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&page={{ .PrevPage }}"
-           hx-get="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&page={{ .PrevPage }}"
-           hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Prev</a>
-      {{ else }}
-        <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
-      {{ end }}
-      {{ if .HasNext }}
-        <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
-           href="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&page={{ .NextPage }}"
-           hx-get="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&page={{ .NextPage }}"
-           hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Next</a>
-      {{ else }}
-        <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
-      {{ end }}
-    </div>
-  </div>
 
-  <!-- Events Table -->
-  <div class="bg-white dark:bg-gray-800 rounded shadow overflow-auto" style="max-height: calc(100vh - 14rem); min-height: 10rem;">
-    <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
-      <colgroup>
-        <col style="width: 160px;" />
-        <col style="width: 100px;" />
-        <col style="width: 180px;" />
-        <col style="width: 140px;" />
-        <col style="width: 140px;" />
-        <col style="width: 120px;" />
-        <col style="width: 100px;" />
-        <col style="width: 60px;" />
-      </colgroup>
-      <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs sticky top-0 z-10">
-        <tr>
-          <th class="px-2 py-2">Timestamp</th>
-          <th class="px-2 py-2">Category</th>
-          <th class="px-2 py-2">Event</th>
-          <th class="px-2 py-2">Actor</th>
-          <th class="px-2 py-2">Target</th>
-          <th class="px-2 py-2">Organization</th>
-          <th class="px-2 py-2">IP</th>
-          <th class="px-2 py-2 text-center">Status</th>
-        </tr>
-      </thead>
-      <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-        {{ range .Items }}
-        <tr>
+    <!-- Events Table -->
+    <div class="overflow-auto" style="max-height: calc(100vh - 18rem); min-height: 10rem;">
+      <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+        <colgroup>
+          <col style="width: 160px;" />
+          <col style="width: 100px;" />
+          <col style="width: 180px;" />
+          <col style="width: 140px;" />
+          <col style="width: 140px;" />
+          <col style="width: 120px;" />
+          <col style="width: 100px;" />
+          <col style="width: 60px;" />
+        </colgroup>
+        <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs sticky top-0 z-10">
+          <tr class="border-b border-gray-300 dark:border-gray-600">
+            <th class="px-2 py-2">Timestamp</th>
+            <th class="px-2 py-2">Category</th>
+            <th class="px-2 py-2">Event</th>
+            <th class="px-2 py-2">Actor</th>
+            <th class="px-2 py-2">Target</th>
+            <th class="px-2 py-2">Organization</th>
+            <th class="px-2 py-2">IP</th>
+            <th class="px-2 py-2 text-center">Status</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ range .Items }}
+          <tr class="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900/50">
           <td class="px-2 py-2 align-middle text-xs whitespace-nowrap">
             <time class="tz-time" datetime="{{ .Timestamp.Format "2006-01-02T15:04:05Z07:00" }}">{{ .Timestamp.Format "Jan 02, 2006 15:04:05" }}</time>
           </td>
@@ -165,16 +166,16 @@
             {{ end }}
           </td>
         </tr>
-        {{ else }}
-        <tr>
-          <td colspan="8" class="px-2 py-6 text-center text-gray-500 dark:text-gray-400">No audit events found.</td>
-        </tr>
-        {{ end }}
-      </tbody>
-    </table>
-    <div class="w-full border-t border-gray-300 dark:border-gray-600"></div>
+          {{ else }}
+          <tr>
+            <td colspan="8" class="px-2 py-6 text-center text-gray-500 dark:text-gray-400">No audit events found.</td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+    </div>
   </div>
-</section>
+</div>
 
 <script>
 (function() {

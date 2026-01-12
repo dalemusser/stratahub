@@ -51,6 +51,8 @@ type listData struct {
 	TotalPages int
 	Total      int64
 	Shown      int
+	RangeStart int
+	RangeEnd   int
 	HasPrev    bool
 	HasNext    bool
 	PrevPage   int

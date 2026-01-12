@@ -3,29 +3,48 @@
 {{ end }}
 
 {{ define "content" }}
-<!-- Title + hide/show toggle (admins only) -->
-<div class="flex items-center justify-between mb-2">
-  <div>
-    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">⛹️ Members</h1>
-  </div>
+<div class="flex flex-col h-full">
+  <!-- Header - mirrors body flex structure so Hide Orgs aligns with section below -->
   {{ if .ShowOrgPane }}
-  <button id="toggle-orgs"
-          class="text-xs px-2 py-1 border rounded hover:bg-gray-50 dark:hover:bg-gray-700"
-          type="button">
-    Hide Orgs
-  </button>
+  <div class="mb-4 flex items-center gap-2 md:gap-4">
+    <div class="flex-none" style="flex-basis: clamp(220px, 22vw, 280px);">
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">⛹️ Members</h1>
+    </div>
+    <div class="flex-1 flex items-center justify-between">
+      <button id="toggle-orgs"
+              class="text-xs px-2 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300"
+              type="button">
+        Hide Orgs
+      </button>
+      <div class="flex items-center gap-2">
+        <a href="/upload_csv?allowGroup=true&return={{ .CurrentPath | urlquery }}{{ if and (ne .SelectedOrg "") (ne .SelectedOrg "all") }}&org={{ .SelectedOrg }}{{ end }}"
+           class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Upload CSV</a>
+        <a href="/members/new?return={{ .CurrentPath | urlquery }}{{ if and (ne .SelectedOrg "") (ne .SelectedOrg "all") }}&org={{ .SelectedOrg }}{{ end }}"
+           class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Add Member</a>
+      </div>
+    </div>
+  </div>
+  {{ else }}
+  <div class="mb-4 flex items-center justify-between">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">⛹️ Members</h1>
+    <div class="flex items-center gap-2">
+      <a href="/upload_csv?allowGroup=true&return={{ .CurrentPath | urlquery }}"
+         class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Upload CSV</a>
+      <a href="/members/new?return={{ .CurrentPath | urlquery }}"
+         class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Add Member</a>
+    </div>
+  </div>
   {{ end }}
-</div>
 
-<!-- Always horizontal: capped sidebar + flexible table; allow horizontal scroll when narrow -->
-<div id="members-grid"
-     class="flex items-start gap-2 md:gap-4 overflow-x-auto scroll-smooth [overscroll-behavior-x:contain] [-webkit-overflow-scrolling:touch]">
+  <!-- Always horizontal: capped sidebar + flexible table; allow horizontal scroll when narrow -->
+  <div id="members-grid"
+       class="flex-1 flex items-start gap-2 md:gap-4 overflow-x-auto scroll-smooth [overscroll-behavior-x:contain] [-webkit-overflow-scrolling:touch]">
   {{ if .ShowOrgPane }}
   <aside id="orgs-sidebar"
          class="org-col flex-none"
          style="flex-basis: clamp(220px, 22vw, 280px);">
-    <div class="bg-white dark:bg-gray-800 rounded shadow p-3">
-      <label class="block text-sm font-semibold mb-2">Organizations</label>
+    <div class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-2">
+      <label class="block text-sm font-semibold mb-2 text-gray-700 dark:text-gray-300">Organizations</label>
 
       <!-- Org search (live; debounced) kept on one line -->
       <form
@@ -43,7 +62,7 @@
         <input
           id="orgs-q" name="org_q" type="text" placeholder="Search orgs..."
           value="{{ .OrgQuery }}"
-          class="flex-auto min-w-0 px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+          class="flex-auto min-w-0 px-3 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
 
         <a
           href="/members?org={{ .SelectedOrg }}{{ if .Status }}&status={{ .Status | urlquery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery | urlquery }}{{ end }}&org_q="
@@ -52,7 +71,7 @@
           hx-target="#content"
           hx-swap="innerHTML"
           hx-push-url="true"
-          class="shrink-0 px-3 py-2 border rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+          class="shrink-0 px-3 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
         >
           Clear
         </a>
@@ -80,20 +99,20 @@
         </span>
         <span class="flex gap-2">
           {{ if .OrgHasPrev }}
-            <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+            <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
                href="/members?org={{ .SelectedOrg }}&org_before={{ .OrgPrevCur }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}"
                hx-get="/members?org={{ .SelectedOrg }}&org_before={{ .OrgPrevCur }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}"
                hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Prev</a>
           {{ else }}
-            <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
+            <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
           {{ end }}
           {{ if .OrgHasNext }}
-            <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+            <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
                href="/members?org={{ .SelectedOrg }}&org_after={{ .OrgNextCur }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}"
                hx-get="/members?org={{ .SelectedOrg }}&org_after={{ .OrgNextCur }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}"
                hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Next</a>
           {{ else }}
-            <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
+            <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
           {{ end }}
         </span>
       </div>
@@ -121,7 +140,7 @@
   {{ end }}
 
   <!-- RIGHT: Members table; keep a sane minimum width so it stays on the right -->
-  <section class="table-col flex-1 min-w-[560px]">
+  <section class="table-col flex-1 min-w-[560px] flex flex-col">
     <!-- Controls -->
     <form
       hx-get="/members"
@@ -140,9 +159,9 @@
         id="member-q" name="search" type="text"
         value="{{ .SearchQuery }}"
         placeholder="Search by name"
-        class="flex-1 px-3 py-2 border rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+        class="flex-1 px-3 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
 
-      <select id="member-status" name="status" class="px-3 py-2 border rounded text-sm">
+      <select id="member-status" name="status" class="px-3 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded text-sm">
         <option value="" {{ if not .Status }}selected{{ end }}>All Statuses</option>
         <option value="active"   {{ if eq .Status "active" }}selected{{ end }}>Active</option>
         <option value="disabled" {{ if eq .Status "disabled" }}selected{{ end }}>Disabled</option>
@@ -168,22 +187,10 @@
           const s = document.getElementById('member-status');
           if (s) s.value = '';
         })()"
-        class="px-4 py-2 border rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700 mr-6"
+        class="px-4 py-2 border dark:border-gray-600 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700"
       >
         Clear
       </a>
-
-      {{ if .ShowOrgPane }}
-        <a href="/upload_csv?allowGroup=true&return={{ .CurrentPath | urlquery }}{{ if and (ne .SelectedOrg "") (ne .SelectedOrg "all") }}&org={{ .SelectedOrg }}{{ end }}"
-           class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Upload CSV</a>
-        <a href="/members/new?return={{ .CurrentPath | urlquery }}{{ if and (ne .SelectedOrg "") (ne .SelectedOrg "all") }}&org={{ .SelectedOrg }}{{ end }}"
-           class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Add Member</a>
-      {{ else }}
-        <a href="/upload_csv?allowGroup=true&return={{ .CurrentPath | urlquery }}"
-          class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Upload CSV</a>
-        <a href="/members/new?return={{ .CurrentPath | urlquery }}"
-           class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">Add Member</a>
-      {{ end }}
     </form>
 
     <!-- Top pager (shows range) -->
@@ -193,26 +200,26 @@
       </div>
       <div class="flex items-center gap-2">
         {{ if .HasPrev }}
-          <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+          <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
              href="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&before={{ .PrevCursor }}&start={{ .PrevStart }}"
              hx-get="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&before={{ .PrevCursor }}&start={{ .PrevStart }}"
              hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Prev</a>
         {{ else }}
-          <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
+          <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
         {{ end }}
         {{ if .HasNext }}
-          <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
+          <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
              href="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&after={{ .NextCursor }}&start={{ .NextStart }}"
              hx-get="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&after={{ .NextCursor }}&start={{ .NextStart }}"
              hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Next</a>
         {{ else }}
-          <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
+          <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
         {{ end }}
       </div>
     </div>
 
     <!-- Table -->
-    <div class="bg-white dark:bg-gray-800 rounded shadow overflow-auto" style="max-height: calc(100vh - 13.5rem); min-height: 10rem;">
+    <div class="p-4 bg-white dark:bg-gray-800 rounded shadow flex-1 mb-2 overflow-auto">
       <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
         <colgroup>
           <col style="width: 24%;" />
@@ -222,7 +229,7 @@
           <col style="width: 12rem;" />
         </colgroup>
         <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs sticky top-0 z-10">
-          <tr>
+          <tr class="border-b border-gray-300 dark:border-gray-600">
             <th class="px-2 py-2">Name</th>
             <th class="px-2 py-2">Login ID</th>
             <th class="px-2 py-2">Organization</th>
@@ -230,9 +237,9 @@
             <th class="px-2 py-2 text-right md:whitespace-nowrap">Actions</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+        <tbody>
           {{ range .MemberRows }}
-          <tr>
+          <tr class="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900/50">
             <td class="px-2 py-2"><div class="truncate" title="{{ .FullName }}">{{ .FullName }}</div></td>
             <td class="px-2 py-2"><div class="truncate" title="{{ .LoginID }}">{{ .LoginID }}</div></td>
             <td class="px-2 py-2"><div class="truncate" title="{{ .OrgName }}">{{ .OrgName }}</div></td>
@@ -314,22 +321,33 @@
     <p class="text-xs text-gray-500 dark:text-gray-400">{{ .LoginID }}</p>
 
     <div class="text-sm text-gray-700 dark:text-gray-300">
-      <p>Use the actions below to view, edit, or remove this member.</p>
+      <p>Use the actions below to view or edit this member.</p>
     </div>
 
-    <div class="flex flex-col gap-3 pt-2">
-      <!-- Row of actions centered -->
-      <div class="flex justify-center gap-2">
-        <a
-          href="/members/{{ .MemberID }}/view?return={{ .BackURL | urlquery }}"
-          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
-        >View</a>
+    <!-- Action buttons -->
+    <div class="flex gap-2">
+      <a
+        href="/members/{{ .MemberID }}/view?return={{ .BackURL | urlquery }}"
+        class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
+      >View</a>
+      <a
+        href="/members/{{ .MemberID }}/edit?return={{ .BackURL | urlquery }}"
+        class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
+      >Edit</a>
+      <button
+        type="button"
+        class="px-3 py-1 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+        onclick="document.getElementById('modal-root').innerHTML=''"
+      >Close</button>
+    </div>
 
-        <a
-          href="/members/{{ .MemberID }}/edit?return={{ .BackURL | urlquery }}"
-          class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
-        >Edit</a>
-
+    <!-- Danger Zone -->
+    <div class="pt-4 mt-2 border-t border-gray-200 dark:border-gray-700">
+      <div class="p-4 border border-red-300 dark:border-red-700 rounded bg-red-50 dark:bg-red-900/20">
+        <h3 class="text-sm font-semibold text-red-800 dark:text-red-300 mb-2">Danger Zone</h3>
+        <p class="text-xs text-red-700 dark:text-red-400 mb-3">
+          Permanently delete this member. This action cannot be undone.
+        </p>
         <form
           method="post"
           action="/members/{{ .MemberID }}/delete"
@@ -339,19 +357,8 @@
           <button
             type="submit"
             class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-          >Delete</button>
+          >Delete Member</button>
         </form>
-      </div>
-
-      <!-- Close button bottom-left -->
-      <div class="flex justify-start">
-        <button
-          type="button"
-          class="px-3 py-1 border rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-          onclick="document.getElementById('modal-root').innerHTML=''"
-        >
-          Close
-        </button>
       </div>
     </div>
   </div>

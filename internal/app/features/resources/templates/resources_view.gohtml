@@ -3,133 +3,151 @@
 {{ end }}
 
 {{ define "content" }}
-<div class="flex items-center mb-2">
-  <a href="{{ .BackURL }}"
-     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
-     title="Go back">
-    ← Back
-  </a>
-  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📚 View Resource</h1>
-</div>
-
-<div class="bg-white dark:bg-gray-800 rounded shadow p-4 max-w-xl space-y-4">
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
-    <input type="text" value="{{ .ResourceTitle }}" class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm" readonly />
-  </div>
-
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
-    <input type="text" value="{{ .Type }}" class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm" readonly />
-  </div>
-
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subject</label>
-    <input type="text" value="{{ .Subject }}" class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm" readonly />
-  </div>
-
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-    <textarea class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm" rows="4" readonly>{{ .Description }}</textarea>
-  </div>
-
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
-    <input type="text" value="{{ .Status }}" class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm" readonly />
-  </div>
-
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Show in Library</label>
-    <input type="text" value="{{ if .ShowInLibrary }}Yes{{ else }}No{{ end }}" class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm" readonly />
-  </div>
-
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Content</label>
-    {{ if .HasFile }}
-      <div class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm flex items-center justify-between">
-        <span>File: {{ .FileName }} {{ if .FileSize }}<span class="text-gray-500 dark:text-gray-400">({{ .FileSize }} bytes)</span>{{ end }}</span>
-        <a href="/resources/{{ .ID }}/download" target="_blank"
-           class="ml-2 px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 whitespace-nowrap">
-          Download
-        </a>
-      </div>
-    {{ else if .LaunchURL }}
-      <div class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm flex items-center justify-between">
-        <span class="break-all">{{ .LaunchURL }}</span>
-        <a href="{{ .LaunchURL }}" target="_blank"
-           class="ml-2 px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 whitespace-nowrap">
-          Open Link
-        </a>
-      </div>
-    {{ else }}
-      <input type="text" value="Not set" class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm" readonly />
-    {{ end }}
-  </div>
-
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Instructions</label>
-    <div class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm tiptap-content min-h-[100px]">{{ .DefaultInstructions }}</div>
-  </div>
-
-  {{ if .CanEdit }}
-  <div class="pt-3">
-    <a
-      href="/resources/{{ .ID }}/edit?return={{ .BackURL | urlquery }}"
-      class="inline-flex items-center px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700"
-    >
-      Edit Resource
+<div class="flex flex-col h-full">
+  <div class="mb-4 flex items-center">
+    <a href="{{ .BackURL }}"
+       class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2 no-loader"
+       title="Go back">
+      ← Back
     </a>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📚 View Resource</h1>
   </div>
-  {{ end }}
-</div>
 
-<div class="mt-4 text-xs text-gray-600 dark:text-gray-400 space-y-1 max-w-xl">
-  <p>
-    <span class="font-semibold">Status</span> –
-    <span class="font-semibold">Active</span>: the resource is available to members. Any member in any group where the resource is assigned will see it in their Resources list and can open it normally.
-    <span class="font-semibold">Disabled</span>: the resource is hidden from all members, even if it is assigned to a group. Leaders and admins can still see it (according to permissions), and assignments remain intact, but members cannot see or open the resource until it is re-activated.
-  </p>
-  <p>
-    <span class="font-semibold">Show in Library</span> – when checked, the resource appears in the Library for leaders when assigning to groups. When unchecked, existing assignments still work, but the resource is hidden from the Library for new assignments (admins always see all resources).
-  </p>
-</div>
+  <div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm flex-1 mb-2">
+    <div class="space-y-3 max-w-xl">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+        <input type="text" value="{{ .ResourceTitle }}" readonly
+               class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
+      </div>
 
-<div class="mt-2 text-xs text-gray-600 dark:text-gray-400 max-w-xl">
-  <table class="w-full border border-gray-200 dark:border-gray-700 border-collapse">
-    <thead class="bg-gray-50 dark:bg-gray-700">
-      <tr>
-        <th class="border border-gray-200 dark:border-gray-700 px-2 py-1 text-left">Setting</th>
-        <th class="border border-gray-200 dark:border-gray-700 px-2 py-1 text-left">Value</th>
-        <th class="border border-gray-200 dark:border-gray-700 px-2 py-1 text-left">Members see it?</th>
-        <th class="border border-gray-200 dark:border-gray-700 px-2 py-1 text-left">Leaders see in Library?</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td class="border border-gray-200 dark:border-gray-700 px-2 py-1 align-top">Status</td>
-        <td class="border border-gray-200 dark:border-gray-700 px-2 py-1 align-top">Active</td>
-        <td class="border border-gray-200 dark:border-gray-700 px-2 py-1 align-top">Yes, if assigned to their group.</td>
-        <td class="border border-gray-200 dark:border-gray-700 px-2 py-1 align-top">Depends on Show in Library (see below).</td>
-      </tr>
-      <tr>
-        <td class="border border-gray-200 dark:border-gray-700 px-2 py-1 align-top">Status</td>
-        <td class="border border-gray-200 dark:border-gray-700 px-2 py-1 align-top">Disabled</td>
-        <td class="border border-gray-200 dark:border-gray-700 px-2 py-1 align-top">No, hidden from all members even if assigned.</td>
-        <td class="border border-gray-200 dark:border-gray-700 px-2 py-1 align-top">Leaders and admins can still see the resource details; it just can't be used with members.</td>
-      </tr>
-      <tr>
-        <td class="border border-gray-200 dark:border-gray-700 px-2 py-1 align-top">Show in Library</td>
-        <td class="border border-gray-200 dark:border-gray-700 px-2 py-1 align-top">Checked</td>
-        <td class="border border-gray-200 dark:border-gray-700 px-2 py-1 align-top">Unchanged (controlled by Status and assignments).</td>
-        <td class="border border-gray-200 dark:border-gray-700 px-2 py-1 align-top">Yes, leaders will see it in the Library when assigning.</td>
-      </tr>
-      <tr>
-        <td class="border border-gray-200 dark:border-gray-700 px-2 py-1 align-top">Show in Library</td>
-        <td class="border border-gray-200 dark:border-gray-700 px-2 py-1 align-top">Unchecked</td>
-        <td class="border border-gray-200 dark:border-gray-700 px-2 py-1 align-top">Unchanged (controlled by Status and assignments).</td>
-        <td class="border border-gray-200 dark:border-gray-700 px-2 py-1 align-top">No, resource is hidden from the Library for new assignments, but existing assignments still work.</td>
-      </tr>
-    </tbody>
-  </table>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+        <input type="text" value="{{ .Type }}" readonly
+               class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Subject</label>
+        <input type="text" value="{{ .Subject }}" readonly
+               class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+        <textarea readonly rows="4"
+                  class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm">{{ .Description }}</textarea>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+        <input type="text" value="{{ .Status }}" readonly
+               class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Show in Library</label>
+        <input type="text" value="{{ if .ShowInLibrary }}Yes{{ else }}No{{ end }}" readonly
+               class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Content</label>
+        {{ if .HasFile }}
+          <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm flex items-center justify-between">
+            <span>File: {{ .FileName }} {{ if .FileSize }}<span class="text-gray-500 dark:text-gray-400">({{ .FileSize }} bytes)</span>{{ end }}</span>
+            <a href="/resources/{{ .ID }}/download" target="_blank"
+               class="ml-2 px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 whitespace-nowrap">
+              Download
+            </a>
+          </div>
+        {{ else if .LaunchURL }}
+          <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm break-all flex items-center justify-between">
+            <span>
+              <span class="font-medium">URL:</span>
+              <a href="{{ .LaunchURL }}" target="_blank" class="text-green-600 dark:text-green-400 hover:underline">{{ .LaunchURL }}</a>
+            </span>
+            <a href="{{ .LaunchURL }}" target="_blank"
+               class="ml-2 px-2 py-1 bg-green-600 text-white text-xs rounded hover:bg-green-700 whitespace-nowrap">
+              Open Link
+            </a>
+          </div>
+        {{ else }}
+          <input type="text" value="Not set" readonly
+                 class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
+        {{ end }}
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Instructions</label>
+        <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm tiptap-content min-h-[100px]">{{ .DefaultInstructions }}</div>
+      </div>
+
+      {{ if .CanEdit }}
+      <!-- Action button -->
+      <div class="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700">
+        <a
+          href="/resources/{{ .ID }}/edit?return={{ .BackURL | urlquery }}"
+          class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
+        >
+          Edit Resource
+        </a>
+      </div>
+      {{ end }}
+    </div>
+
+    <!-- Help text -->
+    <div class="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700 max-w-xl">
+      <div class="text-xs text-gray-600 dark:text-gray-400 space-y-2">
+        <p>
+          <span class="font-semibold">Status</span> –
+          <span class="font-semibold">Active</span>: the resource is available to members. Any member in any group where the resource is assigned will see it in their Resources list and can open it normally.
+          <span class="font-semibold">Disabled</span>: the resource is hidden from all members, even if it is assigned to a group. Leaders and admins can still see it (according to permissions), and assignments remain intact, but members cannot see or open the resource until it is re-activated.
+        </p>
+        <p>
+          <span class="font-semibold">Show in Library</span> – when checked, the resource appears in the Library for leaders when assigning to groups. When unchecked, existing assignments still work, but the resource is hidden from the Library for new assignments (admins always see all resources).
+        </p>
+      </div>
+
+      <div class="mt-3 text-xs text-gray-600 dark:text-gray-400">
+        <table class="w-full border border-gray-200 dark:border-gray-600 border-collapse">
+          <thead class="bg-gray-50 dark:bg-gray-700">
+            <tr>
+              <th class="border border-gray-200 dark:border-gray-600 px-2 py-1 text-left">Setting</th>
+              <th class="border border-gray-200 dark:border-gray-600 px-2 py-1 text-left">Value</th>
+              <th class="border border-gray-200 dark:border-gray-600 px-2 py-1 text-left">Members see it?</th>
+              <th class="border border-gray-200 dark:border-gray-600 px-2 py-1 text-left">Leaders see in Library?</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1 align-top">Status</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1 align-top">Active</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1 align-top">Yes, if assigned to their group.</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1 align-top">Depends on Show in Library (see below).</td>
+            </tr>
+            <tr>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1 align-top">Status</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1 align-top">Disabled</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1 align-top">No, hidden from all members even if assigned.</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1 align-top">Leaders and admins can still see the resource details; it just can't be used with members.</td>
+            </tr>
+            <tr>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1 align-top">Show in Library</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1 align-top">Checked</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1 align-top">Unchanged (controlled by Status and assignments).</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1 align-top">Yes, leaders will see it in the Library when assigning.</td>
+            </tr>
+            <tr>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1 align-top">Show in Library</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1 align-top">Unchecked</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1 align-top">Unchanged (controlled by Status and assignments).</td>
+              <td class="border border-gray-200 dark:border-gray-600 px-2 py-1 align-top">No, resource is hidden from the Library for new assignments, but existing assignments still work.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
 </div>
 {{ end }}

@@ -3,72 +3,77 @@
 {{ end }}
 
 {{ define "content" }}
-<div class="flex items-center mb-2">
-  <a href="{{ .BackURL }}"
-     class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
-     title="Go back">
-    ← Back
-  </a>
-  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">👑 Add Leader</h1>
+<div class="flex flex-col h-full">
+  <div class="mb-4 flex items-center">
+    <a href="{{ .BackURL }}"
+       class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2 no-loader"
+       title="Go back">
+      ← Back
+    </a>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">👑 Add Leader</h1>
+  </div>
+
+  <div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm flex-1 mb-2">
+    {{ if .Error }}
+      <div class="mb-4 p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded max-w-xl">
+        {{ .Error }}
+      </div>
+    {{ end }}
+
+    <form method="post" action="/leaders" class="space-y-3 max-w-xl">
+      <!-- propagate return so success goes back -->
+      <input type="hidden" name="return" value="{{ .BackURL }}">
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
+        <input name="full_name" type="text" value="{{ .FullName }}" required
+               class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+      </div>
+
+      <!-- Organization (select via picker) -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Organization</label>
+
+        <!-- Selected org display -->
+        <div id="selected-org-display" class="min-h-[2.5rem] p-2 border dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 mb-2">
+          <div id="selected-org-name" class="text-sm text-gray-900 dark:text-gray-100 {{ if not .OrgName }}hidden{{ end }}">
+            {{ .OrgName }}
+          </div>
+          <div id="no-org-msg" class="text-gray-500 dark:text-gray-400 text-sm {{ if .OrgName }}hidden{{ end }}">
+            No organization selected
+          </div>
+        </div>
+
+        <!-- Hidden input for form submission -->
+        <input type="hidden" name="orgID" id="org-hidden-input" value="{{ .OrgHex }}">
+
+        <!-- Button to open picker -->
+        <button
+          type="button"
+          id="select-org-btn"
+          class="px-3 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+          hx-get="/organizations/picker{{ if .OrgHex }}?selected={{ .OrgHex }}{{ end }}"
+          hx-target="#org-picker-root"
+          hx-swap="innerHTML"
+        >
+          {{ if .OrgName }}Change Organization...{{ else }}Select Organization...{{ end }}
+        </button>
+      </div>
+
+      {{ template "auth_fields" . }}
+
+      <!-- Status deliberately omitted: new leaders are always created Active -->
+
+      <div class="flex gap-2 pt-2">
+        <button type="submit" class="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700">Add Leader</button>
+        <a href="{{ .BackURL }}" class="px-3 py-1 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Modal container -->
+  <div id="org-picker-root"></div>
 </div>
-
-{{ if .Error }}
-  <div class="mb-3 p-2 border border-red-300 bg-red-50 text-red-700 rounded">
-    {{ .Error }}
-  </div>
-{{ end }}
-
-<form method="post" action="/leaders" class="space-y-3 max-w-xl bg-white dark:bg-gray-800 p-4 rounded border dark:border-gray-700">
-  <!-- propagate return so success goes back -->
-  <input type="hidden" name="return" value="{{ .BackURL }}">
-
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
-    <input name="full_name" type="text" value="{{ .FullName }}" required class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm" />
-  </div>
-
-  <!-- Organization (select via picker) -->
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Organization</label>
-
-    <!-- Selected org display -->
-    <div id="selected-org-display" class="min-h-[2.5rem] p-2 border dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 mb-2">
-      <div id="selected-org-name" class="text-sm text-gray-900 dark:text-gray-100 {{ if not .OrgName }}hidden{{ end }}">
-        {{ .OrgName }}
-      </div>
-      <div id="no-org-msg" class="text-gray-500 dark:text-gray-400 text-sm {{ if .OrgName }}hidden{{ end }}">
-        No organization selected
-      </div>
-    </div>
-
-    <!-- Hidden input for form submission -->
-    <input type="hidden" name="orgID" id="org-hidden-input" value="{{ .OrgHex }}">
-
-    <!-- Button to open picker -->
-    <button
-      type="button"
-      id="select-org-btn"
-      class="px-3 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-      hx-get="/organizations/picker{{ if .OrgHex }}?selected={{ .OrgHex }}{{ end }}"
-      hx-target="#org-picker-root"
-      hx-swap="innerHTML"
-    >
-      {{ if .OrgName }}Change Organization...{{ else }}Select Organization...{{ end }}
-    </button>
-  </div>
-
-  {{ template "auth_fields" . }}
-
-  <!-- Status deliberately omitted: new leaders are always created Active -->
-
-  <div class="flex gap-2 pt-2">
-    <button class="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Add Leader</button>
-    <a href="{{ .BackURL }}" class="px-3 py-1 border rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600">Cancel</a>
-  </div>
-</form>
-
-<!-- Modal container -->
-<div id="org-picker-root"></div>
 
 <script>
 (function() {

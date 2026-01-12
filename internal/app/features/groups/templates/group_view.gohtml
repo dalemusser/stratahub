@@ -3,102 +3,94 @@
 {{ end }}
 
 {{ define "content" }}
-<!-- Back -->
-<div class="flex items-center mb-2">
-  <a href="{{ .BackURL }}"
-     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
-     title="Go back">
-    ← Back
-  </a>
-  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">👥 View Group</h1>
-</div>
-
-<!-- Details card (styled like View Member) -->
-<div class="max-w-3xl bg-white dark:bg-gray-800 p-4 rounded border space-y-3">
-  <!-- Group Name -->
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Group Name</label>
-    <input type="text" value="{{ .Name }}" class="w-full border p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm" readonly />
+<div class="flex flex-col h-full">
+  <div class="mb-4 flex items-center">
+    <a href="{{ .BackURL }}"
+       class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2 no-loader"
+       title="Go back">
+      ← Back
+    </a>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">👥 View Group</h1>
   </div>
 
-  <!-- Description -->
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-    <textarea rows="3" class="w-full border p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm" readonly>{{ .Description }}</textarea>
-  </div>
+  <div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm flex-1 mb-2">
+    <div class="space-y-3 max-w-xl">
+      <!-- Group Name -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Group Name</label>
+        <input type="text" value="{{ .Name }}" readonly
+               class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
+      </div>
 
-  <!-- Organization -->
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Organization</label>
-    <input type="text" value="{{ .OrganizationName }}" class="w-full border p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm" readonly />
-  </div>
+      <!-- Description -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+        <textarea rows="3" readonly
+                  class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm">{{ .Description }}</textarea>
+      </div>
 
-  <!-- Leaders & Members -->
-  <div class="grid grid-cols-2 gap-4">
-    <div>
-      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"># Leaders</label>
-      <input type="text" value="{{ .LeadersCount }}" class="w-full border p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm" readonly />
+      <!-- Organization -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Organization</label>
+        <input type="text" value="{{ .OrganizationName }}" readonly
+               class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
+      </div>
+
+      <!-- Leaders & Members -->
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"># Leaders</label>
+          <input type="text" value="{{ .LeadersCount }}" readonly
+                 class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"># Members</label>
+          <input type="text" value="{{ .MembersCount }}" readonly
+                 class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
+        </div>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="pt-4 mt-4 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-2">
+        <a href="/groups/{{ .GroupID }}/edit?return={{ .CurrentPath | urlquery }}"
+           class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700">Edit Group</a>
+        <a href="/groups/{{ .GroupID }}/manage?return={{ .CurrentPath | urlquery }}"
+           class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700">Manage Users</a>
+        <a href="/upload_csv?org={{ .OrganizationID }}&group={{ .GroupID }}&return={{ .CurrentPath | urlquery }}"
+           class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700">Upload CSV</a>
+        <a href="/groups/{{ .GroupID }}/assign_resources?return={{ .CurrentPath | urlquery }}"
+           class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700">Assign Resources</a>
+      </div>
     </div>
-    <div>
-      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1"># Members</label>
-      <input type="text" value="{{ .MembersCount }}" class="w-full border p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm" readonly />
-    </div>
-  </div>
-</div>
 
-<!-- Buttons row (placed below the card like View Member) -->
-<div class="pt-4 flex flex-wrap gap-2">
-  <a
-    href="/groups/{{ .GroupID }}/edit?return={{ .CurrentPath | urlquery }}"
-    class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
-  >Edit Group</a>
+    <!-- Assigned Resources -->
+    <div class="mt-6 max-w-xl">
+      <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Assigned Resources</h2>
 
-  <a
-    href="/groups/{{ .GroupID }}/manage?return={{ .CurrentPath | urlquery }}"
-    class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
-  >Manage Users</a>
-
-  <a
-    href="/upload_csv?org={{ .OrganizationID }}&group={{ .GroupID }}&return={{ .CurrentPath | urlquery }}"
-    class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
-  >Upload CSV</a>
-
-  <a
-    href="/groups/{{ .GroupID }}/assign_resources?return={{ .CurrentPath | urlquery }}"
-    class="px-3 py-1 bg-indigo-600 text-white text-sm rounded hover:bg-indigo-700"
-  >Assign Resources</a>
-</div>
-
-<!-- Assigned Resources: table like your organization list -->
-<div class="mt-6 max-w-3xl">
-  <h2 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-2">Assigned Resources</h2>
-
-  {{ if .AssignedResources }}
-    <div class="bg-white dark:bg-gray-800 rounded border overflow-hidden">
-      <table class="min-w-full text-sm">
-        <thead class="bg-gray-50 dark:bg-gray-700 text-gray-500 dark:text-gray-400 uppercase text-xs">
-          <tr>
-            <th class="px-4 py-2 text-left">Resource Title</th>
+      {{ if .AssignedResources }}
+      <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+        <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs">
+          <tr class="border-b border-gray-300 dark:border-gray-600">
+            <th class="px-2 py-2">Resource Title</th>
           </tr>
         </thead>
-        <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
+        <tbody>
           {{ range .AssignedResources }}
-            <tr>
-              <td class="px-4 py-2 text-gray-900 dark:text-gray-100">
-                <a
-                  href="/groups/{{ $.GroupID }}/resources/{{ .ResourceID }}?return={{ $.CurrentPath | urlquery }}"
-                  class="text-indigo-600 hover:underline"
-                >
-                  {{ .ResourceTitle }}
-                </a>
-              </td>
-            </tr>
+          <tr class="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900/50">
+            <td class="px-2 py-2 align-middle">
+              <a href="/groups/{{ $.GroupID }}/resources/{{ .ResourceID }}?return={{ $.CurrentPath | urlquery }}"
+                 class="text-indigo-600 dark:text-indigo-400 hover:underline">
+                {{ .ResourceTitle }}
+              </a>
+            </td>
+          </tr>
           {{ end }}
         </tbody>
       </table>
+      {{ else }}
+      <p class="text-gray-500 dark:text-gray-400">No resources assigned to this group.</p>
+      {{ end }}
     </div>
-  {{ else }}
-    <p class="text-gray-500 dark:text-gray-400">No resources assigned to this group.</p>
-  {{ end }}
+  </div>
 </div>
 {{ end }}

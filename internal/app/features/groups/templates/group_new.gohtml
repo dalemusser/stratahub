@@ -3,120 +3,127 @@
 {{ end }}
 
 {{ define "content" }}
-<div class="flex items-center mb-2">
-  <a href="{{ .BackURL }}"
-     class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
-     title="Go back">
-    ← Back
-  </a>
-  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">👥 Add Group</h1>
+<div class="flex flex-col h-full">
+  <div class="mb-4 flex items-center">
+    <a href="{{ .BackURL }}"
+       class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2 no-loader"
+       title="Go back">
+      ← Back
+    </a>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">👥 Add Group</h1>
+  </div>
+
+  <div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm flex-1 mb-2">
+    {{ if .Error }}
+      <div class="mb-4 p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded max-w-xl">
+        {{ .Error }}
+      </div>
+    {{ end }}
+
+    <form method="post" action="/groups" class="space-y-3 max-w-xl" id="new-group-form">
+      <!-- Name -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
+        <input name="name" type="text" value="{{ .Name }}" required
+               class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+      </div>
+
+      {{ if or (eq .Role "admin") (eq .Role "coordinator") }}
+      <!-- Organization (admin/coordinator can select via picker) -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Organization</label>
+
+        <!-- Selected org display -->
+        <div id="selected-org-display" class="min-h-[2.5rem] p-2 border dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 mb-2">
+          <div id="selected-org-name" class="text-sm text-gray-900 dark:text-gray-100 {{ if not .LeaderOrgName }}hidden{{ end }}">
+            {{ .LeaderOrgName }}
+          </div>
+          <div id="no-org-msg" class="text-gray-500 dark:text-gray-400 text-sm {{ if .LeaderOrgName }}hidden{{ end }}">
+            No organization selected
+          </div>
+        </div>
+
+        <!-- Hidden input for form submission -->
+        <input type="hidden" name="orgID" id="org-hidden-input" value="{{ .LeaderOrgID }}" />
+
+        <!-- Button to open picker -->
+        <button
+          type="button"
+          id="select-org-btn"
+          class="px-3 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+          hx-get="/organizations/picker{{ if .LeaderOrgID }}?selected={{ .LeaderOrgID }}{{ end }}"
+          hx-target="#org-picker-root"
+          hx-swap="innerHTML"
+        >
+          {{ if .LeaderOrgName }}Change Organization...{{ else }}Select Organization...{{ end }}
+        </button>
+      </div>
+
+      <!-- Leaders (optional, requires org to be selected) -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Leader(s)</label>
+
+        <!-- Selected leaders display -->
+        <div id="selected-leaders-display" class="min-h-[2.5rem] p-2 border dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 mb-2">
+          <div id="selected-leaders-chips" class="flex flex-wrap gap-1">
+            {{/* Leaders are managed via JavaScript */}}
+          </div>
+          <div id="no-leaders-msg" class="text-gray-500 dark:text-gray-400 text-sm">
+            No leaders selected
+          </div>
+        </div>
+
+        <!-- Hidden inputs for form submission -->
+        <div id="leader-hidden-inputs">
+          {{/* Hidden inputs are managed via JavaScript */}}
+        </div>
+
+        <!-- Button to open picker (disabled when no org selected) -->
+        <button
+          type="button"
+          id="select-leaders-btn"
+          class="{{ if .LeaderOrgID }}px-3 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700{{ else }}px-3 py-2 bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 rounded text-sm cursor-not-allowed{{ end }}"
+          {{ if not .LeaderOrgID }}disabled{{ end }}
+        >
+          Select Leaders...
+        </button>
+
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          {{ if not .LeaderOrgID }}Select an organization first to choose leaders.{{ else }}Selecting leaders is optional; you can assign leaders later.{{ end }}
+        </p>
+      </div>
+      {{ else }}
+      <!-- Organization (read-only for leader) -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Organization</label>
+        <input type="text" value="{{ .LeaderOrgName }}" readonly
+               class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm dark:text-gray-100" />
+        <input type="hidden" name="orgID" value="{{ .LeaderOrgID }}" />
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">You will be assigned as a leader of this group.</p>
+      </div>
+      {{ end }}
+
+      <!-- Description -->
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+        <textarea name="description" rows="4"
+                  class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">{{ .Description }}</textarea>
+      </div>
+
+      <!-- Propagate return so the handler can send user back -->
+      <input type="hidden" name="return" value="{{ .BackURL }}">
+
+      <div class="flex gap-2 pt-2">
+        <button type="submit" class="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700">Add Group</button>
+        <a href="{{ .BackURL }}" class="px-3 py-1 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</a>
+      </div>
+    </form>
+  </div>
+
+  <!-- Modal containers -->
+  <div id="org-picker-root"></div>
+  <div id="leader-picker-root"></div>
 </div>
-
-{{ if .Error }}
-  <div class="mb-3 p-2 border border-red-300 bg-red-50 text-red-700 rounded">
-    {{ .Error }}
-  </div>
-{{ end }}
-
-<form method="post" action="/groups" class="space-y-3 max-w-xl bg-white dark:bg-gray-800 p-4 rounded border dark:border-gray-700" id="new-group-form">
-  <!-- Name -->
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
-    <input name="name" type="text" value="{{ .Name }}" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm" required />
-  </div>
-
-  {{ if or (eq .Role "admin") (eq .Role "coordinator") }}
-    <!-- Organization (admin/coordinator can select via picker) -->
-    <div>
-      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Organization</label>
-
-      <!-- Selected org display -->
-      <div id="selected-org-display" class="min-h-[2.5rem] p-2 border dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 mb-2">
-        <div id="selected-org-name" class="text-sm text-gray-900 dark:text-gray-100 {{ if not .LeaderOrgName }}hidden{{ end }}">
-          {{ .LeaderOrgName }}
-        </div>
-        <div id="no-org-msg" class="text-gray-500 dark:text-gray-400 text-sm {{ if .LeaderOrgName }}hidden{{ end }}">
-          No organization selected
-        </div>
-      </div>
-
-      <!-- Hidden input for form submission -->
-      <input type="hidden" name="orgID" id="org-hidden-input" value="{{ .LeaderOrgID }}" />
-
-      <!-- Button to open picker -->
-      <button
-        type="button"
-        id="select-org-btn"
-        class="px-3 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
-        hx-get="/organizations/picker{{ if .LeaderOrgID }}?selected={{ .LeaderOrgID }}{{ end }}"
-        hx-target="#org-picker-root"
-        hx-swap="innerHTML"
-      >
-        {{ if .LeaderOrgName }}Change Organization...{{ else }}Select Organization...{{ end }}
-      </button>
-    </div>
-
-    <!-- Leaders (optional, requires org to be selected) -->
-    <div>
-      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Leader(s)</label>
-
-      <!-- Selected leaders display -->
-      <div id="selected-leaders-display" class="min-h-[2.5rem] p-2 border dark:border-gray-600 rounded bg-gray-50 dark:bg-gray-700 mb-2">
-        <div id="selected-leaders-chips" class="flex flex-wrap gap-1">
-          {{/* Leaders are managed via JavaScript */}}
-        </div>
-        <div id="no-leaders-msg" class="text-gray-500 dark:text-gray-400 text-sm">
-          No leaders selected
-        </div>
-      </div>
-
-      <!-- Hidden inputs for form submission -->
-      <div id="leader-hidden-inputs">
-        {{/* Hidden inputs are managed via JavaScript */}}
-      </div>
-
-      <!-- Button to open picker (disabled when no org selected) -->
-      <button
-        type="button"
-        id="select-leaders-btn"
-        class="{{ if .LeaderOrgID }}px-3 py-2 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700{{ else }}px-3 py-2 bg-gray-300 dark:bg-gray-600 text-gray-500 dark:text-gray-400 rounded text-sm cursor-not-allowed{{ end }}"
-        {{ if not .LeaderOrgID }}disabled{{ end }}
-      >
-        Select Leaders...
-      </button>
-
-      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-        {{ if not .LeaderOrgID }}Select an organization first to choose leaders.{{ else }}Selecting leaders is optional; you can assign leaders later.{{ end }}
-      </p>
-    </div>
-  {{ else }}
-    <!-- Organization (read-only for leader) -->
-    <div>
-      <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Organization</label>
-      <input type="text" value="{{ .LeaderOrgName }}" class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 text-sm dark:text-gray-100" readonly />
-      <input type="hidden" name="orgID" value="{{ .LeaderOrgID }}" />
-      <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">You will be assigned as a leader of this group.</p>
-    </div>
-  {{ end }}
-
-  <!-- Description -->
-  <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-    <textarea name="description" rows="4" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm">{{ .Description }}</textarea>
-  </div>
-
-  <!-- Propagate return so the handler can send user back -->
-  <input type="hidden" name="return" value="{{ .BackURL }}">
-
-  <div class="flex gap-2 pt-2">
-    <button class="bg-indigo-600 text-white px-3 py-1 rounded hover:bg-indigo-700">Add Group</button>
-    <a href="{{ .BackURL }}" class="px-3 py-1 border rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600">Cancel</a>
-  </div>
-</form>
-
-<!-- Modal containers -->
-<div id="org-picker-root"></div>
-<div id="leader-picker-root"></div>
 
 {{ if or (eq .Role "admin") (eq .Role "coordinator") }}
 <script>
