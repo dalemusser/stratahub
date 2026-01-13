@@ -338,10 +338,14 @@
         selectedGroup.id = selected.value;
         selectedGroup.name = selected.dataset.name;
         updateGroupDisplay();
-        hideGroupError();
       }
       closeGroupPicker();
     };
+
+    function hideGroupError() {
+      var groupError = document.getElementById('group-error');
+      if (groupError) groupError.classList.add('hidden');
+    }
   }
 
   function updateGroupDisplay() {

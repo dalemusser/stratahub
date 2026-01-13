@@ -231,7 +231,7 @@
     <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/profile" title="Profile"><span class="menu-icon mr-2">👤</span><span class="menu-text">Profile</span></a>
     {{/* Settings only for admin on workspace (not apex) */}}
     {{ if and (eq .Role "admin") (not .IsApex) }}
-      <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/settings" title="Site Settings"><span class="menu-icon mr-2">⚙️</span><span class="menu-text">Settings</span></a>
+      <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/settings" title="Workspace Settings"><span class="menu-icon mr-2">⚙️</span><span class="menu-text">Settings</span></a>
     {{ end }}
     <a class="menu-link flex items-center text-red-500 dark:text-red-400 hover:underline" href="/logout" title="Logout"><span class="menu-icon mr-2">🚪</span><span class="menu-text">Logout</span></a>
   {{ else }}

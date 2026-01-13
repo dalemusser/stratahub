@@ -155,6 +155,12 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Validate auth method is enabled for this workspace
+	if !wsauth.IsAuthMethodEnabled(r.Context(), r, h.DB, authm) {
+		h.reRenderNewWithError(w, r, echoData(), "This authentication method is not enabled for this workspace.")
+		return
+	}
+
 	// Validate auth fields using centralized logic
 	authResult, err := authutil.ValidateAndResolve(authutil.AuthInput{
 		Method:       authm,

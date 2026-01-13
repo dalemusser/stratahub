@@ -52,8 +52,9 @@ type listData struct {
 	AllCount      int64
 
 	// members list
-	SearchQuery string
-	Status      string
+	SearchQuery   string
+	LoginIDQuery  string
+	Status        string
 	Shown       int
 	Total       int64
 	HasPrev     bool

@@ -24,6 +24,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
+	"github.com/dalemusser/stratahub/internal/app/system/wsauth"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -51,7 +52,7 @@ func (h *Handler) ServeNew(w http.ResponseWriter, r *http.Request) {
 
 	data := formData{
 		BaseVM:      viewdata.NewBaseVM(r, h.DB, "Add System User", "/system-users"),
-		AuthMethods: models.EnabledAuthMethods,
+		AuthMethods: models.AllAuthMethods,
 		Auth:        "trust", // default auth method
 		IsEdit:      false,
 	}
@@ -91,7 +92,7 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	reRender := func(msg string) {
 		templates.Render(w, r, "system_user_new", formData{
 			BaseVM:             viewdata.NewBaseVM(r, h.DB, "Add System User", "/system-users"),
-			AuthMethods:        models.EnabledAuthMethods,
+			AuthMethods:        models.AllAuthMethods,
 			FullName:           full,
 			LoginID:            loginID,
 			Email:              email,
@@ -115,6 +116,12 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 	if result := inputval.Validate(input); result.HasErrors() {
 		reRender(result.First())
+		return
+	}
+
+	// Validate auth method is enabled for this workspace
+	if !wsauth.IsAuthMethodEnabled(r.Context(), r, h.DB, authm) {
+		reRender("This authentication method is not enabled for this workspace.")
 		return
 	}
 

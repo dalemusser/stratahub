@@ -46,7 +46,7 @@ func (h *Handler) fetchMembersList(
 	r *http.Request,
 	db *mongo.Database,
 	scopeOrg *primitive.ObjectID,
-	searchQuery, status, after, before string,
+	searchQuery, loginIDQuery, status, after, before string,
 	start int,
 	scopeOrgIDs []primitive.ObjectID,
 ) (memberListResult, error) {
@@ -65,11 +65,18 @@ func (h *Handler) fetchMembersList(
 		pbase["organization_id"] = bson.M{"$in": scopeOrgIDs}
 	}
 
-	// Search clause - search by name only
+	// Search clause - search by name
 	if searchQuery != "" {
 		qFold := text.Fold(strings.TrimSpace(searchQuery))
 		hiFold := qFold + "\uffff"
 		pbase["full_name_ci"] = bson.M{"$gte": qFold, "$lt": hiFold}
+	}
+
+	// Search clause - search by login ID
+	if loginIDQuery != "" {
+		qFold := text.Fold(strings.TrimSpace(loginIDQuery))
+		hiFold := qFold + "\uffff"
+		pbase["login_id_ci"] = bson.M{"$gte": qFold, "$lt": hiFold}
 	}
 
 	// Count total via store

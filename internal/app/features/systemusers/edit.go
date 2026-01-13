@@ -24,6 +24,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
+	"github.com/dalemusser/stratahub/internal/app/system/wsauth"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
@@ -97,7 +98,7 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 
 	data := formData{
 		BaseVM:             viewdata.NewBaseVM(r, h.DB, "Edit System User", "/system-users"),
-		AuthMethods:        models.EnabledAuthMethods,
+		AuthMethods:        models.AllAuthMethods,
 		ID:                 u.ID.Hex(),
 		FullName:           u.FullName,
 		LoginID:            loginID,
@@ -236,6 +237,12 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	}
 	if result := inputval.Validate(input); result.HasErrors() {
 		renderEditForm(w, r, h.DB, formParams(result.First()))
+		return
+	}
+
+	// Validate auth method is enabled for this workspace
+	if !wsauth.IsAuthMethodEnabled(r.Context(), r, h.DB, authm) {
+		renderEditForm(w, r, h.DB, formParams("This authentication method is not enabled for this workspace."))
 		return
 	}
 

@@ -6,6 +6,7 @@ import (
 	"maps"
 
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/text"
 	"go.mongodb.org/mongo-driver/bson"
@@ -63,11 +64,12 @@ func FetchOrgPane(
 	}
 	result.Total = total
 
-	// Count all users with the specified role (for "All" row), respecting scope
+	// Count all users with the specified role (for "All" row), respecting scope and workspace
 	allFilter := bson.M{"role": role}
 	if len(scopeOrgIDs) > 0 {
 		allFilter["organization_id"] = bson.M{"$in": scopeOrgIDs}
 	}
+	workspace.FilterCtx(ctx, allFilter)
 	allCount, err := db.Collection("users").CountDocuments(ctx, allFilter)
 	if err != nil {
 		log.Error("database error counting all users by role",
@@ -179,10 +181,12 @@ func fetchOrgUserCounts(
 		return make(map[primitive.ObjectID]int64), nil
 	}
 
-	counts, err := AggregateCountByField(ctx, db, "users", bson.M{
+	filter := bson.M{
 		"role":            role,
 		"organization_id": bson.M{"$in": orgIDs},
-	}, "organization_id")
+	}
+	workspace.FilterCtx(ctx, filter)
+	counts, err := AggregateCountByField(ctx, db, "users", filter, "organization_id")
 	if err != nil {
 		log.Error("database error aggregating user counts by org",
 			zap.Error(err),

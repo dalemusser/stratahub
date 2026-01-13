@@ -53,6 +53,7 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 	orgBefore := query.Get(r, "org_before")
 
 	searchQuery := query.Search(r, "search")
+	loginIDQuery := query.Search(r, "login_id")
 	status := query.Get(r, "status")
 	after := query.Get(r, "after")
 	before := query.Get(r, "before")
@@ -120,7 +121,7 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Fetch members list
-	members, err := h.fetchMembersList(ctx, r, db, scopeOrg, searchQuery, status, after, before, start, scopeOrgIDs)
+	members, err := h.fetchMembersList(ctx, r, db, scopeOrg, searchQuery, loginIDQuery, status, after, before, start, scopeOrgIDs)
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "database error fetching members list", err, "A database error occurred.", "/")
 		return
@@ -147,8 +148,9 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		OrgRangeEnd:   orgPane.RangeEnd,
 
 		// Members filter
-		SearchQuery: searchQuery,
-		Status:      status,
+		SearchQuery:  searchQuery,
+		LoginIDQuery: loginIDQuery,
+		Status:       status,
 
 		// Members counts + range
 		Shown:      members.Shown,

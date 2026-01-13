@@ -158,7 +158,7 @@ func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
 	var orgPane orgPaneData
 	if showOrgPane {
 		var err error
-		orgPane, err = h.fetchOrgPane(ctx, db, orgQ, orgAfter, orgBefore, scopeOrgIDs)
+		orgPane, err = h.fetchOrgPane(ctx, r, db, orgQ, orgAfter, orgBefore, scopeOrgIDs)
 		if err != nil {
 			h.ErrLog.LogServerError(w, r, "database error fetching org pane", err, "A database error occurred.", "/groups")
 			return

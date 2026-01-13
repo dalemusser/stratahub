@@ -72,7 +72,7 @@ func renderEditForm(
 ) {
 	templates.Render(w, r, "system_user_edit", formData{
 		BaseVM:       viewdata.NewBaseVM(r, db, "Edit System User", backToSystemUsersURL(r)),
-		AuthMethods:  models.EnabledAuthMethods,
+		AuthMethods:  models.AllAuthMethods,
 		ID:           p.ID,
 		FullName:     p.FullName,
 		LoginID:      p.LoginID,

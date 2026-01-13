@@ -26,27 +26,6 @@ var AllAuthMethods = []AuthMethod{
 	{Value: "schoology", Label: "Schoology"},
 }
 
-// EnabledAuthMethods contains the auth methods currently available in the UI.
-// Modify this list to control which options appear in Auth Method dropdowns,
-// CSV uploads, and related features. All handling logic for disabled methods
-// remains in place for when they're enabled.
-//
-// Auth method categories (for CSV format display):
-//   - Email-as-login: email, google, microsoft (format: name, method, email)
-//   - Password: password (format: name, password, login_id, temp_password [, email])
-//   - Trust: trust (format: name, trust, login_id [, email])
-//   - SSO with auth_return_id: clever, classlink, schoology (two formats supported)
-var EnabledAuthMethods = []AuthMethod{
-	{Value: "trust", Label: "Trust"},
-	{Value: "password", Label: "Password"},
-	{Value: "email", Label: "Email Verification"},
-	{Value: "google", Label: "Google"},
-	// {Value: "microsoft", Label: "Microsoft"},
-	// {Value: "clever", Label: "Clever"},
-	// {Value: "classlink", Label: "Classlink"},
-	// {Value: "schoology", Label: "Schoology"},
-}
-
 // IsValidAuthMethod checks if a value is a valid auth method.
 func IsValidAuthMethod(value string) bool {
 	for _, m := range AllAuthMethods {
@@ -57,20 +36,10 @@ func IsValidAuthMethod(value string) bool {
 	return false
 }
 
-// IsEnabledAuthMethod checks if a value is an enabled auth method.
-func IsEnabledAuthMethod(value string) bool {
-	for _, m := range EnabledAuthMethods {
-		if m.Value == value {
-			return true
-		}
-	}
-	return false
-}
-
-// EnabledAuthMethodValues returns just the values of enabled auth methods.
-func EnabledAuthMethodValues() []string {
-	values := make([]string, len(EnabledAuthMethods))
-	for i, m := range EnabledAuthMethods {
+// AllAuthMethodValues returns all auth method values as a slice.
+func AllAuthMethodValues() []string {
+	values := make([]string, len(AllAuthMethods))
+	for i, m := range AllAuthMethods {
 		values[i] = m.Value
 	}
 	return values
@@ -87,11 +56,6 @@ type EnabledAuthMethodsForCSV struct {
 	HasTrust bool
 	// SSOAuthMethods are enabled SSO methods requiring auth_return_id (clever, classlink, schoology)
 	SSOAuthMethods []string
-}
-
-// GetEnabledAuthMethodsForCSV returns enabled auth methods grouped by CSV format category.
-func GetEnabledAuthMethodsForCSV() EnabledAuthMethodsForCSV {
-	return GetAuthMethodsForCSV(EnabledAuthMethods)
 }
 
 // GetAuthMethodsForCSV returns auth methods grouped by CSV format category for a given list.

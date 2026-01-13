@@ -4,7 +4,7 @@
 
 {{ define "content" }}
 <div class="mb-4">
-  <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-1">⚙️ Site Settings</h1>
+  <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-1">⚙️ Workspace Settings</h1>
 </div>
 
 {{ if .Error }}
@@ -16,7 +16,7 @@
 <form method="post" action="/settings" enctype="multipart/form-data" class="space-y-4 bg-white dark:bg-gray-800 p-4 rounded shadow">
 
   <div>
-    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Site Name</label>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Workspace Name</label>
     <input name="site_name" type="text" value="{{ .SiteName }}" required
            class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm" />
     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">This name appears in the menu header.</p>
@@ -60,7 +60,8 @@
     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Authentication Methods</label>
     <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
       Select which authentication methods are available for users in this workspace.
-      At least one method must remain enabled.
+      At least one method must remain enabled. You cannot disable your own authentication
+      method - to remove it, first change your authentication method in your profile.
     </p>
     <div class="space-y-2 bg-gray-50 dark:bg-gray-700 p-3 rounded border dark:border-gray-600">
       {{ range .AllAuthMethods }}
