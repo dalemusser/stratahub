@@ -24,6 +24,7 @@ import (
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/dalemusser/waffle/pantry/text"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -266,15 +267,16 @@ func (h *Handler) HandleUploadCSV(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Check which login IDs already exist in this org (for preview: new vs update)
-	loginIDs := make([]string, len(parsed.Members))
+	// Use text.Fold for case and diacritic insensitive matching against login_id_ci
+	loginIDsFolded := make([]string, len(parsed.Members))
 	for i, m := range parsed.Members {
-		loginIDs[i] = strings.ToLower(m.LoginID)
+		loginIDsFolded[i] = text.Fold(m.LoginID)
 	}
 
 	existingInOrg := make(map[string]bool)
-	existingInOtherOrg := make(map[string]primitive.ObjectID) // login_id -> org_id
+	existingInOtherOrg := make(map[string]primitive.ObjectID) // folded login_id -> org_id
 
-	userFilter := bson.M{"login_id": bson.M{"$in": loginIDs}}
+	userFilter := bson.M{"login_id_ci": bson.M{"$in": loginIDsFolded}}
 	workspace.Filter(r, userFilter)
 	cur, err := h.DB.Collection("users").Find(ctx, userFilter)
 	if err != nil {
@@ -285,14 +287,17 @@ func (h *Handler) HandleUploadCSV(w http.ResponseWriter, r *http.Request) {
 
 	for cur.Next(ctx) {
 		var u struct {
-			LoginID string              `bson:"login_id"`
-			OrgID   *primitive.ObjectID `bson:"organization_id"`
+			LoginIDCI *string             `bson:"login_id_ci"`
+			OrgID     *primitive.ObjectID `bson:"organization_id"`
 		}
 		if err := cur.Decode(&u); err != nil {
 			h.ErrLog.LogServerError(w, r, "database error decoding user", err, "A database error occurred.", uploadURL)
 			return
 		}
-		lid := strings.ToLower(u.LoginID)
+		if u.LoginIDCI == nil {
+			continue // skip users without login_id_ci
+		}
+		lid := *u.LoginIDCI // already folded in database
 		if u.OrgID != nil && *u.OrgID == uc.OrgID {
 			existingInOrg[lid] = true
 		} else if u.OrgID != nil {
@@ -304,7 +309,7 @@ func (h *Handler) HandleUploadCSV(w http.ResponseWriter, r *http.Request) {
 	var conflicts []csvutil.LoginConflict
 	conflictOrgIDs := make(map[primitive.ObjectID]bool)
 	for _, m := range parsed.Members {
-		lid := strings.ToLower(m.LoginID)
+		lid := text.Fold(m.LoginID)
 		if otherOrgID, ok := existingInOtherOrg[lid]; ok {
 			conflicts = append(conflicts, csvutil.LoginConflict{LoginID: m.LoginID, OrgID: otherOrgID})
 			conflictOrgIDs[otherOrgID] = true
@@ -352,7 +357,7 @@ func (h *Handler) HandleUploadCSV(w http.ResponseWriter, r *http.Request) {
 	toUpdate := 0
 
 	for i, m := range parsed.Members {
-		lid := strings.ToLower(m.LoginID)
+		lid := text.Fold(m.LoginID)
 		isNew := !existingInOrg[lid]
 		if isNew {
 			toCreate++

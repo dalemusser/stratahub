@@ -272,17 +272,17 @@ func IsValidEmail(email string) bool {
 	return addr.Address == email
 }
 
-// AllowedAuthMethodsList returns the enabled auth methods as a slice.
+// AllowedAuthMethodsList returns all valid auth methods as a slice.
 // Useful for displaying in error messages.
-// This uses models.EnabledAuthMethods as the single source of truth.
+// Note: Workspace-specific enabled methods are checked separately via wsauth.
 func AllowedAuthMethodsList() []string {
-	return models.EnabledAuthMethodValues()
+	return models.AllAuthMethodValues()
 }
 
-// IsValidAuthMethod checks if the given method (case-insensitive) is enabled.
-// This uses models.EnabledAuthMethods as the single source of truth.
+// IsValidAuthMethod checks if the given method (case-insensitive) is a valid auth method.
+// This validates syntax only. Workspace-specific enabled methods are checked via wsauth.
 func IsValidAuthMethod(method string) bool {
-	return models.IsEnabledAuthMethod(strings.ToLower(strings.TrimSpace(method)))
+	return models.IsValidAuthMethod(strings.ToLower(strings.TrimSpace(method)))
 }
 
 // IsValidResourceType checks if the given type is a valid resource type.

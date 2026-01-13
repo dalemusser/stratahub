@@ -171,7 +171,7 @@ func (h *AdminHandler) ServeAssign(w http.ResponseWriter, r *http.Request) {
 			leaderAfter := query.Get(r, "leader_after")
 			leaderBefore := query.Get(r, "leader_before")
 
-			leaderData, err := h.fetchLeaderPaneForAssign(ctx, orgID, leaderSearch, leaderAfter, leaderBefore)
+			leaderData, err := h.fetchLeaderPaneForAssign(ctx, r, orgID, leaderSearch, leaderAfter, leaderBefore)
 			if err != nil {
 				h.Log.Error("error fetching leaders", zap.Error(err))
 				// Continue without leader data
@@ -246,7 +246,7 @@ func (h *AdminHandler) ServeAssignLeadersPane(w http.ResponseWriter, r *http.Req
 	leaderBefore := query.Get(r, "before")
 
 	// Fetch leaders
-	leaderData, err := h.fetchLeaderPaneForAssign(ctx, orgID, leaderSearch, leaderAfter, leaderBefore)
+	leaderData, err := h.fetchLeaderPaneForAssign(ctx, r, orgID, leaderSearch, leaderAfter, leaderBefore)
 	if err != nil {
 		h.Log.Error("error fetching leaders", zap.Error(err))
 		http.Error(w, "Failed to load leaders", http.StatusInternalServerError)
@@ -787,17 +787,19 @@ type leaderPaneResult struct {
 // fetchLeaderPaneForAssign fetches paginated leaders for a given organization.
 func (h *AdminHandler) fetchLeaderPaneForAssign(
 	ctx context.Context,
+	r *http.Request,
 	orgID primitive.ObjectID,
 	searchQuery, after, before string,
 ) (leaderPaneResult, error) {
 	var result leaderPaneResult
 
-	// Build base filter
+	// Build base filter with workspace scoping
 	base := bson.M{
 		"role":            "leader",
 		"status":          "active",
 		"organization_id": orgID,
 	}
+	workspace.Filter(r, base)
 
 	// Add search condition
 	var searchOr []bson.M

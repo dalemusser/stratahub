@@ -25,75 +25,6 @@ import (
 // itoa is a shorthand for strconv.Itoa
 func itoa(i int) string { return strconv.Itoa(i) }
 
-// UpsertMemberInOrg creates or updates a *member* inside the given orgID only.
-// Returns (updated=true) if an existing user in the same org was updated.
-// Returns (conflictErr!=nil) if an email exists in a different org.
-// Returns err on database errors.
-//
-// NOTE: This does not move users between organizations.
-func (s *Store) UpsertMembersInOrg(
-	ctx context.Context,
-	orgID primitive.ObjectID,
-	fullName, email, authMethod string,
-) (updated bool, conflictErr error, err error) {
-
-	email = normalize.Email(email)
-	fullName = normalize.Name(fullName)
-	authMethod = normalize.AuthMethod(authMethod)
-	if email == "" || fullName == "" {
-		return false, nil, nil
-	}
-
-	// Capture timestamp once for consistent created_at/updated_at across both branches.
-	now := time.Now()
-
-	// Lookup by email once to decide create/update/conflict.
-	var existing struct {
-		ID   primitive.ObjectID `bson:"_id"`
-		Org  primitive.ObjectID `bson:"organization_id"`
-		Role string             `bson:"role"`
-	}
-	findErr := s.c.FindOne(ctx, bson.M{"email": email}).Decode(&existing)
-	switch findErr {
-	case mongo.ErrNoDocuments:
-		// Insert new member in this org
-		doc := bson.M{
-			"full_name":       fullName,
-			"full_name_ci":    text.Fold(fullName),
-			"email":           email,
-			"role":            "member",
-			"organization_id": orgID,
-			"status":          status.Active,
-			"auth_method":     authMethod,
-			"created_at":      now,
-			"updated_at":      now,
-		}
-		_, err := s.c.InsertOne(ctx, doc)
-		return false, nil, err
-
-	default:
-		if findErr != nil {
-			return false, nil, findErr
-		}
-		// Exists: only update if already in this org; otherwise conflict.
-		if existing.Org != orgID {
-			return false, ErrDifferentOrg, nil
-		}
-		_, err := s.c.UpdateByID(ctx, existing.ID, bson.M{
-			"$set": bson.M{
-				"full_name":    fullName,
-				"full_name_ci": text.Fold(fullName),
-				"auth_method":  authMethod,
-				"updated_at":   now,
-			},
-		})
-		return true, nil, err
-	}
-}
-
-// ErrDifferentOrg is returned when an email already exists in a different organization.
-var ErrDifferentOrg = errors.New("email exists in a different organization")
-
 // MemberEntry represents a member to upsert.
 type MemberEntry struct {
 	FullName     string
@@ -157,11 +88,13 @@ func (r UpsertBatchResult) HasErrors() bool {
 //   - If login_id found in same org: updates fields (skips silently, counts as Updated)
 //   - If login_id found in different org: error (rejects entire batch)
 //
+// The workspaceID parameter is required for creating new members in multi-tenant mode.
 // ItemErrors provides per-item error tracking for validation failures and duplicates.
 // The Row field is 1-indexed for user display.
 func (s *Store) UpsertMembersInOrgBatch(
 	ctx context.Context,
 	orgID primitive.ObjectID,
+	workspaceID primitive.ObjectID,
 	entries []MemberEntry,
 ) (UpsertBatchResult, error) {
 	var result UpsertBatchResult
@@ -342,6 +275,10 @@ func (s *Store) UpsertMembersInOrgBatch(
 				"auth_method":     entry.authMethod,
 				"created_at":      now,
 				"updated_at":      now,
+			}
+			// Add workspace_id if provided (required for multi-tenant mode)
+			if workspaceID != primitive.NilObjectID {
+				doc["workspace_id"] = workspaceID
 			}
 			// Optional fields
 			if entry.email != nil {

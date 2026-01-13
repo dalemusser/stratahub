@@ -11,7 +11,6 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
-	"strings"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	membershipstore "github.com/dalemusser/stratahub/internal/app/store/memberships"
@@ -23,6 +22,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/wsauth"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/dalemusser/waffle/pantry/text"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -125,9 +125,12 @@ func (h *Handler) HandleConfirm(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Get workspace ID for new members
+	workspaceID := workspace.IDFromRequest(r)
+
 	// Batch upsert members in organization
 	us := userstore.New(h.DB)
-	result, err := us.UpsertMembersInOrgBatch(ctx, uc.OrgID, entries)
+	result, err := us.UpsertMembersInOrgBatch(ctx, uc.OrgID, workspaceID, entries)
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "database error batch upserting members", err, "A database error occurred.", uploadURL)
 		return
@@ -139,24 +142,25 @@ func (h *Handler) HandleConfirm(w http.ResponseWriter, r *http.Request) {
 	// If group mode, add members to the group
 	if groupMode && uc.GroupID != primitive.NilObjectID {
 		// Collect login IDs that were successfully processed (not skipped)
+		// Use text.Fold for case and diacritic insensitive matching
 		skippedSet := make(map[string]struct{}, len(result.SkippedMembers))
 		for _, sm := range result.SkippedMembers {
-			skippedSet[strings.ToLower(sm.LoginID)] = struct{}{}
+			skippedSet[text.Fold(sm.LoginID)] = struct{}{}
 		}
 
-		// Deduplicate and collect processed login IDs
+		// Deduplicate and collect processed login IDs (folded for consistent matching)
 		seen := make(map[string]struct{})
 		var processedLoginIDs []string
 		for _, pm := range previewMembers {
-			loginIDLower := strings.ToLower(pm.LoginID)
-			if _, skipped := skippedSet[loginIDLower]; skipped {
+			loginIDFolded := text.Fold(pm.LoginID)
+			if _, skipped := skippedSet[loginIDFolded]; skipped {
 				continue
 			}
-			if _, dup := seen[loginIDLower]; dup {
+			if _, dup := seen[loginIDFolded]; dup {
 				continue
 			}
-			seen[loginIDLower] = struct{}{}
-			processedLoginIDs = append(processedLoginIDs, loginIDLower)
+			seen[loginIDFolded] = struct{}{}
+			processedLoginIDs = append(processedLoginIDs, loginIDFolded)
 		}
 
 		// Batch fetch users to get their IDs for membership creation
@@ -221,12 +225,14 @@ func (h *Handler) HandleConfirm(w http.ResponseWriter, r *http.Request) {
 }
 
 // batchFetchUsersByLoginID loads all users with the given login IDs in a single query.
+// The loginIDs should be pre-folded using text.Fold() for consistent matching.
 func (h *Handler) batchFetchUsersByLoginID(ctx context.Context, loginIDs []string) (map[string]*models.User, error) {
 	if len(loginIDs) == 0 {
 		return make(map[string]*models.User), nil
 	}
 
-	filter := bson.M{"login_id": bson.M{"$in": loginIDs}}
+	// Query login_id_ci for case and diacritic insensitive matching
+	filter := bson.M{"login_id_ci": bson.M{"$in": loginIDs}}
 	workspace.FilterCtx(ctx, filter)
 	cur, err := h.DB.Collection("users").Find(ctx, filter)
 	if err != nil {
@@ -240,11 +246,12 @@ func (h *Handler) batchFetchUsersByLoginID(ctx context.Context, loginIDs []strin
 		if err := cur.Decode(&u); err != nil {
 			return nil, err
 		}
-		loginID := ""
-		if u.LoginID != nil {
-			loginID = *u.LoginID
+		// Use LoginIDCI as the key since that's what we queried
+		loginIDCI := ""
+		if u.LoginIDCI != nil {
+			loginIDCI = *u.LoginIDCI
 		}
-		users[strings.ToLower(loginID)] = &u
+		users[loginIDCI] = &u
 	}
 	if err := cur.Err(); err != nil {
 		return nil, err

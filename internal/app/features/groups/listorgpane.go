@@ -4,10 +4,12 @@ package groups
 import (
 	"context"
 	"maps"
+	"net/http"
 
 	organizationstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
 	"github.com/dalemusser/stratahub/internal/app/system/orgutil"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/text"
 	"go.mongodb.org/mongo-driver/bson"
@@ -21,6 +23,7 @@ import (
 // scopeOrgIDs limits the orgs to those in the list (for coordinators); nil means all orgs.
 func (h *Handler) fetchOrgPane(
 	ctx context.Context,
+	r *http.Request,
 	db *mongo.Database,
 	orgQ, orgAfter, orgBefore string,
 	scopeOrgIDs []primitive.ObjectID,
@@ -106,11 +109,12 @@ func (h *Handler) fetchOrgPane(
 		result.NextCursor = wafflemongo.EncodeCursor(last.NameCI, last.ID)
 	}
 
-	// Count all groups (for "All" row), respecting scope
+	// Count all groups (for "All" row), respecting scope and workspace
 	allFilter := bson.M{}
 	if len(scopeOrgIDs) > 0 {
 		allFilter["organization_id"] = bson.M{"$in": scopeOrgIDs}
 	}
+	workspace.Filter(r, allFilter)
 	allCount, err := db.Collection("groups").CountDocuments(ctx, allFilter)
 	if err != nil {
 		h.Log.Error("database error counting all groups", zap.Error(err))
@@ -119,7 +123,7 @@ func (h *Handler) fetchOrgPane(
 	result.AllCount = allCount
 
 	// Fetch group counts per org
-	if err := h.fetchOrgGroupCounts(ctx, db, result.Rows); err != nil {
+	if err := h.fetchOrgGroupCounts(ctx, r, db, result.Rows); err != nil {
 		return result, err
 	}
 
@@ -127,7 +131,7 @@ func (h *Handler) fetchOrgPane(
 }
 
 // fetchOrgGroupCounts populates the Count field for each org row.
-func (h *Handler) fetchOrgGroupCounts(ctx context.Context, db *mongo.Database, rows []orgutil.OrgRow) error {
+func (h *Handler) fetchOrgGroupCounts(ctx context.Context, r *http.Request, db *mongo.Database, rows []orgutil.OrgRow) error {
 	if len(rows) == 0 {
 		return nil
 	}
@@ -138,9 +142,11 @@ func (h *Handler) fetchOrgGroupCounts(ctx context.Context, db *mongo.Database, r
 	}
 	orgIDs = dedupObjectIDs(orgIDs)
 
-	byOrg, err := orgutil.AggregateCountByField(ctx, db, "groups", bson.M{
+	filter := bson.M{
 		"organization_id": bson.M{"$in": orgIDs},
-	}, "organization_id")
+	}
+	workspace.Filter(r, filter)
+	byOrg, err := orgutil.AggregateCountByField(ctx, db, "groups", filter, "organization_id")
 	if err != nil {
 		h.Log.Error("database error aggregating group counts", zap.Error(err))
 		return err

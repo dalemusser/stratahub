@@ -58,6 +58,7 @@
         <input type="hidden" name="org" value="{{ .SelectedOrg }}">
         <input type="hidden" name="status" value="{{ .Status }}">
         <input type="hidden" name="search" value="{{ .SearchQuery }}">
+        <input type="hidden" name="login_id" value="{{ .LoginIDQuery }}">
 
         <input
           id="orgs-q" name="org_q" type="text" placeholder="Search orgs..."
@@ -65,9 +66,9 @@
           class="flex-auto min-w-0 px-3 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
 
         <a
-          href="/members?org={{ .SelectedOrg }}{{ if .Status }}&status={{ .Status | urlquery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery | urlquery }}{{ end }}&org_q="
+          href="/members?org={{ .SelectedOrg }}{{ if .Status }}&status={{ .Status | urlquery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery | urlquery }}{{ end }}{{ if .LoginIDQuery }}&login_id={{ .LoginIDQuery | urlquery }}{{ end }}&org_q="
           hx-get="/members"
-          hx-vals='{"org":"{{ .SelectedOrg }}","status":"{{ .Status }}","search":"{{ .SearchQuery }}","org_q":"","start":"1"}'
+          hx-vals='{"org":"{{ .SelectedOrg }}","status":"{{ .Status }}","search":"{{ .SearchQuery }}","login_id":"{{ .LoginIDQuery }}","org_q":"","start":"1"}'
           hx-target="#content"
           hx-swap="innerHTML"
           hx-push-url="true"
@@ -79,8 +80,8 @@
 
       <!-- "All" row -->
       <a
-        href="/members?org=all{{ if .Status }}&status={{ .Status }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}"
-        hx-get="/members?org=all{{ if .Status }}&status={{ .Status }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}"
+        href="/members?org=all{{ if .Status }}&status={{ .Status }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .LoginIDQuery }}&login_id={{ .LoginIDQuery }}{{ end }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}"
+        hx-get="/members?org=all{{ if .Status }}&status={{ .Status }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .LoginIDQuery }}&login_id={{ .LoginIDQuery }}{{ end }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}"
         hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
         class="flex justify-between items-center px-3 py-2 rounded text-sm hover:bg-gray-50 dark:hover:bg-gray-700 {{ if or (eq .SelectedOrg "all") (eq .SelectedOrg "") }}bg-indigo-50 dark:bg-indigo-900/40{{ end }}"
       >
@@ -100,16 +101,16 @@
         <span class="flex gap-2">
           {{ if .OrgHasPrev }}
             <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
-               href="/members?org={{ .SelectedOrg }}&org_before={{ .OrgPrevCur }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}"
-               hx-get="/members?org={{ .SelectedOrg }}&org_before={{ .OrgPrevCur }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}"
+               href="/members?org={{ .SelectedOrg }}&org_before={{ .OrgPrevCur }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .LoginIDQuery }}&login_id={{ .LoginIDQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}"
+               hx-get="/members?org={{ .SelectedOrg }}&org_before={{ .OrgPrevCur }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .LoginIDQuery }}&login_id={{ .LoginIDQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}"
                hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Prev</a>
           {{ else }}
             <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
           {{ end }}
           {{ if .OrgHasNext }}
             <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
-               href="/members?org={{ .SelectedOrg }}&org_after={{ .OrgNextCur }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}"
-               hx-get="/members?org={{ .SelectedOrg }}&org_after={{ .OrgNextCur }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}"
+               href="/members?org={{ .SelectedOrg }}&org_after={{ .OrgNextCur }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .LoginIDQuery }}&login_id={{ .LoginIDQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}"
+               hx-get="/members?org={{ .SelectedOrg }}&org_after={{ .OrgNextCur }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .LoginIDQuery }}&login_id={{ .LoginIDQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}"
                hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Next</a>
           {{ else }}
             <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
@@ -123,8 +124,8 @@
           <li>
             <a
               class="flex items-center gap-2 px-3 py-2 hover:bg-gray-50 dark:hover:bg-gray-700 {{ if eq $.SelectedOrg (.ID.Hex) }}bg-indigo-50 dark:bg-indigo-900/40{{ end }}"
-              href="/members?org={{ .ID.Hex }}{{ if $.OrgQuery }}&org_q={{ $.OrgQuery }}{{ end }}{{ if $.SearchQuery }}&search={{ $.SearchQuery }}{{ end }}{{ if $.Status }}&status={{ $.Status }}{{ end }}"
-              hx-get="/members?org={{ .ID.Hex }}{{ if $.OrgQuery }}&org_q={{ $.OrgQuery }}{{ end }}{{ if $.SearchQuery }}&search={{ $.SearchQuery }}{{ end }}{{ if $.Status }}&status={{ $.Status }}{{ end }}"
+              href="/members?org={{ .ID.Hex }}{{ if $.OrgQuery }}&org_q={{ $.OrgQuery }}{{ end }}{{ if $.SearchQuery }}&search={{ $.SearchQuery }}{{ end }}{{ if $.LoginIDQuery }}&login_id={{ $.LoginIDQuery }}{{ end }}{{ if $.Status }}&status={{ $.Status }}{{ end }}"
+              hx-get="/members?org={{ .ID.Hex }}{{ if $.OrgQuery }}&org_q={{ $.OrgQuery }}{{ end }}{{ if $.SearchQuery }}&search={{ $.SearchQuery }}{{ end }}{{ if $.LoginIDQuery }}&login_id={{ $.LoginIDQuery }}{{ end }}{{ if $.Status }}&status={{ $.Status }}{{ end }}"
               hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
             >
               <span class="flex-1 min-w-0 truncate">{{ .Name }}</span>
@@ -147,7 +148,7 @@
       hx-target="#content"
       hx-swap="innerHTML"
       hx-push-url="true"
-      hx-trigger="submit, keyup changed delay:300ms from:#member-q, change from:#member-status"
+      hx-trigger="submit, keyup changed delay:300ms from:#member-q, keyup changed delay:300ms from:#member-login-q, change from:#member-status"
       class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-1 flex flex-wrap items-center gap-2"
     >
       <input type="hidden" name="org" value="{{ .SelectedOrg }}">
@@ -159,7 +160,13 @@
         id="member-q" name="search" type="text"
         value="{{ .SearchQuery }}"
         placeholder="Search by name"
-        class="flex-1 px-3 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+        class="flex-1 min-w-0 px-3 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
+
+      <input
+        id="member-login-q" name="login_id" type="text"
+        value="{{ .LoginIDQuery }}"
+        placeholder="Search by Login ID"
+        class="flex-1 min-w-0 px-3 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400" />
 
       <select id="member-status" name="status" class="px-3 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded text-sm">
         <option value="" {{ if not .Status }}selected{{ end }}>All Statuses</option>
@@ -175,6 +182,7 @@
           "org":"{{ .SelectedOrg }}",
           "org_q":"{{ .OrgQuery }}",
           "search":"",
+          "login_id":"",
           "status":"",
           "start":"1"
         }'
@@ -184,6 +192,8 @@
         hx-on="click: (() => {
           const q = document.getElementById('member-q');
           if (q) q.value = '';
+          const lq = document.getElementById('member-login-q');
+          if (lq) lq.value = '';
           const s = document.getElementById('member-status');
           if (s) s.value = '';
         })()"
@@ -201,16 +211,16 @@
       <div class="flex items-center gap-2">
         {{ if .HasPrev }}
           <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
-             href="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&before={{ .PrevCursor }}&start={{ .PrevStart }}"
-             hx-get="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&before={{ .PrevCursor }}&start={{ .PrevStart }}"
+             href="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .LoginIDQuery }}&login_id={{ .LoginIDQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&before={{ .PrevCursor }}&start={{ .PrevStart }}"
+             hx-get="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .LoginIDQuery }}&login_id={{ .LoginIDQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&before={{ .PrevCursor }}&start={{ .PrevStart }}"
              hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Prev</a>
         {{ else }}
           <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
         {{ end }}
         {{ if .HasNext }}
           <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
-             href="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&after={{ .NextCursor }}&start={{ .NextStart }}"
-             hx-get="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&after={{ .NextCursor }}&start={{ .NextStart }}"
+             href="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .LoginIDQuery }}&login_id={{ .LoginIDQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&after={{ .NextCursor }}&start={{ .NextStart }}"
+             hx-get="/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery }}{{ end }}{{ if .SearchQuery }}&search={{ .SearchQuery }}{{ end }}{{ if .LoginIDQuery }}&login_id={{ .LoginIDQuery }}{{ end }}{{ if .Status }}&status={{ .Status }}{{ end }}&after={{ .NextCursor }}&start={{ .NextStart }}"
              hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Next</a>
         {{ else }}
           <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
