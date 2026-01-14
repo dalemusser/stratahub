@@ -244,7 +244,7 @@ func TestStore_AddBatch(t *testing.T) {
 		{UserID: leader.ID, Role: "leader"},
 	}
 
-	result, err := store.AddBatch(ctx, group.ID, org.ID, entries)
+	result, err := store.AddBatch(ctx, group.ID, org.ID, group.WorkspaceID, entries)
 	if err != nil {
 		t.Fatalf("AddBatch failed: %v", err)
 	}
@@ -273,7 +273,7 @@ func TestStore_AddBatch_Empty(t *testing.T) {
 	org := fixtures.CreateOrganization(ctx, "Test Org")
 	group := fixtures.CreateGroup(ctx, "Test Group", org.ID)
 
-	result, err := store.AddBatch(ctx, group.ID, org.ID, nil)
+	result, err := store.AddBatch(ctx, group.ID, org.ID, group.WorkspaceID, nil)
 	if err != nil {
 		t.Fatalf("AddBatch failed: %v", err)
 	}
@@ -308,7 +308,7 @@ func TestStore_AddBatch_WithDuplicates(t *testing.T) {
 		{UserID: member2.ID, Role: "member"}, // new
 	}
 
-	result, err := store.AddBatch(ctx, group.ID, org.ID, entries)
+	result, err := store.AddBatch(ctx, group.ID, org.ID, group.WorkspaceID, entries)
 	if err != nil {
 		t.Fatalf("AddBatch failed: %v", err)
 	}
@@ -336,7 +336,7 @@ func TestStore_AddBatch_InvalidRole(t *testing.T) {
 		{UserID: member.ID, Role: "invalid"},
 	}
 
-	_, err := store.AddBatch(ctx, group.ID, org.ID, entries)
+	_, err := store.AddBatch(ctx, group.ID, org.ID, group.WorkspaceID, entries)
 	if err == nil {
 		t.Fatal("expected error for invalid role")
 	}

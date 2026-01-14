@@ -123,7 +123,9 @@ func (h *Handler) ServeGroupView(w http.ResponseWriter, r *http.Request) {
 
 // fetchAssignedResourcesForGroup loads resource titles for a group's assignments.
 func fetchAssignedResourcesForGroup(ctx context.Context, db *mongo.Database, groupID primitive.ObjectID) ([]assignedResourceViewItem, error) {
-	cur, err := db.Collection("group_resource_assignments").Find(ctx, bson.M{"group_id": groupID})
+	filter := bson.M{"group_id": groupID}
+	workspace.FilterCtx(ctx, filter)
+	cur, err := db.Collection("group_resource_assignments").Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}

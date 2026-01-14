@@ -118,8 +118,16 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit request body size to prevent memory exhaustion
+	// Use 8MB to allow for logo uploads, but prevent excessive payloads
+	r.Body = http.MaxBytesReader(w, r.Body, 8<<20)
+
 	// Parse multipart form for file uploads (8MB max for logo)
 	if err := r.ParseMultipartForm(8 << 20); err != nil {
+		if err.Error() == "http: request body too large" {
+			h.ErrLog.LogBadRequest(w, r, "request too large", err, "Request is too large. Maximum size is 8 MB.", "/settings")
+			return
+		}
 		h.ErrLog.LogBadRequest(w, r, "parse form failed", err, "Invalid form data.", "/settings")
 		return
 	}

@@ -16,6 +16,10 @@ type ManagePageData struct {
 	GroupDescription string
 	OrganizationName string
 
+	// For leader removal confirmation dialogs
+	CurrentUserID string // Hex ID of the logged-in user
+	LeaderCount   int    // Number of leaders in the group
+
 	CurrentLeaders  []UserItem
 	CurrentMembers  []UserItem
 	PossibleLeaders []UserItem

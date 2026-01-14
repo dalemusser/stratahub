@@ -14,6 +14,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/store/activity"
 	"github.com/dalemusser/stratahub/internal/app/store/sessions"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
+	"github.com/dalemusser/stratahub/internal/app/system/ratelimit"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 )
@@ -125,10 +126,7 @@ func (h *Handler) ServeHeartbeat(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// Create new activity session
-		ip := r.RemoteAddr
-		if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-			ip = xff
-		}
+		ip := ratelimit.ClientIP(r)
 		newSess, err := h.Sessions.Create(ctx, userOID, orgOID, ip, r.UserAgent(), sessions.CreatedByHeartbeat)
 		if err != nil {
 			h.Log.Warn("failed to create new activity session after timeout",

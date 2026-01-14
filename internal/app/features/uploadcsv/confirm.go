@@ -181,7 +181,8 @@ func (h *Handler) HandleConfirm(w http.ResponseWriter, r *http.Request) {
 
 		// Batch add memberships
 		if len(memberships) > 0 {
-			msResult, err := membershipstore.New(h.DB).AddBatch(ctx, uc.GroupID, uc.OrgID, memberships)
+			wsID := workspace.IDFromRequest(r)
+			msResult, err := membershipstore.New(h.DB).AddBatch(ctx, uc.GroupID, uc.OrgID, wsID, memberships)
 			if err != nil {
 				h.ErrLog.LogServerError(w, r, "database error batch adding memberships", err, "A database error occurred.", uploadURL)
 				return

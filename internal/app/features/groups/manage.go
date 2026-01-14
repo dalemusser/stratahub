@@ -75,7 +75,7 @@ func (h *Handler) ServeManageGroup(w http.ResponseWriter, r *http.Request) {
 
 // buildPageData assembles the ManagePageData for a given group and search window.
 func (h *Handler) buildPageData(r *http.Request, gid, q, after, before string) (ManagePageData, error) {
-	_, _, _, ok := authz.UserCtx(r)
+	_, _, userID, ok := authz.UserCtx(r)
 	if !ok {
 		return ManagePageData{}, fmt.Errorf("unauthorized")
 	}
@@ -174,6 +174,8 @@ func (h *Handler) buildPageData(r *http.Request, gid, q, after, before string) (
 		GroupName:        group.Name,
 		GroupDescription: group.Description,
 		OrganizationName: orgName,
+		CurrentUserID:    userID.Hex(),
+		LeaderCount:      len(currentLeads),
 		CurrentLeaders:   currentLeads,
 		CurrentMembers:   currentMembers,
 		PossibleLeaders:  possibleLeads,

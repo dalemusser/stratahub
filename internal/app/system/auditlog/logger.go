@@ -11,6 +11,7 @@ import (
 	"strconv"
 
 	"github.com/dalemusser/stratahub/internal/app/store/audit"
+	"github.com/dalemusser/stratahub/internal/app/system/ratelimit"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 )
@@ -40,20 +41,6 @@ func New(store *audit.Store, zapLog *zap.Logger, config Config) *Logger {
 		zapLog: zapLog,
 		config: config,
 	}
-}
-
-// getClientIP extracts the client IP from the request.
-func getClientIP(r *http.Request) string {
-	// Check X-Forwarded-For header first (for reverse proxies)
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		return xff
-	}
-	// Check X-Real-IP header
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return xri
-	}
-	// Fall back to RemoteAddr
-	return r.RemoteAddr
 }
 
 // logToZap logs the event to zap with consistent structure.
@@ -138,7 +125,7 @@ func (l *Logger) LoginSuccess(ctx context.Context, r *http.Request, userID primi
 		EventType:      audit.EventLoginSuccess,
 		UserID:         &userID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -153,7 +140,7 @@ func (l *Logger) LoginFailedUserNotFound(ctx context.Context, r *http.Request, a
 	l.Log(ctx, audit.Event{
 		Category:      audit.CategoryAuth,
 		EventType:     audit.EventLoginFailedUserNotFound,
-		IP:            getClientIP(r),
+		IP:            ratelimit.ClientIP(r),
 		UserAgent:     r.UserAgent(),
 		Success:       false,
 		FailureReason: "user not found",
@@ -170,7 +157,7 @@ func (l *Logger) LoginFailedWrongPassword(ctx context.Context, r *http.Request, 
 		EventType:      audit.EventLoginFailedWrongPassword,
 		UserID:         &userID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        false,
 		FailureReason:  "wrong password",
@@ -187,7 +174,7 @@ func (l *Logger) LoginFailedUserDisabled(ctx context.Context, r *http.Request, u
 		EventType:      audit.EventLoginFailedUserDisabled,
 		UserID:         &userID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        false,
 		FailureReason:  "user disabled",
@@ -204,7 +191,7 @@ func (l *Logger) LoginFailedAuthMethodDisabled(ctx context.Context, r *http.Requ
 		EventType:      audit.EventLoginFailedAuthMethodDisabled,
 		UserID:         &userID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        false,
 		FailureReason:  "auth method disabled for workspace",
@@ -222,7 +209,7 @@ func (l *Logger) LoginFailedRateLimit(ctx context.Context, r *http.Request, user
 		EventType:      audit.EventLoginFailedRateLimit,
 		UserID:         &userID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        false,
 		FailureReason:  "rate limit exceeded",
@@ -251,7 +238,7 @@ func (l *Logger) Logout(ctx context.Context, r *http.Request, userIDStr, orgIDSt
 		EventType:      audit.EventLogout,
 		UserID:         userID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 	})
@@ -264,7 +251,7 @@ func (l *Logger) PasswordChanged(ctx context.Context, r *http.Request, userID pr
 		EventType:      audit.EventPasswordChanged,
 		UserID:         &userID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -280,7 +267,7 @@ func (l *Logger) VerificationCodeSent(ctx context.Context, r *http.Request, user
 		EventType:      audit.EventVerificationCodeSent,
 		UserID:         &userID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -296,7 +283,7 @@ func (l *Logger) VerificationCodeResent(ctx context.Context, r *http.Request, us
 		EventType:      audit.EventVerificationCodeResent,
 		UserID:         &userID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -313,7 +300,7 @@ func (l *Logger) VerificationCodeFailed(ctx context.Context, r *http.Request, us
 		EventType:      audit.EventVerificationCodeFailed,
 		UserID:         &userID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        false,
 		FailureReason:  reason,
@@ -327,7 +314,7 @@ func (l *Logger) MagicLinkUsed(ctx context.Context, r *http.Request, userID prim
 		EventType:      audit.EventMagicLinkUsed,
 		UserID:         &userID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -346,7 +333,7 @@ func (l *Logger) UserCreated(ctx context.Context, r *http.Request, actorID, targ
 		UserID:         &targetUserID,
 		ActorID:        &actorID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -365,7 +352,7 @@ func (l *Logger) UserUpdated(ctx context.Context, r *http.Request, actorID, targ
 		UserID:         &targetUserID,
 		ActorID:        &actorID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -383,7 +370,7 @@ func (l *Logger) UserDisabled(ctx context.Context, r *http.Request, actorID, tar
 		UserID:         &targetUserID,
 		ActorID:        &actorID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -400,7 +387,7 @@ func (l *Logger) UserEnabled(ctx context.Context, r *http.Request, actorID, targ
 		UserID:         &targetUserID,
 		ActorID:        &actorID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -417,7 +404,7 @@ func (l *Logger) UserDeleted(ctx context.Context, r *http.Request, actorID, targ
 		UserID:         &targetUserID,
 		ActorID:        &actorID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -434,7 +421,7 @@ func (l *Logger) GroupCreated(ctx context.Context, r *http.Request, actorID, gro
 		EventType:      audit.EventGroupCreated,
 		ActorID:        &actorID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -452,7 +439,7 @@ func (l *Logger) GroupUpdated(ctx context.Context, r *http.Request, actorID, gro
 		EventType:      audit.EventGroupUpdated,
 		ActorID:        &actorID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -470,7 +457,7 @@ func (l *Logger) GroupDeleted(ctx context.Context, r *http.Request, actorID, gro
 		EventType:      audit.EventGroupDeleted,
 		ActorID:        &actorID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -489,7 +476,7 @@ func (l *Logger) MemberAddedToGroup(ctx context.Context, r *http.Request, actorI
 		UserID:         &targetUserID,
 		ActorID:        &actorID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -508,7 +495,7 @@ func (l *Logger) MemberRemovedFromGroup(ctx context.Context, r *http.Request, ac
 		UserID:         &targetUserID,
 		ActorID:        &actorID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -527,7 +514,7 @@ func (l *Logger) OrgCreated(ctx context.Context, r *http.Request, actorID, orgID
 		EventType:      audit.EventOrgCreated,
 		ActorID:        &actorID,
 		OrganizationID: &orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -544,7 +531,7 @@ func (l *Logger) OrgUpdated(ctx context.Context, r *http.Request, actorID, orgID
 		EventType:      audit.EventOrgUpdated,
 		ActorID:        &actorID,
 		OrganizationID: &orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -561,7 +548,7 @@ func (l *Logger) OrgDeleted(ctx context.Context, r *http.Request, actorID, orgID
 		EventType:      audit.EventOrgDeleted,
 		ActorID:        &actorID,
 		OrganizationID: &orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -579,7 +566,7 @@ func (l *Logger) ResourceCreated(ctx context.Context, r *http.Request, actorID, 
 		Category:  audit.CategoryAdmin,
 		EventType: audit.EventResourceCreated,
 		ActorID:   &actorID,
-		IP:        getClientIP(r),
+		IP:        ratelimit.ClientIP(r),
 		UserAgent: r.UserAgent(),
 		Success:   true,
 		Details: map[string]string{
@@ -596,7 +583,7 @@ func (l *Logger) ResourceUpdated(ctx context.Context, r *http.Request, actorID, 
 		Category:  audit.CategoryAdmin,
 		EventType: audit.EventResourceUpdated,
 		ActorID:   &actorID,
-		IP:        getClientIP(r),
+		IP:        ratelimit.ClientIP(r),
 		UserAgent: r.UserAgent(),
 		Success:   true,
 		Details: map[string]string{
@@ -613,7 +600,7 @@ func (l *Logger) ResourceDeleted(ctx context.Context, r *http.Request, actorID, 
 		Category:  audit.CategoryAdmin,
 		EventType: audit.EventResourceDeleted,
 		ActorID:   &actorID,
-		IP:        getClientIP(r),
+		IP:        ratelimit.ClientIP(r),
 		UserAgent: r.UserAgent(),
 		Success:   true,
 		Details: map[string]string{
@@ -632,7 +619,7 @@ func (l *Logger) MaterialCreated(ctx context.Context, r *http.Request, actorID, 
 		Category:  audit.CategoryAdmin,
 		EventType: audit.EventMaterialCreated,
 		ActorID:   &actorID,
-		IP:        getClientIP(r),
+		IP:        ratelimit.ClientIP(r),
 		UserAgent: r.UserAgent(),
 		Success:   true,
 		Details: map[string]string{
@@ -649,7 +636,7 @@ func (l *Logger) MaterialUpdated(ctx context.Context, r *http.Request, actorID, 
 		Category:  audit.CategoryAdmin,
 		EventType: audit.EventMaterialUpdated,
 		ActorID:   &actorID,
-		IP:        getClientIP(r),
+		IP:        ratelimit.ClientIP(r),
 		UserAgent: r.UserAgent(),
 		Success:   true,
 		Details: map[string]string{
@@ -666,7 +653,7 @@ func (l *Logger) MaterialDeleted(ctx context.Context, r *http.Request, actorID, 
 		Category:  audit.CategoryAdmin,
 		EventType: audit.EventMaterialDeleted,
 		ActorID:   &actorID,
-		IP:        getClientIP(r),
+		IP:        ratelimit.ClientIP(r),
 		UserAgent: r.UserAgent(),
 		Success:   true,
 		Details: map[string]string{
@@ -686,7 +673,7 @@ func (l *Logger) ResourceAssignedToGroup(ctx context.Context, r *http.Request, a
 		EventType:      audit.EventResourceAssignedToGroup,
 		ActorID:        &actorID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -707,7 +694,7 @@ func (l *Logger) ResourceAssignmentUpdated(ctx context.Context, r *http.Request,
 		EventType:      audit.EventResourceAssignmentUpdated,
 		ActorID:        &actorID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -726,7 +713,7 @@ func (l *Logger) ResourceUnassignedFromGroup(ctx context.Context, r *http.Reques
 		EventType:      audit.EventResourceUnassignedFromGroup,
 		ActorID:        &actorID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -748,7 +735,7 @@ func (l *Logger) CoordinatorAssignedToOrg(ctx context.Context, r *http.Request, 
 		ActorID:        &actorID,
 		UserID:         &coordinatorID,
 		OrganizationID: &orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -766,7 +753,7 @@ func (l *Logger) CoordinatorUnassignedFromOrg(ctx context.Context, r *http.Reque
 		ActorID:        &actorID,
 		UserID:         &coordinatorID,
 		OrganizationID: &orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -785,7 +772,7 @@ func (l *Logger) MaterialAssigned(ctx context.Context, r *http.Request, actorID,
 		EventType:      audit.EventMaterialAssigned,
 		ActorID:        &actorID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -806,7 +793,7 @@ func (l *Logger) MaterialAssignmentUpdated(ctx context.Context, r *http.Request,
 		EventType:      audit.EventMaterialAssignmentUpdated,
 		ActorID:        &actorID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{
@@ -824,7 +811,7 @@ func (l *Logger) MaterialUnassigned(ctx context.Context, r *http.Request, actorI
 		EventType:      audit.EventMaterialUnassigned,
 		ActorID:        &actorID,
 		OrganizationID: orgID,
-		IP:             getClientIP(r),
+		IP:             ratelimit.ClientIP(r),
 		UserAgent:      r.UserAgent(),
 		Success:        true,
 		Details: map[string]string{

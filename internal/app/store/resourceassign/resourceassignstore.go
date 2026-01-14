@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -70,7 +71,9 @@ func (s *Store) Update(ctx context.Context, a models.GroupResourceAssignment) (m
 }
 
 func (s *Store) ListByGroup(ctx context.Context, groupID primitive.ObjectID) ([]models.GroupResourceAssignment, error) {
-	cur, err := s.c.Find(ctx, bson.M{"group_id": groupID})
+	filter := bson.M{"group_id": groupID}
+	workspace.FilterCtx(ctx, filter)
+	cur, err := s.c.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
