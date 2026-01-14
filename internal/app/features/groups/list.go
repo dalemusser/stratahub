@@ -94,10 +94,12 @@ func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
 		// Initialize to non-nil empty slice to distinguish "leader with no groups" from "not a leader"
 		leaderGroupIDs = []primitive.ObjectID{}
 
-		cur, err := db.Collection("group_memberships").Find(ctx, bson.M{
+		membershipFilter := bson.M{
 			"user_id": uid,
 			"role":    "leader",
-		})
+		}
+		workspace.Filter(r, membershipFilter)
+		cur, err := db.Collection("group_memberships").Find(ctx, membershipFilter)
 		if err != nil {
 			h.ErrLog.LogServerError(w, r, "database error fetching leader groups", err, "A database error occurred.", "/groups")
 			return

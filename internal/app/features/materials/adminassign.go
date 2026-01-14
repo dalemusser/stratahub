@@ -479,6 +479,7 @@ func (h *AdminHandler) HandleAssign(w http.ResponseWriter, r *http.Request) {
 	// Create assignment
 	assignment := models.MaterialAssignment{
 		ID:             primitive.NewObjectID(),
+		WorkspaceID:    workspace.IDFromRequest(r),
 		MaterialID:     matID,
 		OrganizationID: orgID,
 		LeaderID:       leaderID,

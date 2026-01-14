@@ -23,6 +23,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/authutil"
 	"github.com/dalemusser/stratahub/internal/app/system/mailer"
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
+	"github.com/dalemusser/stratahub/internal/app/system/ratelimit"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
@@ -358,7 +359,7 @@ func (h *Handler) createSessionAndRedirect(w http.ResponseWriter, r *http.Reques
 		ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 		defer cancel()
 
-		ip := extractIP(r)
+		ip := ratelimit.ClientIP(r)
 		activitySess, err := h.Sessions.Create(ctx, u.ID, u.OrganizationID, ip, r.UserAgent(), sessions.CreatedByLogin)
 		if err != nil {
 			h.Log.Warn("failed to create activity session", zap.Error(err), zap.String("user_id", u.ID.Hex()))
@@ -397,28 +398,6 @@ func (h *Handler) createSessionAndRedirect(w http.ResponseWriter, r *http.Reques
 	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 
-// extractIP extracts the client IP address from the request.
-func extractIP(r *http.Request) string {
-	// Check X-Forwarded-For header (for reverse proxies)
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		// Take the first IP in the list
-		if idx := strings.Index(xff, ","); idx != -1 {
-			return strings.TrimSpace(xff[:idx])
-		}
-		return strings.TrimSpace(xff)
-	}
-	// Check X-Real-IP header
-	if xri := r.Header.Get("X-Real-IP"); xri != "" {
-		return strings.TrimSpace(xri)
-	}
-	// Fall back to RemoteAddr
-	ip := r.RemoteAddr
-	// Remove port if present
-	if idx := strings.LastIndex(ip, ":"); idx != -1 {
-		ip = ip[:idx]
-	}
-	return ip
-}
 
 // createSessionAndRenderMagicSuccess creates an authenticated session and renders
 // a page that broadcasts to other tabs and redirects via JavaScript.
@@ -457,7 +436,7 @@ func (h *Handler) createSessionAndRenderMagicSuccess(w http.ResponseWriter, r *h
 		ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 		defer cancel()
 
-		ip := extractIP(r)
+		ip := ratelimit.ClientIP(r)
 		activitySess, err := h.Sessions.Create(ctx, u.ID, u.OrganizationID, ip, r.UserAgent(), sessions.CreatedByLogin)
 		if err != nil {
 			h.Log.Warn("failed to create activity session", zap.Error(err), zap.String("user_id", u.ID.Hex()))

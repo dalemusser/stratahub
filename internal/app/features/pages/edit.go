@@ -9,6 +9,7 @@ import (
 	pagestore "github.com/dalemusser/stratahub/internal/app/store/pages"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/htmlsanitize"
+	"github.com/dalemusser/stratahub/internal/app/system/limits"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/domain/models"
@@ -77,7 +78,14 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Limit request body size to prevent memory exhaustion
+	r.Body = http.MaxBytesReader(w, r.Body, limits.MaxPageContentSize)
+
 	if err := r.ParseForm(); err != nil {
+		if err.Error() == "http: request body too large" {
+			h.ErrLog.LogBadRequest(w, r, "request too large", err, "Content is too large. Maximum size is 1 MB.", "/pages/"+slug+"/edit")
+			return
+		}
 		h.ErrLog.LogBadRequest(w, r, "parse form failed", err, "Invalid form data.", "/pages/"+slug+"/edit")
 		return
 	}

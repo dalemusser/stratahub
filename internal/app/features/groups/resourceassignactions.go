@@ -15,6 +15,7 @@ import (
 	resourcestore "github.com/dalemusser/stratahub/internal/app/store/resources"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/go-chi/chi/v5"
@@ -104,6 +105,7 @@ func (h *Handler) HandleAssignResource(w http.ResponseWriter, r *http.Request) {
 	}
 
 	a := models.GroupResourceAssignment{
+		WorkspaceID:    workspace.IDFromRequest(r),
 		GroupID:        group.ID,
 		OrganizationID: group.OrganizationID,
 		ResourceID:     resourceOID,

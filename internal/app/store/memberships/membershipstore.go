@@ -65,11 +65,12 @@ func (s *Store) Add(ctx context.Context, groupID, userID primitive.ObjectID, rol
 	}
 
 	doc := bson.M{
-		"group_id":   groupID,
-		"user_id":    userID,
-		"org_id":     g.OrganizationID,
-		"role":       role,
-		"created_at": time.Now().UTC(),
+		"workspace_id": g.WorkspaceID,
+		"group_id":     groupID,
+		"user_id":      userID,
+		"org_id":       g.OrganizationID,
+		"role":         role,
+		"created_at":   time.Now().UTC(),
 	}
 	_, err := s.c.InsertOne(ctx, doc)
 	if err != nil {
@@ -103,7 +104,7 @@ type AddBatchResult struct {
 // Caller must have already verified that all users belong to the same org as the group.
 // This method skips individual user/group lookups for efficiency.
 // Duplicates are silently counted (not treated as errors).
-func (s *Store) AddBatch(ctx context.Context, groupID, orgID primitive.ObjectID, entries []MembershipEntry) (AddBatchResult, error) {
+func (s *Store) AddBatch(ctx context.Context, groupID, orgID, workspaceID primitive.ObjectID, entries []MembershipEntry) (AddBatchResult, error) {
 	if len(entries) == 0 {
 		return AddBatchResult{}, nil
 	}
@@ -116,11 +117,12 @@ func (s *Store) AddBatch(ctx context.Context, groupID, orgID primitive.ObjectID,
 			return AddBatchResult{}, errBadRole
 		}
 		docs = append(docs, bson.M{
-			"group_id":   groupID,
-			"user_id":    e.UserID,
-			"org_id":     orgID,
-			"role":       e.Role,
-			"created_at": now,
+			"workspace_id": workspaceID,
+			"group_id":     groupID,
+			"user_id":      e.UserID,
+			"org_id":       orgID,
+			"role":         e.Role,
+			"created_at":   now,
 		})
 	}
 

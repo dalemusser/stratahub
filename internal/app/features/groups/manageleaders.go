@@ -139,21 +139,8 @@ func (h *Handler) HandleRemoveLeader(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if actorID == targetOID {
-		uierrors.HTMXBadRequest(w, r, "You cannot remove yourself as leader.", "/groups")
-		return
-	}
-
-	memStore := membershipstore.New(db)
-	cnt, cntErr := memStore.CountByGroup(ctx, group.ID, "leader")
-	if cntErr != nil {
-		h.ErrLog.HTMXLogServerError(w, r, "database error counting group leaders", cntErr, "A database error occurred.", "/groups")
-		return
-	}
-	if cnt <= 1 {
-		uierrors.HTMXBadRequest(w, r, "Cannot remove the last leader.", "/groups")
-		return
-	}
+	// Check if this is self-removal (leader removing themselves)
+	isSelfRemoval := actorID == targetOID
 
 	if err := membershipstore.New(db).Remove(ctx, group.ID, targetOID); err != nil {
 		h.ErrLog.HTMXLogBadRequest(w, r, "database error removing leader from group", err, "Failed to remove leader.", "/groups")
@@ -162,6 +149,13 @@ func (h *Handler) HandleRemoveLeader(w http.ResponseWriter, r *http.Request) {
 
 	// Audit log: leader removed from group
 	h.AuditLog.MemberRemovedFromGroup(ctx, r, actorID, targetOID, group.ID, &group.OrganizationID, actorRole)
+
+	// Self-removal: redirect to groups list (user no longer has access to this group)
+	if isSelfRemoval {
+		w.Header().Set("HX-Redirect", "/groups")
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 
 	h.renderLeadersPartial(w, r, gid)
 }

@@ -355,3 +355,50 @@ func (f *Fixtures) CreateResource(ctx context.Context, title, launchURL string) 
 
 	return resource
 }
+
+// CreateMaterial creates a test material.
+func (f *Fixtures) CreateMaterial(ctx context.Context, title, materialType string) models.Material {
+	f.t.Helper()
+
+	now := time.Now().UTC()
+	material := models.Material{
+		ID:        primitive.NewObjectID(),
+		Title:     title,
+		TitleCI:   text.Fold(title),
+		Type:      materialType,
+		Status:    "active",
+		CreatedAt: now,
+		UpdatedAt: &now,
+	}
+
+	_, err := f.db.Collection("materials").InsertOne(ctx, material)
+	if err != nil {
+		f.t.Fatalf("failed to create test material: %v", err)
+	}
+
+	return material
+}
+
+// CreateMaterialInWorkspace creates a test material in the given workspace.
+func (f *Fixtures) CreateMaterialInWorkspace(ctx context.Context, title, materialType string, workspaceID primitive.ObjectID) models.Material {
+	f.t.Helper()
+
+	now := time.Now().UTC()
+	material := models.Material{
+		ID:          primitive.NewObjectID(),
+		WorkspaceID: workspaceID,
+		Title:       title,
+		TitleCI:     text.Fold(title),
+		Type:        materialType,
+		Status:      "active",
+		CreatedAt:   now,
+		UpdatedAt:   &now,
+	}
+
+	_, err := f.db.Collection("materials").InsertOne(ctx, material)
+	if err != nil {
+		f.t.Fatalf("failed to create test material: %v", err)
+	}
+
+	return material
+}

@@ -5,6 +5,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -71,7 +72,9 @@ func (s *Store) Update(ctx context.Context, a models.MaterialAssignment) (models
 
 // ListByMaterial returns all assignments for a given material.
 func (s *Store) ListByMaterial(ctx context.Context, materialID primitive.ObjectID) ([]models.MaterialAssignment, error) {
-	cur, err := s.c.Find(ctx, bson.M{"material_id": materialID})
+	filter := bson.M{"material_id": materialID}
+	workspace.FilterCtx(ctx, filter)
+	cur, err := s.c.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -85,7 +88,9 @@ func (s *Store) ListByMaterial(ctx context.Context, materialID primitive.ObjectI
 
 // ListByOrg returns all org-wide assignments for a given organization.
 func (s *Store) ListByOrg(ctx context.Context, orgID primitive.ObjectID) ([]models.MaterialAssignment, error) {
-	cur, err := s.c.Find(ctx, bson.M{"organization_id": orgID})
+	filter := bson.M{"organization_id": orgID}
+	workspace.FilterCtx(ctx, filter)
+	cur, err := s.c.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +104,9 @@ func (s *Store) ListByOrg(ctx context.Context, orgID primitive.ObjectID) ([]mode
 
 // ListByLeader returns all individual assignments for a given leader.
 func (s *Store) ListByLeader(ctx context.Context, leaderID primitive.ObjectID) ([]models.MaterialAssignment, error) {
-	cur, err := s.c.Find(ctx, bson.M{"leader_id": leaderID})
+	filter := bson.M{"leader_id": leaderID}
+	workspace.FilterCtx(ctx, filter)
+	cur, err := s.c.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}
@@ -143,12 +150,16 @@ func (s *Store) DeleteByLeader(ctx context.Context, leaderID primitive.ObjectID)
 
 // CountByMaterial returns the number of assignments for a given material.
 func (s *Store) CountByMaterial(ctx context.Context, materialID primitive.ObjectID) (int64, error) {
-	return s.c.CountDocuments(ctx, bson.M{"material_id": materialID})
+	filter := bson.M{"material_id": materialID}
+	workspace.FilterCtx(ctx, filter)
+	return s.c.CountDocuments(ctx, filter)
 }
 
 // ListAll returns all material assignments.
 func (s *Store) ListAll(ctx context.Context) ([]models.MaterialAssignment, error) {
-	cur, err := s.c.Find(ctx, bson.M{})
+	filter := bson.M{}
+	workspace.FilterCtx(ctx, filter)
+	cur, err := s.c.Find(ctx, filter)
 	if err != nil {
 		return nil, err
 	}

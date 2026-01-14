@@ -197,17 +197,28 @@ func (s *Store) UpsertMembersInOrgBatch(
 		return result, nil
 	}
 
-	// Batch fetch all existing users by login_id
-	cur, err := s.c.Find(ctx, bson.M{"login_id": bson.M{"$in": loginIDs}})
+	// Fold login IDs for case/diacritic insensitive matching against login_id_ci
+	foldedLoginIDs := make([]string, len(loginIDs))
+	for i, id := range loginIDs {
+		foldedLoginIDs[i] = text.Fold(id)
+	}
+
+	// Batch fetch all existing users by login_id_ci with workspace filter
+	filter := bson.M{"login_id_ci": bson.M{"$in": foldedLoginIDs}}
+	if workspaceID != primitive.NilObjectID {
+		filter["workspace_id"] = workspaceID
+	}
+	cur, err := s.c.Find(ctx, filter)
 	if err != nil {
 		return result, err
 	}
 	defer cur.Close(ctx)
 
 	type existingUser struct {
-		ID      primitive.ObjectID  `bson:"_id"`
-		LoginID string              `bson:"login_id"`
-		OrgID   *primitive.ObjectID `bson:"organization_id"`
+		ID        primitive.ObjectID  `bson:"_id"`
+		LoginID   string              `bson:"login_id"`
+		LoginIDCI *string             `bson:"login_id_ci"`
+		OrgID     *primitive.ObjectID `bson:"organization_id"`
 	}
 	existing := make(map[string]existingUser, len(loginIDs))
 	for cur.Next(ctx) {
@@ -215,7 +226,14 @@ func (s *Store) UpsertMembersInOrgBatch(
 		if err := cur.Decode(&u); err != nil {
 			return result, err
 		}
-		existing[strings.ToLower(u.LoginID)] = u
+		// Use folded login_id_ci as the key for consistent matching
+		key := ""
+		if u.LoginIDCI != nil {
+			key = *u.LoginIDCI
+		} else {
+			key = text.Fold(u.LoginID)
+		}
+		existing[key] = u
 	}
 	if err := cur.Err(); err != nil {
 		return result, err
@@ -243,7 +261,8 @@ func (s *Store) UpsertMembersInOrgBatch(
 
 	for _, loginID := range loginIDs {
 		entry := normalized[loginID]
-		if ex, found := existing[loginID]; found {
+		foldedID := text.Fold(loginID)
+		if ex, found := existing[foldedID]; found {
 			// User exists
 			if ex.OrgID == nil || *ex.OrgID != orgID {
 				// Different org - track for later org name lookup
