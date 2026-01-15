@@ -21,6 +21,7 @@
     {{ end }}
 
     <form method="post" action="/groups/{{ .GroupID }}/edit" class="space-y-3 max-w-xl">
+      <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
       <!-- Name -->
       <div>
         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name</label>
@@ -61,6 +62,7 @@
           Permanently delete this group. This removes assignments and detaches the group from all users. This cannot be undone.
         </p>
         <form method="post" action="/groups/{{ .GroupID }}/delete">
+          <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
           <input type="hidden" name="return" value="{{ .BackURL }}">
           <button
             type="submit"

@@ -34,6 +34,7 @@
     </div>
 
     <form method="post" action="/workspaces/{{ .WorkspaceID }}/delete">
+      <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
       <div class="mb-6">
         <label for="confirm_name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Type <strong>{{ .WorkspaceName }}</strong> to confirm:

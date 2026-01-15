@@ -38,6 +38,9 @@ type AppConfig struct {
 	SessionName   string // Cookie name for sessions (default: stratahub-session)
 	SessionDomain string // Cookie domain (blank means current host)
 
+	// CSRF protection configuration
+	CSRFKey string // Secret key for CSRF token signing (32+ chars in production)
+
 	// File storage configuration
 	StorageType      string // Storage backend: "local" or "s3"
 	StorageLocalPath string // Local storage path (e.g., "./uploads/materials")

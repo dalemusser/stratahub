@@ -13,6 +13,7 @@
   {{ end }}
 
   <form method="post" action="/workspaces" class="bg-white dark:bg-gray-800 rounded shadow p-6 space-y-4">
+    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
     <div>
       <label for="name" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
         Name <span class="text-red-500">*</span>

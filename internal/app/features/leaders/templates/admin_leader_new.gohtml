@@ -21,6 +21,7 @@
     {{ end }}
 
     <form method="post" action="/leaders" class="space-y-3 max-w-xl">
+      <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
       <!-- propagate return so success goes back -->
       <input type="hidden" name="return" value="{{ .BackURL }}">
 

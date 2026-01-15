@@ -49,6 +49,7 @@
     </div>
 
     <form method="post" action="/upload_csv/confirm" class="flex items-center gap-4 mb-4">
+      <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
       <input type="hidden" name="orgID" value="{{ .OrgHex }}">
       <input type="hidden" name="groupMode" value="{{ .GroupMode }}">
       {{ if .GroupMode }}
@@ -137,6 +138,7 @@
 
   <form id="upload-form" method="post" action="/upload_csv" enctype="multipart/form-data"
         class="space-y-3 bg-white dark:bg-gray-800 p-4 rounded border dark:border-gray-700">
+    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
 
     <input type="hidden" name="return" value="{{ .ReturnURL }}">
     <input type="hidden" name="groupMode" value="{{ .GroupMode }}">

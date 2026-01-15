@@ -26,6 +26,7 @@
   {{ end }}
 
   <form method="post" action="/workspaces/{{ .WorkspaceID }}/settings" enctype="multipart/form-data" class="space-y-4 bg-white dark:bg-gray-800 p-4 rounded shadow">
+    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
 
     <div>
       <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Workspace Name</label>

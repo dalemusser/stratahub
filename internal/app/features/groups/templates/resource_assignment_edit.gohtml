@@ -24,6 +24,7 @@
 </div>
 
 <form method="post" action="/groups/{{ .GroupID }}/assign_resources/{{ .AssignmentID }}/update" class="max-w-2xl bg-white dark:bg-gray-800 border dark:border-gray-700 rounded p-4 space-y-3">
+  <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
   <input type="hidden" name="return" value="{{ .BackURL }}">
   <div>
     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1" for="visible_from">Available from</label>
@@ -110,6 +111,7 @@
 
 <form method="post" action="/groups/{{ .GroupID }}/assign_resources/remove" class="max-w-2xl mt-4"
       onsubmit="return confirm('Are you sure you want to delete this resource assignment?');">
+  <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
   <input type="hidden" name="assignmentID" value="{{ .AssignmentID }}">
   <input type="hidden" name="return" value="{{ .BackURL }}">
   <button type="submit" class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700">

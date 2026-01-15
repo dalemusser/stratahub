@@ -14,6 +14,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/storage"
+	"github.com/gorilla/csrf"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -51,6 +52,9 @@ type BaseVM struct {
 	Title       string
 	BackURL     string
 	CurrentPath string
+
+	// CSRF protection
+	CSRFToken string // Token for form submission
 }
 
 // storageProvider is set by Init and used to generate logo URLs.
@@ -93,6 +97,7 @@ func NewBaseVM(r *http.Request, db *mongo.Database, title, backDefault string) B
 		Title:       title,
 		BackURL:     httpnav.ResolveBackURL(r, backDefault),
 		CurrentPath: httpnav.CurrentPath(r),
+		CSRFToken:   csrf.Token(r),
 	}
 
 	// Get organization name for leaders/members

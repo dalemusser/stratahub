@@ -7,6 +7,17 @@
     <link rel="stylesheet" href="/assets/css/tailwind.css">
     <link rel="stylesheet" href="/assets/css/tiptap.css">
     <script src="/assets/js/htmx.min.js"></script>
+    {{ if .CSRFToken }}<meta name="csrf-token" content="{{ .CSRFToken }}">{{ end }}
+    <script>
+      // CSRF token injection for HTMX requests
+      // Use 'document' instead of 'document.body' since body doesn't exist yet in <head>
+      document.addEventListener('htmx:configRequest', function(evt) {
+        var token = document.querySelector('meta[name="csrf-token"]');
+        if (token) {
+          evt.detail.headers['X-CSRF-Token'] = token.content;
+        }
+      });
+    </script>
     <script>
       // Initialize dark mode before page renders to prevent flash
       (function() {
@@ -248,22 +259,22 @@
         var heartbeatTimer = null;
         var heartbeatUrl = '/api/heartbeat';
 
-        // Use sendBeacon for reliable delivery (doesn't block, survives page switch)
+        // Send initial heartbeat (use fetch to include CSRF token)
         function sendHeartbeatBeacon() {
-          var data = JSON.stringify({page: window.location.pathname});
-          if (navigator.sendBeacon) {
-            navigator.sendBeacon(heartbeatUrl, new Blob([data], {type: 'application/json'}));
-          } else {
-            sendHeartbeatFetch();
-          }
+          sendHeartbeatFetch();
         }
 
         // Use fetch for regular interval heartbeats
         function sendHeartbeatFetch() {
+          var headers = {'Content-Type': 'application/json'};
+          var csrfToken = document.querySelector('meta[name="csrf-token"]');
+          if (csrfToken) {
+            headers['X-CSRF-Token'] = csrfToken.content;
+          }
           fetch(heartbeatUrl, {
             method: 'POST',
             credentials: 'same-origin',
-            headers: {'Content-Type': 'application/json'},
+            headers: headers,
             body: JSON.stringify({page: window.location.pathname})
           }).catch(function() {
             // Silent fail - don't interrupt user experience

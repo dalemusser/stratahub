@@ -21,6 +21,7 @@
     {{ end }}
 
     <form method="post" action="/organizations/{{ .ID }}/edit" class="space-y-3 max-w-xl">
+      <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
       <input type="hidden" name="return" value="{{ .BackURL }}">
 
       <div>
@@ -81,6 +82,7 @@
           Permanently delete this organization. This removes all users and groups in the organization and cannot be undone.
         </p>
         <form method="post" action="/organizations/{{ .ID }}/delete">
+          <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
           <input type="hidden" name="return" value="{{ .BackURL }}">
           <button
             type="submit"

@@ -23,6 +23,7 @@ var appConfigKeys = []config.AppKey{
 	{Name: "session_key", Default: "dev-only-change-me-please-0123456789ABCDEF", Desc: "Session signing key (must be strong in production)"},
 	{Name: "session_name", Default: "stratahub-session", Desc: "Session cookie name"},
 	{Name: "session_domain", Default: "", Desc: "Session cookie domain (blank means current host)"},
+	{Name: "csrf_key", Default: "dev-only-csrf-key-please-change-0123456789", Desc: "CSRF token signing key (32+ chars in production)"},
 
 	// File storage configuration
 	{Name: "storage_type", Default: "local", Desc: "Storage backend: 'local' or 's3'"},
@@ -95,9 +96,10 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 		MongoDatabase:    appValues.String("mongo_database"),
 		MongoMaxPoolSize: uint64(appValues.Int("mongo_max_pool_size")),
 		MongoMinPoolSize: uint64(appValues.Int("mongo_min_pool_size")),
-		SessionKey:       appValues.String("session_key"),
+		SessionKey:    appValues.String("session_key"),
 		SessionName:   appValues.String("session_name"),
 		SessionDomain: appValues.String("session_domain"),
+		CSRFKey:       appValues.String("csrf_key"),
 
 		// File storage
 		StorageType:      appValues.String("storage_type"),

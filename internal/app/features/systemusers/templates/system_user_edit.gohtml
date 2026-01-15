@@ -21,6 +21,7 @@
     {{ end }}
 
     <form method="post" action="/system-users/{{ .ID }}/edit" class="space-y-3 max-w-xl" id="edit-user-form" onsubmit="return confirmRoleChange()">
+      <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
       <input type="hidden" name="return" value="{{ .BackURL }}">
       <input type="hidden" name="previous_role" value="{{ .PreviousRole }}">
 
@@ -141,6 +142,7 @@
           Permanently delete this system user.{{ if eq .UserRole "coordinator" }} This will also remove all organization assignments.{{ end }} This action cannot be undone.
         </p>
         <form method="post" action="/system-users/{{ .ID }}/delete">
+          <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
           <input type="hidden" name="return" value="{{ .BackURL }}">
           <button
             type="submit"

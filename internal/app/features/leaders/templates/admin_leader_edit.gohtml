@@ -27,6 +27,7 @@
     {{ end }}
 
     <form action="/leaders/{{ .ID }}/edit" method="POST" class="space-y-3 max-w-xl">
+      <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
       <input type="hidden" name="return" value="{{ .BackURL }}">
       <!-- keep org but do not allow changes -->
       <input type="hidden" name="orgID" value="{{ .OrgID }}">
@@ -72,6 +73,7 @@
           Permanently delete this leader. This action cannot be undone.
         </p>
         <form action="/leaders/{{ .ID }}/delete" method="POST">
+          <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
           <input type="hidden" name="return" value="{{ .BackURL }}">
           <button
             type="submit"
