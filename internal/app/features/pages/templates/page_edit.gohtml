@@ -21,6 +21,7 @@
 {{ end }}
 
 <form method="post" action="/pages/{{ .Slug }}/edit" class="space-y-4 bg-white dark:bg-gray-800 p-4 rounded shadow flex-1 mb-2 flex flex-col">
+  <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
 
   <div>
     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Page Title</label>

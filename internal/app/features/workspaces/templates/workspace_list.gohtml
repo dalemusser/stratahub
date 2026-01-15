@@ -154,6 +154,7 @@
         {{ if eq .Status "active" }}
         <form method="post" action="/workspaces/{{ .ID }}/status" class="inline"
               onsubmit="return confirm('Suspend this workspace? Users will not be able to access it.');">
+          <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
           <input type="hidden" name="status" value="suspended">
           <button type="submit"
                   class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
@@ -162,6 +163,7 @@
         </form>
         {{ else if eq .Status "suspended" }}
         <form method="post" action="/workspaces/{{ .ID }}/status" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
           <input type="hidden" name="status" value="active">
           <button type="submit"
                   class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">

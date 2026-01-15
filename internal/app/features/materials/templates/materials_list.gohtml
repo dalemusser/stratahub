@@ -254,6 +254,7 @@
         </p>
         <form method="post" action="/materials/{{ .ID }}/delete"
               onsubmit="return confirm('Are you sure you want to delete this material? This will also remove all assignments.');">
+          <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
           <input type="hidden" name="return" value="/materials">
           <button
             type="submit"

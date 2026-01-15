@@ -24,6 +24,7 @@
 </div>
 
 <form method="post" action="/groups/{{ .GroupID }}/assign_resources/add" class="max-w-2xl bg-white dark:bg-gray-800 border dark:border-gray-700 rounded p-4 space-y-3">
+  <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
   <input type="hidden" name="resourceID" value="{{ .ResourceID }}">
   <input type="hidden" name="return" value="{{ .BackURL }}">
 

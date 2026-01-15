@@ -148,6 +148,7 @@
         </p>
         <form method="post" action="/materials/assignments/{{ .ID }}/delete"
               onsubmit="return confirm('Are you sure you want to delete this assignment?');">
+          <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
           <input type="hidden" name="return" value="{{ .BackURL }}">
           <button type="submit" class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700">
             Delete Assignment

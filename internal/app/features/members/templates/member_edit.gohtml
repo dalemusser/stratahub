@@ -25,6 +25,7 @@
 {{ end }}
 
 <form action="/members/{{ .ID }}/edit" method="POST" class="space-y-3 max-w-xl bg-white dark:bg-gray-800 p-4 rounded border dark:border-gray-700 mb-6">
+  <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
   <input type="hidden" name="return" value="{{ .BackURL }}">
   <input type="hidden" name="orgID" value="{{ .OrgID }}">
 
@@ -63,6 +64,7 @@
 </form>
 
 <form action="/members/{{ .ID }}/delete" method="POST" class="max-w-xl">
+  <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
   <input type="hidden" name="return" value="{{ .BackURL }}">
   <button type="submit"
           class="bg-red-600 text-white px-4 py-2 rounded hover:bg-red-700"

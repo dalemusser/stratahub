@@ -21,6 +21,7 @@
     {{ end }}
 
     <form method="post" action="/system-users" class="space-y-3 max-w-xl">
+      <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
       <input type="hidden" name="return" value="{{ .BackURL }}">
 
       <div>

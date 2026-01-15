@@ -58,6 +58,7 @@
 
       <!-- Assignment Form -->
       <form method="post" action="/materials/{{ .MaterialID }}/assign" class="space-y-4">
+        <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
         <input type="hidden" name="org" value="{{ .OrgID }}">
         {{ if .LeaderID }}
         <input type="hidden" name="leader" value="{{ .LeaderID }}">

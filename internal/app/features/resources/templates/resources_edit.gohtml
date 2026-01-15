@@ -21,6 +21,7 @@
     {{ end }}
 
     <form method="post" action="/resources/{{ .ID }}/edit" enctype="multipart/form-data" class="space-y-3 max-w-2xl">
+      <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
       <input type="hidden" name="return" value="{{ .SubmitReturn }}">
 
       <div>
@@ -194,6 +195,7 @@
           Permanently delete this resource. This action cannot be undone.
         </p>
         <form method="post" action="/resources/{{ .ID }}/delete">
+          <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
           <input type="hidden" name="return" value="{{ .DeleteReturn }}">
           <button
             type="submit"

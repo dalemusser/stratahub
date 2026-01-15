@@ -16,6 +16,7 @@
   {{ end }}
 
   <form method="POST" action="/login" class="space-y-3 max-w-md">
+    <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
     <input type="hidden" name="return" value="{{ .ReturnURL }}">
     <!-- Login ID Field -->
     <div>

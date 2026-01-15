@@ -19,6 +19,7 @@
 {{ end }}
 
 <form method="post" action="/resources" enctype="multipart/form-data" class="space-y-3 max-w-2xl bg-white dark:bg-gray-800 p-4 rounded border dark:border-gray-700">
+  <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
   <input type="hidden" name="return" value="{{ .BackURL }}">
 
   <div>

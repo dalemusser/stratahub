@@ -4,6 +4,8 @@ package bootstrap
 import (
 	"net/http"
 
+	"github.com/gorilla/csrf"
+
 	activityfeature "github.com/dalemusser/stratahub/internal/app/features/activity"
 	auditlogfeature "github.com/dalemusser/stratahub/internal/app/features/auditlog"
 	authgooglefeature "github.com/dalemusser/stratahub/internal/app/features/authgoogle"
@@ -120,6 +122,32 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	// Global auth middleware: loads SessionUser into context if logged in.
 	// This makes the current user available to all handlers via auth.CurrentUser(r).
 	r.Use(sessionMgr.LoadSessionUser)
+
+	// CSRF protection: validates token on all POST/PUT/PATCH/DELETE requests.
+	// Token is injected into templates via BaseVM.CSRFToken.
+	// HTMX requests send token via X-CSRF-Token header.
+	csrfMiddleware := csrf.Protect(
+		[]byte(appCfg.CSRFKey),
+		csrf.Secure(secure),
+		csrf.Path("/"),
+		csrf.CookieName("csrf_token"),
+		csrf.FieldName("csrf_token"),
+		csrf.SameSite(csrf.SameSiteLaxMode),
+		csrf.ErrorHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			logger.Warn("CSRF validation failed",
+				zap.String("path", r.URL.Path),
+				zap.String("method", r.Method),
+				zap.String("reason", csrf.FailureReason(r).Error()),
+			)
+			if r.Header.Get("HX-Request") == "true" {
+				w.Header().Set("HX-Redirect", "/login")
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
+			http.Error(w, "CSRF token invalid or missing", http.StatusForbidden)
+		})),
+	)
+	r.Use(csrfMiddleware)
 
 	// Apex domain protection: redirect non-superadmins to their workspace domain.
 	// This prevents workspace users from accidentally accessing apex via shared cookies.
