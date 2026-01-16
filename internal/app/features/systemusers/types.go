@@ -111,11 +111,13 @@ type viewData struct {
 
 // Used by the Manage modal.
 type manageModalData struct {
-	ID       string
-	FullName string
-	LoginID  string
-	Role     string
-	Auth     string
-	Status   string
-	BackURL  string
+	ID        string
+	FullName  string
+	LoginID   string
+	Role      string
+	Auth      string
+	Status    string
+	BackURL   string
+	CSRFToken string
+	IsSelf    bool
 }

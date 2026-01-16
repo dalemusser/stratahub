@@ -15,12 +15,14 @@ type groupManageModalData struct {
 	OrganizationName string
 	BackURL          string
 	Role             string
+	CSRFToken        string
 }
 
 // groupListItem represents a single group row in the list.
 type groupListItem struct {
 	ID                     primitive.ObjectID
 	Name                   string
+	OrganizationID         primitive.ObjectID
 	OrganizationName       string
 	LeadersCount           int
 	MembersCount           int
@@ -48,13 +50,15 @@ type groupListData struct {
 	AllCount      int64
 
 	// Right table
-	Shown      int
-	Total      int64
-	HasPrev    bool
-	HasNext    bool
-	PrevCursor string
-	NextCursor string
-	Groups     []groupListItem
+	SelectedGroup     string // hex of selected group or empty
+	SelectedGroupName string
+	Shown             int
+	Total             int64
+	HasPrev           bool
+	HasNext           bool
+	PrevCursor        string
+	NextCursor        string
+	Groups            []groupListItem
 
 	// groups range + page-index starts
 	RangeStart int

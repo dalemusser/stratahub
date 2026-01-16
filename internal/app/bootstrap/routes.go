@@ -2,11 +2,13 @@
 package bootstrap
 
 import (
+	"context"
 	"net/http"
 
 	"github.com/gorilla/csrf"
 
 	activityfeature "github.com/dalemusser/stratahub/internal/app/features/activity"
+	announcementsfeature "github.com/dalemusser/stratahub/internal/app/features/announcements"
 	auditlogfeature "github.com/dalemusser/stratahub/internal/app/features/auditlog"
 	authgooglefeature "github.com/dalemusser/stratahub/internal/app/features/authgoogle"
 	dashboardfeature "github.com/dalemusser/stratahub/internal/app/features/dashboard"
@@ -32,6 +34,7 @@ import (
 	workspacesfeature "github.com/dalemusser/stratahub/internal/app/features/workspaces"
 	appresources "github.com/dalemusser/stratahub/internal/app/resources"
 	"github.com/dalemusser/stratahub/internal/app/store/activity"
+	announcementstore "github.com/dalemusser/stratahub/internal/app/store/announcement"
 	"github.com/dalemusser/stratahub/internal/app/store/audit"
 	"github.com/dalemusser/stratahub/internal/app/store/oauthstate"
 	"github.com/dalemusser/stratahub/internal/app/store/sessions"
@@ -93,6 +96,23 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	// Initialize viewdata with storage for logo URLs.
 	viewdata.Init(deps.FileStorage)
 
+	// Set up announcement loader for viewdata (loads active announcements for all pages)
+	annStore := announcementstore.New(deps.StrataHubMongoDatabase)
+	viewdata.SetAnnouncementLoader(func(ctx context.Context) []viewdata.AnnouncementVM {
+		active, _ := annStore.GetActive(ctx)
+		vms := make([]viewdata.AnnouncementVM, len(active))
+		for i, a := range active {
+			vms[i] = viewdata.AnnouncementVM{
+				ID:          a.ID.Hex(),
+				Title:       a.Title,
+				Content:     a.Content,
+				Type:        string(a.Type),
+				Dismissible: a.Dismissible,
+			}
+		}
+		return vms
+	})
+
 	// Create error logger for handlers.
 	errLog := errorsfeature.NewErrorLogger(logger)
 
@@ -126,8 +146,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	// CSRF protection: validates token on all POST/PUT/PATCH/DELETE requests.
 	// Token is injected into templates via BaseVM.CSRFToken.
 	// HTMX requests send token via X-CSRF-Token header.
-	csrfMiddleware := csrf.Protect(
-		[]byte(appCfg.CSRFKey),
+	csrfOpts := []csrf.Option{
 		csrf.Secure(secure),
 		csrf.Path("/"),
 		csrf.CookieName("csrf_token"),
@@ -146,7 +165,23 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 			}
 			http.Error(w, "CSRF token invalid or missing", http.StatusForbidden)
 		})),
-	)
+	}
+	// In multi-workspace mode, set CSRF cookie domain to match session domain.
+	// This ensures the CSRF cookie is shared across subdomains (e.g., mhs.adroit.games, adroit.games).
+	if appCfg.SessionDomain != "" {
+		csrfOpts = append(csrfOpts, csrf.Domain(appCfg.SessionDomain))
+	}
+	// In dev mode, trust localhost origins for CSRF validation.
+	// gorilla/csrf validates the Origin header's Host against TrustedOrigins (not the full URL).
+	if !secure {
+		csrfOpts = append(csrfOpts, csrf.TrustedOrigins([]string{
+			"localhost:8080",
+			"localhost:3000",
+			"127.0.0.1:8080",
+			"127.0.0.1:3000",
+		}))
+	}
+	csrfMiddleware := csrf.Protect([]byte(appCfg.CSRFKey), csrfOpts...)
 	r.Use(csrfMiddleware)
 
 	// Apex domain protection: redirect non-superadmins to their workspace domain.
@@ -264,6 +299,10 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		dashboardHandler := dashboardfeature.NewHandler(deps.StrataHubMongoDatabase, logger)
 		wsr.Mount("/dashboard", dashboardfeature.Routes(dashboardHandler, sessionMgr))
 
+		// Active sessions dashboard (admin only)
+		sessionsHandler := dashboardfeature.NewSessionsHandler(deps.StrataHubMongoDatabase, sessionsStore, logger)
+		wsr.Mount("/dashboard/sessions", dashboardfeature.SessionsRoutes(sessionsHandler, sessionMgr))
+
 		// Organization management
 		orgHandler := organizationsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, auditLogger, logger)
 		wsr.Mount("/organizations", organizationsfeature.Routes(orgHandler, sessionMgr))
@@ -294,7 +333,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		adminResHandler := resourcesfeature.NewAdminHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, auditLogger, logger)
 		wsr.Mount("/resources", resourcesfeature.AdminRoutes(adminResHandler, sessionMgr))
 
-		memberResHandler := resourcesfeature.NewMemberHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, activityStore, sessionMgr, logger)
+		memberResHandler := resourcesfeature.NewMemberHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, activityStore, sessionsStore, sessionMgr, logger)
 		wsr.Mount("/member/resources", resourcesfeature.MemberRoutes(memberResHandler, sessionMgr))
 
 		// Material management (admin and leader views)
@@ -318,6 +357,13 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		// Activity dashboard (for leaders to monitor student activity)
 		activityHandler := activityfeature.NewHandler(deps.StrataHubMongoDatabase, sessionsStore, activityStore, sessionMgr, errLog, logger)
 		wsr.Mount("/activity", activityfeature.Routes(activityHandler, sessionMgr))
+
+		// Announcements management (admin only)
+		announcementsHandler := announcementsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
+		wsr.Route("/announcements", func(sr chi.Router) {
+			sr.Use(sessionMgr.RequireRole("admin"))
+			announcementsHandler.MountRoutes(sr)
+		})
 	})
 
 	// Heartbeat API (for activity tracking - no workspace required for cross-domain tracking)

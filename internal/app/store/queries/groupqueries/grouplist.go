@@ -16,6 +16,7 @@ type GroupListItem struct {
 	ID              primitive.ObjectID `bson:"_id"`
 	Name            string             `bson:"name"`
 	NameCI          string             `bson:"name_ci"`
+	OrgID           primitive.ObjectID `bson:"organization_id"`
 	OrgName         string             `bson:"org_name"`
 	LeadersCount    int                `bson:"leaders_count"`
 	MembersCount    int                `bson:"members_count"`
@@ -111,9 +112,10 @@ func ListGroupsWithCounts(
 	// Project final fields - compute counts using $size and $filter
 	pipe = append(pipe,
 		bson.D{{Key: "$project", Value: bson.M{
-			"_id":     1,
-			"name":    1,
-			"name_ci": 1,
+			"_id":             1,
+			"name":            1,
+			"name_ci":         1,
+			"organization_id": 1,
 			"org_name": bson.M{"$ifNull": []interface{}{
 				bson.M{"$arrayElemAt": []interface{}{"$org.name", 0}},
 				"",

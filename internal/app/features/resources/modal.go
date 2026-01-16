@@ -11,6 +11,7 @@ import (
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -76,6 +77,7 @@ func (h *AdminHandler) ServeManageModal(w http.ResponseWriter, r *http.Request) 
 		Description:   row.Description,
 		BackURL:       back,
 		CanEdit:       authz.CanManageResources(r),
+		CSRFToken:     csrf.Token(r),
 	}
 
 	templates.RenderSnippet(w, "resource_manage_modal", vm)

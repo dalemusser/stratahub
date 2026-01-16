@@ -82,4 +82,5 @@ type manageModalData struct {
 	Subdomain string
 	Status    string
 	Domain    string // Primary domain for building workspace URLs
+	CSRFToken string
 }

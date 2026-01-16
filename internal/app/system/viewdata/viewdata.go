@@ -19,6 +19,15 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
+// AnnouncementVM represents an announcement for display in templates.
+type AnnouncementVM struct {
+	ID          string
+	Title       string
+	Content     string
+	Type        string // info, warning, critical
+	Dismissible bool
+}
+
 // BaseVM contains common fields for all view models.
 // Embed this struct in your feature-specific view models.
 //
@@ -55,15 +64,30 @@ type BaseVM struct {
 
 	// CSRF protection
 	CSRFToken string // Token for form submission
+
+	// Announcements for banner display
+	Announcements []AnnouncementVM
 }
 
 // storageProvider is set by Init and used to generate logo URLs.
 var storageProvider storage.Store
 
+// AnnouncementLoader is a function that loads active announcements.
+// This is set by bootstrap to avoid circular dependencies.
+type AnnouncementLoader func(ctx context.Context) []AnnouncementVM
+
+var announcementLoader AnnouncementLoader
+
 // Init sets the storage provider for generating logo URLs.
 // Call this once at startup from bootstrap.
 func Init(store storage.Store) {
 	storageProvider = store
+}
+
+// SetAnnouncementLoader sets the function used to load active announcements.
+// Call this once at startup from bootstrap after the announcement store is available.
+func SetAnnouncementLoader(loader AnnouncementLoader) {
+	announcementLoader = loader
 }
 
 // NewBaseVM creates a fully populated BaseVM for a page.
@@ -122,6 +146,11 @@ func NewBaseVM(r *http.Request, db *mongo.Database, title, backDefault string) B
 				}
 			}
 		}
+	}
+
+	// Load active announcements if loader is configured
+	if announcementLoader != nil {
+		vm.Announcements = announcementLoader(r.Context())
 	}
 
 	return vm

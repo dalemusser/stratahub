@@ -9,7 +9,7 @@
      title="Go back">
     <- Back
   </a>
-  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📎 Edit Assignment</h1>
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📎 Edit Material Assignment</h1>
 </div>
 
 {{ if .Error }}
@@ -25,7 +25,7 @@
   <div>
     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Material</label>
     <div class="w-full border dark:border-gray-600 p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm flex items-center justify-between">
-      <a href="/materials/{{ .MaterialID }}/view" class="text-indigo-600 hover:underline">{{ .MaterialTitle }}</a>
+      <a href="/materials/{{ .MaterialID }}/view" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ .MaterialTitle }}</a>
       {{ if .HasFile }}
         <a href="/materials/{{ .MaterialID }}/download" target="_blank"
            class="ml-2 px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700 whitespace-nowrap">
@@ -115,6 +115,25 @@
     </button>
   </div>
 </form>
+
+<!-- Danger Zone -->
+<div class="max-w-2xl mt-4">
+  <div class="p-4 border border-red-300 dark:border-red-700 rounded bg-red-50 dark:bg-red-900/20">
+    <h3 class="text-sm font-semibold text-red-800 dark:text-red-300 mb-2">Danger Zone</h3>
+    <p class="text-xs text-red-700 dark:text-red-400 mb-3">
+      Permanently delete this material assignment. This action cannot be undone.
+    </p>
+    <form method="post" action="/materials/assignments/{{ .ID }}/delete">
+      <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+      <input type="hidden" name="return" value="{{ .BackURL }}">
+      <button type="submit"
+              class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
+              onclick="return confirm('Delete this material assignment? This action cannot be undone.');">
+        Delete Assignment
+      </button>
+    </form>
+  </div>
+</div>
 
 <script src="/assets/js/tiptap.min.js"></script>
 <script>

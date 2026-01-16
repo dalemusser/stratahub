@@ -38,6 +38,7 @@ type listData struct {
 	EventType string
 	StartDate string
 	EndDate   string
+	Timezone  string
 
 	// Filter options
 	Categories []categoryOption

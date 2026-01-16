@@ -17,6 +17,7 @@ import (
 	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -24,11 +25,12 @@ import (
 
 // leaderManageModalData is the view model for the HTMX leader manage modal.
 type leaderManageModalData struct {
-	LeaderID string
-	FullName string
-	LoginID  string
-	OrgName  string
-	BackURL  string
+	LeaderID  string
+	FullName  string
+	LoginID   string
+	OrgName   string
+	BackURL   string
+	CSRFToken string
 }
 
 // ServeLeaderManageModal renders the HTMX modal to manage a single leader
@@ -86,11 +88,12 @@ func (h *Handler) ServeLeaderManageModal(w http.ResponseWriter, r *http.Request)
 		loginID = *usr.LoginID
 	}
 	data := leaderManageModalData{
-		LeaderID: uid.Hex(),
-		FullName: usr.FullName,
-		LoginID:  strings.ToLower(loginID),
-		OrgName:  orgName,
-		BackURL:  back,
+		LeaderID:  uid.Hex(),
+		FullName:  usr.FullName,
+		LoginID:   strings.ToLower(loginID),
+		OrgName:   orgName,
+		BackURL:   back,
+		CSRFToken: csrf.Token(r),
 	}
 
 	templates.RenderSnippet(w, "admin_leader_manage_modal", data)

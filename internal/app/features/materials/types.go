@@ -56,7 +56,8 @@ type manageModalData struct {
 	FileName    string
 	Description string
 	BackURL     string
-	CanEdit     bool // True for admin; false for coordinator (view-only)
+	CanEdit     bool   // True for admin; false for coordinator (view-only)
+	CSRFToken   string
 }
 
 // MaterialTypeOption is used to populate the material type select menu.
@@ -259,6 +260,7 @@ type assignmentManageModalData struct {
 	VisibleUntil  string
 	Directions    string
 	BackURL       string
+	CSRFToken     string
 }
 
 // assignmentViewData is the view-model for viewing an assignment.

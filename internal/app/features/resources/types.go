@@ -65,7 +65,8 @@ type manageModalData struct {
 	ShowInLibrary bool
 	Description   string
 	BackURL       string
-	CanEdit       bool // True for admin; false for coordinator (view-only)
+	CanEdit       bool   // True for admin; false for coordinator (view-only)
+	CSRFToken     string
 }
 
 // ResourceTypeOption is used to populate the resource type select menu.

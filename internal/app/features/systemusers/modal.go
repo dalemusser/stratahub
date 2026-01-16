@@ -15,6 +15,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
@@ -25,7 +26,7 @@ import (
 // (system_user_manage_modal).
 func (h *Handler) ServeManageModal(w http.ResponseWriter, r *http.Request) {
 	// Only admins can manage system users.
-	_, _, _, ok := userContext(r)
+	_, _, currentUserID, ok := userContext(r)
 	if !ok {
 		return
 	}
@@ -56,13 +57,15 @@ func (h *Handler) ServeManageModal(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := manageModalData{
-		ID:       idHex,
-		FullName: u.FullName,
-		LoginID:  loginID,
-		Role:     normalize.Role(u.Role),
-		Auth:     normalize.AuthMethod(u.AuthMethod),
-		Status:   normalize.Status(u.Status),
-		BackURL:  back,
+		ID:        idHex,
+		FullName:  u.FullName,
+		LoginID:   loginID,
+		Role:      normalize.Role(u.Role),
+		Auth:      normalize.AuthMethod(u.AuthMethod),
+		Status:    normalize.Status(u.Status),
+		BackURL:   back,
+		CSRFToken: csrf.Token(r),
+		IsSelf:    currentUserID == uid,
 	}
 
 	templates.RenderSnippet(w, "system_user_manage_modal", data)

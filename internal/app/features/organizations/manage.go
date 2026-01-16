@@ -12,6 +12,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -54,10 +55,11 @@ func (h *Handler) ServeManageModal(w http.ResponseWriter, r *http.Request) {
 	back := navigation.SafeBackURL(r, navigation.OrganizationsBackURL)
 
 	data := orgManageModalData{
-		ID:      org.ID.Hex(),
-		Name:    org.Name,
-		BackURL: back,
-		Role:    role,
+		ID:        org.ID.Hex(),
+		Name:      org.Name,
+		BackURL:   back,
+		Role:      role,
+		CSRFToken: csrf.Token(r),
 	}
 
 	// Snippet is defined as {{ define "organization_manage_modal" }} ...
