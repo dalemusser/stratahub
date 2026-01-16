@@ -9,7 +9,6 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/store/sessions"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/auditlog"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 )
 
@@ -45,16 +44,14 @@ func (h *Handler) ServeLogout(w http.ResponseWriter, r *http.Request) {
 		h.Log.Warn("session decode failed during logout", zap.Error(err))
 	}
 
-	// Close activity session if one exists
+	// Close activity session if one exists (using token-based lookup)
 	if h.Sessions != nil {
-		if activitySessionID, ok := session.Values["activity_session_id"].(string); ok && activitySessionID != "" {
-			if oid, err := primitive.ObjectIDFromHex(activitySessionID); err == nil {
-				ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
-				if err := h.Sessions.Close(ctx, oid, "logout"); err != nil {
-					h.Log.Warn("failed to close activity session", zap.Error(err), zap.String("session_id", activitySessionID))
-				}
-				cancel()
+		if sessionToken, ok := session.Values["session_token"].(string); ok && sessionToken != "" {
+			ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+			if err := h.Sessions.Close(ctx, sessionToken, sessions.EndReasonLogout); err != nil {
+				h.Log.Warn("failed to close activity session", zap.Error(err))
 			}
+			cancel()
 		}
 	}
 

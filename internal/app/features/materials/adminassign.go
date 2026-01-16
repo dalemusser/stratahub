@@ -31,6 +31,7 @@ import (
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/dalemusser/waffle/pantry/text"
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -1081,6 +1082,7 @@ func (h *AdminHandler) ServeAssignmentManageModal(w http.ResponseWriter, r *http
 		TargetName:    targetName,
 		TargetType:    targetType,
 		BackURL:       httpnav.ResolveBackURL(r, "/materials/assignments"),
+		CSRFToken:     csrf.Token(r),
 	}
 
 	if assignment.VisibleFrom != nil {

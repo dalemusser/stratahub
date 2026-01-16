@@ -21,6 +21,7 @@ import (
 	"github.com/dalemusser/waffle/pantry/query"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
@@ -249,11 +250,12 @@ func (h *Handler) ServeManageMemberModal(w http.ResponseWriter, r *http.Request)
 	}
 
 	data := memberManageModalData{
-		MemberID: u.ID.Hex(),
-		FullName: u.FullName,
-		LoginID:  loginID,
-		OrgName:  orgName,
-		BackURL:  back,
+		MemberID:  u.ID.Hex(),
+		FullName:  u.FullName,
+		LoginID:   loginID,
+		OrgName:   orgName,
+		BackURL:   back,
+		CSRFToken: csrf.Token(r),
 	}
 
 	// Render the modal snippet

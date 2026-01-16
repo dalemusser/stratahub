@@ -22,6 +22,7 @@ import (
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -74,7 +75,8 @@ func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
 	db := h.DB
 
 	// --- read query params ---
-	selectedOrg := normalize.QueryParam(r.URL.Query().Get("org")) // "all" or org hex
+	selectedOrg := normalize.QueryParam(r.URL.Query().Get("org"))     // "all" or org hex
+	selectedGroup := normalize.QueryParam(r.URL.Query().Get("group")) // group hex or empty
 	orgQ := normalize.QueryParam(r.URL.Query().Get("org_q"))
 	orgAfter := normalize.QueryParam(r.URL.Query().Get("org_after"))
 	orgBefore := normalize.QueryParam(r.URL.Query().Get("org_before"))
@@ -176,6 +178,47 @@ func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
 
 	rng := paging.ComputeRange(start, shown)
 
+	// Validate selected group exists in the current results and get its name
+	selectedGroupName := ""
+	if selectedGroup != "" {
+		found := false
+		for _, g := range groups {
+			if g.ID.Hex() == selectedGroup {
+				selectedGroupName = g.Name
+				found = true
+				break
+			}
+		}
+		// If the selected group isn't in the current page, try to look it up
+		if !found {
+			if gid, err := primitive.ObjectIDFromHex(selectedGroup); err == nil {
+				var g struct {
+					Name           string             `bson:"name"`
+					OrganizationID primitive.ObjectID `bson:"organization_id"`
+				}
+				filter := bson.M{"_id": gid}
+				workspace.Filter(r, filter)
+				if err := db.Collection("groups").FindOne(ctx, filter).Decode(&g); err == nil {
+					selectedGroupName = g.Name
+					// If an org is selected, verify the group belongs to it
+					if selectedOrg != "" && selectedOrg != "all" {
+						if g.OrganizationID.Hex() != selectedOrg {
+							// Group doesn't belong to selected org, clear selection
+							selectedGroup = ""
+							selectedGroupName = ""
+						}
+					}
+				} else {
+					// Group not found, clear selection
+					selectedGroup = ""
+				}
+			} else {
+				// Invalid group ID format
+				selectedGroup = ""
+			}
+		}
+	}
+
 	data := groupListData{
 		BaseVM: viewdata.NewBaseVM(r, h.DB, "Groups", "/groups"),
 
@@ -193,14 +236,16 @@ func (h *Handler) ServeGroupsList(w http.ResponseWriter, r *http.Request) {
 		OrgRows:       orgPane.Rows,
 		AllCount:      orgPane.AllCount,
 
-		SearchQuery: search,
-		Shown:       shown,
-		Total:       total,
-		HasPrev:     hasPrev,
-		HasNext:     hasNext,
-		PrevCursor:  prevCur,
-		NextCursor:  nextCur,
-		Groups:      groups,
+		SearchQuery:       search,
+		SelectedGroup:     selectedGroup,
+		SelectedGroupName: selectedGroupName,
+		Shown:             shown,
+		Total:             total,
+		HasPrev:           hasPrev,
+		HasNext:           hasNext,
+		PrevCursor:        prevCur,
+		NextCursor:        nextCur,
+		Groups:            groups,
 
 		RangeStart: rng.Start,
 		RangeEnd:   rng.End,
@@ -275,6 +320,7 @@ func (h *Handler) fetchGroupsList(
 		rows = append(rows, groupListItem{
 			ID:                     g.ID,
 			Name:                   g.Name,
+			OrganizationID:         g.OrgID,
 			OrganizationName:       g.OrgName,
 			LeadersCount:           g.LeadersCount,
 			MembersCount:           g.MembersCount,
@@ -366,6 +412,7 @@ func (h *Handler) ServeGroupManageModal(w http.ResponseWriter, r *http.Request) 
 		OrganizationName: orgName,
 		BackURL:          back,
 		Role:             role,
+		CSRFToken:        csrf.Token(r),
 	}
 
 	templates.RenderSnippet(w, "group_manage_group_modal", data)

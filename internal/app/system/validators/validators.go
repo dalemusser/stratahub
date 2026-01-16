@@ -167,8 +167,8 @@ func usersSchema() bson.M {
 			"properties": bson.M{
 				"full_name":    bson.M{"bsonType": "string", "minLength": 1, "pattern": ".*\\S.*"},
 				"full_name_ci": bson.M{"bsonType": "string", "minLength": 1, "pattern": ".*\\S.*"},
-				"login_id":       bson.M{"bsonType": "string"},
-				"login_id_ci":    bson.M{"bsonType": "string"},
+				"login_id":       bson.M{"bsonType": bson.A{"string", "null"}},
+				"login_id_ci":    bson.M{"bsonType": bson.A{"string", "null"}},
 				"auth_return_id": bson.M{"bsonType": bson.A{"string", "null"}},
 				"email":          bson.M{"bsonType": bson.A{"string", "null"}},
 				"role":           bson.M{"enum": bson.A{"superadmin", "admin", "analyst", "coordinator", "leader", "member", "guest"}},

@@ -444,17 +444,33 @@ func (h *Handler) createSessionAndRedirect(w http.ResponseWriter, r *http.Reques
 		loginID = *u.LoginID
 	}
 
-	// Create activity session for tracking
+	// Create activity session for tracking (with token-based identification)
 	if h.Sessions != nil {
-		ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
-		defer cancel()
-
-		ip := extractIP(r)
-		activitySess, err := h.Sessions.Create(ctx, u.ID, u.OrganizationID, ip, r.UserAgent(), sessions.CreatedByLogin)
-		if err != nil {
-			h.Log.Warn("failed to create activity session", zap.Error(err), zap.String("user_id", u.ID.Hex()))
+		token, tokenErr := auth.GenerateSessionToken()
+		if tokenErr != nil {
+			h.Log.Warn("failed to generate session token", zap.Error(tokenErr), zap.String("user_id", u.ID.Hex()))
 		} else {
-			sess.Values["activity_session_id"] = activitySess.ID.Hex()
+			ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
+			defer cancel()
+
+			now := time.Now()
+			activitySess := sessions.Session{
+				Token:          token,
+				UserID:         u.ID,
+				OrganizationID: u.OrganizationID,
+				IP:             extractIP(r),
+				UserAgent:      r.UserAgent(),
+				LoginAt:        now,
+				LastActivity:   now,
+				CreatedBy:      sessions.CreatedByLogin,
+				ExpiresAt:      now.Add(24 * 30 * time.Hour), // 30 days
+			}
+			if err := h.Sessions.Create(ctx, activitySess); err != nil {
+				h.Log.Warn("failed to create activity session", zap.Error(err), zap.String("user_id", u.ID.Hex()))
+			} else {
+				// Store session token in cookie for later lookup
+				sess.Values["session_token"] = token
+			}
 		}
 	}
 

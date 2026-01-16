@@ -73,7 +73,7 @@ func (w *SessionCleanup) cleanup() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	count, err := w.sessions.CloseInactiveSessionsSimple(ctx, w.inactiveThreshold)
+	count, err := w.sessions.CloseInactiveSessions(ctx, w.inactiveThreshold)
 	if err != nil {
 		w.log.Error("failed to close inactive sessions", zap.Error(err))
 		return

@@ -17,6 +17,7 @@ import (
 	"github.com/dalemusser/waffle/pantry/storage"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 )
@@ -120,6 +121,7 @@ func (h *AdminHandler) ServeManageModal(w http.ResponseWriter, r *http.Request) 
 		Description: mat.Description,
 		BackURL:     httpnav.ResolveBackURL(r, "/materials"),
 		CanEdit:     canEdit,
+		CSRFToken:   csrf.Token(r),
 	}
 
 	templates.RenderSnippet(w, "material_manage_modal", data)

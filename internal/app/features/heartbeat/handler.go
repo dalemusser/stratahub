@@ -43,25 +43,20 @@ type heartbeatRequest struct {
 }
 
 // ServeHeartbeat handles POST /api/heartbeat.
-// Updates the LastActiveAt timestamp for the user's current session.
+// Updates the LastActivity timestamp for the user's current session.
 // If the session was closed due to inactivity, creates a new one.
+// Returns 401 if the session has been terminated by an admin.
 func (h *Handler) ServeHeartbeat(w http.ResponseWriter, r *http.Request) {
-	// Get activity session ID from the session cookie
+	// Get session token from the cookie
 	sess, err := h.SessionMgr.GetSession(r)
 	if err != nil {
 		w.WriteHeader(http.StatusOK) // Silent fail - invalid session
 		return
 	}
 
-	activitySessionID, ok := sess.Values["activity_session_id"].(string)
-	if !ok || activitySessionID == "" {
-		w.WriteHeader(http.StatusOK) // Silent fail - no activity session
-		return
-	}
-
-	oid, err := primitive.ObjectIDFromHex(activitySessionID)
-	if err != nil {
-		w.WriteHeader(http.StatusOK) // Silent fail - invalid ID
+	sessionToken, ok := sess.Values["session_token"].(string)
+	if !ok || sessionToken == "" {
+		w.WriteHeader(http.StatusOK) // Silent fail - no session token
 		return
 	}
 
@@ -71,15 +66,24 @@ func (h *Handler) ServeHeartbeat(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewDecoder(r.Body).Decode(&req) // Ignore error, page is optional
 	}
 
-	// Update last active time and current page
+	// Check if the session is still valid (not terminated by admin)
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 
-	result, err := h.Sessions.UpdateLastActive(ctx, oid, req.Page)
+	dbSession, err := h.Sessions.GetByToken(ctx, sessionToken)
+	if err != nil || dbSession == nil {
+		// Session was terminated or doesn't exist - tell client to logout
+		w.WriteHeader(http.StatusUnauthorized)
+		return
+	}
+
+	// Update last activity time and current page (using token-based lookup)
+
+	result, err := h.Sessions.UpdateCurrentPage(ctx, sessionToken, req.Page)
 	if err != nil {
-		h.Log.Warn("failed to update session last_active_at",
+		h.Log.Warn("failed to update session activity",
 			zap.Error(err),
-			zap.String("session_id", activitySessionID))
+			zap.String("page", req.Page))
 		w.WriteHeader(http.StatusOK)
 		return
 	}
@@ -95,7 +99,13 @@ func (h *Handler) ServeHeartbeat(w http.ResponseWriter, r *http.Request) {
 					orgOID = &oid
 				}
 			}
-			if err := h.Activity.RecordPageView(ctx, userOID, oid, orgOID, req.Page); err != nil {
+			// Look up session to get its ID for activity recording
+			sessionDoc, _ := h.Sessions.GetByToken(ctx, sessionToken)
+			var sessionOID primitive.ObjectID
+			if sessionDoc != nil {
+				sessionOID = sessionDoc.ID
+			}
+			if err := h.Activity.RecordPageView(ctx, userOID, sessionOID, orgOID, req.Page); err != nil {
 				h.Log.Warn("failed to record page view",
 					zap.Error(err),
 					zap.String("page", req.Page))
@@ -125,10 +135,30 @@ func (h *Handler) ServeHeartbeat(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 
+		// Generate new session token
+		newToken, tokenErr := auth.GenerateSessionToken()
+		if tokenErr != nil {
+			h.Log.Warn("failed to generate session token",
+				zap.Error(tokenErr),
+				zap.String("user_id", userIDStr))
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
 		// Create new activity session
-		ip := ratelimit.ClientIP(r)
-		newSess, err := h.Sessions.Create(ctx, userOID, orgOID, ip, r.UserAgent(), sessions.CreatedByHeartbeat)
-		if err != nil {
+		now := time.Now()
+		newSess := sessions.Session{
+			Token:          newToken,
+			UserID:         userOID,
+			OrganizationID: orgOID,
+			IP:             ratelimit.ClientIP(r),
+			UserAgent:      r.UserAgent(),
+			LoginAt:        now,
+			LastActivity:   now,
+			CreatedBy:      sessions.CreatedByHeartbeat,
+			ExpiresAt:      now.Add(24 * 30 * time.Hour), // 30 days
+		}
+		if err := h.Sessions.Create(ctx, newSess); err != nil {
 			h.Log.Warn("failed to create new activity session after timeout",
 				zap.Error(err),
 				zap.String("user_id", userIDStr))
@@ -136,16 +166,15 @@ func (h *Handler) ServeHeartbeat(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// Update cookie with new session ID
-		sess.Values["activity_session_id"] = newSess.ID.Hex()
+		// Update cookie with new session token
+		sess.Values["session_token"] = newToken
 		if err := sess.Save(r, w); err != nil {
-			h.Log.Warn("failed to save session with new activity_session_id",
+			h.Log.Warn("failed to save session with new session_token",
 				zap.Error(err))
 		}
 
 		h.Log.Info("created new activity session after inactivity timeout",
-			zap.String("user_id", userIDStr),
-			zap.String("new_session_id", newSess.ID.Hex()))
+			zap.String("user_id", userIDStr))
 	}
 
 	w.WriteHeader(http.StatusOK)

@@ -6,6 +6,8 @@ package auth
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/base64"
 	"net/http"
 	"net/url"
 	"strings"
@@ -32,12 +34,13 @@ const (
 *─────────────────────────────────────────────────────────────────────────────*/
 
 const (
-	isAuthKey    = "is_authenticated"
-	userIDKey    = "user_id"
-	userName     = "user_name"
-	userLoginID  = "user_login_id"
-	userRole     = "user_role"
-	userOrgID    = "organization_id"
+	isAuthKey       = "is_authenticated"
+	userIDKey       = "user_id"
+	userName        = "user_name"
+	userLoginID     = "user_login_id"
+	userRole        = "user_role"
+	userOrgID       = "organization_id"
+	sessionTokenKey = "session_token"
 )
 
 /*─────────────────────────────────────────────────────────────────────────────*
@@ -189,6 +192,24 @@ type SessionUser struct {
 	WorkspaceID  string   // User's primary workspace (empty for superadmin)
 	WorkspaceIDs []string // All workspaces user has access to
 	IsSuperAdmin bool     // Quick check for superadmin role
+
+	// Session token for MongoDB session tracking
+	Token string
+}
+
+// SessionToken returns the session token for this user.
+func (u *SessionUser) SessionToken() string {
+	return u.Token
+}
+
+// GenerateSessionToken generates a cryptographically secure session token.
+// The token is 32 random bytes encoded as URL-safe base64 (43 chars).
+func GenerateSessionToken() (string, error) {
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		return "", err
+	}
+	return base64.URLEncoding.EncodeToString(b), nil
 }
 
 type ctxKey string
@@ -255,6 +276,8 @@ func (sm *SessionManager) LoadSessionUser(next http.Handler) http.Handler {
 				u := sm.userFetcher.FetchUser(r.Context(), userID)
 				if u != nil {
 					// User exists and is active - inject into context
+					// Also extract session token for MongoDB session tracking
+					u.Token = getString(sess, sessionTokenKey)
 					r = withUser(r, u)
 				} else {
 					// User not found, disabled, or deleted - clear session
@@ -273,6 +296,7 @@ func (sm *SessionManager) LoadSessionUser(next http.Handler) http.Handler {
 					LoginID:        getString(sess, userLoginID),
 					Role:           getString(sess, userRole),
 					OrganizationID: getString(sess, userOrgID),
+					Token:          getString(sess, sessionTokenKey),
 				}
 				r = withUser(r, u)
 			}

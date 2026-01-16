@@ -162,25 +162,24 @@
 
     {{ if eq .Role "admin" }}
     <!-- Danger Zone -->
-    <div class="p-3 border border-red-300 dark:border-red-700 rounded bg-red-50 dark:bg-red-900/20">
-      <div class="flex items-center justify-between gap-4">
-        <div>
-          <div class="text-sm font-semibold text-red-800 dark:text-red-300">Danger Zone</div>
-          <p class="text-xs text-red-700 dark:text-red-400">Permanently delete this organization.</p>
-        </div>
-        <form
-          method="post"
-          action="/organizations/{{ .ID }}/delete"
-          onsubmit="return confirm('Are you sure you want to delete this organization? This cannot be undone.');"
+    <div class="p-4 border border-red-300 dark:border-red-700 rounded bg-red-50 dark:bg-red-900/20">
+      <h3 class="text-sm font-semibold text-red-800 dark:text-red-300 mb-2">Danger Zone</h3>
+      <p class="text-xs text-red-700 dark:text-red-400 mb-3">
+        Permanently delete this organization. This action cannot be undone.
+      </p>
+      <form
+        method="post"
+        action="/organizations/{{ .ID }}/delete"
+        onsubmit="return confirm('Are you sure you want to delete this organization? This cannot be undone.');"
+      >
+        <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+        <button
+          type="submit"
+          class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
         >
-          <button
-            type="submit"
-            class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700"
-          >
-            Delete
-          </button>
-        </form>
-      </div>
+          Delete Organization
+        </button>
+      </form>
     </div>
     {{ end }}
 

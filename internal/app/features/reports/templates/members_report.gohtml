@@ -129,10 +129,10 @@
           </div>
         </form>
 
-        <!-- Filename + Download form (non-HTMX) -->
+        <!-- Filename + Download form (non-HTMX, no-loader prevents spinner on file download) -->
         <form
           action="/reports/members.csv" method="GET"
-          class="grid grid-cols-[1fr_max-content] gap-1 sm:col-span-2 lg:col-span-2 lg:items-end"
+          class="no-loader grid grid-cols-[1fr_max-content] gap-1 sm:col-span-2 lg:col-span-2 lg:items-end"
         >
           <input type="hidden" name="org" value="{{ .SelectedOrg }}">
           <input type="hidden" name="group" value="{{ .SelectedGroup }}">

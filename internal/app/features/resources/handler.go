@@ -4,6 +4,7 @@ package resources
 import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/store/activity"
+	"github.com/dalemusser/stratahub/internal/app/store/sessions"
 	"github.com/dalemusser/stratahub/internal/app/system/auditlog"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/waffle/pantry/storage"
@@ -35,6 +36,7 @@ type MemberHandler struct {
 	Log        *zap.Logger
 	ErrLog     *uierrors.ErrorLogger
 	Activity   *activity.Store
+	Sessions   *sessions.Store
 	SessionMgr *auth.SessionManager
 }
 
@@ -51,14 +53,15 @@ func NewAdminHandler(db *mongo.Database, store storage.Store, errLog *uierrors.E
 }
 
 // NewMemberHandler constructs a MemberHandler bound to the
-// given Mongo database, file storage, activity store, session manager, and logger.
-func NewMemberHandler(db *mongo.Database, store storage.Store, errLog *uierrors.ErrorLogger, activityStore *activity.Store, sessionMgr *auth.SessionManager, logger *zap.Logger) *MemberHandler {
+// given Mongo database, file storage, activity store, sessions store, session manager, and logger.
+func NewMemberHandler(db *mongo.Database, store storage.Store, errLog *uierrors.ErrorLogger, activityStore *activity.Store, sessStore *sessions.Store, sessionMgr *auth.SessionManager, logger *zap.Logger) *MemberHandler {
 	return &MemberHandler{
 		DB:         db,
 		Storage:    store,
 		Log:        logger,
 		ErrLog:     errLog,
 		Activity:   activityStore,
+		Sessions:   sessStore,
 		SessionMgr: sessionMgr,
 	}
 }

@@ -14,6 +14,7 @@ import (
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/dalemusser/waffle/pantry/text"
 	"github.com/go-chi/chi/v5"
+	"github.com/gorilla/csrf"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -231,6 +232,7 @@ func (h *Handler) ServeManageModal(w http.ResponseWriter, r *http.Request) {
 		Subdomain: ws.Subdomain,
 		Status:    ws.Status,
 		Domain:    h.PrimaryDomain,
+		CSRFToken: csrf.Token(r),
 	}
 
 	templates.RenderSnippet(w, "workspace_manage_modal", data)

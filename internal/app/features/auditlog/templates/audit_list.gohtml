@@ -22,13 +22,15 @@
 
   <!-- Filter Controls -->
   <form
+    id="audit-filter-form"
     hx-get="/audit"
     hx-target="#content"
     hx-swap="innerHTML"
     hx-push-url="true"
-    hx-trigger="submit, change from:#audit-category, change from:#audit-event-type"
+    hx-trigger="change from:#audit-category, change from:#audit-event-type, change from:#audit-start-date, change from:#audit-end-date, change from:#tz-select"
     class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-2 flex flex-wrap items-center gap-2"
   >
+    <input type="hidden" id="audit-tz" name="tz" value="{{ .Timezone }}" />
     <select id="audit-category" name="category" class="px-3 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400">
       <option value="" {{ if not .Category }}selected{{ end }}>All Categories</option>
       {{ range .Categories }}
@@ -45,6 +47,7 @@
 
     <input
       type="date"
+      id="audit-start-date"
       name="start_date"
       value="{{ .StartDate }}"
       placeholder="Start date"
@@ -53,15 +56,12 @@
 
     <input
       type="date"
+      id="audit-end-date"
       name="end_date"
       value="{{ .EndDate }}"
       placeholder="End date"
       class="px-3 py-2 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
     />
-
-    <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
-      Filter
-    </button>
 
     <a
       href="/audit"
@@ -82,16 +82,16 @@
       <div class="flex items-center gap-2">
         {{ if .HasPrev }}
           <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
-             href="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&page={{ .PrevPage }}"
-             hx-get="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&page={{ .PrevPage }}"
+             href="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&tz={{ .Timezone }}&page={{ .PrevPage }}"
+             hx-get="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&tz={{ .Timezone }}&page={{ .PrevPage }}"
              hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Prev</a>
         {{ else }}
           <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
         {{ end }}
         {{ if .HasNext }}
           <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
-             href="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&page={{ .NextPage }}"
-             hx-get="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&page={{ .NextPage }}"
+             href="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&tz={{ .Timezone }}&page={{ .NextPage }}"
+             hx-get="/audit?category={{ .Category }}&event_type={{ .EventType }}&start_date={{ .StartDate }}&end_date={{ .EndDate }}&tz={{ .Timezone }}&page={{ .NextPage }}"
              hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Next</a>
         {{ else }}
           <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
@@ -180,6 +180,7 @@
 <script>
 (function() {
     var tzSelect = document.getElementById('tz-select');
+    var tzHidden = document.getElementById('audit-tz');
     if (!tzSelect) return;
 
     var STORAGE_KEY = 'audit_log_timezone';
@@ -213,9 +214,18 @@
         return 'UTC';
     }
 
-    // Set initial selection
-    var selectedTz = findTimezoneOption(currentTz);
+    // Sync hidden input with select
+    function syncHiddenInput(tz) {
+        if (tzHidden) {
+            tzHidden.value = tz;
+        }
+    }
+
+    // Set initial selection (use URL param if present, else stored/browser)
+    var urlTz = tzHidden ? tzHidden.value : '';
+    var selectedTz = urlTz || findTimezoneOption(currentTz);
     tzSelect.value = selectedTz;
+    syncHiddenInput(selectedTz);
 
     // Format all timestamps
     function formatTimestamps(tz) {
@@ -254,10 +264,12 @@
     // Initial format
     formatTimestamps(selectedTz);
 
-    // Handle timezone change
+    // Handle timezone change - sync hidden input and save to localStorage
+    // The form will auto-submit due to hx-trigger on #tz-select change
     tzSelect.addEventListener('change', function() {
         var tz = tzSelect.value;
         localStorage.setItem(STORAGE_KEY, tz);
+        syncHiddenInput(tz);
         formatTimestamps(tz);
     });
 
@@ -265,10 +277,14 @@
     document.body.addEventListener('htmx:afterSwap', function(evt) {
         if (evt.detail.target.id === 'content') {
             var newTzSelect = document.getElementById('tz-select');
+            var newTzHidden = document.getElementById('audit-tz');
             if (newTzSelect) {
-                var tz = localStorage.getItem(STORAGE_KEY) || browserTz;
+                // Use URL param if present, else stored/browser
+                var urlTz = newTzHidden ? newTzHidden.value : '';
+                var tz = urlTz || localStorage.getItem(STORAGE_KEY) || browserTz;
                 var selected = findTimezoneOption(tz);
                 newTzSelect.value = selected;
+                if (newTzHidden) newTzHidden.value = selected;
                 formatTimestamps(selected);
             }
         }

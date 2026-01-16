@@ -184,11 +184,12 @@ type uploadPreviewRow struct {
 
 // memberManageModalData is used to render the Manage Member modal.
 type memberManageModalData struct {
-	MemberID string
-	FullName string
-	LoginID  string
-	OrgName  string
-	BackURL  string
+	MemberID  string
+	FullName  string
+	LoginID   string
+	OrgName   string
+	BackURL   string
+	CSRFToken string
 }
 
 // orgPaneData holds all the data needed to render the org pane.

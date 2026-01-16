@@ -28,23 +28,27 @@ import (
 )
 
 // getActivitySessionID extracts the activity session ID from the user's session cookie.
+// Uses token-based lookup to get the session's MongoDB ObjectID.
 func (h *MemberHandler) getActivitySessionID(r *http.Request) primitive.ObjectID {
-	if h.SessionMgr == nil {
+	if h.SessionMgr == nil || h.Sessions == nil {
 		return primitive.NilObjectID
 	}
 	sess, err := h.SessionMgr.GetSession(r)
 	if err != nil {
 		return primitive.NilObjectID
 	}
-	activitySessionID, ok := sess.Values["activity_session_id"].(string)
-	if !ok || activitySessionID == "" {
+	sessionToken, ok := sess.Values["session_token"].(string)
+	if !ok || sessionToken == "" {
 		return primitive.NilObjectID
 	}
-	oid, err := primitive.ObjectIDFromHex(activitySessionID)
-	if err != nil {
+	// Look up session by token to get its ID
+	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
+	defer cancel()
+	sessionDoc, err := h.Sessions.GetByToken(ctx, sessionToken)
+	if err != nil || sessionDoc == nil {
 		return primitive.NilObjectID
 	}
-	return oid
+	return sessionDoc.ID
 }
 
 // ServeViewResource handles GET /member/resources/{resourceID} for members.

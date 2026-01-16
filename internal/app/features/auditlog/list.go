@@ -43,11 +43,20 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 	eventType := strings.TrimSpace(r.URL.Query().Get("event_type"))
 	startDate := strings.TrimSpace(r.URL.Query().Get("start_date"))
 	endDate := strings.TrimSpace(r.URL.Query().Get("end_date"))
+	tzParam := strings.TrimSpace(r.URL.Query().Get("tz"))
 	pageStr := r.URL.Query().Get("page")
 
 	page := 1
 	if p, err := strconv.Atoi(pageStr); err == nil && p > 0 {
 		page = p
+	}
+
+	// Load timezone location for date parsing (fall back to Local if invalid)
+	loc := time.Local
+	if tzParam != "" {
+		if parsedLoc, err := time.LoadLocation(tzParam); err == nil {
+			loc = parsedLoc
+		}
 	}
 
 	// Build query filter
@@ -58,14 +67,14 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		Offset:    int64((page - 1) * pageSize),
 	}
 
-	// Parse dates
+	// Parse dates in user's selected timezone
 	if startDate != "" {
-		if t, err := time.Parse("2006-01-02", startDate); err == nil {
+		if t, err := time.ParseInLocation("2006-01-02", startDate, loc); err == nil {
 			filter.StartTime = &t
 		}
 	}
 	if endDate != "" {
-		if t, err := time.Parse("2006-01-02", endDate); err == nil {
+		if t, err := time.ParseInLocation("2006-01-02", endDate, loc); err == nil {
 			// End of day
 			endOfDay := t.Add(24*time.Hour - time.Second)
 			filter.EndTime = &endOfDay
@@ -175,26 +184,32 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 			Success:   e.Success,
 			Details:   e.Details,
 		}
+		// Resolve actor name
 		if e.ActorID != nil {
 			if name, ok := userNames[*e.ActorID]; ok {
 				item.ActorName = name
-			} else {
-				item.ActorName = e.ActorID.Hex()
 			}
+			// Don't show raw ObjectID for deleted users - leave blank
+		} else if e.UserID != nil && e.Category == audit.CategoryAuth {
+			// For auth events, the user is the actor (they're logging in/out themselves)
+			if name, ok := userNames[*e.UserID]; ok {
+				item.ActorName = name
+			}
+			// Don't show raw ObjectID for deleted users - leave blank
 		}
-		if e.UserID != nil {
+		// Resolve target name (for admin events where UserID is the target)
+		if e.UserID != nil && e.Category != audit.CategoryAuth {
 			if name, ok := userNames[*e.UserID]; ok {
 				item.TargetName = name
-			} else {
-				item.TargetName = e.UserID.Hex()
 			}
+			// Don't show raw ObjectID for deleted users - leave blank
 		}
+		// Resolve organization name
 		if e.OrganizationID != nil {
 			if name, ok := orgNames[*e.OrganizationID]; ok {
 				item.OrgName = name
-			} else {
-				item.OrgName = e.OrganizationID.Hex()
 			}
+			// Don't show raw ObjectID for deleted orgs - leave blank
 		}
 		items = append(items, item)
 	}
@@ -235,6 +250,7 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		EventType:      eventType,
 		StartDate:      startDate,
 		EndDate:        endDate,
+		Timezone:       tzParam,
 		Categories:     allCategories(),
 		EventTypes:     eventTypes,
 		TimezoneGroups: tzGroups,

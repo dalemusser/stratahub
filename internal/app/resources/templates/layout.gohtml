@@ -110,6 +110,44 @@
       #sidebar.collapsed #menu-toggle {
         transform: rotate(180deg);
       }
+
+      /* Announcement banner styles */
+      .announcement-banner {
+        font-size: 0.875rem;
+      }
+      .announcement-info {
+        background-color: #dbeafe;
+        color: #1e40af;
+        border-bottom: 1px solid #93c5fd;
+      }
+      .dark .announcement-info {
+        background-color: rgba(59, 130, 246, 0.2);
+        color: #93c5fd;
+        border-bottom-color: rgba(59, 130, 246, 0.3);
+      }
+      .announcement-warning {
+        background-color: #fef3c7;
+        color: #92400e;
+        border-bottom: 1px solid #fcd34d;
+      }
+      .dark .announcement-warning {
+        background-color: rgba(245, 158, 11, 0.2);
+        color: #fcd34d;
+        border-bottom-color: rgba(245, 158, 11, 0.3);
+      }
+      .announcement-critical {
+        background-color: #fee2e2;
+        color: #991b1b;
+        border-bottom: 1px solid #fca5a5;
+      }
+      .dark .announcement-critical {
+        background-color: rgba(239, 68, 68, 0.2);
+        color: #fca5a5;
+        border-bottom-color: rgba(239, 68, 68, 0.3);
+      }
+      .announcement-banner.dismissed {
+        display: none;
+      }
     </style>
   </head>
 
@@ -164,7 +202,8 @@
 
         document.addEventListener('submit', function(e) {
           var form = e.target;
-          if (!form.hasAttribute('hx-post') && !form.hasAttribute('hx-get')) {
+          if (!form.hasAttribute('hx-post') && !form.hasAttribute('hx-get') &&
+              !form.classList.contains('no-loader')) {
             showLoader();
             // If confirm() was cancelled, the form won't submit and we'll still be here
             // Use a short timeout to hide the loader if navigation isn't happening
@@ -193,8 +232,35 @@
       </aside>
 
       <!-- Main Content (footer stays at bottom of this area) -->
-      <main class="flex-1 h-screen overflow-hidden bg-gray-100 dark:bg-gray-900 grid grid-rows-[1fr_auto]">
-        <div id="content" class="px-4 py-2 overflow-y-auto">
+      <main class="flex-1 h-screen overflow-hidden bg-gray-100 dark:bg-gray-900 flex flex-col">
+        <!-- Announcement Banners -->
+        {{ if .Announcements }}
+        <div id="announcement-banners" class="announcement-banners">
+          {{ range .Announcements }}
+          <div class="announcement-banner announcement-{{ .Type }}" data-announcement-id="{{ .ID }}"{{ if .Dismissible }} data-dismissible="true"{{ end }}>
+            <div class="flex items-center justify-between px-4 py-2">
+              <div class="flex items-center gap-2">
+                {{ if eq .Type "critical" }}
+                <span class="text-lg">⚠️</span>
+                {{ else if eq .Type "warning" }}
+                <span class="text-lg">⚡</span>
+                {{ else }}
+                <span class="text-lg">ℹ️</span>
+                {{ end }}
+                <span class="font-semibold">{{ .Title }}</span>
+                {{ if .Content }}
+                <span class="opacity-80">— {{ .Content }}</span>
+                {{ end }}
+              </div>
+              {{ if .Dismissible }}
+              <button onclick="dismissAnnouncement('{{ .ID }}')" class="ml-4 opacity-60 hover:opacity-100 text-lg" title="Dismiss">×</button>
+              {{ end }}
+            </div>
+          </div>
+          {{ end }}
+        </div>
+        {{ end }}
+        <div id="content" class="px-4 py-2 overflow-y-auto flex-1">
           {{ block "content" . }}{{ end }}
         </div>
         {{ if .FooterHTML }}
@@ -252,6 +318,30 @@
         }
       })();
 
+      // Announcement dismissal
+      function dismissAnnouncement(id) {
+        var dismissed = JSON.parse(localStorage.getItem('dismissed-announcements') || '[]');
+        if (dismissed.indexOf(id) === -1) {
+          dismissed.push(id);
+          localStorage.setItem('dismissed-announcements', JSON.stringify(dismissed));
+        }
+        var banner = document.querySelector('[data-announcement-id="' + id + '"]');
+        if (banner) {
+          banner.classList.add('dismissed');
+        }
+      }
+
+      // Hide previously dismissed announcements on page load
+      (function() {
+        var dismissed = JSON.parse(localStorage.getItem('dismissed-announcements') || '[]');
+        dismissed.forEach(function(id) {
+          var banner = document.querySelector('[data-announcement-id="' + id + '"]');
+          if (banner && banner.hasAttribute('data-dismissible')) {
+            banner.classList.add('dismissed');
+          }
+        });
+      })();
+
       {{ if .IsLoggedIn }}
       // Activity heartbeat - sends pulse every 60 seconds for session tracking
       (function() {
@@ -276,6 +366,12 @@
             credentials: 'same-origin',
             headers: headers,
             body: JSON.stringify({page: window.location.pathname})
+          }).then(function(response) {
+            if (response.status === 401) {
+              // Session was terminated by admin - redirect to logout
+              stopHeartbeat();
+              window.location.href = '/logout';
+            }
           }).catch(function() {
             // Silent fail - don't interrupt user experience
           });
