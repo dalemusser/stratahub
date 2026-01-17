@@ -90,6 +90,15 @@ func SetAnnouncementLoader(loader AnnouncementLoader) {
 	announcementLoader = loader
 }
 
+// GetAnnouncements returns active announcements using the configured loader.
+// Returns nil if no loader is configured.
+func GetAnnouncements(ctx context.Context) []AnnouncementVM {
+	if announcementLoader != nil {
+		return announcementLoader(ctx)
+	}
+	return nil
+}
+
 // NewBaseVM creates a fully populated BaseVM for a page.
 // This is the preferred way to create a BaseVM for embedding in view models.
 //

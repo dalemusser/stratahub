@@ -31,3 +31,9 @@ func (h *Handler) Unauthorized(w http.ResponseWriter, r *http.Request) {
 func (h *Handler) ApexDenied(w http.ResponseWriter, r *http.Request) {
 	RenderApexDenied(w, r)
 }
+
+// NotFound renders a friendly "page not found" page.
+// Used as catch-all for unmatched routes.
+func (h *Handler) NotFound(w http.ResponseWriter, r *http.Request) {
+	RenderNotFound(w, r, "", "/")
+}
