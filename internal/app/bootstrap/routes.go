@@ -28,6 +28,7 @@ import (
 	reportsfeature "github.com/dalemusser/stratahub/internal/app/features/reports"
 	resourcesfeature "github.com/dalemusser/stratahub/internal/app/features/resources"
 	settingsfeature "github.com/dalemusser/stratahub/internal/app/features/settings"
+	statusfeature "github.com/dalemusser/stratahub/internal/app/features/status"
 	systemusersfeature "github.com/dalemusser/stratahub/internal/app/features/systemusers"
 	uploadcsvfeature "github.com/dalemusser/stratahub/internal/app/features/uploadcsv"
 	userinfofeature "github.com/dalemusser/stratahub/internal/app/features/userinfo"
@@ -191,7 +192,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	}
 
 	// Health check endpoint for load balancers and orchestrators
-	healthHandler := healthfeature.NewHandler(deps.StrataHubMongoClient, logger)
+	healthHandler := healthfeature.NewHandler(deps.StrataHubMongoClient, appCfg.BaseURL, logger)
 	r.Mount("/health", healthfeature.Routes(healthHandler))
 
 	// Static assets with pre-compressed file support (gzip/brotli)
@@ -354,7 +355,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 			settingsHandler.MountRoutes(sr)
 		})
 
-		// Activity dashboard (for leaders to monitor student activity)
+		// Activity dashboard (for leaders to monitor member activity)
 		activityHandler := activityfeature.NewHandler(deps.StrataHubMongoDatabase, sessionsStore, activityStore, sessionMgr, errLog, logger)
 		wsr.Mount("/activity", activityfeature.Routes(activityHandler, sessionMgr))
 
@@ -366,9 +367,52 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		})
 	})
 
+	// System status page (admin only - no workspace required)
+	statusAppCfg := statusfeature.AppConfig{
+		MongoURI:                  appCfg.MongoURI,
+		MongoDatabase:             appCfg.MongoDatabase,
+		MongoMaxPoolSize:          appCfg.MongoMaxPoolSize,
+		MongoMinPoolSize:          appCfg.MongoMinPoolSize,
+		SessionKey:                appCfg.SessionKey,
+		SessionName:               appCfg.SessionName,
+		SessionDomain:             appCfg.SessionDomain,
+		CSRFKey:                   appCfg.CSRFKey,
+		StorageType:               appCfg.StorageType,
+		StorageLocalPath:          appCfg.StorageLocalPath,
+		StorageLocalURL:           appCfg.StorageLocalURL,
+		StorageS3Region:           appCfg.StorageS3Region,
+		StorageS3Bucket:           appCfg.StorageS3Bucket,
+		StorageS3Prefix:           appCfg.StorageS3Prefix,
+		StorageCFURL:              appCfg.StorageCFURL,
+		StorageCFKeyPairID:        appCfg.StorageCFKeyPairID,
+		StorageCFKeyPath:          appCfg.StorageCFKeyPath,
+		MailSMTPHost:              appCfg.MailSMTPHost,
+		MailSMTPPort:              appCfg.MailSMTPPort,
+		MailSMTPUser:              appCfg.MailSMTPUser,
+		MailSMTPPass:              appCfg.MailSMTPPass,
+		MailFrom:                  appCfg.MailFrom,
+		MailFromName:              appCfg.MailFromName,
+		BaseURL:                   appCfg.BaseURL,
+		EmailVerifyExpiry:         appCfg.EmailVerifyExpiry,
+		AuditLogAuth:              appCfg.AuditLogAuth,
+		AuditLogAdmin:             appCfg.AuditLogAdmin,
+		GoogleClientID:            appCfg.GoogleClientID,
+		GoogleClientSecret:        appCfg.GoogleClientSecret,
+		MultiWorkspace:            appCfg.MultiWorkspace,
+		PrimaryDomain:             appCfg.PrimaryDomain,
+		DefaultWorkspaceName:      appCfg.DefaultWorkspaceName,
+		DefaultWorkspaceSubdomain: appCfg.DefaultWorkspaceSubdomain,
+		SuperAdminEmail:           appCfg.SuperAdminEmail,
+	}
+	statusHandler := statusfeature.NewHandler(deps.StrataHubMongoClient, appCfg.BaseURL, coreCfg, statusAppCfg, logger)
+	r.Mount("/admin/status", statusfeature.Routes(statusHandler, sessionMgr))
+
 	// Heartbeat API (for activity tracking - no workspace required for cross-domain tracking)
 	heartbeatHandler := heartbeatfeature.NewHandler(sessionsStore, activityStore, sessionMgr, logger)
 	r.Mount("/api/heartbeat", heartbeatfeature.Routes(heartbeatHandler, sessionMgr))
+
+	// 404 catch-all for unmatched routes
+	r.NotFound(errorsHandler.NotFound)
 
 	return r, nil
 }

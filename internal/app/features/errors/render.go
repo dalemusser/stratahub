@@ -6,9 +6,11 @@ import (
 	"net/http"
 
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/httpnav"
 	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/gorilla/csrf"
 	"go.uber.org/zap"
 )
 
@@ -22,10 +24,12 @@ type pageData struct {
 	BackURL    string
 
 	// Layout fields (required by layout/menu templates)
-	SiteName   string
-	LogoURL    string
-	FooterHTML string
-	IsApex     bool
+	SiteName      string
+	LogoURL       string
+	FooterHTML    string
+	IsApex        bool
+	CSRFToken     string
+	Announcements []viewdata.AnnouncementVM // Empty for error pages
 
 	// Additional fields for specific error pages
 	ActualRole string // The user's actual role (for display when Role is overridden for menu)
@@ -58,13 +62,15 @@ func RenderApexDenied(w http.ResponseWriter, r *http.Request) {
 	role, name, _, signed := authz.UserCtx(r)
 
 	data := pageData{
-		Title:      "Wrong Domain",
-		IsLoggedIn: signed,
-		Role:       "visitor", // Force visitor menu to show minimal options
-		UserName:   name,
-		SiteName:   models.DefaultSiteName,
-		IsApex:     true,
-		ActualRole: role,
+		Title:         "Wrong Domain",
+		IsLoggedIn:    signed,
+		Role:          "visitor", // Force visitor menu to show minimal options
+		UserName:      name,
+		SiteName:      models.DefaultSiteName,
+		IsApex:        true,
+		ActualRole:    role,
+		CSRFToken:     csrf.Token(r),
+		Announcements: viewdata.GetAnnouncements(r.Context()),
 	}
 
 	w.WriteHeader(http.StatusForbidden)
@@ -80,13 +86,15 @@ func RenderUnauthorized(w http.ResponseWriter, r *http.Request, backURL string) 
 	}
 
 	data := pageData{
-		Title:      "Sign in required",
-		IsLoggedIn: signed,
-		Role:       role,
-		UserName:   name,
-		Message:    "Please sign in to continue.",
-		BackURL:    backURL,
-		SiteName:   models.DefaultSiteName,
+		Title:         "Sign in required",
+		IsLoggedIn:    signed,
+		Role:          role,
+		UserName:      name,
+		Message:       "Please sign in to continue.",
+		BackURL:       backURL,
+		SiteName:      models.DefaultSiteName,
+		CSRFToken:     csrf.Token(r),
+		Announcements: viewdata.GetAnnouncements(r.Context()),
 	}
 
 	w.WriteHeader(http.StatusUnauthorized)
@@ -102,13 +110,15 @@ func RenderForbidden(w http.ResponseWriter, r *http.Request, msg, backURL string
 	}
 
 	data := pageData{
-		Title:      "Access denied",
-		IsLoggedIn: signed,
-		Role:       role,
-		UserName:   name,
-		Message:    msg,
-		BackURL:    backURL,
-		SiteName:   models.DefaultSiteName,
+		Title:         "Access denied",
+		IsLoggedIn:    signed,
+		Role:          role,
+		UserName:      name,
+		Message:       msg,
+		BackURL:       backURL,
+		SiteName:      models.DefaultSiteName,
+		CSRFToken:     csrf.Token(r),
+		Announcements: viewdata.GetAnnouncements(r.Context()),
 	}
 
 	w.WriteHeader(http.StatusForbidden)
@@ -127,13 +137,15 @@ func RenderServerError(w http.ResponseWriter, r *http.Request, msg, backURL stri
 	}
 
 	data := pageData{
-		Title:      "Server error",
-		IsLoggedIn: signed,
-		Role:       role,
-		UserName:   name,
-		Message:    msg,
-		BackURL:    backURL,
-		SiteName:   models.DefaultSiteName,
+		Title:         "Server error",
+		IsLoggedIn:    signed,
+		Role:          role,
+		UserName:      name,
+		Message:       msg,
+		BackURL:       backURL,
+		SiteName:      models.DefaultSiteName,
+		CSRFToken:     csrf.Token(r),
+		Announcements: viewdata.GetAnnouncements(r.Context()),
 	}
 
 	w.WriteHeader(http.StatusInternalServerError)
@@ -152,13 +164,15 @@ func RenderBadRequest(w http.ResponseWriter, r *http.Request, msg, backURL strin
 	}
 
 	data := pageData{
-		Title:      "Bad request",
-		IsLoggedIn: signed,
-		Role:       role,
-		UserName:   name,
-		Message:    msg,
-		BackURL:    backURL,
-		SiteName:   models.DefaultSiteName,
+		Title:         "Bad request",
+		IsLoggedIn:    signed,
+		Role:          role,
+		UserName:      name,
+		Message:       msg,
+		BackURL:       backURL,
+		SiteName:      models.DefaultSiteName,
+		CSRFToken:     csrf.Token(r),
+		Announcements: viewdata.GetAnnouncements(r.Context()),
 	}
 
 	w.WriteHeader(http.StatusBadRequest)
@@ -177,17 +191,19 @@ func RenderNotFound(w http.ResponseWriter, r *http.Request, msg, backURL string)
 	}
 
 	data := pageData{
-		Title:      "Not found",
-		IsLoggedIn: signed,
-		Role:       role,
-		UserName:   name,
-		Message:    msg,
-		BackURL:    backURL,
-		SiteName:   models.DefaultSiteName,
+		Title:         "Not found",
+		IsLoggedIn:    signed,
+		Role:          role,
+		UserName:      name,
+		Message:       msg,
+		BackURL:       backURL,
+		SiteName:      models.DefaultSiteName,
+		CSRFToken:     csrf.Token(r),
+		Announcements: viewdata.GetAnnouncements(r.Context()),
 	}
 
 	w.WriteHeader(http.StatusNotFound)
-	templates.Render(w, r, "error_forbidden", data)
+	templates.Render(w, r, "error_not_found", data)
 }
 
 // isHTMXRequest checks if the request is an HTMX partial request.

@@ -29,6 +29,8 @@ type workspaceSettingsVM struct {
 	viewdata.BaseVM
 	WorkspaceID        string
 	WorkspaceName      string
+	Subdomain          string // Current subdomain
+	Domain             string // Primary domain for display (e.g., "adroit.games")
 	WSSiteName         string // Workspace-specific site name (different from BaseVM.SiteName which is apex context)
 	HasLogo            bool
 	LogoURL            string
@@ -90,6 +92,8 @@ func (h *Handler) ServeSettings(w http.ResponseWriter, r *http.Request) {
 		BaseVM:             viewdata.NewBaseVM(r, h.DB, "Workspace Settings", "/workspaces"),
 		WorkspaceID:        wsID.Hex(),
 		WorkspaceName:      ws.Name,
+		Subdomain:          ws.Subdomain,
+		Domain:             h.PrimaryDomain,
 		WSSiteName:         settings.SiteName,
 		HasLogo:            settings.HasLogo(),
 		LogoURL:            logoURL,
@@ -118,6 +122,7 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	workspaceName := strings.TrimSpace(r.FormValue("workspace_name"))
+	newSubdomain := strings.ToLower(strings.TrimSpace(r.FormValue("subdomain")))
 	siteName := strings.TrimSpace(r.FormValue("site_name"))
 	footerHTML := htmlsanitize.Sanitize(strings.TrimSpace(r.FormValue("footer_html")))
 	removeLogo := r.FormValue("remove_logo") != ""
@@ -127,6 +132,22 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	if workspaceName == "" {
 		h.renderSettingsWithError(w, r, wsID, "Workspace name is required.")
 		return
+	}
+	if newSubdomain == "" {
+		h.renderSettingsWithError(w, r, wsID, "Subdomain is required.")
+		return
+	}
+	// Validate subdomain format
+	if !SubdomainRegex.MatchString(newSubdomain) {
+		h.renderSettingsWithError(w, r, wsID, "Subdomain must contain only lowercase letters, numbers, and hyphens. It cannot start or end with a hyphen.")
+		return
+	}
+	// Check reserved subdomains
+	for _, reserved := range ReservedSubdomains {
+		if newSubdomain == reserved {
+			h.renderSettingsWithError(w, r, wsID, "This subdomain is reserved and cannot be used.")
+			return
+		}
 	}
 	if siteName == "" {
 		h.renderSettingsWithError(w, r, wsID, "Site name is required.")
@@ -213,16 +234,20 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update workspace name
+	// Update workspace name and subdomain
 	wsStore := workspacestore.New(h.DB)
-	wsUpdate := models.Workspace{Name: workspaceName}
+	wsUpdate := models.Workspace{Name: workspaceName, Subdomain: newSubdomain}
 	if err := wsStore.Update(ctx, wsID, wsUpdate); err != nil {
 		if err == workspacestore.ErrDuplicateName {
 			h.renderSettingsWithError(w, r, wsID, "A workspace with that name already exists.")
 			return
 		}
-		h.Log.Error("failed to update workspace name", zap.Error(err))
-		h.renderSettingsWithError(w, r, wsID, "Failed to update workspace name.")
+		if err == workspacestore.ErrDuplicateSubdomain {
+			h.renderSettingsWithError(w, r, wsID, "A workspace with that subdomain already exists.")
+			return
+		}
+		h.Log.Error("failed to update workspace", zap.Error(err))
+		h.renderSettingsWithError(w, r, wsID, "Failed to update workspace.")
 		return
 	}
 
@@ -263,6 +288,8 @@ func (h *Handler) renderSettingsWithError(w http.ResponseWriter, r *http.Request
 		BaseVM:             viewdata.NewBaseVM(r, h.DB, "Workspace Settings", "/workspaces"),
 		WorkspaceID:        wsID.Hex(),
 		WorkspaceName:      ws.Name,
+		Subdomain:          ws.Subdomain,
+		Domain:             h.PrimaryDomain,
 		WSSiteName:         settings.SiteName,
 		HasLogo:            settings.HasLogo(),
 		LogoURL:            logoURL,

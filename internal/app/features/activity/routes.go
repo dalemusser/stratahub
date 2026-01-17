@@ -24,7 +24,7 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 		// Weekly summary view
 		pr.Get("/summary", h.ServeSummary)
 
-		// Student detail view
+		// Member detail view
 		pr.Get("/member/{memberID}", h.ServeMemberDetail)
 
 		// HTMX partial for refreshing member detail content

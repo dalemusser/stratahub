@@ -109,7 +109,7 @@ type summaryData struct {
 	Members []summaryRow
 }
 
-// activityEvent represents an event in the student detail timeline.
+// activityEvent represents an event in the member detail timeline.
 type activityEvent struct {
 	Time        time.Time
 	TimeLabel   string
@@ -117,7 +117,7 @@ type activityEvent struct {
 	Description string
 }
 
-// sessionBlock represents a session in the student detail view.
+// sessionBlock represents a session in the member detail view.
 type sessionBlock struct {
 	Date         string
 	LoginTime    string
@@ -127,7 +127,7 @@ type sessionBlock struct {
 	Events       []activityEvent
 }
 
-// memberDetailData is the view model for the student detail view.
+// memberDetailData is the view model for the member detail view.
 type memberDetailData struct {
 	viewdata.BaseVM
 

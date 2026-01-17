@@ -18,8 +18,11 @@ import (
 	"go.uber.org/zap"
 )
 
-// subdomainRegex validates subdomain format: lowercase alphanumeric and hyphens only.
-var subdomainRegex = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+// SubdomainRegex validates subdomain format: lowercase alphanumeric and hyphens only.
+var SubdomainRegex = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$`)
+
+// ReservedSubdomains are subdomains that cannot be used for workspaces.
+var ReservedSubdomains = []string{"www", "api", "admin", "app", "mail", "ftp", "localhost"}
 
 // createWorkspaceInput defines validation rules for creating a workspace.
 type createWorkspaceInput struct {
@@ -70,14 +73,13 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Validate subdomain format
-	if !subdomainRegex.MatchString(subdomain) {
+	if !SubdomainRegex.MatchString(subdomain) {
 		reRender("Subdomain must contain only lowercase letters, numbers, and hyphens. It cannot start or end with a hyphen.")
 		return
 	}
 
-	// Reserved subdomains
-	reserved := []string{"www", "api", "admin", "app", "mail", "ftp", "localhost"}
-	for _, r := range reserved {
+	// Check reserved subdomains
+	for _, r := range ReservedSubdomains {
 		if subdomain == r {
 			reRender("This subdomain is reserved and cannot be used.")
 			return
