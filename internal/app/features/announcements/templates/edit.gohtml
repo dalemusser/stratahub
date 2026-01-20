@@ -80,6 +80,24 @@
       </a>
     </div>
   </form>
+
+  <!-- Danger Zone -->
+  <div class="max-w-lg mt-6">
+    <div class="p-4 border border-red-300 dark:border-red-700 rounded bg-red-50 dark:bg-red-900/20">
+      <h3 class="text-sm font-semibold text-red-800 dark:text-red-300 mb-2">Danger Zone</h3>
+      <p class="text-xs text-red-700 dark:text-red-400 mb-3">Permanently delete this announcement. This action cannot be undone.</p>
+      <form method="POST" action="/announcements/{{ .ID }}/delete">
+        <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+        <button
+          type="submit"
+          class="bg-red-600 text-white px-3 py-1 rounded hover:bg-red-700 text-sm"
+          onclick="return confirm('Delete this announcement? This action cannot be undone.');"
+        >
+          Delete Announcement
+        </button>
+      </form>
+    </div>
+  </div>
 </div>
 </div>
 {{ end }}

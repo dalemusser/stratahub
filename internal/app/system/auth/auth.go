@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/gorilla/securecookie"
@@ -63,11 +64,12 @@ type SessionManager struct {
 //   - sessionKey: signing key for cookies (must be ≥32 chars in production)
 //   - name: session cookie name (defaults to "stratahub-session" if empty)
 //   - domain: cookie domain (empty means current host)
+//   - maxAge: session cookie lifetime (e.g., 24*time.Hour)
 //   - secure: if true, cookies are Secure + SameSite=None (for HTTPS production)
 //   - logger: zap logger for session error logging
 //
 // Returns an error if sessionKey is empty or too weak for production mode.
-func NewSessionManager(sessionKey, name, domain string, secure bool, logger *zap.Logger) (*SessionManager, error) {
+func NewSessionManager(sessionKey, name, domain string, maxAge time.Duration, secure bool, logger *zap.Logger) (*SessionManager, error) {
 	if sessionKey == "" {
 		return nil, &SessionConfigError{Message: "session key is empty; provide ≥32 random chars"}
 	}
@@ -98,6 +100,7 @@ func NewSessionManager(sessionKey, name, domain string, secure bool, logger *zap
 	opts := &sessions.Options{
 		Domain:   domain,
 		Path:     "/",
+		MaxAge:   int(maxAge.Seconds()),
 		Secure:   secure,
 		HttpOnly: true,
 	}

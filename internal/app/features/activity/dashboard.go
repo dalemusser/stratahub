@@ -32,11 +32,18 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 
+	// Get viewer role for determining available roles
+	viewerRole, _, _, _ := authz.UserCtx(r)
+
 	// Parse query parameters
 	selectedGroup := query.Get(r, "group")
 	statusFilter := query.Get(r, "status")
 	if statusFilter == "" {
 		statusFilter = "all"
+	}
+	roleFilter := query.Get(r, "role")
+	if roleFilter == "" {
+		roleFilter = "all"
 	}
 	searchQuery := query.Get(r, "search")
 	sortBy := query.Get(r, "sort")
@@ -54,8 +61,13 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Get groups and all members based on user role
-	groups, allMembers, err := h.fetchGroupsAndMembers(ctx, r, selectedGroup)
+	// Build role filter options based on viewer role
+	availableRoles := getAvailableRoles(viewerRole)
+	roleOptions := buildRoleOptions(availableRoles, roleFilter)
+	showRoleFilter := len(availableRoles) > 1
+
+	// Get groups and all users based on viewer role
+	groups, allMembers, err := h.fetchGroupsAndMembers(ctx, r, selectedGroup, roleFilter)
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "failed to fetch groups and members", err, "A database error occurred.", "/")
 		return
@@ -77,6 +89,9 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 	// Filter by search query
 	filteredMembers := filterMembersBySearch(allMembers, searchQuery)
 
+	// Filter by role (for UI filtering when viewing multiple roles)
+	filteredMembers = filterMembersByRole(filteredMembers, roleFilter)
+
 	// Filter by status
 	filteredMembers = filterMembersByStatus(filteredMembers, statusFilter)
 
@@ -105,26 +120,29 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := dashboardData{
-		BaseVM:        viewdata.NewBaseVM(r, h.DB, "Activity Dashboard", "/activity"),
-		SelectedGroup: selectedGroup,
-		Groups:        groups,
-		StatusFilter:  statusFilter,
-		SearchQuery:   searchQuery,
-		SortBy:        sortBy,
-		SortDir:       sortDir,
-		Page:          page,
-		Total:         total,
-		RangeStart:    rangeStart,
-		RangeEnd:      rangeEnd,
-		HasPrev:       page > 1,
-		HasNext:       endIdx < total,
-		PrevPage:      page - 1,
-		NextPage:      page + 1,
-		TotalMembers:  len(allMembers),
-		OnlineCount:   onlineCount,
-		IdleCount:     idleCount,
-		OfflineCount:  offlineCount,
-		Members:       pagedMembers,
+		BaseVM:         viewdata.NewBaseVM(r, h.DB, "Activity Dashboard", "/activity"),
+		SelectedGroup:  selectedGroup,
+		Groups:         groups,
+		StatusFilter:   statusFilter,
+		SearchQuery:    searchQuery,
+		RoleFilter:     roleFilter,
+		Roles:          roleOptions,
+		ShowRoleFilter: showRoleFilter,
+		SortBy:         sortBy,
+		SortDir:        sortDir,
+		Page:           page,
+		Total:          total,
+		RangeStart:     rangeStart,
+		RangeEnd:       rangeEnd,
+		HasPrev:        page > 1,
+		HasNext:        endIdx < total,
+		PrevPage:       page - 1,
+		NextPage:       page + 1,
+		TotalMembers:   len(allMembers),
+		OnlineCount:    onlineCount,
+		IdleCount:      idleCount,
+		OfflineCount:   offlineCount,
+		Members:        pagedMembers,
 	}
 
 	templates.Render(w, r, "activity_dashboard", data)
@@ -136,11 +154,18 @@ func (h *Handler) ServeOnlineTable(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
 	defer cancel()
 
+	// Get viewer role for determining available roles
+	viewerRole, _, _, _ := authz.UserCtx(r)
+
 	// Parse query parameters
 	selectedGroup := query.Get(r, "group")
 	statusFilter := query.Get(r, "status")
 	if statusFilter == "" {
 		statusFilter = "all"
+	}
+	roleFilter := query.Get(r, "role")
+	if roleFilter == "" {
+		roleFilter = "all"
 	}
 	searchQuery := query.Get(r, "search")
 	sortBy := query.Get(r, "sort")
@@ -158,8 +183,13 @@ func (h *Handler) ServeOnlineTable(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Get groups and all members based on user role
-	groups, allMembers, err := h.fetchGroupsAndMembers(ctx, r, selectedGroup)
+	// Build role filter options based on viewer role
+	availableRoles := getAvailableRoles(viewerRole)
+	roleOptions := buildRoleOptions(availableRoles, roleFilter)
+	showRoleFilter := len(availableRoles) > 1
+
+	// Get groups and all users based on viewer role
+	groups, allMembers, err := h.fetchGroupsAndMembers(ctx, r, selectedGroup, roleFilter)
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
@@ -181,6 +211,9 @@ func (h *Handler) ServeOnlineTable(w http.ResponseWriter, r *http.Request) {
 	// Filter by search query
 	filteredMembers := filterMembersBySearch(allMembers, searchQuery)
 
+	// Filter by role (for UI filtering when viewing multiple roles)
+	filteredMembers = filterMembersByRole(filteredMembers, roleFilter)
+
 	// Filter by status
 	filteredMembers = filterMembersByStatus(filteredMembers, statusFilter)
 
@@ -209,34 +242,38 @@ func (h *Handler) ServeOnlineTable(w http.ResponseWriter, r *http.Request) {
 	}
 
 	data := dashboardData{
-		BaseVM:        viewdata.NewBaseVM(r, h.DB, "Activity Dashboard", "/activity"),
-		SelectedGroup: selectedGroup,
-		Groups:        groups,
-		StatusFilter:  statusFilter,
-		SearchQuery:   searchQuery,
-		SortBy:        sortBy,
-		SortDir:       sortDir,
-		Page:          page,
-		Total:         total,
-		RangeStart:    rangeStart,
-		RangeEnd:      rangeEnd,
-		HasPrev:       page > 1,
-		HasNext:       endIdx < total,
-		PrevPage:      page - 1,
-		NextPage:      page + 1,
-		TotalMembers:  len(allMembers),
-		OnlineCount:   onlineCount,
-		IdleCount:     idleCount,
-		OfflineCount:  offlineCount,
-		Members:       pagedMembers,
+		BaseVM:         viewdata.NewBaseVM(r, h.DB, "Activity Dashboard", "/activity"),
+		SelectedGroup:  selectedGroup,
+		Groups:         groups,
+		StatusFilter:   statusFilter,
+		SearchQuery:    searchQuery,
+		RoleFilter:     roleFilter,
+		Roles:          roleOptions,
+		ShowRoleFilter: showRoleFilter,
+		SortBy:         sortBy,
+		SortDir:        sortDir,
+		Page:           page,
+		Total:          total,
+		RangeStart:     rangeStart,
+		RangeEnd:       rangeEnd,
+		HasPrev:        page > 1,
+		HasNext:        endIdx < total,
+		PrevPage:       page - 1,
+		NextPage:       page + 1,
+		TotalMembers:   len(allMembers),
+		OnlineCount:    onlineCount,
+		IdleCount:      idleCount,
+		OfflineCount:   offlineCount,
+		Members:        pagedMembers,
 	}
 
 	templates.Render(w, r, "activity_online_table", data)
 }
 
-// fetchGroupsAndMembers gets the groups and member activity for the current user's scope.
-func (h *Handler) fetchGroupsAndMembers(ctx context.Context, r *http.Request, selectedGroup string) ([]groupOption, []memberRow, error) {
-	role, _, userID, ok := authz.UserCtx(r)
+// fetchGroupsAndMembers gets the groups and user activity for the current user's scope.
+// The roleFilter parameter is used for deciding which roles to fetch.
+func (h *Handler) fetchGroupsAndMembers(ctx context.Context, r *http.Request, selectedGroup, roleFilter string) ([]groupOption, []memberRow, error) {
+	viewerRole, _, userID, ok := authz.UserCtx(r)
 	if !ok {
 		return nil, nil, nil
 	}
@@ -244,14 +281,35 @@ func (h *Handler) fetchGroupsAndMembers(ctx context.Context, r *http.Request, se
 	db := h.DB
 	now := time.Now().UTC()
 
-	// Get groups based on role
+	// Determine which target roles to fetch based on viewer role
+	var targetRoles []string
+	var includeNonGroupUsers bool
+
+	switch viewerRole {
+	case "superadmin", "admin":
+		// Admin/SuperAdmin can see all roles
+		targetRoles = []string{"member", "leader"}
+		includeNonGroupUsers = true // Also fetch coordinators, admins, superadmins
+	case "coordinator":
+		// Coordinator can see members and leaders in their orgs
+		targetRoles = []string{"member", "leader"}
+		includeNonGroupUsers = false
+	case "leader":
+		// Leader can only see members in their groups
+		targetRoles = []string{"member"}
+		includeNonGroupUsers = false
+	default:
+		return nil, nil, nil
+	}
+
+	// Get groups based on viewer role
 	var groupIDs []primitive.ObjectID
 	var groupMap = make(map[primitive.ObjectID]string) // ID -> Name
+	var orgIDs []primitive.ObjectID                     // For coordinator/admin org scoping
 
-	switch role {
+	switch viewerRole {
 	case "superadmin", "admin":
-		// SuperAdmin/Admin can see all groups (but we'll limit to some reasonable set)
-		// For now, let's get groups from the selected org or all active groups
+		// SuperAdmin/Admin can see all groups
 		groups, err := h.fetchAllGroups(ctx, db)
 		if err != nil {
 			return nil, nil, err
@@ -263,7 +321,7 @@ func (h *Handler) fetchGroupsAndMembers(ctx context.Context, r *http.Request, se
 
 	case "coordinator":
 		// Coordinator sees groups in their assigned organizations
-		orgIDs := authz.UserOrgIDs(r)
+		orgIDs = authz.UserOrgIDs(r)
 		groups, err := h.fetchGroupsByOrgs(ctx, db, orgIDs)
 		if err != nil {
 			return nil, nil, err
@@ -283,10 +341,6 @@ func (h *Handler) fetchGroupsAndMembers(ctx context.Context, r *http.Request, se
 			groupIDs = append(groupIDs, g.ID)
 			groupMap[g.ID] = g.Name
 		}
-	}
-
-	if len(groupIDs) == 0 {
-		return nil, nil, nil
 	}
 
 	// Build group options for dropdown
@@ -318,13 +372,27 @@ func (h *Handler) fetchGroupsAndMembers(ctx context.Context, r *http.Request, se
 		filterGroupIDs = groupIDs
 	}
 
-	// Get members in these groups
-	members, err := h.fetchMembersWithActivity(ctx, db, filterGroupIDs, groupMap, now)
-	if err != nil {
-		return nil, nil, err
+	// Get group-based users (members and leaders from group_memberships)
+	var allUsers []memberRow
+	if len(filterGroupIDs) > 0 {
+		groupUsers, err := h.fetchGroupUsersWithActivity(ctx, db, filterGroupIDs, groupMap, targetRoles, now)
+		if err != nil {
+			return nil, nil, err
+		}
+		allUsers = append(allUsers, groupUsers...)
 	}
 
-	return groups, members, nil
+	// For admins/superadmins, also fetch non-group users (coordinators, admins, superadmins)
+	if includeNonGroupUsers {
+		nonGroupRoles := []string{"coordinator", "admin", "superadmin"}
+		nonGroupUsers, err := h.fetchNonGroupUsersWithActivity(ctx, db, nonGroupRoles, now)
+		if err != nil {
+			return nil, nil, err
+		}
+		allUsers = append(allUsers, nonGroupUsers...)
+	}
+
+	return groups, allUsers, nil
 }
 
 // fetchLeaderGroups gets groups where the user is a leader.
@@ -435,15 +503,178 @@ func (h *Handler) fetchAllGroups(ctx context.Context, db *mongo.Database) ([]lea
 	return groups, nil
 }
 
-// fetchMembersWithActivity gets members in the specified groups with their activity status.
-func (h *Handler) fetchMembersWithActivity(ctx context.Context, db *mongo.Database, groupIDs []primitive.ObjectID, groupMap map[primitive.ObjectID]string, now time.Time) ([]memberRow, error) {
-	if len(groupIDs) == 0 {
+// fetchNonGroupUsersWithActivity fetches users who don't appear in group_memberships
+// (coordinators, admins, superadmins) with their activity status.
+func (h *Handler) fetchNonGroupUsersWithActivity(ctx context.Context, db *mongo.Database, roles []string, now time.Time) ([]memberRow, error) {
+	if len(roles) == 0 {
 		return nil, nil
 	}
 
-	// Get member user IDs and their group associations
+	// Query users directly by role
+	filter := bson.M{
+		"role":   bson.M{"$in": roles},
+		"status": "active",
+	}
+	workspace.FilterCtx(ctx, filter)
+
+	cur, err := db.Collection("users").Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+
+	type userInfo struct {
+		ID      primitive.ObjectID  `bson:"_id"`
+		Name    string              `bson:"full_name"`
+		LoginID string              `bson:"login_id"`
+		Email   string              `bson:"email"`
+		Role    string              `bson:"role"`
+		OrgID   *primitive.ObjectID `bson:"organization_id"`
+	}
+
+	var usersInfo []userInfo
+	var userIDs []primitive.ObjectID
+	orgIDs := make(map[primitive.ObjectID]bool)
+
+	for cur.Next(ctx) {
+		var u userInfo
+		if err := cur.Decode(&u); err != nil {
+			return nil, err
+		}
+		usersInfo = append(usersInfo, u)
+		userIDs = append(userIDs, u.ID)
+		if u.OrgID != nil && !u.OrgID.IsZero() {
+			orgIDs[*u.OrgID] = true
+		}
+	}
+
+	if len(usersInfo) == 0 {
+		return nil, nil
+	}
+
+	// Fetch organization names
+	orgNames := make(map[primitive.ObjectID]string)
+	if len(orgIDs) > 0 {
+		var orgIDList []primitive.ObjectID
+		for oid := range orgIDs {
+			orgIDList = append(orgIDList, oid)
+		}
+		orgCur, err := db.Collection("organizations").Find(ctx, bson.M{"_id": bson.M{"$in": orgIDList}})
+		if err == nil {
+			defer orgCur.Close(ctx)
+			for orgCur.Next(ctx) {
+				var org struct {
+					ID   primitive.ObjectID `bson:"_id"`
+					Name string             `bson:"name"`
+				}
+				if orgCur.Decode(&org) == nil {
+					orgNames[org.ID] = org.Name
+				}
+			}
+		}
+	}
+
+	// Get active sessions for these users
+	sessionMap, err := h.getActiveSessionsForUsers(ctx, userIDs, now)
+	if err != nil {
+		return nil, err
+	}
+
+	// Get today's activity for these users
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, time.UTC)
+	todayActivity, err := h.getTodayActivityForUsers(ctx, userIDs, todayStart, now)
+	if err != nil {
+		return nil, err
+	}
+
+	// Build user rows
+	var users []memberRow
+	for _, u := range usersInfo {
+		// Get organization name
+		orgName := ""
+		if u.OrgID != nil && !u.OrgID.IsZero() {
+			orgName = orgNames[*u.OrgID]
+		}
+
+		// Determine status
+		status := StatusOffline
+		statusLabel := "Offline"
+		var lastActive *time.Time
+
+		if sess, ok := sessionMap[u.ID]; ok {
+			lastActive = &sess.LastActiveAt
+			timeSince := now.Sub(sess.LastActiveAt)
+			if timeSince < OnlineThreshold {
+				status = StatusOnline
+				statusLabel = "Active"
+			} else if timeSince < IdleThreshold {
+				status = StatusIdle
+				statusLabel = "Idle"
+			}
+		}
+
+		// Get current activity (only for online/idle users)
+		currentActivity := ""
+		if status != StatusOffline {
+			sess, hasSession := sessionMap[u.ID]
+			currentPage := ""
+			if hasSession {
+				currentPage = sess.CurrentPage
+			}
+
+			if currentPage != "" {
+				currentActivity = formatPageName(currentPage)
+			} else {
+				currentActivity = "Dashboard"
+			}
+		}
+
+		// Get time today
+		timeTodayMins := 0
+		if mins, ok := todayActivity[u.ID]; ok {
+			timeTodayMins = mins
+		}
+
+		// Format time today
+		timeTodayStr := "0 min"
+		if timeTodayMins > 0 {
+			if timeTodayMins >= 60 {
+				timeTodayStr = fmt.Sprintf("%dh %dm", timeTodayMins/60, timeTodayMins%60)
+			} else {
+				timeTodayStr = fmt.Sprintf("%d min", timeTodayMins)
+			}
+		}
+
+		users = append(users, memberRow{
+			ID:              u.ID.Hex(),
+			Name:            u.Name,
+			LoginID:         u.LoginID,
+			Email:           u.Email,
+			OrgName:         orgName,
+			GroupName:       "", // Non-group users don't have a group
+			Role:            u.Role,
+			Status:          status,
+			StatusLabel:     statusLabel,
+			CurrentActivity: currentActivity,
+			TimeTodayMins:   timeTodayMins,
+			TimeTodayStr:    timeTodayStr,
+			LastActiveAt:    lastActive,
+		})
+	}
+
+	return users, nil
+}
+
+// fetchGroupUsersWithActivity gets users in the specified groups with their activity status.
+// targetRoles specifies which roles to fetch (e.g., ["member"] or ["member", "leader"]).
+func (h *Handler) fetchGroupUsersWithActivity(ctx context.Context, db *mongo.Database, groupIDs []primitive.ObjectID, groupMap map[primitive.ObjectID]string, targetRoles []string, now time.Time) ([]memberRow, error) {
+	if len(groupIDs) == 0 || len(targetRoles) == 0 {
+		return nil, nil
+	}
+
+	// Get user IDs and their group associations for the target roles
 	pipeline := []bson.M{
-		{"$match": bson.M{"group_id": bson.M{"$in": groupIDs}, "role": "member"}},
+		{"$match": bson.M{"group_id": bson.M{"$in": groupIDs}, "role": bson.M{"$in": targetRoles}}},
 		{"$lookup": bson.M{
 			"from":         "users",
 			"localField":   "user_id",
@@ -459,6 +690,7 @@ func (h *Handler) fetchMembersWithActivity(ctx context.Context, db *mongo.Databa
 			"email":           "$user.email",
 			"organization_id": "$user.organization_id",
 			"group_id":        1,
+			"membership_role": "$role", // The role in the group (member or leader)
 		}},
 	}
 
@@ -468,59 +700,66 @@ func (h *Handler) fetchMembersWithActivity(ctx context.Context, db *mongo.Databa
 	}
 	defer cur.Close(ctx)
 
-	// Collect unique members (a member might be in multiple groups)
-	type memberInfo struct {
+	// Collect unique users (a user might be in multiple groups with different roles)
+	type userInfo struct {
 		UserID   primitive.ObjectID
 		Name     string
 		LoginID  string
 		Email    string
 		OrgID    primitive.ObjectID
 		GroupIDs []primitive.ObjectID
+		Role     string // Highest role: leader > member
 	}
-	memberMap := make(map[primitive.ObjectID]*memberInfo)
+	userMap := make(map[primitive.ObjectID]*userInfo)
 
 	for cur.Next(ctx) {
 		var doc struct {
-			UserID  primitive.ObjectID `bson:"user_id"`
-			Name    string             `bson:"name"`
-			LoginID string             `bson:"login_id"`
-			Email   string             `bson:"email"`
-			OrgID   primitive.ObjectID `bson:"organization_id"`
-			GroupID primitive.ObjectID `bson:"group_id"`
+			UserID         primitive.ObjectID `bson:"user_id"`
+			Name           string             `bson:"name"`
+			LoginID        string             `bson:"login_id"`
+			Email          string             `bson:"email"`
+			OrgID          primitive.ObjectID `bson:"organization_id"`
+			GroupID        primitive.ObjectID `bson:"group_id"`
+			MembershipRole string             `bson:"membership_role"`
 		}
 		if err := cur.Decode(&doc); err != nil {
 			return nil, err
 		}
 
-		if m, ok := memberMap[doc.UserID]; ok {
-			m.GroupIDs = append(m.GroupIDs, doc.GroupID)
+		if u, ok := userMap[doc.UserID]; ok {
+			u.GroupIDs = append(u.GroupIDs, doc.GroupID)
+			// Keep highest role (leader > member)
+			if doc.MembershipRole == "leader" {
+				u.Role = "leader"
+			}
 		} else {
-			memberMap[doc.UserID] = &memberInfo{
+			userMap[doc.UserID] = &userInfo{
 				UserID:   doc.UserID,
 				Name:     doc.Name,
 				LoginID:  doc.LoginID,
 				Email:    doc.Email,
 				OrgID:    doc.OrgID,
 				GroupIDs: []primitive.ObjectID{doc.GroupID},
+				Role:     doc.MembershipRole,
 			}
 		}
 	}
 
-	if len(memberMap) == 0 {
+	if len(userMap) == 0 {
 		return nil, nil
 	}
 
 	// Get user IDs for session lookup
 	var userIDs []primitive.ObjectID
-	for uid := range memberMap {
+	for uid := range userMap {
 		userIDs = append(userIDs, uid)
 	}
 
 	// Collect unique organization IDs and fetch org names
 	orgIDs := make(map[primitive.ObjectID]bool)
-	for _, m := range memberMap {
-		if !m.OrgID.IsZero() {
-			orgIDs[m.OrgID] = true
+	for _, u := range userMap {
+		if !u.OrgID.IsZero() {
+			orgIDs[u.OrgID] = true
 		}
 	}
 	orgNames := make(map[primitive.ObjectID]string)
@@ -563,22 +802,22 @@ func (h *Handler) fetchMembersWithActivity(ctx context.Context, db *mongo.Databa
 		return nil, err
 	}
 
-	// Build member rows
-	var members []memberRow
-	for _, m := range memberMap {
+	// Build user rows
+	var users []memberRow
+	for _, u := range userMap {
 		// Determine group name (use first group for display)
 		groupName := ""
-		if len(m.GroupIDs) > 0 {
-			groupName = groupMap[m.GroupIDs[0]]
-			if len(m.GroupIDs) > 1 {
+		if len(u.GroupIDs) > 0 {
+			groupName = groupMap[u.GroupIDs[0]]
+			if len(u.GroupIDs) > 1 {
 				groupName += " (+)"
 			}
 		}
 
 		// Get organization name
 		orgName := ""
-		if !m.OrgID.IsZero() {
-			orgName = orgNames[m.OrgID]
+		if !u.OrgID.IsZero() {
+			orgName = orgNames[u.OrgID]
 		}
 
 		// Determine status
@@ -586,7 +825,7 @@ func (h *Handler) fetchMembersWithActivity(ctx context.Context, db *mongo.Databa
 		statusLabel := "Offline"
 		var lastActive *time.Time
 
-		if sess, ok := sessionMap[m.UserID]; ok {
+		if sess, ok := sessionMap[u.UserID]; ok {
 			lastActive = &sess.LastActiveAt
 			timeSince := now.Sub(sess.LastActiveAt)
 			if timeSince < OnlineThreshold {
@@ -601,14 +840,14 @@ func (h *Handler) fetchMembersWithActivity(ctx context.Context, db *mongo.Databa
 		// Get current activity (only for online/idle users)
 		currentActivity := ""
 		if status != StatusOffline {
-			sess, hasSession := sessionMap[m.UserID]
+			sess, hasSession := sessionMap[u.UserID]
 			currentPage := ""
 			if hasSession {
 				currentPage = sess.CurrentPage
 			}
 
 			// Only show resource activity if user is still on a resource page
-			if res, ok := currentResources[m.UserID]; ok && strings.HasPrefix(currentPage, "/member/resources/") {
+			if res, ok := currentResources[u.UserID]; ok && strings.HasPrefix(currentPage, "/member/resources/") {
 				currentActivity = res
 			} else if currentPage != "" {
 				currentActivity = formatPageName(currentPage)
@@ -619,7 +858,7 @@ func (h *Handler) fetchMembersWithActivity(ctx context.Context, db *mongo.Databa
 
 		// Get time today
 		timeTodayMins := 0
-		if mins, ok := todayActivity[m.UserID]; ok {
+		if mins, ok := todayActivity[u.UserID]; ok {
 			timeTodayMins = mins
 		}
 
@@ -633,13 +872,14 @@ func (h *Handler) fetchMembersWithActivity(ctx context.Context, db *mongo.Databa
 			}
 		}
 
-		members = append(members, memberRow{
-			ID:              m.UserID.Hex(),
-			Name:            m.Name,
-			LoginID:         m.LoginID,
-			Email:           m.Email,
+		users = append(users, memberRow{
+			ID:              u.UserID.Hex(),
+			Name:            u.Name,
+			LoginID:         u.LoginID,
+			Email:           u.Email,
 			OrgName:         orgName,
 			GroupName:       groupName,
+			Role:            u.Role,
 			Status:          status,
 			StatusLabel:     statusLabel,
 			CurrentActivity: currentActivity,
@@ -650,7 +890,7 @@ func (h *Handler) fetchMembersWithActivity(ctx context.Context, db *mongo.Databa
 	}
 
 	// Return unsorted - caller will sort as needed
-	return members, nil
+	return users, nil
 }
 
 // sessionInfo holds minimal session data for status calculation.
@@ -673,11 +913,11 @@ func (h *Handler) getActiveSessionsForUsers(ctx context.Context, userIDs []primi
 			"user_id":   bson.M{"$in": userIDs},
 			"logout_at": nil,
 		}},
-		{"$sort": bson.M{"last_active_at": -1}},
+		{"$sort": bson.M{"last_activity": -1}},
 		{"$group": bson.M{
-			"_id":            "$user_id",
-			"last_active_at": bson.M{"$first": "$last_active_at"},
-			"current_page":   bson.M{"$first": "$current_page"},
+			"_id":           "$user_id",
+			"last_activity": bson.M{"$first": "$last_activity"},
+			"current_page":  bson.M{"$first": "$current_page"},
 		}},
 	}
 
@@ -691,13 +931,13 @@ func (h *Handler) getActiveSessionsForUsers(ctx context.Context, userIDs []primi
 	for cur.Next(ctx) {
 		var doc struct {
 			ID           primitive.ObjectID `bson:"_id"`
-			LastActiveAt time.Time          `bson:"last_active_at"`
+			LastActivity time.Time          `bson:"last_activity"`
 			CurrentPage  string             `bson:"current_page"`
 		}
 		if err := cur.Decode(&doc); err != nil {
 			return nil, err
 		}
-		result[doc.ID] = sessionInfo{LastActiveAt: doc.LastActiveAt, CurrentPage: doc.CurrentPage}
+		result[doc.ID] = sessionInfo{LastActiveAt: doc.LastActivity, CurrentPage: doc.CurrentPage}
 	}
 
 	return result, nil
@@ -886,6 +1126,57 @@ func sortMembers(members []memberRow, sortBy, sortDir string) {
 		}
 		return less
 	})
+}
+
+// filterMembersByRole filters members by their role.
+func filterMembersByRole(members []memberRow, roleFilter string) []memberRow {
+	if roleFilter == "all" || roleFilter == "" {
+		return members
+	}
+
+	var filtered []memberRow
+	for _, m := range members {
+		if m.Role == roleFilter {
+			filtered = append(filtered, m)
+		}
+	}
+	return filtered
+}
+
+// getAvailableRoles returns the roles that a viewer can see based on their role.
+func getAvailableRoles(viewerRole string) []string {
+	switch viewerRole {
+	case "superadmin", "admin":
+		return []string{"all", "member", "leader", "coordinator", "admin", "superadmin"}
+	case "coordinator":
+		return []string{"all", "member", "leader"}
+	case "leader":
+		return []string{"member"} // Only one role, no filter shown
+	default:
+		return nil
+	}
+}
+
+// buildRoleOptions builds the role filter options for the dropdown.
+func buildRoleOptions(availableRoles []string, selectedRole string) []roleOption {
+	labels := map[string]string{
+		"all":        "All Roles",
+		"member":     "Members",
+		"leader":     "Leaders",
+		"coordinator": "Coordinators",
+		"admin":      "Admins",
+		"superadmin": "Super Admins",
+	}
+
+	var options []roleOption
+	for _, role := range availableRoles {
+		options = append(options, roleOption{
+			Value:    role,
+			Label:    labels[role],
+			Selected: role == selectedRole || (selectedRole == "" && role == "all"),
+		})
+	}
+	return options
 }
 
 // formatPageName converts a URL path to a readable page name.

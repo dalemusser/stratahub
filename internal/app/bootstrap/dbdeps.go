@@ -3,7 +3,7 @@ package bootstrap
 
 import (
 	"github.com/dalemusser/stratahub/internal/app/system/mailer"
-	"github.com/dalemusser/stratahub/internal/app/system/workers"
+	"github.com/dalemusser/stratahub/internal/app/system/tasks"
 	"github.com/dalemusser/waffle/pantry/storage"
 	"go.mongodb.org/mongo-driver/mongo"
 )
@@ -34,6 +34,6 @@ type DBDeps struct {
 	// Mailer for sending emails (verification codes, etc.)
 	Mailer *mailer.Mailer
 
-	// Background workers
-	SessionCleanupWorker *workers.SessionCleanup
+	// Background task runner for cleanup jobs
+	TaskRunner *tasks.Runner
 }

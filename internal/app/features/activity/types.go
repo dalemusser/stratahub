@@ -8,6 +8,7 @@ package activity
 import (
 	"time"
 
+	"github.com/dalemusser/stratahub/internal/app/system/timezones"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -27,7 +28,7 @@ const OnlineThreshold = 2 * time.Minute
 // IdleThreshold is the duration after which a user is considered "idle" (but not offline).
 const IdleThreshold = 10 * time.Minute
 
-// memberRow represents a member in the activity dashboard.
+// memberRow represents a user in the activity dashboard.
 type memberRow struct {
 	ID              string
 	Name            string
@@ -35,6 +36,7 @@ type memberRow struct {
 	Email           string
 	OrgName         string
 	GroupName       string
+	Role            string // User's role (member, leader, coordinator, admin, superadmin)
 	Status          Status
 	StatusLabel     string
 	CurrentActivity string
@@ -50,6 +52,13 @@ type groupOption struct {
 	Selected bool
 }
 
+// roleOption represents a role for the filter dropdown.
+type roleOption struct {
+	Value    string // "all", "member", "leader", "coordinator", "admin", "superadmin"
+	Label    string // "All Roles", "Members", "Leaders", etc.
+	Selected bool
+}
+
 // dashboardData is the view model for the real-time dashboard.
 type dashboardData struct {
 	viewdata.BaseVM
@@ -59,9 +68,12 @@ type dashboardData struct {
 	Groups        []groupOption
 	StatusFilter  string // "all", "online", "idle", "offline"
 	SearchQuery   string
+	RoleFilter    string       // "all", "member", "leader", "coordinator", "admin", "superadmin"
+	Roles         []roleOption // Available roles for the current viewer
+	ShowRoleFilter bool        // True when multiple roles available to filter
 
 	// Sorting
-	SortBy  string // "name", "group", "time"
+	SortBy  string // "name", "group", "time", "role"
 	SortDir string // "asc", "desc"
 
 	// Pagination
@@ -84,12 +96,13 @@ type dashboardData struct {
 	Members []memberRow
 }
 
-// summaryRow represents a member in the weekly summary view.
+// summaryRow represents a user in the weekly summary view.
 type summaryRow struct {
 	ID           string
 	Name         string
 	Email        string
 	GroupName    string
+	Role         string // User's role (member, leader, coordinator, admin, superadmin)
 	SessionCount int
 	TotalTimeStr string // Pre-formatted "Xh Ym" or "X min"
 	OutsideClass int    // Sessions at unusual times
@@ -100,31 +113,37 @@ type summaryData struct {
 	viewdata.BaseVM
 
 	// Filter state
-	SelectedGroup string
-	Groups        []groupOption
-	WeekStart     string
-	WeekEnd       string
+	SelectedGroup  string
+	Groups         []groupOption
+	RoleFilter     string       // "all", "member", "leader", "coordinator", "admin", "superadmin"
+	Roles          []roleOption // Available roles for the current viewer
+	ShowRoleFilter bool         // True when multiple roles available to filter
+	WeekStart      string
+	WeekEnd        string
 
-	// Member rows
+	// User rows
 	Members []summaryRow
 }
 
 // activityEvent represents an event in the member detail timeline.
 type activityEvent struct {
 	Time        time.Time
-	TimeLabel   string
+	TimeLabel   string // Formatted time (fallback)
+	TimeISO     string // ISO 8601 format for client-side formatting
 	EventType   string
 	Description string
 }
 
 // sessionBlock represents a session in the member detail view.
 type sessionBlock struct {
-	Date         string
-	LoginTime    string
-	LogoutTime   string
-	Duration     string
-	EndReason    string
-	Events       []activityEvent
+	Date           string
+	LoginTime      string    // Formatted time (fallback)
+	LoginTimeISO   string    // ISO 8601 format for client-side formatting
+	LogoutTime     string    // Formatted time (fallback)
+	LogoutTimeISO  string    // ISO 8601 format for client-side formatting (empty if active)
+	Duration       string
+	EndReason      string
+	Events         []activityEvent
 }
 
 // memberDetailData is the view model for the member detail view.
@@ -139,9 +158,9 @@ type memberDetailData struct {
 	GroupNames string
 	OrgName    string
 
-	// Timezone info
-	TimezoneName  string // e.g., "America/Denver"
-	TimezoneLabel string // e.g., "MST" or "MDT"
+	// Timezone selector
+	Timezone       string               // Selected timezone ID (e.g., "America/Denver")
+	TimezoneGroups []timezones.ZoneGroup // Grouped timezone options for dropdown
 
 	// Stats
 	TotalSessions    int

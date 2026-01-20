@@ -75,7 +75,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	// Create the session manager using app config.
 	// Secure cookies are enabled in production mode.
 	secure := coreCfg.Env == "prod"
-	sessionMgr, err := auth.NewSessionManager(appCfg.SessionKey, appCfg.SessionName, appCfg.SessionDomain, secure, logger)
+	sessionMgr, err := auth.NewSessionManager(appCfg.SessionKey, appCfg.SessionName, appCfg.SessionDomain, appCfg.SessionMaxAge, secure, logger)
 	if err != nil {
 		logger.Error("session manager init failed", zap.Error(err))
 		return nil, err
@@ -365,6 +365,9 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 			sr.Use(sessionMgr.RequireRole("admin"))
 			announcementsHandler.MountRoutes(sr)
 		})
+
+		// User-facing announcements view (authenticated users)
+		wsr.Mount("/my-announcements", announcementsfeature.ViewRoutes(announcementsHandler, sessionMgr))
 	})
 
 	// System status page (admin only - no workspace required)
@@ -376,6 +379,10 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		SessionKey:                appCfg.SessionKey,
 		SessionName:               appCfg.SessionName,
 		SessionDomain:             appCfg.SessionDomain,
+		SessionMaxAge:             appCfg.SessionMaxAge,
+		IdleLogoutEnabled:         appCfg.IdleLogoutEnabled,
+		IdleLogoutTimeout:         appCfg.IdleLogoutTimeout,
+		IdleLogoutWarning:         appCfg.IdleLogoutWarning,
 		CSRFKey:                   appCfg.CSRFKey,
 		StorageType:               appCfg.StorageType,
 		StorageLocalPath:          appCfg.StorageLocalPath,
@@ -409,6 +416,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 
 	// Heartbeat API (for activity tracking - no workspace required for cross-domain tracking)
 	heartbeatHandler := heartbeatfeature.NewHandler(sessionsStore, activityStore, sessionMgr, logger)
+	heartbeatHandler.SetIdleLogoutConfig(appCfg.IdleLogoutEnabled, appCfg.IdleLogoutTimeout, appCfg.IdleLogoutWarning)
 	r.Mount("/api/heartbeat", heartbeatfeature.Routes(heartbeatHandler, sessionMgr))
 
 	// 404 catch-all for unmatched routes

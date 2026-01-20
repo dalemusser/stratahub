@@ -14,9 +14,10 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/store/activity"
 	"github.com/dalemusser/stratahub/internal/app/store/audit"
 	"github.com/dalemusser/stratahub/internal/app/store/emailverify"
+	"github.com/dalemusser/stratahub/internal/app/store/oauthstate"
 	"github.com/dalemusser/stratahub/internal/app/store/sessions"
 	workspacestore "github.com/dalemusser/stratahub/internal/app/store/workspaces"
-	"github.com/dalemusser/stratahub/internal/app/system/workers"
+	"github.com/dalemusser/stratahub/internal/app/system/tasks"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/config"
 	"github.com/dalemusser/waffle/pantry/text"
@@ -108,15 +109,17 @@ func Startup(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, 
 		return err
 	}
 
-	// Start session cleanup background worker
-	// Runs every minute, closes sessions inactive for more than 10 minutes
-	deps.SessionCleanupWorker = workers.NewSessionCleanup(
-		sessionsStore,
-		logger,
-		1*time.Minute,  // check every minute
-		10*time.Minute, // close sessions inactive for 10+ minutes
-	)
-	deps.SessionCleanupWorker.Start()
+	// Start background task runner
+	oauthStateStore := oauthstate.New(deps.StrataHubMongoDatabase)
+	deps.TaskRunner = tasks.New(logger)
+
+	// Close sessions inactive for 10+ minutes (checked every minute)
+	deps.TaskRunner.Register(tasks.InactiveSessionCleanupJob(sessionsStore, logger, 10*time.Minute))
+
+	// Cleanup expired OAuth states (backup for TTL index)
+	deps.TaskRunner.Register(tasks.OAuthStateCleanupJob(oauthStateStore, logger))
+
+	deps.TaskRunner.Start()
 
 	return nil
 }

@@ -23,6 +23,13 @@ var appConfigKeys = []config.AppKey{
 	{Name: "session_key", Default: "dev-only-change-me-please-0123456789ABCDEF", Desc: "Session signing key (must be strong in production)"},
 	{Name: "session_name", Default: "stratahub-session", Desc: "Session cookie name"},
 	{Name: "session_domain", Default: "", Desc: "Session cookie domain (blank means current host)"},
+	{Name: "session_max_age", Default: "24h", Desc: "Session cookie max age (e.g., 24h, 720h, 30m)"},
+
+	// Idle logout configuration
+	{Name: "idle_logout_enabled", Default: false, Desc: "Enable automatic logout after idle time"},
+	{Name: "idle_logout_timeout", Default: "30m", Desc: "Idle timeout duration before logout"},
+	{Name: "idle_logout_warning", Default: "5m", Desc: "Warning time before idle logout"},
+
 	{Name: "csrf_key", Default: "dev-only-csrf-key-please-change-0123456789", Desc: "CSRF token signing key (32+ chars in production)"},
 
 	// File storage configuration
@@ -99,7 +106,14 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 		SessionKey:    appValues.String("session_key"),
 		SessionName:   appValues.String("session_name"),
 		SessionDomain: appValues.String("session_domain"),
-		CSRFKey:       appValues.String("csrf_key"),
+		SessionMaxAge: appValues.Duration("session_max_age", 24*time.Hour),
+
+		// Idle logout
+		IdleLogoutEnabled: appValues.Bool("idle_logout_enabled"),
+		IdleLogoutTimeout: appValues.Duration("idle_logout_timeout", 30*time.Minute),
+		IdleLogoutWarning: appValues.Duration("idle_logout_warning", 5*time.Minute),
+
+		CSRFKey: appValues.String("csrf_key"),
 
 		// File storage
 		StorageType:      appValues.String("storage_type"),

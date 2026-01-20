@@ -232,6 +232,10 @@
   {{ end }}
 
   {{ if .IsLoggedIn }}
+    {{/* Announcements only on workspace (not apex) */}}
+    {{ if not .IsApex }}
+      <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/my-announcements" title="Announcements"><span class="menu-icon mr-2">📢</span><span class="menu-text">Announcements</span></a>
+    {{ end }}
     <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/profile" title="Profile"><span class="menu-icon mr-2">👤</span><span class="menu-text">Profile</span></a>
     {{/* Settings only for admin on workspace (not apex) */}}
     {{ if and (eq .Role "admin") (not .IsApex) }}

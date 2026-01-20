@@ -34,9 +34,15 @@ type AppConfig struct {
 	MongoMinPoolSize uint64 // Minimum connections to keep warm (default: 10)
 
 	// Session management configuration
-	SessionKey    string // Secret key for signing session cookies (must be strong in production)
-	SessionName   string // Cookie name for sessions (default: stratahub-session)
-	SessionDomain string // Cookie domain (blank means current host)
+	SessionKey    string        // Secret key for signing session cookies (must be strong in production)
+	SessionName   string        // Cookie name for sessions (default: stratahub-session)
+	SessionDomain string        // Cookie domain (blank means current host)
+	SessionMaxAge time.Duration // Maximum session cookie lifetime (default: 24h)
+
+	// Idle logout configuration
+	IdleLogoutEnabled bool          // Enable automatic logout after idle time
+	IdleLogoutTimeout time.Duration // Duration of inactivity before logout (default: 30m)
+	IdleLogoutWarning time.Duration // Time before logout to show warning (default: 5m)
 
 	// CSRF protection configuration
 	CSRFKey string // Secret key for CSRF token signing (32+ chars in production)

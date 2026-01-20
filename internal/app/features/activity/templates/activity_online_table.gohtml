@@ -1,5 +1,5 @@
 {{ define "activity_online_table" }}
-<div hx-get="/activity/online-table?group={{ .SelectedGroup }}&status={{ .StatusFilter }}&search={{ .SearchQuery }}&sort={{ .SortBy }}&dir={{ .SortDir }}&page={{ .Page }}"
+<div hx-get="/activity/online-table?group={{ .SelectedGroup }}&status={{ .StatusFilter }}&role={{ .RoleFilter }}&search={{ .SearchQuery }}&sort={{ .SortBy }}&dir={{ .SortDir }}&page={{ .Page }}"
      hx-trigger="every 30s"
      hx-target="#online-table"
      hx-swap="innerHTML">
@@ -11,7 +11,7 @@
   <div class="flex items-center gap-2">
     {{ if .HasPrev }}
       <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap cursor-pointer"
-         hx-get="/activity/online-table?group={{ .SelectedGroup }}&status={{ .StatusFilter }}&search={{ .SearchQuery }}&sort={{ .SortBy }}&dir={{ .SortDir }}&page={{ .PrevPage }}"
+         hx-get="/activity/online-table?group={{ .SelectedGroup }}&status={{ .StatusFilter }}&role={{ .RoleFilter }}&search={{ .SearchQuery }}&sort={{ .SortBy }}&dir={{ .SortDir }}&page={{ .PrevPage }}"
          hx-target="#online-table"
          hx-swap="innerHTML">Prev</a>
     {{ else }}
@@ -19,7 +19,7 @@
     {{ end }}
     {{ if .HasNext }}
       <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border dark:border-gray-600 rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap cursor-pointer"
-         hx-get="/activity/online-table?group={{ .SelectedGroup }}&status={{ .StatusFilter }}&search={{ .SearchQuery }}&sort={{ .SortBy }}&dir={{ .SortDir }}&page={{ .NextPage }}"
+         hx-get="/activity/online-table?group={{ .SelectedGroup }}&status={{ .StatusFilter }}&role={{ .RoleFilter }}&search={{ .SearchQuery }}&sort={{ .SortBy }}&dir={{ .SortDir }}&page={{ .NextPage }}"
          hx-target="#online-table"
          hx-swap="innerHTML">Next</a>
     {{ else }}
@@ -31,18 +31,18 @@
 <div class="p-4 bg-white dark:bg-gray-800 rounded shadow overflow-auto" style="max-height: calc(100vh - 19rem); min-height: 10rem;">
   {{ if eq (len .Members) 0 }}
   <div class="p-8 text-center text-gray-500 dark:text-gray-400">
-    No members found matching the selected filters.
+    No users found matching the selected filters.
   </div>
   {{ else }}
   <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
     <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs sticky top-0 z-10">
       <tr class="border-b border-gray-300 dark:border-gray-600">
         <th class="px-4 py-2 w-1/4">
-          <a hx-get="/activity/online-table?group={{ $.SelectedGroup }}&status={{ $.StatusFilter }}&search={{ $.SearchQuery }}&sort=name&dir={{ if and (eq $.SortBy "name") (eq $.SortDir "asc") }}desc{{ else }}asc{{ end }}&page=1"
+          <a hx-get="/activity/online-table?group={{ $.SelectedGroup }}&status={{ $.StatusFilter }}&role={{ $.RoleFilter }}&search={{ $.SearchQuery }}&sort=name&dir={{ if and (eq $.SortBy "name") (eq $.SortDir "asc") }}desc{{ else }}asc{{ end }}&page=1"
              hx-target="#online-table"
              hx-swap="innerHTML"
              class="flex items-center gap-1 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer">
-            Member
+            User
             {{ if eq $.SortBy "name" }}
               {{ if eq $.SortDir "asc" }}<span class="text-indigo-600 dark:text-indigo-400">▼</span>{{ else }}<span class="text-indigo-600 dark:text-indigo-400">▲</span>{{ end }}
             {{ else }}
@@ -51,7 +51,7 @@
           </a>
         </th>
         <th class="px-4 py-2 w-1/5">
-          <a hx-get="/activity/online-table?group={{ $.SelectedGroup }}&status={{ $.StatusFilter }}&search={{ $.SearchQuery }}&sort=group&dir={{ if and (eq $.SortBy "group") (eq $.SortDir "asc") }}desc{{ else }}asc{{ end }}&page=1"
+          <a hx-get="/activity/online-table?group={{ $.SelectedGroup }}&status={{ $.StatusFilter }}&role={{ $.RoleFilter }}&search={{ $.SearchQuery }}&sort=group&dir={{ if and (eq $.SortBy "group") (eq $.SortDir "asc") }}desc{{ else }}asc{{ end }}&page=1"
              hx-target="#online-table"
              hx-swap="innerHTML"
              class="flex items-center gap-1 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer">
@@ -63,10 +63,13 @@
             {{ end }}
           </a>
         </th>
+        {{ if $.ShowRoleFilter }}
+        <th class="px-4 py-2 w-24 text-center">Role</th>
+        {{ end }}
         <th class="px-4 py-2 w-20 text-center">Status</th>
         <th class="px-4 py-2">Current Activity</th>
         <th class="px-4 py-2 w-28">
-          <a hx-get="/activity/online-table?group={{ $.SelectedGroup }}&status={{ $.StatusFilter }}&search={{ $.SearchQuery }}&sort=time&dir={{ if and (eq $.SortBy "time") (eq $.SortDir "desc") }}asc{{ else }}desc{{ end }}&page=1"
+          <a hx-get="/activity/online-table?group={{ $.SelectedGroup }}&status={{ $.StatusFilter }}&role={{ $.RoleFilter }}&search={{ $.SearchQuery }}&sort=time&dir={{ if and (eq $.SortBy "time") (eq $.SortDir "desc") }}asc{{ else }}desc{{ end }}&page=1"
              hx-target="#online-table"
              hx-swap="innerHTML"
              class="flex items-center gap-1 hover:text-gray-900 dark:hover:text-gray-200 cursor-pointer">
@@ -89,8 +92,23 @@
           <div class="text-xs text-gray-500 dark:text-gray-400 truncate">{{ .LoginID }}</div>
         </td>
         <td class="px-4 py-2 align-middle" title="{{ .OrgName }}">
-          <div class="text-sm text-gray-600 dark:text-gray-300 truncate">{{ .GroupName }}</div>
+          <div class="text-sm text-gray-600 dark:text-gray-300 truncate">{{ if .GroupName }}{{ .GroupName }}{{ else }}<span class="text-gray-400">--</span>{{ end }}</div>
         </td>
+        {{ if $.ShowRoleFilter }}
+        <td class="px-4 py-2 align-middle text-center">
+          {{ if eq .Role "superadmin" }}
+          <span class="inline-block px-2 py-1 text-xs font-medium text-center rounded bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-400">Super Admin</span>
+          {{ else if eq .Role "admin" }}
+          <span class="inline-block px-2 py-1 text-xs font-medium text-center rounded bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-400">Admin</span>
+          {{ else if eq .Role "coordinator" }}
+          <span class="inline-block px-2 py-1 text-xs font-medium text-center rounded bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-400">Coordinator</span>
+          {{ else if eq .Role "leader" }}
+          <span class="inline-block px-2 py-1 text-xs font-medium text-center rounded bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-400">Leader</span>
+          {{ else }}
+          <span class="inline-block px-2 py-1 text-xs font-medium text-center rounded bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">Member</span>
+          {{ end }}
+        </td>
+        {{ end }}
         <td class="px-4 py-2 align-middle text-center">
           {{ if eq .Status "online" }}
           <span class="inline-block w-16 px-2 py-1 text-xs font-medium text-center rounded bg-green-100 text-green-700 dark:bg-green-900/40 dark:text-green-400">Active</span>

@@ -119,8 +119,35 @@ This configuration:
 | `session_key` | string | *(dev default)* | Secret key for signing session cookies |
 | `session_name` | string | `"stratahub-session"` | Session cookie name |
 | `session_domain` | string | `""` | Session cookie domain (blank = current host) |
+| `session_max_age` | duration | `"24h"` | Session cookie lifetime (e.g., `24h`, `720h`, `30m`) |
 
 > **Security Note:** The `session_key` must be a strong, random string in production. Never use the default development key in production environments.
+
+### Idle Logout Configuration
+
+StrataHub can automatically log out users who are idle (browser tab open but no interaction). This is useful for security-sensitive deployments where unattended sessions should be terminated.
+
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| `idle_logout_enabled` | bool | `false` | Enable automatic logout after idle time |
+| `idle_logout_timeout` | duration | `"30m"` | Duration of inactivity before logout |
+| `idle_logout_warning` | duration | `"5m"` | Time before logout to show warning banner |
+
+**How it works:**
+- "Idle" means the browser tab is open (heartbeat running) but the user hasn't interacted (no clicks, keystrokes, or scrolling)
+- When idle time approaches the timeout, a yellow warning banner appears: "You will be logged out due to inactivity in X minute(s). [Stay Logged In]"
+- Clicking "Stay Logged In" or any user interaction resets the idle timer
+- If the user doesn't interact, they are automatically logged out when the timeout expires
+
+**Example configuration:**
+```toml
+# Log out users after 15 minutes of inactivity, warn 2 minutes before
+idle_logout_enabled = true
+idle_logout_timeout = "15m"
+idle_logout_warning = "2m"
+```
+
+> **Note:** Idle logout is disabled by default. When disabled, sessions remain active as long as the browser tab is open (within `session_max_age`).
 
 ---
 
@@ -614,6 +641,12 @@ mongo_database = "strata_hub"
 session_key = "dev-only-change-me-please-0123456789ABCDEF"
 session_name = "stratahub-session"
 session_domain = ""
+session_max_age = "24h"
+
+# Idle Logout (disabled by default)
+# idle_logout_enabled = false
+# idle_logout_timeout = "30m"
+# idle_logout_warning = "5m"
 ```
 
 ### Running the Application
@@ -657,4 +690,10 @@ export STRATAHUB_DOMAIN=yourdomain.com
 export STRATAHUB_MONGO_URI="mongodb://user:password@mongo.yourdomain.com:27017/strata_hub?authSource=admin"
 export STRATAHUB_SESSION_KEY="$(openssl rand -hex 32)"
 export STRATAHUB_SESSION_DOMAIN=".yourdomain.com"
+export STRATAHUB_SESSION_MAX_AGE=24h
+
+# Optional: Enable idle logout for security-sensitive deployments
+# export STRATAHUB_IDLE_LOGOUT_ENABLED=true
+# export STRATAHUB_IDLE_LOGOUT_TIMEOUT=30m
+# export STRATAHUB_IDLE_LOGOUT_WARNING=5m
 ```
