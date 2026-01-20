@@ -30,17 +30,29 @@ import (
 //
 // StrataHub disconnects the MongoDB client to release connection pool resources.
 func Shutdown(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, logger *zap.Logger) error {
-	// Stop background workers first
-	if deps.SessionCleanupWorker != nil {
-		deps.SessionCleanupWorker.Stop()
+	var firstErr error
+
+	// Stop background task runner with context timeout
+	if deps.TaskRunner != nil {
+		logger.Info("stopping background task runner")
+		if err := deps.TaskRunner.Stop(ctx); err != nil {
+			logger.Warn("background task runner did not stop cleanly", zap.Error(err))
+			if firstErr == nil {
+				firstErr = err
+			}
+		}
 	}
 
+	// Disconnect MongoDB client
 	if deps.StrataHubMongoClient != nil {
 		logger.Info("disconnecting StrataHub MongoDB client")
 		if err := deps.StrataHubMongoClient.Disconnect(ctx); err != nil {
 			logger.Error("MongoDB disconnect failed", zap.Error(err))
-			return err
+			if firstErr == nil {
+				firstErr = err
+			}
 		}
 	}
-	return nil
+
+	return firstErr
 }

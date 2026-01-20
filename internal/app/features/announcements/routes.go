@@ -9,6 +9,7 @@ func (h *Handler) MountRoutes(r chi.Router) {
 	r.Get("/", h.List)
 	r.Get("/new", h.ShowNew)
 	r.Post("/new", h.Create)
+	r.Get("/{id}", h.Show)
 	r.Get("/{id}/manage_modal", h.ManageModal)
 	r.Get("/{id}/edit", h.ShowEdit)
 	r.Post("/{id}", h.Update)

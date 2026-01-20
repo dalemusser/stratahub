@@ -49,7 +49,7 @@
          hx-target="#online-table"
          hx-swap="innerHTML"
          hx-trigger="keyup changed delay:300ms"
-         hx-include="#group-filter, #status-filter"
+         hx-include="#group-filter, #status-filter{{ if .ShowRoleFilter }}, #role-filter{{ end }}"
          hx-vals='{"sort":"{{ .SortBy }}","dir":"{{ .SortDir }}","page":"1"}'>
 
   <div class="flex items-center gap-2">
@@ -59,7 +59,7 @@
             hx-get="/activity/online-table"
             hx-target="#online-table"
             hx-swap="innerHTML"
-            hx-include="#search-filter, #status-filter"
+            hx-include="#search-filter, #status-filter{{ if .ShowRoleFilter }}, #role-filter{{ end }}"
             hx-vals='{"sort":"{{ .SortBy }}","dir":"{{ .SortDir }}","page":"1"}'
             name="group">
       {{ range .Groups }}
@@ -75,7 +75,7 @@
             hx-get="/activity/online-table"
             hx-target="#online-table"
             hx-swap="innerHTML"
-            hx-include="#search-filter, #group-filter"
+            hx-include="#search-filter, #group-filter{{ if .ShowRoleFilter }}, #role-filter{{ end }}"
             hx-vals='{"sort":"{{ .SortBy }}","dir":"{{ .SortDir }}","page":"1"}'
             name="status">
       <option value="all" {{ if eq .StatusFilter "all" }}selected{{ end }}>All Statuses</option>
@@ -84,6 +84,24 @@
       <option value="offline" {{ if eq .StatusFilter "offline" }}selected{{ end }}>Offline</option>
     </select>
   </div>
+
+  {{ if .ShowRoleFilter }}
+  <div class="flex items-center gap-2">
+    <label class="text-sm text-gray-600 dark:text-gray-400">Role:</label>
+    <select id="role-filter"
+            class="text-sm border border-gray-300 dark:border-gray-600 rounded px-3 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+            hx-get="/activity/online-table"
+            hx-target="#online-table"
+            hx-swap="innerHTML"
+            hx-include="#search-filter, #group-filter, #status-filter"
+            hx-vals='{"sort":"{{ .SortBy }}","dir":"{{ .SortDir }}","page":"1"}'
+            name="role">
+      {{ range .Roles }}
+      <option value="{{ .Value }}" {{ if .Selected }}selected{{ end }}>{{ .Label }}</option>
+      {{ end }}
+    </select>
+  </div>
+  {{ end }}
 
   <!-- Refresh controls -->
   <div class="flex items-center gap-2 ml-auto">

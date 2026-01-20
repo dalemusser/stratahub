@@ -1,0 +1,248 @@
+# StrataHub Configuration Example
+# Copy this file to config.toml and update values for your environment.
+#
+# Configuration can also be set via:
+#   - Environment variables: STRATAHUB_<KEY> (e.g., STRATAHUB_MONGO_URI)
+#   - Command-line flags: --<key> (e.g., --mongo_uri)
+#
+# Precedence (highest wins): flags > env vars > config file > defaults
+
+# =============================================================================
+# RUNTIME ENVIRONMENT
+# =============================================================================
+
+# Environment mode: "dev" or "prod"
+# In prod mode, Let's Encrypt uses production servers
+env = "dev"
+
+# Log level: debug, info, warn, error
+log_level = "debug"
+
+# =============================================================================
+# HTTP SERVER
+# =============================================================================
+
+# HTTP port (default: 8080)
+http_port = 8080
+
+# HTTPS port (default: 443, used when use_https = true)
+https_port = 443
+
+# Enable HTTPS (requires TLS configuration below)
+use_https = false
+
+# HTTP server timeouts
+read_timeout = "15s"
+read_header_timeout = "10s"
+write_timeout = "60s"
+idle_timeout = "120s"
+shutdown_timeout = "15s"
+
+# Maximum request body size in bytes (default: 2MB, 0 = no limit, -1 = reject all)
+max_request_body_bytes = 2097152
+
+# =============================================================================
+# TLS / HTTPS (only needed if use_https = true)
+# =============================================================================
+
+# Option 1: Let's Encrypt (automatic certificates)
+# use_lets_encrypt = true
+# lets_encrypt_email = "admin@example.com"
+# lets_encrypt_cache_dir = "letsencrypt-cache"
+# domain = "example.com"
+# For wildcard certs (required for multi-workspace), use dns-01 challenge:
+# lets_encrypt_challenge = "dns-01"
+# route53_hosted_zone_id = "Z1234567890ABC"
+# domains = '["example.com", "*.example.com"]'
+
+# Option 2: Manual TLS (your own certificates)
+# cert_file = "/path/to/cert.pem"
+# key_file = "/path/to/key.pem"
+
+# =============================================================================
+# DATABASE
+# =============================================================================
+
+# MongoDB connection URI
+mongo_uri = "mongodb://localhost:27017"
+
+# MongoDB database name
+mongo_database = "strata_hub"
+
+# Connection pool settings
+mongo_max_pool_size = 100
+mongo_min_pool_size = 10
+
+# Database connection timeout
+db_connect_timeout = "10s"
+
+# Index creation timeout on startup
+index_boot_timeout = "120s"
+
+# =============================================================================
+# SESSIONS & SECURITY
+# =============================================================================
+
+# Session signing key (MUST be changed in production, 32+ characters)
+session_key = "dev-only-change-me-please-0123456789ABCDEF"
+
+# Session cookie name
+session_name = "stratahub-session"
+
+# Session cookie domain (blank = current host only)
+# For multi-workspace mode with subdomains, use ".example.com" (with leading dot)
+# This is auto-derived from primary_domain if not set in multi-workspace mode
+session_domain = ""
+
+# Session duration (e.g., 24h, 720h for 30 days)
+session_max_age = "24h"
+
+# CSRF token signing key (MUST be changed in production, 32+ characters)
+csrf_key = "dev-only-csrf-key-please-change-0123456789"
+
+# =============================================================================
+# IDLE LOGOUT
+# =============================================================================
+
+# Enable automatic logout after idle time
+idle_logout_enabled = false
+
+# Idle timeout duration before logout
+idle_logout_timeout = "30m"
+
+# Warning time before idle logout
+idle_logout_warning = "5m"
+
+# =============================================================================
+# MULTI-WORKSPACE MODE
+# =============================================================================
+
+# Enable multi-workspace mode (subdomain-based tenancy)
+# When enabled, each workspace has its own subdomain (e.g., team1.example.com)
+multi_workspace = false
+
+# Primary domain for OAuth callbacks and workspace selector
+# Required when multi_workspace = true (e.g., "example.com")
+# Session domain is auto-derived as ".example.com" for cross-subdomain cookies
+primary_domain = ""
+
+# =============================================================================
+# DEFAULT WORKSPACE
+# =============================================================================
+
+# Display name for the default workspace
+default_workspace_name = "Default"
+
+# Subdomain for the default workspace (e.g., "app" -> app.example.com)
+default_workspace_subdomain = "app"
+
+# =============================================================================
+# SUPERADMIN
+# =============================================================================
+
+# Email of the superadmin user (creates/promotes on startup)
+# Leave empty to disable automatic superadmin creation
+superadmin_email = ""
+
+# =============================================================================
+# FILE STORAGE
+# =============================================================================
+
+# Storage backend: "local" or "s3"
+storage_type = "local"
+
+# --- Local Storage ---
+# Path for uploaded files
+storage_local_path = "./uploads/materials"
+
+# URL prefix for serving files
+storage_local_url = "/files/materials"
+
+# --- S3 Storage (uncomment to use) ---
+# storage_type = "s3"
+# storage_s3_region = "us-east-1"
+# storage_s3_bucket = "my-bucket"
+# storage_s3_prefix = "materials/"
+
+# --- CloudFront CDN (optional, for S3) ---
+# storage_cf_url = "https://d1234567890.cloudfront.net"
+# storage_cf_keypair_id = "APKAXXXXXXXXXXXXXXXX"
+# storage_cf_key_path = "/path/to/cloudfront-private-key.pem"
+
+# =============================================================================
+# EMAIL / SMTP
+# =============================================================================
+
+# SMTP server settings
+mail_smtp_host = "localhost"
+mail_smtp_port = 1025
+mail_smtp_user = ""
+mail_smtp_pass = ""
+
+# From address for outgoing emails
+mail_from = "noreply@stratahub.com"
+mail_from_name = "StrataHub"
+
+# Base URL for email links (magic links, password reset, etc.)
+# In multi-workspace mode, this should be the primary domain
+base_url = "http://localhost:3000"
+
+# Email verification code/link expiry
+email_verify_expiry = "10m"
+
+# =============================================================================
+# GOOGLE OAUTH (optional)
+# =============================================================================
+
+# Google OAuth2 credentials
+# Get these from: https://console.cloud.google.com/apis/credentials
+# For multi-workspace mode, add redirect URIs for each subdomain or use
+# the primary domain for OAuth callbacks
+google_client_id = ""
+google_client_secret = ""
+
+# =============================================================================
+# AUDIT LOGGING
+# =============================================================================
+
+# Auth event logging: "all" (db+log), "db", "log", or "off"
+audit_log_auth = "all"
+
+# Admin event logging: "all" (db+log), "db", "log", or "off"
+audit_log_admin = "all"
+
+# =============================================================================
+# COMPRESSION
+# =============================================================================
+
+# Enable HTTP response compression
+enable_compression = true
+
+# Compression level (1 = fastest, 9 = best compression)
+compression_level = 5
+
+# =============================================================================
+# CORS (Cross-Origin Resource Sharing)
+# =============================================================================
+
+# Enable CORS headers
+enable_cors = false
+
+# Allowed origins (JSON array or comma-separated in env var)
+# For multi-workspace mode, you may need to allow all subdomains
+# cors_allowed_origins = '["https://example.com", "https://*.example.com"]'
+
+# Allowed HTTP methods
+# cors_allowed_methods = '["GET", "POST", "PUT", "DELETE"]'
+
+# Allowed request headers
+# cors_allowed_headers = '["Accept", "Authorization", "Content-Type"]'
+
+# Headers exposed to the browser
+# cors_exposed_headers = '["Link"]'
+
+# Allow credentials (cookies, authorization headers)
+cors_allow_credentials = false
+
+# Preflight cache duration in seconds
+cors_max_age = 0

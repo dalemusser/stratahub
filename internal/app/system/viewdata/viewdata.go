@@ -50,6 +50,7 @@ type BaseVM struct {
 
 	// User context (from auth middleware)
 	IsLoggedIn bool
+	LoginID    string // User's login identifier (for per-user tracking)
 	Role       string
 	UserName   string
 	UserOrg    string // Organization name for leaders/members
@@ -133,9 +134,12 @@ func NewBaseVM(r *http.Request, db *mongo.Database, title, backDefault string) B
 		CSRFToken:   csrf.Token(r),
 	}
 
-	// Get organization name for leaders/members
-	if user, ok := auth.CurrentUser(r); ok && user.OrganizationName != "" {
-		vm.UserOrg = user.OrganizationName
+	// Get LoginID and organization name from session if logged in
+	if user, ok := auth.CurrentUser(r); ok {
+		vm.LoginID = user.LoginID
+		if user.OrganizationName != "" {
+			vm.UserOrg = user.OrganizationName
+		}
 	}
 
 	if db != nil {
@@ -157,8 +161,8 @@ func NewBaseVM(r *http.Request, db *mongo.Database, title, backDefault string) B
 		}
 	}
 
-	// Load active announcements if loader is configured
-	if announcementLoader != nil {
+	// Load active announcements only if logged in and loader is configured
+	if signedIn && announcementLoader != nil {
 		vm.Announcements = announcementLoader(r.Context())
 	}
 

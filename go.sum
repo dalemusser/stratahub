@@ -104,6 +104,8 @@ github.com/dalemusser/waffle v0.1.30 h1:78uFzyt+RqE07tF2QizDdx50MVZvoT/Snid8KaH4
 github.com/dalemusser/waffle v0.1.30/go.mod h1:zd3snpTWrWGNfciuVyYKgAk/ttEn1fC8kynCKU2ZNsI=
 github.com/dalemusser/waffle v0.1.31 h1:6VCsum36MK8ijdJ+oi+8I2l2Urwd0EBENVc6HBBuNYw=
 github.com/dalemusser/waffle v0.1.31/go.mod h1:zd3snpTWrWGNfciuVyYKgAk/ttEn1fC8kynCKU2ZNsI=
+github.com/dalemusser/waffle v0.1.33 h1:W0JyoYnkFrzMr1XPManYyRDQ9T8k3t8uhnBRpSX8M9E=
+github.com/dalemusser/waffle v0.1.33/go.mod h1:zd3snpTWrWGNfciuVyYKgAk/ttEn1fC8kynCKU2ZNsI=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc h1:U9qPSI2PIWSS1VwoXQT9A3Wy9MM3WgvqSxFWenqJduM=
 github.com/davecgh/go-spew v1.1.2-0.20180830191138-d8f796af33cc/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/envoyproxy/go-control-plane v0.13.5-0.20251024222203-75eaa193e329 h1:K+fnvUM0VZ7ZFJf0n4L/BRlnsb9pL/GuDG6FqaH+PwM=

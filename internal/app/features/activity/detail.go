@@ -14,10 +14,11 @@ import (
 	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
-	"github.com/dalemusser/stratahub/internal/app/policy/memberpolicy"
 	activitystore "github.com/dalemusser/stratahub/internal/app/store/activity"
 	sessionsstore "github.com/dalemusser/stratahub/internal/app/store/sessions"
+	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/timezones"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
@@ -26,7 +27,7 @@ import (
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
-// ServeMemberDetail renders the detailed activity view for a specific member.
+// ServeMemberDetail renders the detailed activity view for a specific user.
 // GET /activity/member/{memberID}
 func (h *Handler) ServeMemberDetail(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
@@ -35,26 +36,25 @@ func (h *Handler) ServeMemberDetail(w http.ResponseWriter, r *http.Request) {
 	memberIDStr := chi.URLParam(r, "memberID")
 	memberID, err := primitive.ObjectIDFromHex(memberIDStr)
 	if err != nil {
-		uierrors.RenderBadRequest(w, r, "Invalid member ID.", "/activity")
+		uierrors.RenderBadRequest(w, r, "Invalid user ID.", "/activity")
 		return
 	}
 
 	db := h.DB
 
-	// Check authorization - can the current user view this member?
-	memberInfo, canAccess, err := memberpolicy.CheckMemberAccess(ctx, db, r, memberID)
+	// Check authorization - can the current user view this user's activity?
+	canAccess, err := h.canViewUserActivity(ctx, r, memberID)
 	if err != nil {
-		h.ErrLog.LogServerError(w, r, "failed to check member access", err, "A database error occurred.", "/activity")
-		return
-	}
-	if memberInfo == nil {
-		uierrors.RenderNotFound(w, r, "Member not found.", "/activity")
+		h.ErrLog.LogServerError(w, r, "failed to check user access", err, "A database error occurred.", "/activity")
 		return
 	}
 	if !canAccess {
-		uierrors.RenderForbidden(w, r, "You don't have permission to view this member's activity.", "/activity")
+		uierrors.RenderForbidden(w, r, "You don't have permission to view this user's activity.", "/activity")
 		return
 	}
+
+	// Get timezone parameter (will be set client-side via JavaScript)
+	tzParam := strings.TrimSpace(r.URL.Query().Get("tz"))
 
 	// Get member details including organization
 	var member struct {
@@ -69,22 +69,14 @@ func (h *Handler) ServeMemberDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get organization timezone
-	var orgName, tzName string
-	var loc *time.Location = time.UTC // Default to UTC
+	// Get organization name
+	var orgName string
 	if member.OrgID != nil {
 		var org struct {
-			Name     string `bson:"name"`
-			TimeZone string `bson:"time_zone"`
+			Name string `bson:"name"`
 		}
 		if err := db.Collection("organizations").FindOne(ctx, bson.M{"_id": member.OrgID}).Decode(&org); err == nil {
 			orgName = org.Name
-			tzName = org.TimeZone
-			if org.TimeZone != "" {
-				if parsedLoc, err := time.LoadLocation(org.TimeZone); err == nil {
-					loc = parsedLoc
-				}
-			}
 		}
 	}
 
@@ -137,26 +129,22 @@ func (h *Handler) ServeMemberDetail(w http.ResponseWriter, r *http.Request) {
 		avgSessionMins = totalMins / totalSessions
 	}
 
-	// Build session blocks with events (converted to organization timezone)
-	sessionBlocks := h.buildSessionBlocks(sessions, events, loc)
+	// Build session blocks with events (timestamps will be formatted client-side)
+	sessionBlocks := h.buildSessionBlocks(sessions, events)
 
-	// Get timezone abbreviation for display
-	// Always show timezone - default to UTC if org has no timezone set
-	if tzName == "" {
-		tzName = "UTC"
-	}
-	tzLabel := time.Now().In(loc).Format("MST")
+	// Get timezone groups for selector
+	tzGroups, _ := timezones.Groups()
 
 	data := memberDetailData{
-		BaseVM:           viewdata.NewBaseVM(r, h.DB, "Member Activity", "/activity"),
+		BaseVM:           viewdata.NewBaseVM(r, h.DB, "Activity History", "/activity"),
 		MemberID:         memberIDStr,
 		MemberName:       member.Name,
 		LoginID:          member.LoginID,
 		Email:            member.Email,
 		GroupNames:       groupNames,
 		OrgName:          orgName,
-		TimezoneName:     tzName,
-		TimezoneLabel:    tzLabel,
+		Timezone:         tzParam,
+		TimezoneGroups:   tzGroups,
 		TotalSessions:    totalSessions,
 		TotalTimeStr:     formatDuration(int64(totalMins) * 60), // Convert mins to secs for formatDuration
 		AvgSessionMins:   avgSessionMins,
@@ -176,42 +164,15 @@ func (h *Handler) ServeMemberDetailContent(w http.ResponseWriter, r *http.Reques
 	memberIDStr := chi.URLParam(r, "memberID")
 	memberID, err := primitive.ObjectIDFromHex(memberIDStr)
 	if err != nil {
-		http.Error(w, "Invalid member ID", http.StatusBadRequest)
+		http.Error(w, "Invalid user ID", http.StatusBadRequest)
 		return
 	}
 
-	db := h.DB
-
 	// Check authorization
-	_, canAccess, err := memberpolicy.CheckMemberAccess(ctx, db, r, memberID)
+	canAccess, err := h.canViewUserActivity(ctx, r, memberID)
 	if err != nil || !canAccess {
 		http.Error(w, "Forbidden", http.StatusForbidden)
 		return
-	}
-
-	// Get organization timezone
-	var member struct {
-		OrgID *primitive.ObjectID `bson:"organization_id"`
-	}
-	if err := db.Collection("users").FindOne(ctx, bson.M{"_id": memberID}).Decode(&member); err != nil {
-		http.Error(w, "Member not found", http.StatusNotFound)
-		return
-	}
-
-	var tzName string
-	var loc *time.Location = time.UTC
-	if member.OrgID != nil {
-		var org struct {
-			TimeZone string `bson:"time_zone"`
-		}
-		if err := db.Collection("organizations").FindOne(ctx, bson.M{"_id": member.OrgID}).Decode(&org); err == nil {
-			tzName = org.TimeZone
-			if org.TimeZone != "" {
-				if parsedLoc, err := time.LoadLocation(org.TimeZone); err == nil {
-					loc = parsedLoc
-				}
-			}
-		}
 	}
 
 	// Get session history (last 30 days)
@@ -256,19 +217,11 @@ func (h *Handler) ServeMemberDetailContent(w http.ResponseWriter, r *http.Reques
 		avgSessionMins = totalMins / totalSessions
 	}
 
-	// Build session blocks
-	sessionBlocks := h.buildSessionBlocks(sessions, events, loc)
-
-	// Get timezone label
-	if tzName == "" {
-		tzName = "UTC"
-	}
-	tzLabel := time.Now().In(loc).Format("MST")
+	// Build session blocks (timestamps will be formatted client-side)
+	sessionBlocks := h.buildSessionBlocks(sessions, events)
 
 	data := memberDetailData{
 		MemberID:         memberIDStr,
-		TimezoneName:     tzName,
-		TimezoneLabel:    tzLabel,
 		TotalSessions:    totalSessions,
 		TotalTimeStr:     formatDuration(int64(totalMins) * 60),
 		AvgSessionMins:   avgSessionMins,
@@ -279,10 +232,11 @@ func (h *Handler) ServeMemberDetailContent(w http.ResponseWriter, r *http.Reques
 	templates.RenderSnippet(w, "activity_member_detail_content", data)
 }
 
-// getMemberGroupNames returns a comma-separated list of group names for a member.
+// getMemberGroupNames returns a comma-separated list of group names for a user.
+// Returns groups where the user is a member or leader.
 func (h *Handler) getMemberGroupNames(ctx context.Context, memberID primitive.ObjectID) (string, error) {
 	pipeline := []bson.M{
-		{"$match": bson.M{"user_id": memberID, "role": "member"}},
+		{"$match": bson.M{"user_id": memberID}},
 		{"$lookup": bson.M{
 			"from":         "groups",
 			"localField":   "group_id",
@@ -318,7 +272,7 @@ type sessionRecord struct {
 	ID           primitive.ObjectID `bson:"_id"`
 	LoginAt      time.Time          `bson:"login_at"`
 	LogoutAt     *time.Time         `bson:"logout_at"`
-	LastActiveAt time.Time          `bson:"last_active_at"`
+	LastActivity time.Time          `bson:"last_activity"`
 	CreatedBy    string             `bson:"created_by"`
 	EndReason    string             `bson:"end_reason"`
 	DurationSecs int64              `bson:"duration_secs"`
@@ -328,7 +282,7 @@ type sessionRecord struct {
 // It also closes any stale sessions (open but inactive for more than 10 minutes).
 func (h *Handler) getMemberSessions(ctx context.Context, memberID primitive.ObjectID, since time.Time) ([]sessionRecord, error) {
 	// First, close any stale sessions for this user
-	// A session is stale if it has no logout_at and last_active_at is > 10 minutes ago
+	// A session is stale if it has no logout_at and last_activity is > 10 minutes ago
 	staleThreshold := time.Now().UTC().Add(-10 * time.Minute)
 	h.closeStaleSessionsForUser(ctx, memberID, staleThreshold)
 
@@ -360,9 +314,9 @@ func (h *Handler) getMemberSessions(ctx context.Context, memberID primitive.Obje
 // closeStaleSessionsForUser closes sessions that are open but inactive.
 func (h *Handler) closeStaleSessionsForUser(ctx context.Context, userID primitive.ObjectID, threshold time.Time) {
 	cur, err := h.DB.Collection("sessions").Find(ctx, bson.M{
-		"user_id":        userID,
-		"logout_at":      nil,
-		"last_active_at": bson.M{"$lt": threshold},
+		"user_id":       userID,
+		"logout_at":     nil,
+		"last_activity": bson.M{"$lt": threshold},
 	})
 	if err != nil {
 		return
@@ -373,18 +327,18 @@ func (h *Handler) closeStaleSessionsForUser(ctx context.Context, userID primitiv
 		var s struct {
 			ID           primitive.ObjectID `bson:"_id"`
 			LoginAt      time.Time          `bson:"login_at"`
-			LastActiveAt time.Time          `bson:"last_active_at"`
+			LastActivity time.Time          `bson:"last_activity"`
 		}
 		if err := cur.Decode(&s); err != nil {
 			continue
 		}
 
-		// Close the session - use last_active_at as the logout time
-		duration := int64(s.LastActiveAt.Sub(s.LoginAt).Seconds())
+		// Close the session - use last_activity as the logout time
+		duration := int64(s.LastActivity.Sub(s.LoginAt).Seconds())
 		_, _ = h.DB.Collection("sessions").UpdateOne(ctx,
 			bson.M{"_id": s.ID},
 			bson.M{"$set": bson.M{
-				"logout_at":     s.LastActiveAt,
+				"logout_at":     s.LastActivity,
 				"end_reason":    "inactive",
 				"duration_secs": duration,
 			}},
@@ -424,7 +378,8 @@ func (h *Handler) getEventsForSessions(ctx context.Context, sessionIDs []primiti
 
 // buildSessionBlocks organizes sessions and events into display blocks.
 // Events are matched to sessions by timestamp range (login_at to logout_at) or by session_id.
-func (h *Handler) buildSessionBlocks(sessions []sessionRecord, events []activitystore.Event, loc *time.Location) []sessionBlock {
+// Timestamps are provided in ISO format for client-side timezone formatting.
+func (h *Handler) buildSessionBlocks(sessions []sessionRecord, events []activitystore.Event) []sessionBlock {
 	// First, try to group events by session_id (direct match)
 	eventsBySession := make(map[primitive.ObjectID][]activitystore.Event)
 	unmatchedEvents := make([]activitystore.Event, 0)
@@ -474,14 +429,16 @@ func (h *Handler) buildSessionBlocks(sessions []sessionRecord, events []activity
 
 	var blocks []sessionBlock
 	for _, s := range sessions {
-		// Convert times to organization timezone
-		loginLocal := s.LoginAt.In(loc)
-		date := loginLocal.Format("Jan 2, 2006")
-		loginTime := loginLocal.Format("3:04 PM")
+		// Format times in UTC as fallback (client-side JS will format in selected timezone)
+		date := s.LoginAt.UTC().Format("Jan 2, 2006")
+		loginTime := s.LoginAt.UTC().Format("3:04 PM")
+		loginTimeISO := s.LoginAt.UTC().Format(time.RFC3339)
 
 		logoutTime := ""
+		logoutTimeISO := ""
 		if s.LogoutAt != nil {
-			logoutTime = s.LogoutAt.In(loc).Format("3:04 PM")
+			logoutTime = s.LogoutAt.UTC().Format("3:04 PM")
+			logoutTimeISO = s.LogoutAt.UTC().Format(time.RFC3339)
 		}
 
 		duration := formatDuration(s.DurationSecs)
@@ -508,15 +465,22 @@ func (h *Handler) buildSessionBlocks(sessions []sessionRecord, events []activity
 		}
 		activityEvents = append(activityEvents, activityEvent{
 			Time:        s.LoginAt,
-			TimeLabel:   loginLocal.Format("3:04 PM"),
+			TimeLabel:   s.LoginAt.UTC().Format("3:04 PM"),
+			TimeISO:     s.LoginAt.UTC().Format(time.RFC3339),
 			EventType:   loginEventType,
 			Description: loginDesc,
 		})
 
 		for _, e := range eventsBySession[s.ID] {
+			// Skip events that occurred before this session started (orphan events from other sessions)
+			if e.Timestamp.Before(s.LoginAt) {
+				continue
+			}
+
 			ae := activityEvent{
 				Time:      e.Timestamp,
-				TimeLabel: e.Timestamp.In(loc).Format("3:04 PM"),
+				TimeLabel: e.Timestamp.UTC().Format("3:04 PM"),
+				TimeISO:   e.Timestamp.UTC().Format(time.RFC3339),
 				EventType: e.EventType,
 			}
 
@@ -542,48 +506,145 @@ func (h *Handler) buildSessionBlocks(sessions []sessionRecord, events []activity
 			}
 			activityEvents = append(activityEvents, activityEvent{
 				Time:        *s.LogoutAt,
-				TimeLabel:   s.LogoutAt.In(loc).Format("3:04 PM"),
+				TimeLabel:   s.LogoutAt.UTC().Format("3:04 PM"),
+				TimeISO:     s.LogoutAt.UTC().Format(time.RFC3339),
 				EventType:   "logout",
 				Description: logoutDesc,
 			})
 		}
 
-		// For active sessions, add idle status if no recent activity events
-		if s.LogoutAt == nil {
-			// Find the latest activity event (excluding login/resumed)
-			var lastEventTime time.Time
-			for _, e := range eventsBySession[s.ID] {
-				if e.Timestamp.After(lastEventTime) {
-					lastEventTime = e.Timestamp
-				}
-			}
-			// If no events, use login time as the idle start
-			if lastEventTime.IsZero() {
-				lastEventTime = s.LoginAt
-			}
-			// Add idle event showing when they became idle
-			activityEvents = append(activityEvents, activityEvent{
-				Time:        lastEventTime,
-				TimeLabel:   lastEventTime.In(loc).Format("3:04 PM"),
-				EventType:   "idle",
-				Description: fmt.Sprintf("Idle since %s", lastEventTime.In(loc).Format("3:04 PM")),
-			})
-		}
-
-		// Reverse events so newest are first (consistent with session ordering)
+		// Sort events by time (oldest first), then reverse so newest are first
+		slices.SortFunc(activityEvents, func(a, b activityEvent) int {
+			return a.Time.Compare(b.Time)
+		})
 		slices.Reverse(activityEvents)
 
+		// For active sessions, add "Last activity" at the very top (after reversal)
+		if s.LogoutAt == nil {
+			// Use the session's last_activity time (updated by every heartbeat)
+			lastActivityTime := s.LastActivity
+			if lastActivityTime.IsZero() {
+				lastActivityTime = s.LoginAt
+			}
+			// Prepend status event showing last activity
+			idleEvent := activityEvent{
+				Time:        lastActivityTime,
+				TimeLabel:   lastActivityTime.UTC().Format("3:04 PM"),
+				TimeISO:     lastActivityTime.UTC().Format(time.RFC3339),
+				EventType:   "idle",
+				Description: "Last activity",
+			}
+			activityEvents = append([]activityEvent{idleEvent}, activityEvents...)
+		}
+
 		blocks = append(blocks, sessionBlock{
-			Date:       date,
-			LoginTime:  loginTime,
-			LogoutTime: logoutTime,
-			Duration:   duration,
-			EndReason:  endReason,
-			Events:     activityEvents,
+			Date:          date,
+			LoginTime:     loginTime,
+			LoginTimeISO:  loginTimeISO,
+			LogoutTime:    logoutTime,
+			LogoutTimeISO: logoutTimeISO,
+			Duration:      duration,
+			EndReason:     endReason,
+			Events:        activityEvents,
 		})
 	}
 
 	return blocks
+}
+
+// canViewUserActivity checks if the current user can view activity for the target user.
+// Authorization rules:
+//   - Admin/SuperAdmin: can view activity for any user
+//   - Coordinator: can view activity for members and leaders in their assigned organizations
+//   - Leader: can view activity for members in groups they lead
+func (h *Handler) canViewUserActivity(ctx context.Context, r *http.Request, targetUserID primitive.ObjectID) (bool, error) {
+	viewerRole, _, viewerID, ok := authz.UserCtx(r)
+	if !ok {
+		return false, nil
+	}
+
+	// Users can always view their own activity
+	if viewerID == targetUserID {
+		return true, nil
+	}
+
+	// Admin/SuperAdmin can view anyone
+	if viewerRole == "superadmin" || viewerRole == "admin" {
+		return true, nil
+	}
+
+	// Get the target user's info
+	var targetUser struct {
+		Role  string              `bson:"role"`
+		OrgID *primitive.ObjectID `bson:"organization_id"`
+	}
+	err := h.DB.Collection("users").FindOne(ctx, bson.M{"_id": targetUserID}).Decode(&targetUser)
+	if err != nil {
+		return false, err
+	}
+
+	switch viewerRole {
+	case "coordinator":
+		// Coordinators can view members and leaders in their assigned orgs
+		if targetUser.Role != "member" && targetUser.Role != "leader" {
+			return false, nil
+		}
+		if targetUser.OrgID == nil {
+			return false, nil
+		}
+		return authz.CanAccessOrg(r, *targetUser.OrgID), nil
+
+	case "leader":
+		// Leaders can only view members in groups they lead
+		if targetUser.Role != "member" {
+			return false, nil
+		}
+		// Check if target user is in any group the viewer leads
+		leaderGroups, err := h.getLeaderGroupIDs(ctx, viewerID)
+		if err != nil {
+			return false, err
+		}
+		if len(leaderGroups) == 0 {
+			return false, nil
+		}
+		// Check if target user is a member in any of those groups
+		count, err := h.DB.Collection("group_memberships").CountDocuments(ctx, bson.M{
+			"user_id":  targetUserID,
+			"group_id": bson.M{"$in": leaderGroups},
+			"role":     "member",
+		})
+		if err != nil {
+			return false, err
+		}
+		return count > 0, nil
+
+	default:
+		return false, nil
+	}
+}
+
+// getLeaderGroupIDs returns the group IDs where the user is a leader.
+func (h *Handler) getLeaderGroupIDs(ctx context.Context, userID primitive.ObjectID) ([]primitive.ObjectID, error) {
+	cur, err := h.DB.Collection("group_memberships").Find(ctx, bson.M{
+		"user_id": userID,
+		"role":    "leader",
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+
+	var groupIDs []primitive.ObjectID
+	for cur.Next(ctx) {
+		var doc struct {
+			GroupID primitive.ObjectID `bson:"group_id"`
+		}
+		if err := cur.Decode(&doc); err != nil {
+			return nil, err
+		}
+		groupIDs = append(groupIDs, doc.GroupID)
+	}
+	return groupIDs, nil
 }
 
 // formatDuration formats seconds as a human-readable duration.
