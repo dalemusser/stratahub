@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"go.uber.org/zap"
@@ -21,6 +22,7 @@ func newTestSessionManager(t *testing.T) *auth.SessionManager {
 		"test-session-key-must-be-32-chars-long",
 		"test-session",
 		"",
+		24*time.Hour,
 		false,
 		logger,
 	)

@@ -237,7 +237,7 @@ func TestHandleCreate_DuplicateEmail(t *testing.T) {
 
 	form := url.Values{
 		"full_name":   {"New Admin"},
-		"email":       {"existing@example.com"},
+		"login_id":    {"existing@example.com"},
 		"role":        {"admin"},
 		"auth_method": {"email"},
 	}
@@ -268,7 +268,7 @@ func TestHandleCreate_InvalidEmail(t *testing.T) {
 
 	form := url.Values{
 		"full_name":   {"Test User"},
-		"email":       {"not-an-email"},
+		"login_id":    {"not-an-email"},
 		"role":        {"admin"},
 		"auth_method": {"email"},
 	}

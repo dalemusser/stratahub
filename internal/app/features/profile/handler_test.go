@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/dalemusser/stratahub/internal/domain/models"
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/features/profile"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
@@ -60,22 +61,22 @@ func TestServeProfile_Authenticated(t *testing.T) {
 
 	// Create a user in the database
 	usrStore := userstore.New(db)
-	userID := primitive.NewObjectID()
+	orgID := primitive.NewObjectID()
 	email := "test@example.com"
-	err := usrStore.Create(ctx, userstore.CreateInput{
-		ID:         userID,
-		FullName:   "Test User",
-		LoginID:    email,
-		Email:      &email,
-		Role:       "member",
-		AuthMethod: "password",
+	createdUser, err := usrStore.Create(ctx, models.User{
+		FullName:       "Test User",
+		LoginID:        &email,
+		Email:          &email,
+		Role:           "member",
+		OrganizationID: &orgID,
+		AuthMethod:     "password",
 	})
 	if err != nil {
 		t.Fatalf("failed to create test user: %v", err)
 	}
 
 	sessionUser := &auth.SessionUser{
-		ID:      userID.Hex(),
+		ID:      createdUser.ID.Hex(),
 		Name:    "Test User",
 		LoginID: email,
 		Role:    "member",
@@ -105,22 +106,22 @@ func TestServeProfile_SuccessMessage(t *testing.T) {
 
 	// Create a user in the database
 	usrStore := userstore.New(db)
-	userID := primitive.NewObjectID()
+	orgID := primitive.NewObjectID()
 	email := "test@example.com"
-	err := usrStore.Create(ctx, userstore.CreateInput{
-		ID:         userID,
-		FullName:   "Test User",
-		LoginID:    email,
-		Email:      &email,
-		Role:       "member",
-		AuthMethod: "password",
+	createdUser, err := usrStore.Create(ctx, models.User{
+		FullName:       "Test User",
+		LoginID:        &email,
+		Email:          &email,
+		Role:           "member",
+		OrganizationID: &orgID,
+		AuthMethod:     "password",
 	})
 	if err != nil {
 		t.Fatalf("failed to create test user: %v", err)
 	}
 
 	sessionUser := &auth.SessionUser{
-		ID:      userID.Hex(),
+		ID:      createdUser.ID.Hex(),
 		Name:    "Test User",
 		LoginID: email,
 		Role:    "member",
@@ -176,24 +177,24 @@ func TestHandleChangePassword_PasswordMismatch(t *testing.T) {
 
 	// Create a password user in the database
 	usrStore := userstore.New(db)
-	userID := primitive.NewObjectID()
+	orgID := primitive.NewObjectID()
 	email := "test@example.com"
 	passwordHash, _ := authutil.HashPassword("oldpass123!")
-	err := usrStore.Create(ctx, userstore.CreateInput{
-		ID:           userID,
-		FullName:     "Test User",
-		LoginID:      email,
-		Email:        &email,
-		Role:         "member",
-		AuthMethod:   "password",
-		PasswordHash: &passwordHash,
+	createdUser, err := usrStore.Create(ctx, models.User{
+		FullName:       "Test User",
+		LoginID:        &email,
+		Email:          &email,
+		Role:           "member",
+		OrganizationID: &orgID,
+		AuthMethod:     "password",
+		PasswordHash:   &passwordHash,
 	})
 	if err != nil {
 		t.Fatalf("failed to create test user: %v", err)
 	}
 
 	sessionUser := &auth.SessionUser{
-		ID:      userID.Hex(),
+		ID:      createdUser.ID.Hex(),
 		Name:    "Test User",
 		LoginID: email,
 		Role:    "member",
@@ -233,24 +234,24 @@ func TestHandleChangePassword_Success(t *testing.T) {
 
 	// Create a password user in the database
 	usrStore := userstore.New(db)
-	userID := primitive.NewObjectID()
+	orgID := primitive.NewObjectID()
 	email := "test@example.com"
 	passwordHash, _ := authutil.HashPassword("oldpass123!")
-	err := usrStore.Create(ctx, userstore.CreateInput{
-		ID:           userID,
-		FullName:     "Test User",
-		LoginID:      email,
-		Email:        &email,
-		Role:         "member",
-		AuthMethod:   "password",
-		PasswordHash: &passwordHash,
+	createdUser, err := usrStore.Create(ctx, models.User{
+		FullName:       "Test User",
+		LoginID:        &email,
+		Email:          &email,
+		Role:           "member",
+		OrganizationID: &orgID,
+		AuthMethod:     "password",
+		PasswordHash:   &passwordHash,
 	})
 	if err != nil {
 		t.Fatalf("failed to create test user: %v", err)
 	}
 
 	sessionUser := &auth.SessionUser{
-		ID:      userID.Hex(),
+		ID:      createdUser.ID.Hex(),
 		Name:    "Test User",
 		LoginID: email,
 		Role:    "member",
@@ -280,7 +281,7 @@ func TestHandleChangePassword_Success(t *testing.T) {
 	}
 
 	// Verify password was actually changed
-	user, _ := usrStore.GetByID(ctx, userID)
+	user, _ := usrStore.GetByID(ctx, createdUser.ID)
 	if user != nil && user.PasswordHash != nil {
 		if !authutil.CheckPassword("newpass456!", *user.PasswordHash) {
 			t.Error("password should have been changed")
@@ -295,22 +296,22 @@ func TestHandleUpdatePreferences_Success(t *testing.T) {
 
 	// Create a user in the database
 	usrStore := userstore.New(db)
-	userID := primitive.NewObjectID()
+	orgID := primitive.NewObjectID()
 	email := "test@example.com"
-	err := usrStore.Create(ctx, userstore.CreateInput{
-		ID:         userID,
-		FullName:   "Test User",
-		LoginID:    email,
-		Email:      &email,
-		Role:       "member",
-		AuthMethod: "password",
+	createdUser, err := usrStore.Create(ctx, models.User{
+		FullName:       "Test User",
+		LoginID:        &email,
+		Email:          &email,
+		Role:           "member",
+		OrganizationID: &orgID,
+		AuthMethod:     "password",
 	})
 	if err != nil {
 		t.Fatalf("failed to create test user: %v", err)
 	}
 
 	sessionUser := &auth.SessionUser{
-		ID:      userID.Hex(),
+		ID:      createdUser.ID.Hex(),
 		Name:    "Test User",
 		LoginID: email,
 		Role:    "member",
@@ -361,22 +362,22 @@ func TestHandleUpdatePreferences_InvalidTheme(t *testing.T) {
 
 	// Create a user in the database
 	usrStore := userstore.New(db)
-	userID := primitive.NewObjectID()
+	orgID := primitive.NewObjectID()
 	email := "test@example.com"
-	err := usrStore.Create(ctx, userstore.CreateInput{
-		ID:         userID,
-		FullName:   "Test User",
-		LoginID:    email,
-		Email:      &email,
-		Role:       "member",
-		AuthMethod: "password",
+	createdUser, err := usrStore.Create(ctx, models.User{
+		FullName:       "Test User",
+		LoginID:        &email,
+		Email:          &email,
+		Role:           "member",
+		OrganizationID: &orgID,
+		AuthMethod:     "password",
 	})
 	if err != nil {
 		t.Fatalf("failed to create test user: %v", err)
 	}
 
 	sessionUser := &auth.SessionUser{
-		ID:      userID.Hex(),
+		ID:      createdUser.ID.Hex(),
 		Name:    "Test User",
 		LoginID: email,
 		Role:    "member",

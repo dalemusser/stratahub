@@ -24,7 +24,7 @@ func newTestHandler(t *testing.T) *heartbeat.Handler {
 	sessionsStore := sessions.New(db)
 	activityStore := activitystore.New(db)
 
-	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", false, logger)
+	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", 24*time.Hour, false, logger)
 	if err != nil {
 		t.Fatalf("NewSessionManager failed: %v", err)
 	}
@@ -117,8 +117,14 @@ func TestServeHeartbeat_EmptyBody(t *testing.T) {
 
 func TestRoutes(t *testing.T) {
 	handler := newTestHandler(t)
+	logger := zap.NewNop()
 
-	router := heartbeat.Routes(handler)
+	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", 24*time.Hour, false, logger)
+	if err != nil {
+		t.Fatalf("NewSessionManager failed: %v", err)
+	}
+
+	router := heartbeat.Routes(handler, sessionMgr)
 	if router == nil {
 		t.Fatal("Routes() returned nil")
 	}

@@ -53,7 +53,7 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 	case "coordinator":
 		h.ServeCoordinator(w, r)
 	case "leader":
-		h.ServeLeader(w, r)
+		http.Redirect(w, r, "/mhsdashboard", http.StatusSeeOther)
 	case "member":
 		h.ServeMember(w, r)
 	default:

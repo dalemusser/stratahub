@@ -1,0 +1,226 @@
+{{ define "mhsdashboard_view" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div style="height: calc(100% - 8px);" class="flex flex-col">
+<style>
+  /* MHS Dashboard specific styles */
+  .mhs-vertical-text {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    white-space: nowrap;
+  }
+  .mhs-cell-success {
+    background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  }
+  .mhs-cell-warning {
+    background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%);
+  }
+  .mhs-cell-empty {
+    background: #ffffff;
+  }
+  .mhs-wave-bg {
+    background: linear-gradient(180deg, #0c2d48 0%, #145374 50%, #2e8bc0 100%);
+  }
+  /* Hide scrollbars on synced areas */
+  .mhs-hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .mhs-hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  /* Styled scrollbar for main area */
+  .mhs-styled-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #2e8bc0 #e8f4f8;
+  }
+  .mhs-styled-scrollbar::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .mhs-styled-scrollbar::-webkit-scrollbar-track {
+    background: #e8f4f8;
+    border-radius: 5px;
+  }
+  .mhs-styled-scrollbar::-webkit-scrollbar-thumb {
+    background: #2e8bc0;
+    border-radius: 5px;
+  }
+  .mhs-styled-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #145374;
+  }
+  .mhs-styled-scrollbar::-webkit-scrollbar-corner {
+    background: #e8f4f8;
+  }
+  /* Grid dimensions */
+  .mhs-grid-container {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    grid-template-rows: 148px 1fr;
+    min-height: 400px;
+  }
+  .mhs-header-height { height: 148px; }
+  .mhs-name-width { width: 140px; min-width: 140px; }
+  .mhs-row-height { height: 28px; }
+  .mhs-cell-width { width: 28px; min-width: 28px; max-width: 28px; }
+  .mhs-h1 { height: 40px; }
+  .mhs-h2 { height: 28px; }
+  .mhs-h3 { height: 80px; }
+</style>
+
+<!-- Header Banner -->
+<header class="mhs-wave-bg text-white shadow-lg -mx-4 -mt-2 mb-4" style="padding: 10px 24px;">
+  <div style="display: flex; align-items: center; justify-content: space-between;">
+    <div style="display: flex; align-items: center; gap: 12px;">
+      <div style="width: 40px; height: 40px; border-radius: 50%; background: #b1d4e0; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+        <svg style="width: 24px; height: 24px; color: #0c2d48;" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M12 2c-5.33 4.55-8 8.48-8 11.8 0 4.98 3.8 8.2 8 8.2s8-3.22 8-8.2c0-3.32-2.67-7.25-8-11.8zm0 18c-3.35 0-6-2.57-6-6.2 0-2.34 1.95-5.44 6-9.14 4.05 3.7 6 6.79 6 9.14 0 3.63-2.65 6.2-6 6.2z"/>
+        </svg>
+      </div>
+      <div style="line-height: 1.2;">
+        <h1 style="margin: 0; font-size: 1.25rem; font-weight: 700; letter-spacing: -0.025em; color: white;">Mission HydroSci</h1>
+        <p style="margin: 0; font-size: 0.75rem; font-weight: 500; color: #b1d4e0;">Progress Overview</p>
+      </div>
+    </div>
+    <div style="font-size: 0.75rem; color: #b1d4e0; cursor: help;" title="Last updated">{{ .LastUpdated }}{{ if .TimezoneAbbr }} {{ .TimezoneAbbr }}{{ end }}</div>
+  </div>
+</header>
+
+<!-- Dashboard Card -->
+<div class="bg-white rounded-xl shadow-xl overflow-hidden border border-slate-200 flex flex-col flex-1 min-h-0">
+  <!-- Class Info Bar -->
+  <div class="bg-[#e8f4f8] px-4 py-2 border-b border-[#b1d4e0] flex items-center justify-between flex-shrink-0">
+    <!-- Left: Group selector -->
+    <div>
+      {{ if .Groups }}
+      <select id="group-select"
+              class="text-sm border border-[#b1d4e0] rounded px-3 py-1.5 bg-white text-[#0c2d48] font-semibold"
+              hx-get="/mhsdashboard/grid"
+              hx-target="#mhs-grid"
+              hx-swap="innerHTML"
+              name="group">
+        {{ range .Groups }}
+        <option value="{{ .ID }}" {{ if .Selected }}selected{{ end }}>{{ .Name }}</option>
+        {{ end }}
+      </select>
+      {{ end }}
+    </div>
+    <!-- Center: Legend -->
+    <div class="flex items-center gap-5 text-xs">
+      <div class="flex items-center gap-1.5">
+        <span class="w-4 h-4 flex-shrink-0 rounded mhs-cell-success border border-green-600"></span>
+        <span class="text-slate-600">Completed</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-4 h-4 flex-shrink-0 rounded mhs-cell-warning border border-yellow-600"></span>
+        <span class="text-slate-600">Needs Review</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-4 h-4 flex-shrink-0 rounded border border-slate-300 bg-white"></span>
+        <span class="text-slate-600">Not Started</span>
+      </div>
+    </div>
+    <!-- Right: Refresh controls -->
+    <div class="flex items-center gap-2">
+      <button id="mhs-refresh-btn"
+              type="button"
+              class="text-sm px-2 py-1 border border-[#b1d4e0] rounded hover:bg-white text-[#145374] cursor-pointer"
+              title="Refresh now">
+        Refresh
+      </button>
+      <span id="mhs-countdown" class="text-xs text-slate-500 w-8 text-center cursor-help" title="Time until refresh">30s</span>
+    </div>
+  </div>
+
+  <!-- Grid Container -->
+  <div id="mhs-grid" class="flex-grow overflow-hidden">
+    {{ template "mhsdashboard_grid" . }}
+  </div>
+</div>
+
+<script>
+(function() {
+  var scrollPos = { x: 0, y: 0 };
+  var countdown = 30;
+  var countdownEl = document.getElementById('mhs-countdown');
+  var refreshBtn = document.getElementById('mhs-refresh-btn');
+  var countdownInterval = null;
+
+  function updateCountdown() {
+    if (countdownEl) {
+      countdownEl.textContent = countdown + 's';
+    }
+  }
+
+  function startCountdown() {
+    countdown = 30;
+    updateCountdown();
+    if (countdownInterval) clearInterval(countdownInterval);
+    countdownInterval = setInterval(function() {
+      countdown--;
+      if (countdown < 0) countdown = 30;
+      updateCountdown();
+    }, 1000);
+  }
+
+  function doRefresh() {
+    var groupSelect = document.getElementById('group-select');
+    var group = groupSelect ? groupSelect.value : '';
+    var url = '/mhsdashboard/grid?group=' + encodeURIComponent(group);
+    htmx.ajax('GET', url, { target: '#mhs-grid', swap: 'innerHTML' });
+    countdown = 30;
+    updateCountdown();
+  }
+
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', doRefresh);
+  }
+
+  // Save scroll position before swap
+  document.body.addEventListener('htmx:beforeSwap', function(evt) {
+    if (evt.detail.target && evt.detail.target.id === 'mhs-grid') {
+      var dataScroll = document.getElementById('mhs-data-scroll');
+      if (dataScroll) {
+        scrollPos = { x: dataScroll.scrollLeft, y: dataScroll.scrollTop };
+      }
+    }
+  });
+
+  // Restore scroll position and reset countdown after swap
+  document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target && evt.detail.target.id === 'mhs-grid') {
+      var dataScroll = document.getElementById('mhs-data-scroll');
+      if (dataScroll && (scrollPos.x > 0 || scrollPos.y > 0)) {
+        dataScroll.scrollLeft = scrollPos.x;
+        dataScroll.scrollTop = scrollPos.y;
+      }
+      // Re-setup scroll sync after swap
+      setupScrollSync();
+      countdown = 30;
+      updateCountdown();
+    }
+  });
+
+  function setupScrollSync() {
+    var headerScroll = document.getElementById('mhs-header-scroll');
+    var namesScroll = document.getElementById('mhs-names-scroll');
+    var dataScroll = document.getElementById('mhs-data-scroll');
+
+    if (dataScroll && headerScroll && namesScroll) {
+      dataScroll.addEventListener('scroll', function() {
+        headerScroll.scrollLeft = dataScroll.scrollLeft;
+        namesScroll.scrollTop = dataScroll.scrollTop;
+      });
+    }
+  }
+
+  // Initial setup
+  startCountdown();
+  setupScrollSync();
+})();
+</script>
+</div>
+{{ end }}

@@ -10,9 +10,9 @@ import (
 	"github.com/dalemusser/waffle/pantry/templates"
 )
 
-// Embed the shared template files.
+// Embed the shared template files and configuration files.
 //
-//go:embed templates/*.gohtml
+//go:embed templates/*.gohtml mhs_progress_points.json
 var FS embed.FS
 
 // Embed assets (CSS, JS) for bundling into the binary.

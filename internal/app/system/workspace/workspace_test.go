@@ -201,6 +201,7 @@ func TestRequireWorkspace_Rejects_NoContext(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("Accept", "application/json") // API request gets 400, HTML gets 303 redirect
 	rr := httptest.NewRecorder()
 
 	handler.ServeHTTP(rr, req)
@@ -220,6 +221,7 @@ func TestRequireWorkspace_Rejects_ApexDomain(t *testing.T) {
 	}))
 
 	req := httptest.NewRequest("GET", "/test", nil)
+	req.Header.Set("Accept", "application/json") // API request gets 400, HTML gets 303 redirect
 	req = workspace.WithTestApex(req)
 	rr := httptest.NewRecorder()
 

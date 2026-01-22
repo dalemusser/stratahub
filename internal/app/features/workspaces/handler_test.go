@@ -1,14 +1,13 @@
 package workspaces_test
 
 import (
-	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/features/workspaces"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
-	"github.com/dalemusser/stratahub/internal/app/system/auditlog"
 	"github.com/dalemusser/stratahub/internal/testutil"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
@@ -19,8 +18,7 @@ func newTestHandler(t *testing.T) *workspaces.Handler {
 	db := testutil.SetupTestDB(t)
 	logger := zap.NewNop()
 	errLog := uierrors.NewErrorLogger(logger)
-	audit := auditlog.NewNopLogger()
-	return workspaces.NewHandler(db, nil, errLog, audit, "example.com", logger)
+	return workspaces.NewHandler(db, nil, errLog, nil, "example.com", logger) // nil audit logger is valid
 }
 
 func TestNewHandler(t *testing.T) {
@@ -118,7 +116,7 @@ func TestRoutes(t *testing.T) {
 	handler := newTestHandler(t)
 	logger := zap.NewNop()
 
-	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", false, logger)
+	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", 24*time.Hour, false, logger)
 	if err != nil {
 		t.Fatalf("NewSessionManager failed: %v", err)
 	}

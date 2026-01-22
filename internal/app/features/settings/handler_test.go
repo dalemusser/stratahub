@@ -5,6 +5,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/go-chi/chi/v5"
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/features/settings"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
@@ -91,17 +92,11 @@ func TestHandleSettings_Unauthenticated(t *testing.T) {
 	}
 }
 
-func TestRoutes(t *testing.T) {
+func TestMountRoutes(t *testing.T) {
 	handler := newTestHandler(t)
-	logger := zap.NewNop()
 
-	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", false, logger)
-	if err != nil {
-		t.Fatalf("NewSessionManager failed: %v", err)
-	}
+	r := chi.NewRouter()
+	handler.MountRoutes(r)
 
-	router := settings.Routes(handler, sessionMgr)
-	if router == nil {
-		t.Fatal("Routes() returned nil")
-	}
+	// Test passes if MountRoutes doesn't panic
 }

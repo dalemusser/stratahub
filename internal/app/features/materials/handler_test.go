@@ -1,14 +1,13 @@
 package materials_test
 
 import (
-	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/features/materials"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
-	"github.com/dalemusser/stratahub/internal/app/system/auditlog"
 	"github.com/dalemusser/stratahub/internal/testutil"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
@@ -19,8 +18,7 @@ func newTestAdminHandler(t *testing.T) *materials.AdminHandler {
 	db := testutil.SetupTestDB(t)
 	logger := zap.NewNop()
 	errLog := uierrors.NewErrorLogger(logger)
-	audit := auditlog.NewNopLogger()
-	return materials.NewAdminHandler(db, nil, errLog, audit, logger)
+	return materials.NewAdminHandler(db, nil, errLog, nil, logger) // nil audit logger is valid
 }
 
 func newTestLeaderHandler(t *testing.T) *materials.LeaderHandler {
@@ -123,7 +121,7 @@ func TestLeaderList_LeaderUser(t *testing.T) {
 				// Template rendering may panic in tests
 			}
 		}()
-		handler.ServeLeaderList(rec, req)
+		handler.ServeListMaterials(rec, req)
 	}()
 
 	// Test passes if handler logic executed without unexpected errors
@@ -133,7 +131,7 @@ func TestAdminRoutes(t *testing.T) {
 	handler := newTestAdminHandler(t)
 	logger := zap.NewNop()
 
-	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", false, logger)
+	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", 24*time.Hour, false, logger)
 	if err != nil {
 		t.Fatalf("NewSessionManager failed: %v", err)
 	}
@@ -148,7 +146,7 @@ func TestLeaderRoutes(t *testing.T) {
 	handler := newTestLeaderHandler(t)
 	logger := zap.NewNop()
 
-	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", false, logger)
+	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", 24*time.Hour, false, logger)
 	if err != nil {
 		t.Fatalf("NewSessionManager failed: %v", err)
 	}

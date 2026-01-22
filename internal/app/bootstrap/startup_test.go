@@ -34,7 +34,7 @@ func TestEnsureSuperAdmin_CreatesNew(t *testing.T) {
 
 	// Verify user was created
 	var user models.User
-	err = db.Collection("users").FindOne(ctx, bson.M{"email": "superadmin@test.com"}).Decode(&user)
+	err = db.Collection("users").FindOne(ctx, bson.M{"login_id": "superadmin@test.com"}).Decode(&user)
 	if err != nil {
 		t.Fatalf("failed to find created user: %v", err)
 	}
