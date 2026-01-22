@@ -1,6 +1,8 @@
 package sessions_test
 
 import (
+	"crypto/rand"
+	"encoding/base64"
 	"testing"
 	"time"
 
@@ -9,6 +11,48 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
 )
+
+// generateTestToken generates a random session token for tests.
+func generateTestToken(t *testing.T) string {
+	t.Helper()
+	b := make([]byte, 32)
+	if _, err := rand.Read(b); err != nil {
+		t.Fatalf("failed to generate token: %v", err)
+	}
+	return base64.URLEncoding.EncodeToString(b)
+}
+
+// createTestSession creates a session and returns the session with populated fields.
+func createTestSession(t *testing.T, store *sessions.Store, userID primitive.ObjectID, orgID *primitive.ObjectID, ip, userAgent, createdBy string) sessions.Session {
+	t.Helper()
+	ctx, cancel := testutil.TestContext()
+	defer cancel()
+
+	sess := sessions.Session{
+		UserID:         userID,
+		OrganizationID: orgID,
+		IP:             ip,
+		UserAgent:      userAgent,
+		CreatedBy:      createdBy,
+		Token:          generateTestToken(t),
+		ExpiresAt:      time.Now().Add(24 * time.Hour),
+	}
+
+	err := store.CreateWithAutoClose(ctx, sess)
+	if err != nil {
+		t.Fatalf("CreateWithAutoClose failed: %v", err)
+	}
+
+	// Fetch the created session to get populated fields
+	activeSessions, err := store.GetActiveByUser(ctx, userID)
+	if err != nil {
+		t.Fatalf("GetActiveByUser failed: %v", err)
+	}
+	if len(activeSessions) == 0 {
+		t.Fatal("expected at least one active session")
+	}
+	return activeSessions[0]
+}
 
 func TestStore_Create(t *testing.T) {
 	db := testutil.SetupTestDB(t)
@@ -19,33 +63,47 @@ func TestStore_Create(t *testing.T) {
 	userID := primitive.NewObjectID()
 	orgID := primitive.NewObjectID()
 
-	sess, err := store.Create(ctx, userID, &orgID, "192.168.1.1", "Mozilla/5.0", sessions.CreatedByLogin)
+	sess := sessions.Session{
+		UserID:         userID,
+		OrganizationID: &orgID,
+		IP:             "192.168.1.1",
+		UserAgent:      "Mozilla/5.0",
+		CreatedBy:      sessions.CreatedByLogin,
+		Token:          generateTestToken(t),
+		ExpiresAt:      time.Now().Add(24 * time.Hour),
+	}
+
+	err := store.Create(ctx, sess)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if sess.ID == primitive.NilObjectID {
-		t.Error("expected ID to be assigned")
+	// Verify session was created by fetching it
+	activeSessions, err := store.GetActiveByUser(ctx, userID)
+	if err != nil {
+		t.Fatalf("GetActiveByUser failed: %v", err)
 	}
-	if sess.UserID != userID {
-		t.Errorf("UserID: got %v, want %v", sess.UserID, userID)
+	if len(activeSessions) != 1 {
+		t.Fatalf("expected 1 active session, got %d", len(activeSessions))
 	}
-	if sess.OrganizationID == nil || *sess.OrganizationID != orgID {
-		t.Errorf("OrganizationID: got %v, want %v", sess.OrganizationID, orgID)
+
+	created := activeSessions[0]
+	if created.UserID != userID {
+		t.Errorf("UserID: got %v, want %v", created.UserID, userID)
 	}
-	if sess.IP != "192.168.1.1" {
-		t.Errorf("IP: got %q, want %q", sess.IP, "192.168.1.1")
+	if created.OrganizationID == nil || *created.OrganizationID != orgID {
+		t.Errorf("OrganizationID: got %v, want %v", created.OrganizationID, orgID)
 	}
-	if sess.CreatedBy != sessions.CreatedByLogin {
-		t.Errorf("CreatedBy: got %q, want %q", sess.CreatedBy, sessions.CreatedByLogin)
+	if created.IP != "192.168.1.1" {
+		t.Errorf("IP: got %q, want %q", created.IP, "192.168.1.1")
 	}
-	if sess.LoginAt.IsZero() {
+	if created.CreatedBy != sessions.CreatedByLogin {
+		t.Errorf("CreatedBy: got %q, want %q", created.CreatedBy, sessions.CreatedByLogin)
+	}
+	if created.LoginAt.IsZero() {
 		t.Error("expected LoginAt to be set")
 	}
-	if sess.LastActiveAt.IsZero() {
-		t.Error("expected LastActiveAt to be set")
-	}
-	if sess.LogoutAt != nil {
+	if created.LogoutAt != nil {
 		t.Error("expected LogoutAt to be nil for new session")
 	}
 }
@@ -58,17 +116,33 @@ func TestStore_Create_WithoutOrgID(t *testing.T) {
 
 	userID := primitive.NewObjectID()
 
-	sess, err := store.Create(ctx, userID, nil, "192.168.1.1", "", sessions.CreatedByLogin)
+	sess := sessions.Session{
+		UserID:    userID,
+		IP:        "192.168.1.1",
+		CreatedBy: sessions.CreatedByLogin,
+		Token:     generateTestToken(t),
+		ExpiresAt: time.Now().Add(24 * time.Hour),
+	}
+
+	err := store.Create(ctx, sess)
 	if err != nil {
 		t.Fatalf("Create failed: %v", err)
 	}
 
-	if sess.OrganizationID != nil {
+	activeSessions, err := store.GetActiveByUser(ctx, userID)
+	if err != nil {
+		t.Fatalf("GetActiveByUser failed: %v", err)
+	}
+	if len(activeSessions) != 1 {
+		t.Fatalf("expected 1 active session, got %d", len(activeSessions))
+	}
+
+	if activeSessions[0].OrganizationID != nil {
 		t.Error("expected OrganizationID to be nil")
 	}
 }
 
-func TestStore_Create_ClosesExistingSessions(t *testing.T) {
+func TestStore_CreateWithAutoClose_ClosesExistingSessions(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	store := sessions.New(db)
 	ctx, cancel := testutil.TestContext()
@@ -77,16 +151,10 @@ func TestStore_Create_ClosesExistingSessions(t *testing.T) {
 	userID := primitive.NewObjectID()
 
 	// Create first session
-	sess1, err := store.Create(ctx, userID, nil, "192.168.1.1", "", sessions.CreatedByLogin)
-	if err != nil {
-		t.Fatalf("Create first session failed: %v", err)
-	}
+	sess1 := createTestSession(t, store, userID, nil, "192.168.1.1", "", sessions.CreatedByLogin)
 
 	// Create second session - should close the first
-	_, err = store.Create(ctx, userID, nil, "192.168.1.2", "", sessions.CreatedByHeartbeat)
-	if err != nil {
-		t.Fatalf("Create second session failed: %v", err)
-	}
+	_ = createTestSession(t, store, userID, nil, "192.168.1.2", "", sessions.CreatedByHeartbeat)
 
 	// Verify first session is now closed
 	oldSess, err := store.GetByID(ctx, sess1.ID)
@@ -109,11 +177,7 @@ func TestStore_GetByID(t *testing.T) {
 	defer cancel()
 
 	userID := primitive.NewObjectID()
-
-	created, err := store.Create(ctx, userID, nil, "192.168.1.1", "Test Agent", sessions.CreatedByLogin)
-	if err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
+	created := createTestSession(t, store, userID, nil, "192.168.1.1", "Test Agent", sessions.CreatedByLogin)
 
 	found, err := store.GetByID(ctx, created.ID)
 	if err != nil {
@@ -148,16 +212,12 @@ func TestStore_Close(t *testing.T) {
 	defer cancel()
 
 	userID := primitive.NewObjectID()
-
-	sess, err := store.Create(ctx, userID, nil, "192.168.1.1", "", sessions.CreatedByLogin)
-	if err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
+	sess := createTestSession(t, store, userID, nil, "192.168.1.1", "", sessions.CreatedByLogin)
 
 	// Wait briefly so duration > 0
 	time.Sleep(10 * time.Millisecond)
 
-	err = store.Close(ctx, sess.ID, "logout")
+	err := store.CloseByID(ctx, sess.ID, "logout")
 	if err != nil {
 		t.Fatalf("Close failed: %v", err)
 	}
@@ -186,7 +246,7 @@ func TestStore_Close_NotFound(t *testing.T) {
 	defer cancel()
 
 	fakeID := primitive.NewObjectID()
-	err := store.Close(ctx, fakeID, "logout")
+	err := store.CloseByID(ctx, fakeID, "logout")
 	if err != mongo.ErrNoDocuments {
 		t.Errorf("expected mongo.ErrNoDocuments, got %v", err)
 	}
@@ -199,13 +259,9 @@ func TestStore_UpdateLastActive(t *testing.T) {
 	defer cancel()
 
 	userID := primitive.NewObjectID()
+	sess := createTestSession(t, store, userID, nil, "192.168.1.1", "", sessions.CreatedByLogin)
 
-	sess, err := store.Create(ctx, userID, nil, "192.168.1.1", "", sessions.CreatedByLogin)
-	if err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
-
-	result, err := store.UpdateLastActive(ctx, sess.ID, "/dashboard")
+	result, err := store.UpdateCurrentPage(ctx, sess.Token, "/dashboard")
 	if err != nil {
 		t.Fatalf("UpdateLastActive failed: %v", err)
 	}
@@ -219,7 +275,7 @@ func TestStore_UpdateLastActive(t *testing.T) {
 	}
 
 	// Second update should return previous page
-	result2, err := store.UpdateLastActive(ctx, sess.ID, "/settings")
+	result2, err := store.UpdateCurrentPage(ctx, sess.Token, "/settings")
 	if err != nil {
 		t.Fatalf("UpdateLastActive (2) failed: %v", err)
 	}
@@ -236,20 +292,16 @@ func TestStore_UpdateLastActive_ClosedSession(t *testing.T) {
 	defer cancel()
 
 	userID := primitive.NewObjectID()
-
-	sess, err := store.Create(ctx, userID, nil, "192.168.1.1", "", sessions.CreatedByLogin)
-	if err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
+	sess := createTestSession(t, store, userID, nil, "192.168.1.1", "", sessions.CreatedByLogin)
 
 	// Close the session
-	err = store.Close(ctx, sess.ID, "logout")
+	err := store.CloseByID(ctx, sess.ID, "logout")
 	if err != nil {
 		t.Fatalf("Close failed: %v", err)
 	}
 
 	// Try to update closed session
-	result, err := store.UpdateLastActive(ctx, sess.ID, "/dashboard")
+	result, err := store.UpdateCurrentPage(ctx, sess.Token, "/dashboard")
 	if err != nil {
 		t.Fatalf("UpdateLastActive failed: %v", err)
 	}
@@ -269,16 +321,10 @@ func TestStore_GetActiveByUser(t *testing.T) {
 	user2 := primitive.NewObjectID()
 
 	// Create session for user1
-	_, err := store.Create(ctx, user1, nil, "192.168.1.1", "", sessions.CreatedByLogin)
-	if err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
+	_ = createTestSession(t, store, user1, nil, "192.168.1.1", "", sessions.CreatedByLogin)
 
 	// Create session for user2
-	_, err = store.Create(ctx, user2, nil, "192.168.1.2", "", sessions.CreatedByLogin)
-	if err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
+	_ = createTestSession(t, store, user2, nil, "192.168.1.2", "", sessions.CreatedByLogin)
 
 	// Get active sessions for user1
 	sessions1, err := store.GetActiveByUser(ctx, user1)
@@ -300,12 +346,9 @@ func TestStore_GetActiveByUser_NoActiveSessions(t *testing.T) {
 	userID := primitive.NewObjectID()
 
 	// Create and close a session
-	sess, err := store.Create(ctx, userID, nil, "192.168.1.1", "", sessions.CreatedByLogin)
-	if err != nil {
-		t.Fatalf("Create failed: %v", err)
-	}
+	sess := createTestSession(t, store, userID, nil, "192.168.1.1", "", sessions.CreatedByLogin)
 
-	err = store.Close(ctx, sess.ID, "logout")
+	err := store.CloseByID(ctx, sess.ID, "logout")
 	if err != nil {
 		t.Fatalf("Close failed: %v", err)
 	}
@@ -329,12 +372,9 @@ func TestStore_GetByUser(t *testing.T) {
 
 	userID := primitive.NewObjectID()
 
-	// Create multiple sessions (Create closes previous, but we're testing GetByUser returns history)
+	// Create multiple sessions (CreateWithAutoClose closes previous, but we're testing GetByUser returns history)
 	for i := 0; i < 5; i++ {
-		_, err := store.Create(ctx, userID, nil, "192.168.1.1", "", sessions.CreatedByLogin)
-		if err != nil {
-			t.Fatalf("Create failed: %v", err)
-		}
+		_ = createTestSession(t, store, userID, nil, "192.168.1.1", "", sessions.CreatedByLogin)
 	}
 
 	// Get user's session history with limit
@@ -367,11 +407,11 @@ func TestStore_GetByOrganization(t *testing.T) {
 	user2 := primitive.NewObjectID()
 
 	// Create sessions for org1
-	_, _ = store.Create(ctx, user1, &org1, "192.168.1.1", "", sessions.CreatedByLogin)
-	_, _ = store.Create(ctx, user2, &org1, "192.168.1.2", "", sessions.CreatedByLogin)
+	_ = createTestSession(t, store, user1, &org1, "192.168.1.1", "", sessions.CreatedByLogin)
+	_ = createTestSession(t, store, user2, &org1, "192.168.1.2", "", sessions.CreatedByLogin)
 
 	// Create session for org2
-	_, _ = store.Create(ctx, user1, &org2, "192.168.1.3", "", sessions.CreatedByLogin)
+	_ = createTestSession(t, store, user1, &org2, "192.168.1.3", "", sessions.CreatedByLogin)
 
 	// Get sessions for org1
 	orgSessions, err := store.GetByOrganization(ctx, org1, 10)
@@ -401,8 +441,8 @@ func TestStore_CountActiveInOrg(t *testing.T) {
 	user2 := primitive.NewObjectID()
 
 	// Create active sessions for org
-	_, _ = store.Create(ctx, user1, &orgID, "192.168.1.1", "", sessions.CreatedByLogin)
-	_, _ = store.Create(ctx, user2, &orgID, "192.168.1.2", "", sessions.CreatedByLogin)
+	_ = createTestSession(t, store, user1, &orgID, "192.168.1.1", "", sessions.CreatedByLogin)
+	_ = createTestSession(t, store, user2, &orgID, "192.168.1.2", "", sessions.CreatedByLogin)
 
 	// Count with a generous threshold
 	count, err := store.CountActiveInOrg(ctx, orgID, 5*time.Minute)

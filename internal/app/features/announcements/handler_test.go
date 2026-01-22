@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dalemusser/stratahub/internal/app/features/announcements"
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
@@ -310,26 +311,20 @@ func TestDelete_Success(t *testing.T) {
 	}
 }
 
-func TestRoutes(t *testing.T) {
+func TestMountRoutes(t *testing.T) {
 	handler, _, _ := newTestHandler(t)
-	logger := zap.NewNop()
 
-	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", false, logger)
-	if err != nil {
-		t.Fatalf("NewSessionManager failed: %v", err)
-	}
+	r := chi.NewRouter()
+	handler.MountRoutes(r)
 
-	router := announcements.Routes(handler, sessionMgr)
-	if router == nil {
-		t.Fatal("Routes() returned nil")
-	}
+	// Test passes if MountRoutes doesn't panic
 }
 
 func TestViewRoutes(t *testing.T) {
 	handler, _, _ := newTestHandler(t)
 	logger := zap.NewNop()
 
-	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", false, logger)
+	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", 24*time.Hour, false, logger)
 	if err != nil {
 		t.Fatalf("NewSessionManager failed: %v", err)
 	}

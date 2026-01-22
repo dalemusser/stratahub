@@ -168,7 +168,7 @@ func TestRoutes(t *testing.T) {
 	handler := newTestHandler(t)
 	logger := zap.NewNop()
 
-	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", false, logger)
+	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", 24*time.Hour, false, logger)
 	if err != nil {
 		t.Fatalf("NewSessionManager failed: %v", err)
 	}

@@ -202,6 +202,7 @@ func TestStore_OrgIDsByUser(t *testing.T) {
 	org1 := fixtures.CreateOrganization(ctx, "Org One")
 	org2 := fixtures.CreateOrganization(ctx, "Org Two")
 	org3 := fixtures.CreateOrganization(ctx, "Org Three")
+	_ = org3 // org3 exists but is not assigned to coordinator
 
 	// Assign coordinator to 2 orgs
 	_, _ = store.Create(ctx, models.CoordinatorAssignment{UserID: coordinator.ID, OrganizationID: org1.ID})

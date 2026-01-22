@@ -5,14 +5,14 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/dalemusser/stratahub/internal/app/features/authgoogle"
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/store/oauthstate"
 	"github.com/dalemusser/stratahub/internal/app/store/sessions"
-	"github.com/dalemusser/stratahub/internal/app/store/workspaces"
+	workspacestore "github.com/dalemusser/stratahub/internal/app/store/workspaces"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
-	"github.com/dalemusser/stratahub/internal/app/system/auditlog"
 	"github.com/dalemusser/stratahub/internal/testutil"
 	"go.uber.org/zap"
 )
@@ -23,21 +23,20 @@ func newTestHandler(t *testing.T) *authgoogle.Handler {
 	logger := zap.NewNop()
 	errLog := uierrors.NewErrorLogger(logger)
 
-	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", false, logger)
+	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", 24*time.Hour, false, logger)
 	if err != nil {
 		t.Fatalf("NewSessionManager failed: %v", err)
 	}
 
 	sessStore := sessions.New(db)
 	stateStore := oauthstate.New(db)
-	wsStore := workspaces.New(db)
-	audit := auditlog.NewNopLogger()
+	wsStore := workspacestore.New(db)
 
 	return authgoogle.NewHandler(
 		db,
 		sessionMgr,
 		errLog,
-		audit,
+		nil, // audit logger (nil is valid - Logger handles nil receivers)
 		sessStore,
 		stateStore,
 		wsStore,
@@ -69,21 +68,20 @@ func TestIsConfigured_NotConfigured(t *testing.T) {
 	logger := zap.NewNop()
 	errLog := uierrors.NewErrorLogger(logger)
 
-	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", false, logger)
+	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", 24*time.Hour, false, logger)
 	if err != nil {
 		t.Fatalf("NewSessionManager failed: %v", err)
 	}
 
 	sessStore := sessions.New(db)
 	stateStore := oauthstate.New(db)
-	wsStore := workspaces.New(db)
-	audit := auditlog.NewNopLogger()
+	wsStore := workspacestore.New(db)
 
 	h := authgoogle.NewHandler(
 		db,
 		sessionMgr,
 		errLog,
-		audit,
+		nil, // audit logger
 		sessStore,
 		stateStore,
 		wsStore,
@@ -105,21 +103,20 @@ func TestServeLogin_NotConfigured(t *testing.T) {
 	logger := zap.NewNop()
 	errLog := uierrors.NewErrorLogger(logger)
 
-	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", false, logger)
+	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", 24*time.Hour, false, logger)
 	if err != nil {
 		t.Fatalf("NewSessionManager failed: %v", err)
 	}
 
 	sessStore := sessions.New(db)
 	stateStore := oauthstate.New(db)
-	wsStore := workspaces.New(db)
-	audit := auditlog.NewNopLogger()
+	wsStore := workspacestore.New(db)
 
 	h := authgoogle.NewHandler(
 		db,
 		sessionMgr,
 		errLog,
-		audit,
+		nil, // audit logger
 		sessStore,
 		stateStore,
 		wsStore,

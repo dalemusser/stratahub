@@ -24,7 +24,7 @@ func newTestHandler(t *testing.T) (*login.Handler, *testutil.Fixtures) {
 	errLog := uierrors.NewErrorLogger(logger)
 
 	// Create a session manager for testing (dev mode, weak key allowed)
-	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", false, logger)
+	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", 24*time.Hour, false, logger)
 	if err != nil {
 		t.Fatalf("NewSessionManager failed: %v", err)
 	}

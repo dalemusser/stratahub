@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/dalemusser/stratahub/internal/app/features/logout"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
@@ -19,7 +20,7 @@ func newTestHandler(t *testing.T) *logout.Handler {
 	logger := zap.NewNop()
 
 	// Create a session manager for testing
-	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", false, logger)
+	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", 24*time.Hour, false, logger)
 	if err != nil {
 		t.Fatalf("NewSessionManager failed: %v", err)
 	}
@@ -94,7 +95,7 @@ func TestServeLogout_HTMX_ReturnsHXRedirect(t *testing.T) {
 
 func TestServeLogout_WithExistingSession(t *testing.T) {
 	logger := zap.NewNop()
-	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", false, logger)
+	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", 24*time.Hour, false, logger)
 	if err != nil {
 		t.Fatalf("NewSessionManager failed: %v", err)
 	}

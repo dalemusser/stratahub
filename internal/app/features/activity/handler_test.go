@@ -1,9 +1,9 @@
 package activity_test
 
 import (
-	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/dalemusser/stratahub/internal/app/features/activity"
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
@@ -24,7 +24,7 @@ func newTestHandler(t *testing.T) *activity.Handler {
 	sessionsStore := sessions.New(db)
 	activityStore := activitystore.New(db)
 
-	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", false, logger)
+	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", 24*time.Hour, false, logger)
 	if err != nil {
 		t.Fatalf("NewSessionManager failed: %v", err)
 	}
@@ -174,7 +174,7 @@ func TestRoutes(t *testing.T) {
 	handler := newTestHandler(t)
 	logger := zap.NewNop()
 
-	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", false, logger)
+	sessionMgr, err := auth.NewSessionManager("test-session-key-for-testing-only", "test-session", "", 24*time.Hour, false, logger)
 	if err != nil {
 		t.Fatalf("NewSessionManager failed: %v", err)
 	}

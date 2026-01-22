@@ -16,7 +16,7 @@ func TestServe_DatabaseConnected(t *testing.T) {
 	db := testutil.SetupTestDB(t)
 	client := db.Client()
 	logger := zap.NewNop()
-	handler := health.NewHandler(client, logger)
+	handler := health.NewHandler(client, "http://localhost:8080", logger)
 
 	req := httptest.NewRequest("GET", "/health", nil)
 	rec := httptest.NewRecorder()
@@ -34,15 +34,22 @@ func TestServe_DatabaseConnected(t *testing.T) {
 	}
 
 	// Verify response body
-	var response map[string]string
+	var response struct {
+		Status   string `json:"status"`
+		Database string `json:"database"`
+		Cert     *struct {
+			DaysLeft int  `json:"days_left"`
+			Valid    bool `json:"valid"`
+		} `json:"cert,omitempty"`
+	}
 	if err := json.Unmarshal(rec.Body.Bytes(), &response); err != nil {
 		t.Fatalf("failed to parse response: %v", err)
 	}
 
-	if response["status"] != "ok" {
-		t.Errorf("status: got %q, want %q", response["status"], "ok")
+	if response.Status != "ok" {
+		t.Errorf("status: got %q, want %q", response.Status, "ok")
 	}
-	if response["database"] != "connected" {
-		t.Errorf("database: got %q, want %q", response["database"], "connected")
+	if response.Database != "connected" {
+		t.Errorf("database: got %q, want %q", response.Database, "connected")
 	}
 }

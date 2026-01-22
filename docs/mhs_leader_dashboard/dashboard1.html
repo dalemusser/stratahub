@@ -1,0 +1,528 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mission HydroSci - Teacher Dashboard</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        'outfit': ['Outfit', 'sans-serif'],
+                        'mono': ['Space Mono', 'monospace'],
+                    },
+                    colors: {
+                        'hydro': {
+                            'deep': '#0c2d48',
+                            'mid': '#145374',
+                            'light': '#2e8bc0',
+                            'pale': '#b1d4e0',
+                            'foam': '#e8f4f8',
+                        },
+                        'status': {
+                            'success': '#22c55e',
+                            'warning': '#eab308',
+                            'empty': '#ffffff',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        body {
+            font-family: 'Outfit', sans-serif;
+        }
+        
+        .vertical-text {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+            transform: rotate(180deg);
+            white-space: nowrap;
+        }
+
+        .cell-success {
+            background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+        }
+        
+        .cell-warning {
+            background: linear-gradient(135deg, #eab308 0%, #ca8a04 100%);
+        }
+        
+        .cell-empty {
+            background: #ffffff;
+        }
+
+        .wave-bg {
+            background: linear-gradient(180deg, #0c2d48 0%, #145374 50%, #2e8bc0 100%);
+        }
+
+        #floating-tooltip {
+            position: fixed;
+            z-index: 9999;
+            max-width: 280px;
+            padding: 12px;
+            background: #0c2d48;
+            color: white;
+            font-size: 12px;
+            text-align: left;
+            border-radius: 8px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.15s ease;
+        }
+
+        #floating-tooltip.visible {
+            opacity: 1;
+        }
+
+        #floating-tooltip .tooltip-title {
+            font-weight: bold;
+            color: #b1d4e0;
+            margin-bottom: 4px;
+        }
+
+        #floating-tooltip .tooltip-body {
+            line-height: 1.5;
+        }
+
+        /* Grid layout for frozen rows/columns */
+        .table-container {
+            display: grid;
+            grid-template-columns: auto 1fr;
+            grid-template-rows: auto 1fr;
+            height: calc(100vh - 220px);
+            min-height: 400px;
+        }
+
+        /* Hide scrollbars on synced areas */
+        .hide-scrollbar {
+            -ms-overflow-style: none;
+            scrollbar-width: none;
+        }
+        .hide-scrollbar::-webkit-scrollbar {
+            display: none;
+        }
+
+        /* Styled scrollbar for main area */
+        .styled-scrollbar {
+            scrollbar-width: thin;
+            scrollbar-color: #2e8bc0 #e8f4f8;
+        }
+        .styled-scrollbar::-webkit-scrollbar {
+            width: 10px;
+            height: 10px;
+        }
+        .styled-scrollbar::-webkit-scrollbar-track {
+            background: #e8f4f8;
+            border-radius: 5px;
+        }
+        .styled-scrollbar::-webkit-scrollbar-thumb {
+            background: #2e8bc0;
+            border-radius: 5px;
+        }
+        .styled-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #145374;
+        }
+        .styled-scrollbar::-webkit-scrollbar-corner {
+            background: #e8f4f8;
+        }
+
+        /* Fixed cell dimensions */
+        .cell-h1 { height: 40px; }
+        .cell-h2 { height: 28px; }
+        .cell-h3 { height: 80px; }
+        .cell-data { height: 28px; }
+        .cell-w { min-width: 28px; max-width: 28px; width: 28px; }
+        .name-w { min-width: 140px; }
+    </style>
+</head>
+<body class="bg-slate-100 h-screen flex flex-col overflow-hidden">
+    <!-- Floating Tooltip -->
+    <div id="floating-tooltip">
+        <div class="tooltip-title"></div>
+        <div class="tooltip-body"></div>
+    </div>
+
+    <!-- Header -->
+    <header class="wave-bg text-white py-4 px-6 shadow-lg flex-shrink-0">
+        <div class="flex items-center gap-3">
+            <div class="w-10 h-10 bg-hydro-pale rounded-full flex items-center justify-center">
+                <svg class="w-6 h-6 text-hydro-deep" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 2c-5.33 4.55-8 8.48-8 11.8 0 4.98 3.8 8.2 8 8.2s8-3.22 8-8.2c0-3.32-2.67-7.25-8-11.8zm0 18c-3.35 0-6-2.57-6-6.2 0-2.34 1.95-5.44 6-9.14 4.05 3.7 6 6.79 6 9.14 0 3.63-2.65 6.2-6 6.2z"/>
+                </svg>
+            </div>
+            <div>
+                <h1 class="text-xl font-bold tracking-tight">Mission HydroSci</h1>
+                <p class="text-hydro-pale text-xs font-medium">Teacher Dashboard — Class Progress Overview</p>
+            </div>
+        </div>
+    </header>
+
+    <!-- Dashboard Container -->
+    <main class="flex-grow p-4 overflow-hidden">
+        <div class="bg-white rounded-xl shadow-xl overflow-hidden border border-slate-200 h-full flex flex-col">
+            <!-- Class Info Bar -->
+            <div class="bg-hydro-foam px-4 py-3 border-b border-hydro-pale flex items-center justify-between flex-shrink-0">
+                <div>
+                    <h2 class="text-base font-semibold text-hydro-deep">Period 3 — Earth Science</h2>
+                    <p class="text-xs text-hydro-mid">30 Students • Last updated: Dec 4, 2024</p>
+                </div>
+                <div class="flex items-center gap-4 text-xs">
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-3 h-3 rounded cell-success border border-green-600"></span>
+                        <span class="text-slate-600">Completed</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-3 h-3 rounded cell-warning border border-yellow-600"></span>
+                        <span class="text-slate-600">Needs Review</span>
+                    </div>
+                    <div class="flex items-center gap-1.5">
+                        <span class="w-3 h-3 rounded cell-empty border border-slate-300"></span>
+                        <span class="text-slate-600">Not Started</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Table Grid Container -->
+            <div class="table-container flex-grow">
+                <!-- Top-Left Corner (frozen both ways) -->
+                <div class="bg-hydro-deep z-20 shadow-[2px_2px_8px_-2px_rgba(0,0,0,0.2)]">
+                    <div class="cell-h1 name-w flex items-center px-3 border-b border-hydro-mid">
+                        <div>
+                            <div class="font-bold text-white text-sm">Name</div>
+                            <div class="text-[10px] text-hydro-pale">Student</div>
+                        </div>
+                    </div>
+                    <div class="cell-h2 name-w bg-hydro-mid border-b border-hydro-light"></div>
+                    <div class="cell-h3 name-w bg-hydro-light flex items-end px-3 pb-2 border-b border-hydro-pale">
+                        <span class="text-hydro-foam font-medium text-[10px]">Progress Points →</span>
+                    </div>
+                </div>
+
+                <!-- Top Header (frozen vertically, scrolls horizontally) -->
+                <div id="header-scroll" class="overflow-x-hidden hide-scrollbar bg-hydro-deep">
+                    <div id="header-content" class="flex flex-col">
+                        <!-- Row 1: Unit headers -->
+                        <div id="unit-header-row" class="flex cell-h1"></div>
+                        <!-- Row 2: Progress point IDs -->
+                        <div id="progress-id-row" class="flex cell-h2 bg-hydro-mid"></div>
+                        <!-- Row 3: Descriptions -->
+                        <div id="description-row" class="flex cell-h3 bg-hydro-light"></div>
+                    </div>
+                </div>
+
+                <!-- Left Column (frozen horizontally, scrolls vertically) -->
+                <div id="names-scroll" class="overflow-y-hidden hide-scrollbar bg-white shadow-[2px_0_8px_-2px_rgba(0,0,0,0.1)] z-10">
+                    <div id="names-content"></div>
+                </div>
+
+                <!-- Main Data Area (scrolls both ways) -->
+                <div id="data-scroll" class="overflow-auto styled-scrollbar bg-white">
+                    <div id="data-content"></div>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        // Progress point definitions
+        const units = [
+            {
+                name: "Unit 1",
+                title: "The Water Cycle",
+                points: [
+                    { id: "u1p1", short: "Cycle Intro", full: "Introduction to the Water Cycle: Students learn the basic stages of Earth's water cycle and why it's essential for all life." },
+                    { id: "u1p2", short: "Evap Lab", full: "Evaporation Laboratory: Hands-on experiment where students observe and measure evaporation rates under different conditions." },
+                    { id: "u1p3", short: "Cloud Form", full: "Cloud Formation Activity: Interactive simulation showing how water vapor condenses to form different types of clouds." },
+                    { id: "u1p4", short: "Precip Types", full: "Precipitation Types Puzzle: Students identify and classify rain, snow, sleet, and hail based on temperature conditions." },
+                    { id: "u1p5", short: "Cycle Quiz", full: "Water Cycle Assessment: Comprehensive quiz testing understanding of the complete water cycle process." }
+                ]
+            },
+            {
+                name: "Unit 2",
+                title: "Watersheds & Rivers",
+                points: [
+                    { id: "u2p1", short: "Watershed Map", full: "Watershed Mapping Mission: Students trace water flow patterns and identify watershed boundaries in their region." },
+                    { id: "u2p2", short: "River Flow", full: "River Flow Dynamics: Exploration of how rivers move, meander, and shape the landscape over time." },
+                    { id: "u2p3", short: "Erosion Puzzle", full: "Erosion Mechanics Puzzle: Problem-solving activity about how water erodes rock and soil to form valleys and canyons." },
+                    { id: "u2p4", short: "Delta Discovery", full: "Delta Discovery Quest: Virtual expedition to explore how river deltas form where rivers meet larger bodies of water." },
+                    { id: "u2p5", short: "Flow Rate", full: "Water Flow Calculations: Students measure and calculate the speed and volume of moving water." },
+                    { id: "u2p6", short: "River Quest", full: "River Ecosystem Quest: Final challenge exploring the plants and animals that depend on river systems." }
+                ]
+            },
+            {
+                name: "Unit 3",
+                title: "Groundwater Systems",
+                points: [
+                    { id: "u3p1", short: "Aquifer Intro", full: "Aquifer Introduction: Learning about underground water storage in porous rock and soil layers." },
+                    { id: "u3p2", short: "Porosity Test", full: "Porosity Testing Lab: Experiments comparing how different materials hold and transmit water underground." },
+                    { id: "u3p3", short: "Well Placement", full: "Well Drilling Simulation: Strategic decision-making game about where to place wells for optimal water access." },
+                    { id: "u3p4", short: "Spring Hunt", full: "Natural Spring Hunt: Map-based activity locating where groundwater emerges naturally at the surface." },
+                    { id: "u3p5", short: "Contamination", full: "Contamination Tracker: Simulation tracking how pollutants can spread through groundwater systems." }
+                ]
+            },
+            {
+                name: "Unit 4",
+                title: "Ocean Currents",
+                points: [
+                    { id: "u4p1", short: "Current Map", full: "Ocean Current Mapping: Interactive activity tracing major warm and cold currents around the globe." },
+                    { id: "u4p2", short: "Temp Layers", full: "Temperature Stratification: Exploring how ocean water forms distinct temperature layers at different depths." },
+                    { id: "u4p3", short: "Salinity Lab", full: "Salinity Experiments: Lab activities showing how salt content affects water density and movement." },
+                    { id: "u4p4", short: "Climate Link", full: "Climate Connection Challenge: Understanding how ocean currents influence weather and climate patterns worldwide." }
+                ]
+            },
+            {
+                name: "Unit 5",
+                title: "Water Conservation",
+                points: [
+                    { id: "u5p1", short: "Usage Audit", full: "Water Usage Audit: Students audit water consumption in a virtual home and identify waste." },
+                    { id: "u5p2", short: "Pollution ID", full: "Pollution Source Investigation: Detective activity identifying and categorizing sources of water pollution." },
+                    { id: "u5p3", short: "Filter Design", full: "Filtration System Design: Engineering challenge to design an effective water purification system." },
+                    { id: "u5p4", short: "Drought Plan", full: "Drought Response Planning: Creating emergency water conservation plans for drought conditions." },
+                    { id: "u5p5", short: "Action Plan", full: "Conservation Action Plan: Developing a comprehensive plan to reduce water waste in daily life." },
+                    { id: "u5p6", short: "Final Mission", full: "Final Conservation Mission: Culminating project applying all learned concepts to solve a water crisis scenario." }
+                ]
+            }
+        ];
+
+        // Student names (30 names, alphabetical by first name)
+        const students = [
+            "Abigail Chen", "Adrian Foster", "Aisha Patel", "Benjamin Wright", "Brianna Lopez",
+            "Caleb Morrison", "Charlotte Kim", "Daniel Okonkwo", "Elena Rodriguez", "Ethan Nakamura",
+            "Faith Williams", "Gabriel Santos", "Hannah Johansson", "Isaac Thompson", "Jasmine Lee",
+            "Jordan Mitchell", "Kayla Andersen", "Leo Fernandez", "Luna Ramirez", "Marcus Brown",
+            "Maya Singh", "Nathan Cooper", "Olivia Zhang", "Owen Fitzgerald", "Priya Sharma",
+            "Quinn Reeves", "Riley Jackson", "Sofia Martinez", "Tyler Nguyen", "Victoria Adams"
+        ];
+
+        // Generate progress status for a student
+        function generateStudentProgress(studentIndex) {
+            const progress = [];
+            const baseProgress = 13 + Math.floor(Math.random() * 5) - 2;
+            const adjustedProgress = Math.max(8, Math.min(18, baseProgress + (studentIndex % 5) - 2));
+            
+            let pointIndex = 0;
+            units.forEach(unit => {
+                unit.points.forEach(point => {
+                    if (pointIndex < adjustedProgress) {
+                        if (Math.random() < 0.15) {
+                            progress.push('warning');
+                        } else {
+                            progress.push('success');
+                        }
+                    } else {
+                        progress.push('empty');
+                    }
+                    pointIndex++;
+                });
+            });
+            
+            return progress;
+        }
+
+        // Build the table
+        function buildTable() {
+            const unitHeaderRow = document.getElementById('unit-header-row');
+            const progressIdRow = document.getElementById('progress-id-row');
+            const descriptionRow = document.getElementById('description-row');
+            const namesContent = document.getElementById('names-content');
+            const dataContent = document.getElementById('data-content');
+
+            // Unit descriptions for tooltips
+        const unitDescriptions = {
+            "Unit 1": "The Water Cycle: Students explore evaporation, condensation, precipitation, and collection—the continuous journey of water through Earth's systems.",
+            "Unit 2": "Watersheds & Rivers: Students investigate how water flows across landscapes, shapes terrain through erosion, and creates river ecosystems.",
+            "Unit 3": "Groundwater Systems: Students discover the hidden world of aquifers, learn about porosity and permeability, and understand how wells access underground water.",
+            "Unit 4": "Ocean Currents: Students map global ocean circulation patterns and explore how temperature, salinity, and currents influence climate worldwide.",
+            "Unit 5": "Water Conservation: Students become water stewards by auditing usage, investigating pollution, designing filtration systems, and creating conservation action plans."
+        };
+
+        // Possible issues for yellow cells
+        const yellowIssues = [
+            "Needed multiple attempts to complete the puzzle correctly",
+            "Completed activity but skipped optional exploration sections",
+            "Submitted with minor errors in calculations",
+            "Required hints to finish the challenge",
+            "Completed under time pressure with some rushed answers",
+            "Missed 2-3 questions on the assessment",
+            "Had difficulty with the interactive simulation controls",
+            "Needed teacher intervention to proceed",
+            "Completed but showed misconceptions in reflection questions",
+            "Struggled with reading comprehension of instructions"
+        ];
+
+        // Build unit headers
+            units.forEach(unit => {
+                const div = document.createElement('div');
+                const width = unit.points.length * 28;
+                div.style.minWidth = width + 'px';
+                div.style.width = width + 'px';
+                div.className = 'flex flex-col justify-center items-center border-l border-hydro-mid px-1 bg-hydro-deep cursor-help';
+                div.setAttribute('data-tooltip-title', unit.name + ': ' + unit.title);
+                div.setAttribute('data-tooltip-body', unitDescriptions[unit.name]);
+                div.innerHTML = `
+                    <div class="font-bold text-white text-xs">${unit.name}</div>
+                    <div class="text-[9px] text-hydro-pale truncate">${unit.title}</div>
+                `;
+                unitHeaderRow.appendChild(div);
+            });
+
+            // Build progress point IDs
+            units.forEach((unit, unitIndex) => {
+                unit.points.forEach((point, pointIndex) => {
+                    const div = document.createElement('div');
+                    div.className = `cell-w flex items-center justify-center text-[9px] font-mono text-white bg-hydro-mid ${pointIndex === 0 ? 'border-l border-hydro-light' : ''}`;
+                    div.textContent = point.id;
+                    progressIdRow.appendChild(div);
+                });
+            });
+
+            // Build description row
+            units.forEach((unit, unitIndex) => {
+                unit.points.forEach((point, pointIndex) => {
+                    const div = document.createElement('div');
+                    div.className = `cell-w flex items-center justify-center cursor-help bg-hydro-light ${pointIndex === 0 ? 'border-l border-hydro-pale' : ''}`;
+                    div.setAttribute('data-tooltip-title', `${point.id.toUpperCase()}: ${point.short}`);
+                    div.setAttribute('data-tooltip-body', point.full);
+                    div.innerHTML = `<div class="vertical-text text-[9px] text-white font-medium">${point.short}</div>`;
+                    descriptionRow.appendChild(div);
+                });
+            });
+
+            // Generate email from student name
+        function generateEmail(name) {
+            const parts = name.toLowerCase().split(' ');
+            const firstName = parts[0];
+            const lastName = parts[1];
+            // Mix up email formats for variety
+            const formats = [
+                `${firstName}.${lastName}@gmail.com`,
+                `${firstName}${lastName}@gmail.com`,
+                `${firstName}.${lastName}2024@gmail.com`,
+                `${firstName}_${lastName}@gmail.com`,
+                `${firstName[0]}${lastName}@gmail.com`
+            ];
+            // Use name length to deterministically pick a format
+            return formats[name.length % formats.length];
+        }
+
+        // Build student names and data rows
+            students.forEach((student, studentIndex) => {
+                const progress = generateStudentProgress(studentIndex);
+                const bgClass = studentIndex % 2 === 0 ? 'bg-slate-50' : 'bg-white';
+                
+                // Name cell
+                const nameDiv = document.createElement('div');
+                nameDiv.className = `cell-data name-w flex items-center px-3 text-xs font-medium text-slate-700 border-b border-slate-200 cursor-help ${bgClass}`;
+                nameDiv.textContent = student;
+                nameDiv.setAttribute('data-tooltip-title', student);
+                nameDiv.setAttribute('data-tooltip-body', generateEmail(student));
+                namesContent.appendChild(nameDiv);
+
+                // Data row
+                const rowDiv = document.createElement('div');
+                rowDiv.className = `flex cell-data ${bgClass}`;
+                
+                let pointIndex = 0;
+                units.forEach(unit => {
+                    unit.points.forEach((point, pIndex) => {
+                        const status = progress[pointIndex];
+                        
+                        let cellClass = 'cell-empty';
+                        let borderClass = 'border-slate-200';
+                        if (status === 'success') {
+                            cellClass = 'cell-success';
+                            borderClass = 'border-green-300';
+                        } else if (status === 'warning') {
+                            cellClass = 'cell-warning';
+                            borderClass = 'border-yellow-300';
+                        }
+                        
+                        const cellDiv = document.createElement('div');
+                        cellDiv.className = `cell-w p-0.5 border-b border-slate-200 ${pIndex === 0 ? 'border-l' : ''}`;
+                        
+                        const innerDiv = document.createElement('div');
+                        innerDiv.className = `${cellClass} w-full h-full rounded border ${borderClass}`;
+                        
+                        // Add tooltip to yellow cells
+                        if (status === 'warning') {
+                            const randomIssue = yellowIssues[Math.floor(Math.random() * yellowIssues.length)];
+                            cellDiv.classList.add('cursor-help');
+                            cellDiv.setAttribute('data-tooltip-title', `${student} — ${point.id.toUpperCase()}: Needs Review`);
+                            cellDiv.setAttribute('data-tooltip-body', randomIssue);
+                        }
+                        
+                        cellDiv.appendChild(innerDiv);
+                        rowDiv.appendChild(cellDiv);
+                        pointIndex++;
+                    });
+                });
+                
+                dataContent.appendChild(rowDiv);
+            });
+        }
+
+        // Setup synchronized scrolling
+        function setupScrollSync() {
+            const headerScroll = document.getElementById('header-scroll');
+            const namesScroll = document.getElementById('names-scroll');
+            const dataScroll = document.getElementById('data-scroll');
+
+            dataScroll.addEventListener('scroll', () => {
+                headerScroll.scrollLeft = dataScroll.scrollLeft;
+                namesScroll.scrollTop = dataScroll.scrollTop;
+            });
+        }
+
+        // Setup floating tooltip
+        function setupTooltips() {
+            const tooltip = document.getElementById('floating-tooltip');
+            const tooltipTitle = tooltip.querySelector('.tooltip-title');
+            const tooltipBody = tooltip.querySelector('.tooltip-body');
+
+            document.querySelectorAll('[data-tooltip-title]').forEach(el => {
+                el.addEventListener('mouseenter', (e) => {
+                    const title = el.getAttribute('data-tooltip-title');
+                    const body = el.getAttribute('data-tooltip-body');
+                    
+                    tooltipTitle.textContent = title;
+                    tooltipBody.textContent = body;
+                    
+                    const rect = el.getBoundingClientRect();
+                    
+                    let top = rect.bottom + 8;
+                    let left = rect.left + (rect.width / 2) - 140;
+                    
+                    if (left < 10) left = 10;
+                    if (left + 280 > window.innerWidth) left = window.innerWidth - 290;
+                    if (top + 100 > window.innerHeight) {
+                        top = rect.top - 100;
+                    }
+                    
+                    tooltip.style.top = top + 'px';
+                    tooltip.style.left = left + 'px';
+                    tooltip.classList.add('visible');
+                });
+
+                el.addEventListener('mouseleave', () => {
+                    tooltip.classList.remove('visible');
+                });
+            });
+        }
+
+        // Initialize
+        document.addEventListener('DOMContentLoaded', () => {
+            buildTable();
+            setupScrollSync();
+            setupTooltips();
+        });
+    </script>
+</body>
+</html>
