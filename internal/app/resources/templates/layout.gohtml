@@ -336,8 +336,9 @@
           }
         };
 
-        // Hide previously dismissed announcements on page load
-        if (storageKey) {
+        // Function to hide previously dismissed announcements
+        function hideDismissedAnnouncements() {
+          if (!storageKey) return;
           var dismissed = JSON.parse(localStorage.getItem(storageKey) || '[]');
           dismissed.forEach(function(id) {
             var banner = document.querySelector('[data-announcement-id="' + id + '"]');
@@ -346,6 +347,21 @@
             }
           });
         }
+
+        // Hide on initial page load
+        hideDismissedAnnouncements();
+
+        // Also hide when page is restored from bfcache (back-forward cache)
+        window.addEventListener('pageshow', function(event) {
+          if (event.persisted) {
+            hideDismissedAnnouncements();
+          }
+        });
+
+        // Also hide after any HTMX content swap (in case announcements are loaded dynamically)
+        document.body.addEventListener('htmx:afterSwap', function() {
+          hideDismissedAnnouncements();
+        });
       })();
 
       {{ if .IsLoggedIn }}

@@ -24,6 +24,8 @@ import (
 	materialsfeature "github.com/dalemusser/stratahub/internal/app/features/materials"
 	membersfeature "github.com/dalemusser/stratahub/internal/app/features/members"
 	mhsdashboardfeature "github.com/dalemusser/stratahub/internal/app/features/mhsdashboard"
+	mhsdashboard2feature "github.com/dalemusser/stratahub/internal/app/features/mhsdashboard2"
+	mhsdashboard3feature "github.com/dalemusser/stratahub/internal/app/features/mhsdashboard3"
 	organizationsfeature "github.com/dalemusser/stratahub/internal/app/features/organizations"
 	pagesfeature "github.com/dalemusser/stratahub/internal/app/features/pages"
 	reportsfeature "github.com/dalemusser/stratahub/internal/app/features/reports"
@@ -363,6 +365,14 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		// MHS Leader Dashboard (Mission HydroSci progress tracking)
 		mhsDashboardHandler := mhsdashboardfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
 		wsr.Mount("/mhsdashboard", mhsdashboardfeature.Routes(mhsDashboardHandler, sessionMgr))
+
+		// MHS Leader Dashboard 2 (experimental version)
+		mhsDashboard2Handler := mhsdashboard2feature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
+		wsr.Mount("/mhsdashboard2", mhsdashboard2feature.Routes(mhsDashboard2Handler, sessionMgr))
+
+		// MHS Leader Dashboard 3 (colorblind-friendly version)
+		mhsDashboard3Handler := mhsdashboard3feature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
+		wsr.Mount("/mhsdashboard3", mhsdashboard3feature.Routes(mhsDashboard3Handler, sessionMgr))
 
 		// Announcements management (admin only)
 		announcementsHandler := announcementsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)

@@ -1,74 +1,74 @@
 {
   "units": [
     {
-      "id": "u1",
+      "id": "Unit 1",
       "title": "Unit 1 Title",
       "progress_points": [
         {
           "id": "u1p1",
-          "short_name": "Point 1",
+          "short_name": "Get Your Space Legs",
           "description": "Description of progress point u1p1"
         },
         {
           "id": "u1p2",
-          "short_name": "Point 2",
+          "short_name": "Info and Intros",
           "description": "Description of progress point u1p2"
         },
         {
           "id": "u1p3",
-          "short_name": "Point 3",
+          "short_name": "Defend Expedition",
           "description": "Description of progress point u1p3"
         },
         {
           "id": "u1p4",
-          "short_name": "Point 4",
+          "short_name": "Unexpected Turbulence",
           "description": "Description of progress point u1p4"
-        },
-        {
-          "id": "u1p5",
-          "short_name": "Point 5",
-          "description": "Description of progress point u1p5"
         }
       ]
     },
     {
-      "id": "u2",
+      "id": "Unit 2",
       "title": "Unit 2 Title",
       "progress_points": [
         {
           "id": "u2p1",
-          "short_name": "Point 1",
+          "short_name": "Escape the Ruins + Topographic Glyph",
           "description": "Description of progress point u2p1"
         },
         {
           "id": "u2p2",
-          "short_name": "Point 2",
+          "short_name": "Foraged Forging + Finding Toppo",
           "description": "Description of progress point u2p2"
         },
         {
           "id": "u2p3",
-          "short_name": "Point 3",
+          "short_name": "Finding Tera & Aryn",
           "description": "Description of progress point u2p3"
         },
         {
           "id": "u2p4",
-          "short_name": "Point 4",
+          "short_name": "Investigate the Temple & Watershed Glyph",
           "description": "Description of progress point u2p4"
         },
         {
           "id": "u2p5",
-          "short_name": "Point 5",
+          "short_name": "Getting the Band Back Together",
           "description": "Description of progress point u2p5"
         },
         {
           "id": "u2p6",
-          "short_name": "Point 6",
+          "short_name": "Drone Tutorial + Data Collection",
           "description": "Description of progress point u2p6"
+        },
+        {
+          "id": "u2p7",
+          "short_name": "Watershed Argument",
+          "description": "Description of progress point u2p7"
         }
       ]
     },
     {
-      "id": "u3",
+      "id": "Unit 3",
       "title": "Unit 3 Title",
       "progress_points": [
         {
@@ -99,7 +99,7 @@
       ]
     },
     {
-      "id": "u4",
+      "id": "Unit 4",
       "title": "Unit 4 Title",
       "progress_points": [
         {
@@ -125,7 +125,7 @@
       ]
     },
     {
-      "id": "u5",
+      "id": "Unit 5",
       "title": "Unit 5 Title",
       "progress_points": [
         {
