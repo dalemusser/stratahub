@@ -1,0 +1,719 @@
+{{ define "mhsdashboard3_view" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div id="mhs-dashboard" data-theme="default" style="height: calc(100% - 8px);" class="flex flex-col">
+<style>
+  /* Theme CSS Variables */
+  #mhs-dashboard {
+    /* Default theme colors */
+    --mhs-success-bg: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+    --mhs-success-border: #16a34a;
+    --mhs-warning-bg: linear-gradient(135deg, #eab308 0%, #ca8a04 100%);
+    --mhs-warning-border: #ca8a04;
+    --mhs-legend-success-border: #16a34a;
+    --mhs-legend-warning-border: #ca8a04;
+  }
+
+  /* Theme: Blue/Yellow - Colorblind Friendly */
+  #mhs-dashboard[data-theme="blue-yellow"] {
+    --mhs-success-bg: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    --mhs-success-border: #2563eb;
+    --mhs-legend-success-border: #2563eb;
+  }
+
+  /* Theme: Teal/Orange - Alternative Colorblind */
+  #mhs-dashboard[data-theme="teal-orange"] {
+    --mhs-success-bg: linear-gradient(135deg, #14b8a6 0%, #0d9488 100%);
+    --mhs-success-border: #0d9488;
+    --mhs-warning-bg: linear-gradient(135deg, #f97316 0%, #ea580c 100%);
+    --mhs-warning-border: #ea580c;
+    --mhs-legend-success-border: #0d9488;
+    --mhs-legend-warning-border: #ea580c;
+  }
+
+  /* Theme: High Contrast */
+  #mhs-dashboard[data-theme="high-contrast"] {
+    --mhs-success-bg: linear-gradient(135deg, #15803d 0%, #166534 100%);
+    --mhs-success-border: #14532d;
+    --mhs-warning-bg: linear-gradient(135deg, #fbbf24 0%, #f59e0b 100%);
+    --mhs-warning-border: #d97706;
+    --mhs-legend-success-border: #14532d;
+    --mhs-legend-warning-border: #d97706;
+  }
+
+  /* Theme: With Markers - adds visual symbols */
+  #mhs-dashboard[data-theme="with-markers"] .mhs-cell-warning::after {
+    content: "!";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    font-weight: bold;
+    color: #78350f;
+    text-shadow: 0 0 2px rgba(255,255,255,0.5);
+  }
+  #mhs-dashboard[data-theme="with-markers"] .mhs-cell-warning {
+    position: relative;
+  }
+  #mhs-dashboard[data-theme="with-markers"] .mhs-cell-success::after {
+    content: "\2713";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 11px;
+    font-weight: bold;
+    color: #14532d;
+    text-shadow: 0 0 2px rgba(255,255,255,0.5);
+  }
+  #mhs-dashboard[data-theme="with-markers"] .mhs-cell-success {
+    position: relative;
+  }
+
+  /* Theme: Blue + Markers - Colorblind with symbols */
+  #mhs-dashboard[data-theme="blue-markers"] {
+    --mhs-success-bg: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+    --mhs-success-border: #2563eb;
+    --mhs-legend-success-border: #2563eb;
+  }
+  #mhs-dashboard[data-theme="blue-markers"] .mhs-cell-warning::after {
+    content: "!";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 12px;
+    font-weight: bold;
+    color: #78350f;
+    text-shadow: 0 0 2px rgba(255,255,255,0.5);
+  }
+  #mhs-dashboard[data-theme="blue-markers"] .mhs-cell-warning {
+    position: relative;
+  }
+  #mhs-dashboard[data-theme="blue-markers"] .mhs-cell-success::after {
+    content: "\2713";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 11px;
+    font-weight: bold;
+    color: #1e3a5f;
+    text-shadow: 0 0 2px rgba(255,255,255,0.5);
+  }
+  #mhs-dashboard[data-theme="blue-markers"] .mhs-cell-success {
+    position: relative;
+  }
+
+  /* Apply theme colors to cells */
+  .mhs-cell-success {
+    background: var(--mhs-success-bg);
+  }
+  .mhs-cell-warning {
+    background: var(--mhs-warning-bg);
+  }
+  .mhs-cell-empty {
+    background: #ffffff;
+  }
+
+  /* Legend samples use theme colors */
+  .mhs-legend-success {
+    background: var(--mhs-success-bg);
+    border-color: var(--mhs-legend-success-border) !important;
+  }
+  .mhs-legend-warning {
+    background: var(--mhs-warning-bg);
+    border-color: var(--mhs-legend-warning-border) !important;
+  }
+
+  /* MHS Dashboard specific styles */
+  .mhs-vertical-text {
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    transform: rotate(180deg);
+    white-space: normal;
+    word-break: break-word;
+    text-align: left;
+    max-width: 100%;
+    line-height: 1.1;
+  }
+  /* Hide scrollbars on synced areas */
+  .mhs-hide-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  .mhs-hide-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  /* Styled scrollbar for main area */
+  .mhs-styled-scrollbar {
+    scrollbar-width: thin;
+    scrollbar-color: #2e8bc0 #e8f4f8;
+  }
+  .mhs-styled-scrollbar::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  .mhs-styled-scrollbar::-webkit-scrollbar-track {
+    background: #e8f4f8;
+    border-radius: 5px;
+  }
+  .mhs-styled-scrollbar::-webkit-scrollbar-thumb {
+    background: #2e8bc0;
+    border-radius: 5px;
+  }
+  .mhs-styled-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #145374;
+  }
+  .mhs-styled-scrollbar::-webkit-scrollbar-corner {
+    background: #e8f4f8;
+  }
+  /* Grid dimensions */
+  .mhs-grid-container {
+    display: grid;
+    grid-template-columns: 140px 1fr;
+    grid-template-rows: 160px 1fr;
+    min-height: 400px;
+  }
+  .mhs-header-height { height: 160px; }
+  .mhs-name-width { width: 140px; min-width: 140px; }
+  .mhs-row-height { height: 28px; }
+  .mhs-cell-width { width: 28px; min-width: 28px; max-width: 28px; }
+  .mhs-h1 { height: 40px; }
+  .mhs-h3 { height: 120px; }
+  /* Vertical text cell - align to bottom, clip at top */
+  .mhs-vertical-cell {
+    overflow: hidden;
+    display: flex;
+    align-items: flex-end;
+    justify-content: center;
+    padding: 2px 1px 4px 1px;
+    cursor: pointer;
+    transition: background-color 0.15s ease;
+  }
+  .mhs-vertical-cell:hover {
+    background-color: rgba(255, 255, 255, 0.15);
+  }
+  /* Modal styles */
+  .mhs-modal-backdrop {
+    position: fixed;
+    inset: 0;
+    background-color: rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease;
+  }
+  .mhs-modal-backdrop.active {
+    opacity: 1;
+    visibility: visible;
+  }
+  .mhs-modal {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%) scale(0.95);
+    z-index: 1001;
+    width: 90%;
+    max-width: 500px;
+    max-height: 80vh;
+    background: white;
+    border-radius: 12px;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.2s ease, visibility 0.2s ease, transform 0.2s ease;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+  .mhs-modal.active {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  .mhs-modal-header {
+    background: linear-gradient(135deg, #0c2d48 0%, #145374 100%);
+    color: white;
+    padding: 16px 20px;
+    position: relative;
+  }
+  .mhs-modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 28px;
+    height: 28px;
+    border: none;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: white;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background-color 0.15s ease;
+  }
+  .mhs-modal-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+  }
+  .mhs-modal-body {
+    padding: 20px;
+    overflow-y: auto;
+    flex: 1;
+  }
+  /* Theme info button */
+  .mhs-theme-info-btn {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    border: 1px solid #b1d4e0;
+    background: white;
+    color: #145374;
+    font-size: 12px;
+    font-weight: bold;
+    cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s ease;
+  }
+  .mhs-theme-info-btn:hover {
+    background: #145374;
+    color: white;
+    border-color: #145374;
+  }
+</style>
+
+<!-- Dashboard Card -->
+<div class="bg-white rounded-xl shadow-xl overflow-hidden border border-slate-200 flex flex-col flex-1 min-h-0">
+  <!-- Class Info Bar -->
+  <div class="bg-[#e8f4f8] px-4 py-2 border-b border-[#b1d4e0] flex items-center justify-between flex-shrink-0">
+    <!-- Left: Group selector and Theme selector -->
+    <div class="flex items-center gap-4">
+      {{ if .Groups }}
+      <select id="group-select"
+              class="text-sm border border-[#b1d4e0] rounded px-3 py-1.5 bg-white text-[#0c2d48] font-semibold"
+              hx-get="/mhsdashboard3/grid"
+              hx-target="#mhs-grid"
+              hx-swap="innerHTML"
+              name="group">
+        {{ range .Groups }}
+        <option value="{{ .ID }}" {{ if .Selected }}selected{{ end }}>{{ .Name }}</option>
+        {{ end }}
+      </select>
+      {{ end }}
+      <!-- Theme Selector -->
+      <div class="flex items-center gap-1.5">
+        <select id="theme-select"
+                class="text-sm border border-[#b1d4e0] rounded px-2 py-1.5 bg-white text-[#0c2d48]">
+          <option value="default">Default (Green/Yellow)</option>
+          <option value="blue-yellow">Blue/Yellow</option>
+          <option value="teal-orange">Teal/Orange</option>
+          <option value="high-contrast">High Contrast</option>
+          <option value="with-markers">With Markers</option>
+          <option value="blue-markers">Blue + Markers</option>
+        </select>
+        <button id="theme-info-btn" type="button" class="mhs-theme-info-btn" title="Theme information">?</button>
+      </div>
+    </div>
+    <!-- Center: Legend -->
+    <div class="flex items-center gap-5 text-xs">
+      <div class="flex items-center gap-1.5">
+        <span class="w-4 h-4 flex-shrink-0 rounded mhs-legend-success border"></span>
+        <span class="text-slate-600">Completed</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-4 h-4 flex-shrink-0 rounded mhs-legend-warning border"></span>
+        <span class="text-slate-600">Needs Review</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-4 h-4 flex-shrink-0 rounded border border-slate-300 bg-white"></span>
+        <span class="text-slate-600">Not Started</span>
+      </div>
+    </div>
+    <!-- Right: Refresh controls -->
+    <div class="flex items-center gap-2">
+      <button id="mhs-refresh-btn"
+              type="button"
+              class="text-sm px-2 py-1 border border-[#b1d4e0] rounded hover:bg-white text-[#145374] cursor-pointer"
+              title="Refresh now">
+        Refresh
+      </button>
+      <span id="mhs-countdown" class="text-xs text-slate-500 w-8 text-center cursor-help" title="Time until refresh">30s</span>
+    </div>
+  </div>
+
+  <!-- Grid Container -->
+  <div id="mhs-grid" class="flex-grow overflow-hidden">
+    {{ template "mhsdashboard3_grid" . }}
+  </div>
+</div>
+
+<!-- Shared Modal Backdrop -->
+<div id="mhs-modal-backdrop" class="mhs-modal-backdrop"></div>
+
+<!-- Progress Point Info Modal -->
+<div id="mhs-modal" class="mhs-modal">
+  <div class="mhs-modal-header">
+    <button id="mhs-modal-close" class="mhs-modal-close" type="button" aria-label="Close">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M1 1l12 12M13 1L1 13"/>
+      </svg>
+    </button>
+    <div id="mhs-modal-id" class="text-xs text-[#b1d4e0] uppercase tracking-wide mb-1"></div>
+    <h3 id="mhs-modal-title" class="text-lg font-semibold pr-8"></h3>
+  </div>
+  <div class="mhs-modal-body">
+    <div class="mb-4">
+      <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Description</h4>
+      <p id="mhs-modal-description" class="text-slate-700"></p>
+    </div>
+    <div class="pt-4 border-t border-slate-200">
+      <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Additional Information</h4>
+      <p class="text-slate-500 text-sm italic">More details about this progress point can be added here, such as learning objectives, resources, or tips for teachers.</p>
+    </div>
+  </div>
+</div>
+
+<!-- Student Review Modal -->
+<div id="mhs-review-modal" class="mhs-modal">
+  <div class="mhs-modal-header" style="background: linear-gradient(135deg, #ca8a04 0%, #a16207 100%);">
+    <button id="mhs-review-modal-close" class="mhs-modal-close" type="button" aria-label="Close">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M1 1l12 12M13 1L1 13"/>
+      </svg>
+    </button>
+    <div class="flex items-center gap-2 mb-1">
+      <svg class="w-4 h-4 text-yellow-200" fill="currentColor" viewBox="0 0 20 20">
+        <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"/>
+      </svg>
+      <span class="text-xs text-yellow-200 uppercase tracking-wide">Needs Review</span>
+    </div>
+    <h3 id="mhs-review-modal-student" class="text-lg font-semibold pr-8"></h3>
+    <div id="mhs-review-modal-point" class="text-sm text-yellow-100 mt-1"></div>
+  </div>
+  <div class="mhs-modal-body">
+    <div class="mb-4">
+      <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Issue Details</h4>
+      <p id="mhs-review-modal-reason" class="text-slate-700"></p>
+    </div>
+    <div class="pt-4 border-t border-slate-200">
+      <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Suggested Actions</h4>
+      <ul class="space-y-2 text-sm text-slate-600">
+        <li class="flex items-start gap-2">
+          <svg class="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+          <span>Review the student's submitted work in detail</span>
+        </li>
+        <li class="flex items-start gap-2">
+          <svg class="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+          <span>Provide specific feedback on areas needing improvement</span>
+        </li>
+        <li class="flex items-start gap-2">
+          <svg class="w-4 h-4 text-amber-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+          </svg>
+          <span>Schedule a check-in with the student if needed</span>
+        </li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<!-- Theme Info Modal -->
+<div id="mhs-theme-modal" class="mhs-modal">
+  <div class="mhs-modal-header" style="background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);">
+    <button id="mhs-theme-modal-close" class="mhs-modal-close" type="button" aria-label="Close">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M1 1l12 12M13 1L1 13"/>
+      </svg>
+    </button>
+    <div class="flex items-center gap-2 mb-1">
+      <svg class="w-4 h-4 text-indigo-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"/>
+      </svg>
+      <span class="text-xs text-indigo-200 uppercase tracking-wide">Theme Information</span>
+    </div>
+    <h3 id="mhs-theme-modal-title" class="text-lg font-semibold pr-8"></h3>
+  </div>
+  <div class="mhs-modal-body">
+    <div class="mb-4">
+      <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Description</h4>
+      <p id="mhs-theme-modal-description" class="text-slate-700"></p>
+    </div>
+    <div class="pt-4 border-t border-slate-200">
+      <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Design Rationale</h4>
+      <p id="mhs-theme-modal-rationale" class="text-slate-600 text-sm"></p>
+    </div>
+    <div id="mhs-theme-modal-accessibility" class="pt-4 border-t border-slate-200 mt-4">
+      <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Accessibility Notes</h4>
+      <p id="mhs-theme-modal-access-text" class="text-slate-600 text-sm"></p>
+    </div>
+  </div>
+</div>
+
+<script>
+(function() {
+  var scrollPos = { x: 0, y: 0 };
+  var countdown = 30;
+  var countdownEl = document.getElementById('mhs-countdown');
+  var refreshBtn = document.getElementById('mhs-refresh-btn');
+  var countdownInterval = null;
+
+  // Theme definitions with info
+  var themes = {
+    'default': {
+      name: 'Default (Green/Yellow)',
+      description: 'The standard color scheme using green for completed items and yellow/amber for items needing review.',
+      rationale: 'Green traditionally represents success or completion, while yellow/amber is commonly associated with caution or attention needed. This is an intuitive pairing that most users will immediately understand.',
+      accessibility: 'This theme may be difficult for users with red-green color blindness (deuteranopia or protanopia), as green and yellow can appear similar. Consider using the Blue/Yellow or marker-based themes for better accessibility.'
+    },
+    'blue-yellow': {
+      name: 'Blue/Yellow (Colorblind Friendly)',
+      description: 'Replaces green with blue while keeping yellow for review items. Designed specifically for users with color vision deficiency.',
+      rationale: 'Blue is distinguishable by virtually all forms of color blindness, making it an excellent choice for the "completed" status. The blue/yellow combination is a classic colorblind-safe pairing used in accessibility guidelines worldwide.',
+      accessibility: 'This theme is optimized for users with deuteranopia (red-green color blindness), which affects approximately 8% of men and 0.5% of women. Blue and yellow remain distinct across most types of color vision deficiency.'
+    },
+    'teal-orange': {
+      name: 'Teal/Orange',
+      description: 'Uses teal (blue-green) for completed items and orange for items needing review.',
+      rationale: 'Teal and orange are complementary colors that provide strong visual contrast. This combination offers a fresh, modern look while maintaining good accessibility for most users.',
+      accessibility: 'Teal sits between blue and green on the color spectrum, making it more distinguishable than pure green for many colorblind users. Orange provides better contrast than yellow for some vision types.'
+    },
+    'high-contrast': {
+      name: 'High Contrast',
+      description: 'Uses deeper, more saturated versions of the default colors for maximum visibility.',
+      rationale: 'Higher saturation and darker tones create stronger visual distinction between states. This can be helpful in bright environments, on lower-quality displays, or for users who prefer bolder colors.',
+      accessibility: 'While this theme improves general visibility, it does not specifically address color blindness. Users with color vision deficiency may still have difficulty distinguishing between green and yellow.'
+    },
+    'with-markers': {
+      name: 'With Markers',
+      description: 'Adds visual symbols to cells: a checkmark (✓) for completed items and an exclamation mark (!) for items needing review.',
+      rationale: 'By adding shape/symbol differentiation in addition to color, this theme does not rely solely on color to convey information. This is a key principle of accessible design (WCAG 2.1 guideline 1.4.1).',
+      accessibility: 'Excellent accessibility. Users can identify status by shape alone, making this theme suitable for all types of color vision, including complete color blindness (achromatopsia). The symbols also help in black-and-white printing.'
+    },
+    'blue-markers': {
+      name: 'Blue + Markers (Maximum Accessibility)',
+      description: 'Combines the colorblind-friendly blue/yellow palette with visual markers for the highest level of accessibility.',
+      rationale: 'This theme applies both color optimization and shape differentiation, following the "belt and suspenders" approach to accessibility. It ensures information is conveyed through multiple visual channels.',
+      accessibility: 'This is the most accessible option, suitable for users with any type of color vision deficiency, low vision, or when viewing the dashboard in challenging conditions. Recommended as the default for inclusive design.'
+    }
+  };
+
+  function updateCountdown() {
+    if (countdownEl) {
+      countdownEl.textContent = countdown + 's';
+    }
+  }
+
+  function startCountdown() {
+    countdown = 30;
+    updateCountdown();
+  }
+
+  function doRefresh() {
+    var groupSelect = document.getElementById('group-select');
+    var group = groupSelect ? groupSelect.value : '';
+    var url = '/mhsdashboard3/grid?group=' + encodeURIComponent(group);
+    htmx.ajax('GET', url, { target: '#mhs-grid', swap: 'innerHTML' });
+    countdown = 30;
+    updateCountdown();
+  }
+
+  if (refreshBtn) {
+    refreshBtn.addEventListener('click', doRefresh);
+  }
+
+  // Theme switching
+  var themeSelect = document.getElementById('theme-select');
+  var dashboard = document.getElementById('mhs-dashboard');
+
+  if (themeSelect && dashboard) {
+    themeSelect.addEventListener('change', function() {
+      dashboard.setAttribute('data-theme', this.value);
+    });
+  }
+
+  // Theme info button
+  var themeInfoBtn = document.getElementById('theme-info-btn');
+  var themeModal = document.getElementById('mhs-theme-modal');
+  var themeModalClose = document.getElementById('mhs-theme-modal-close');
+  var themeModalTitle = document.getElementById('mhs-theme-modal-title');
+  var themeModalDescription = document.getElementById('mhs-theme-modal-description');
+  var themeModalRationale = document.getElementById('mhs-theme-modal-rationale');
+  var themeModalAccessText = document.getElementById('mhs-theme-modal-access-text');
+
+  function openThemeInfoModal() {
+    var currentTheme = themeSelect ? themeSelect.value : 'default';
+    var info = themes[currentTheme] || themes['default'];
+
+    themeModalTitle.textContent = info.name;
+    themeModalDescription.textContent = info.description;
+    themeModalRationale.textContent = info.rationale;
+    themeModalAccessText.textContent = info.accessibility;
+
+    themeModal.classList.add('active');
+    modalBackdrop.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    activeModal = themeModal;
+  }
+
+  if (themeInfoBtn) {
+    themeInfoBtn.addEventListener('click', openThemeInfoModal);
+  }
+  if (themeModalClose) {
+    themeModalClose.addEventListener('click', closeModal);
+  }
+
+  // Save scroll position before swap
+  document.body.addEventListener('htmx:beforeSwap', function(evt) {
+    if (evt.detail.target && evt.detail.target.id === 'mhs-grid') {
+      var dataScroll = document.getElementById('mhs-data-scroll');
+      if (dataScroll) {
+        scrollPos = { x: dataScroll.scrollLeft, y: dataScroll.scrollTop };
+      }
+    }
+  });
+
+  // Restore scroll position and reset countdown after swap
+  document.body.addEventListener('htmx:afterSwap', function(evt) {
+    if (evt.detail.target && evt.detail.target.id === 'mhs-grid') {
+      var dataScroll = document.getElementById('mhs-data-scroll');
+      if (dataScroll && (scrollPos.x > 0 || scrollPos.y > 0)) {
+        dataScroll.scrollLeft = scrollPos.x;
+        dataScroll.scrollTop = scrollPos.y;
+      }
+      setupScrollSync();
+      countdown = 30;
+      updateCountdown();
+    }
+  });
+
+  function setupScrollSync() {
+    var headerScroll = document.getElementById('mhs-header-scroll');
+    var namesScroll = document.getElementById('mhs-names-scroll');
+    var dataScroll = document.getElementById('mhs-data-scroll');
+
+    if (dataScroll && headerScroll && namesScroll) {
+      dataScroll.addEventListener('scroll', function() {
+        headerScroll.scrollLeft = dataScroll.scrollLeft;
+        namesScroll.scrollTop = dataScroll.scrollTop;
+      });
+    }
+  }
+
+  // Modal elements
+  var modalBackdrop = document.getElementById('mhs-modal-backdrop');
+
+  // Progress Point Info Modal
+  var infoModal = document.getElementById('mhs-modal');
+  var infoModalClose = document.getElementById('mhs-modal-close');
+  var infoModalId = document.getElementById('mhs-modal-id');
+  var infoModalTitle = document.getElementById('mhs-modal-title');
+  var infoModalDescription = document.getElementById('mhs-modal-description');
+
+  // Review Modal
+  var reviewModal = document.getElementById('mhs-review-modal');
+  var reviewModalClose = document.getElementById('mhs-review-modal-close');
+  var reviewModalStudent = document.getElementById('mhs-review-modal-student');
+  var reviewModalPoint = document.getElementById('mhs-review-modal-point');
+  var reviewModalReason = document.getElementById('mhs-review-modal-reason');
+
+  var activeModal = null;
+
+  // Convert point ID like "u1p1" to "Unit 1, Point 1"
+  function formatPointId(id) {
+    var match = id.match(/u(\d+)p(\d+)/i);
+    if (match) {
+      return 'Unit ' + match[1] + ', Point ' + match[2];
+    }
+    return id;
+  }
+
+  function openInfoModal(id, title, description) {
+    infoModalId.textContent = formatPointId(id);
+    infoModalTitle.textContent = title;
+    infoModalDescription.textContent = description || 'No description available.';
+    infoModal.classList.add('active');
+    modalBackdrop.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    activeModal = infoModal;
+  }
+
+  function openReviewModal(studentName, pointId, pointTitle, reviewReason) {
+    reviewModalStudent.textContent = studentName;
+    reviewModalPoint.textContent = formatPointId(pointId) + ' - ' + pointTitle;
+    reviewModalReason.textContent = reviewReason || 'No details available.';
+    reviewModal.classList.add('active');
+    modalBackdrop.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    activeModal = reviewModal;
+  }
+
+  function closeModal() {
+    if (activeModal) {
+      activeModal.classList.remove('active');
+    }
+    modalBackdrop.classList.remove('active');
+    document.body.style.overflow = '';
+    activeModal = null;
+  }
+
+  if (infoModalClose) {
+    infoModalClose.addEventListener('click', closeModal);
+  }
+  if (reviewModalClose) {
+    reviewModalClose.addEventListener('click', closeModal);
+  }
+  if (modalBackdrop) {
+    modalBackdrop.addEventListener('click', closeModal);
+  }
+
+  // Close on Escape key
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && activeModal) {
+      closeModal();
+    }
+  });
+
+  // Handle clicks on progress point headers (delegated)
+  function setupClickHandlers() {
+    document.body.addEventListener('click', function(e) {
+      // Progress point header click
+      var pointCell = e.target.closest('.mhs-progress-point');
+      if (pointCell) {
+        var id = pointCell.dataset.pointId || '';
+        var title = pointCell.dataset.pointTitle || '';
+        var description = pointCell.dataset.pointDescription || '';
+        openInfoModal(id, title, description);
+        return;
+      }
+
+      // Review cell click (yellow squares)
+      var reviewCell = e.target.closest('.mhs-review-cell');
+      if (reviewCell) {
+        var studentName = reviewCell.dataset.studentName || '';
+        var pointId = reviewCell.dataset.pointId || '';
+        var pointTitle = reviewCell.dataset.pointTitle || '';
+        var reviewReason = reviewCell.dataset.reviewReason || '';
+        openReviewModal(studentName, pointId, pointTitle, reviewReason);
+        return;
+      }
+    });
+  }
+
+  // Initial setup
+  startCountdown();
+  setupScrollSync();
+  setupClickHandlers();
+})();
+</script>
+</div>
+{{ end }}
