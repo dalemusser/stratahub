@@ -81,6 +81,9 @@ type DashboardData struct {
 	UnitHeaders  []UnitHeader
 	PointHeaders []PointHeader
 	Members      []MemberRow
+
+	SortBy  string // Sort field (currently only "name")
+	SortDir string // Sort direction: "asc" or "desc"
 }
 
 // GridData is the view model for the HTMX-refreshed grid content.
@@ -96,4 +99,7 @@ type GridData struct {
 
 	// CSRF token for refresh requests
 	CSRFToken string
+
+	SortBy  string // Sort field (currently only "name")
+	SortDir string // Sort direction: "asc" or "desc"
 }
