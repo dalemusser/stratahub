@@ -16,12 +16,22 @@
 
   <!-- Top-Left Corner (frozen both ways) -->
   <div class="mhs-name-width mhs-header-height bg-[#0c2d48] z-20 shadow-[2px_2px_8px_-2px_rgba(0,0,0,0.2)]">
-    <!-- Row 1: Name header (40px) -->
+    <!-- Row 1: Name header (40px) with sort control -->
     <div class="mhs-h1 flex items-center px-3 border-b border-[#145374]">
-      <div>
-        <div class="font-bold text-white text-sm">Name</div>
-        <div class="text-[10px] text-[#b1d4e0]">Student</div>
-      </div>
+      <a hx-get="/mhsdashboard3/grid?group={{ $.SelectedGroup }}&sort=name&dir={{ if eq $.SortDir "asc" }}desc{{ else }}asc{{ end }}"
+         hx-target="#mhs-grid"
+         hx-swap="innerHTML"
+         class="flex items-center gap-1 cursor-pointer hover:text-[#b1d4e0] transition-colors">
+        <div>
+          <div class="font-bold text-white text-sm">Name</div>
+          <div class="text-[10px] text-[#b1d4e0]">Student</div>
+        </div>
+        {{ if eq $.SortDir "asc" }}
+        <span class="text-[#b1d4e0] text-xs ml-1" title="Sorted A-Z (click for Z-A)">&#9660;</span>
+        {{ else }}
+        <span class="text-[#b1d4e0] text-xs ml-1" title="Sorted Z-A (click for A-Z)">&#9650;</span>
+        {{ end }}
+      </a>
     </div>
     <!-- Row 2: Progress Points label (120px) -->
     <div class="mhs-h3 bg-[#2e8bc0] flex flex-col justify-between px-3 py-2 border-b border-[#b1d4e0]">

@@ -300,6 +300,7 @@
               hx-get="/mhsdashboard3/grid"
               hx-target="#mhs-grid"
               hx-swap="innerHTML"
+              hx-vals='{"sort": "name", "dir": "{{ .SortDir }}"}'
               name="group">
         {{ range .Groups }}
         <option value="{{ .ID }}" {{ if .Selected }}selected{{ end }}>{{ .Name }}</option>
@@ -348,7 +349,7 @@
   </div>
 
   <!-- Grid Container -->
-  <div id="mhs-grid" class="flex-grow overflow-hidden">
+  <div id="mhs-grid" class="flex-grow overflow-hidden" data-sort-dir="{{ .SortDir }}">
     {{ template "mhsdashboard3_grid" . }}
   </div>
 </div>
@@ -521,7 +522,9 @@
   function doRefresh() {
     var groupSelect = document.getElementById('group-select');
     var group = groupSelect ? groupSelect.value : '';
-    var url = '/mhsdashboard3/grid?group=' + encodeURIComponent(group);
+    var gridEl = document.getElementById('mhs-grid');
+    var sortDir = gridEl ? (gridEl.dataset.sortDir || 'asc') : 'asc';
+    var url = '/mhsdashboard3/grid?group=' + encodeURIComponent(group) + '&sort=name&dir=' + sortDir;
     htmx.ajax('GET', url, { target: '#mhs-grid', swap: 'innerHTML' });
     countdown = 30;
     updateCountdown();
@@ -593,6 +596,17 @@
       setupScrollSync();
       countdown = 30;
       updateCountdown();
+
+      // Update sort direction data attribute from the request URL
+      var pathInfo = evt.detail.pathInfo;
+      if (pathInfo && pathInfo.requestPath) {
+        var url = new URL(pathInfo.requestPath, window.location.origin);
+        var dir = url.searchParams.get('dir') || 'asc';
+        var gridEl = document.getElementById('mhs-grid');
+        if (gridEl) {
+          gridEl.dataset.sortDir = dir;
+        }
+      }
     }
   });
 

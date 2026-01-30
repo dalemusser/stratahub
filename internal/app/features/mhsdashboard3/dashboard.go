@@ -75,6 +75,16 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 		selectedGroup = groups[0].ID.Hex()
 	}
 
+	// Get sort parameters from query, default to name ascending
+	sortBy := r.URL.Query().Get("sort")
+	if sortBy == "" {
+		sortBy = "name"
+	}
+	sortDir := r.URL.Query().Get("dir")
+	if sortDir != "desc" {
+		sortDir = "asc"
+	}
+
 	// Build group options for dropdown
 	groupOptions := make([]GroupOption, len(groups))
 	var selectedGroupName string
@@ -102,7 +112,7 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 		groupOptions[0].Selected = true
 	}
 
-	members, err := h.getMembersForGroup(ctx, r, selectedOID)
+	members, err := h.getMembersForGroup(ctx, r, selectedOID, sortDir)
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "failed to load members", err, "A database error occurred.", "/dashboard")
 		return
@@ -126,6 +136,8 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 		UnitHeaders:   unitHeaders,
 		PointHeaders:  pointHeaders,
 		Members:       memberRows,
+		SortBy:        sortBy,
+		SortDir:       sortDir,
 	}
 
 	templates.Render(w, r, "mhsdashboard3_view", data)
@@ -181,6 +193,16 @@ func (h *Handler) ServeGrid(w http.ResponseWriter, r *http.Request) {
 		selectedGroup = groups[0].ID.Hex()
 	}
 
+	// Get sort parameters from query, default to name ascending
+	sortBy := r.URL.Query().Get("sort")
+	if sortBy == "" {
+		sortBy = "name"
+	}
+	sortDir := r.URL.Query().Get("dir")
+	if sortDir != "desc" {
+		sortDir = "asc"
+	}
+
 	selectedOID, err := primitive.ObjectIDFromHex(selectedGroup)
 	if err != nil {
 		selectedOID = groups[0].ID
@@ -198,7 +220,7 @@ func (h *Handler) ServeGrid(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	members, err := h.getMembersForGroup(ctx, r, selectedOID)
+	members, err := h.getMembersForGroup(ctx, r, selectedOID, sortDir)
 	if err != nil {
 		h.Log.Error("failed to load members", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -219,6 +241,8 @@ func (h *Handler) ServeGrid(w http.ResponseWriter, r *http.Request) {
 		PointHeaders:  pointHeaders,
 		Members:       memberRows,
 		CSRFToken:     csrf.Token(r),
+		SortBy:        sortBy,
+		SortDir:       sortDir,
 	}
 
 	templates.Render(w, r, "mhsdashboard3_grid", data)
@@ -306,8 +330,9 @@ func (h *Handler) getGroupsForUser(ctx context.Context, r *http.Request, userID 
 	return groups, nil
 }
 
-// getMembersForGroup returns all members of the given group.
-func (h *Handler) getMembersForGroup(ctx context.Context, r *http.Request, groupID primitive.ObjectID) ([]models.User, error) {
+// getMembersForGroup returns all members of the given group, sorted by name.
+// sortDir should be "asc" for A-Z or "desc" for Z-A.
+func (h *Handler) getMembersForGroup(ctx context.Context, r *http.Request, groupID primitive.ObjectID, sortDir string) ([]models.User, error) {
 	wsID := workspace.IDFromRequest(r)
 
 	// Get member user IDs from memberships
@@ -354,10 +379,16 @@ func (h *Handler) getMembersForGroup(ctx context.Context, r *http.Request, group
 		return nil, err
 	}
 
-	// Sort by name
-	sort.Slice(users, func(i, j int) bool {
-		return users[i].FullName < users[j].FullName
-	})
+	// Sort by name based on direction (case-insensitive using FullNameCI)
+	if sortDir == "desc" {
+		sort.Slice(users, func(i, j int) bool {
+			return users[i].FullNameCI > users[j].FullNameCI
+		})
+	} else {
+		sort.Slice(users, func(i, j int) bool {
+			return users[i].FullNameCI < users[j].FullNameCI
+		})
+	}
 
 	return users, nil
 }
