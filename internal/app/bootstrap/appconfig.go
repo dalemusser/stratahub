@@ -33,6 +33,9 @@ type AppConfig struct {
 	MongoMaxPoolSize uint64 // Maximum connections in pool (default: 100)
 	MongoMinPoolSize uint64 // Minimum connections to keep warm (default: 10)
 
+	// MHSGrader database (for reading progress grades - same cluster, different database)
+	MHSGraderDatabase string // Database name for MHSGrader grades (default: mhsgrader)
+
 	// Session management configuration
 	SessionKey    string        // Secret key for signing session cookies (must be strong in production)
 	SessionName   string        // Cookie name for sessions (default: stratahub-session)
@@ -53,9 +56,10 @@ type AppConfig struct {
 	StorageLocalURL  string // URL prefix for serving local files (e.g., "/files/materials")
 
 	// S3/CloudFront configuration (only used if StorageType is "s3")
-	StorageS3Region    string // AWS region
-	StorageS3Bucket    string // S3 bucket name
-	StorageS3Prefix    string // Key prefix (e.g., "materials/")
+	StorageS3Region string // AWS region
+	StorageS3Bucket string // S3 bucket name
+	StorageS3Prefix string // Key prefix (e.g., "materials/")
+	StorageS3ACL    string // Default ACL for uploaded objects (e.g., "public-read", "private")
 	StorageCFURL       string // CloudFront distribution URL
 	StorageCFKeyPairID string // CloudFront key pair ID
 	StorageCFKeyPath   string // Path to CloudFront private key file

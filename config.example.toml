@@ -73,6 +73,10 @@ mongo_database = "strata_hub"
 mongo_max_pool_size = 100
 mongo_min_pool_size = 10
 
+# MHSGrader database for progress grades (same cluster, different database)
+# Used by MHS Dashboard to display student progress
+mhsgrader_database = "mhsgrader"
+
 # Database connection timeout
 db_connect_timeout = "10s"
 

@@ -48,14 +48,21 @@ const (
 | SessionManager - injectable session management                              |
 *─────────────────────────────────────────────────────────────────────────────*/
 
+// WorkspaceChecker validates if a user has access to the current workspace.
+// It returns the workspace ID (hex string) and whether this is the apex domain.
+// Returns ("", true) for apex domain requests.
+// Returns (workspaceID, false) for workspace subdomain requests.
+type WorkspaceChecker func(r *http.Request) (workspaceID string, isApex bool)
+
 // SessionManager encapsulates session store and configuration.
 // It provides middleware and utilities for session-based authentication.
 // Use NewSessionManager to create an instance.
 type SessionManager struct {
-	store       *sessions.CookieStore
-	logger      *zap.Logger
-	name        string
-	userFetcher UserFetcher
+	store            *sessions.CookieStore
+	logger           *zap.Logger
+	name             string
+	userFetcher      UserFetcher
+	workspaceChecker WorkspaceChecker
 }
 
 // NewSessionManager creates a new SessionManager with the provided configuration.
@@ -156,6 +163,13 @@ func (sm *SessionManager) GetSession(r *http.Request) (*sessions.Session, error)
 // user data on each request. This must be called after database initialization.
 func (sm *SessionManager) SetUserFetcher(uf UserFetcher) {
 	sm.userFetcher = uf
+}
+
+// SetWorkspaceChecker sets the WorkspaceChecker used by LoadSessionUser to validate
+// that the authenticated user has access to the current workspace. This is required
+// for multi-workspace mode where session cookies are shared across subdomains.
+func (sm *SessionManager) SetWorkspaceChecker(wc WorkspaceChecker) {
+	sm.workspaceChecker = wc
 }
 
 /*─────────────────────────────────────────────────────────────────────────────*
@@ -277,10 +291,31 @@ func (sm *SessionManager) LoadSessionUser(next http.Handler) http.Handler {
 			if sm.userFetcher != nil && userID != "" {
 				u := sm.userFetcher.FetchUser(r.Context(), userID)
 				if u != nil {
-					// User exists and is active - inject into context
-					// Also extract session token for MongoDB session tracking
-					u.Token = getString(sess, sessionTokenKey)
-					r = withUser(r, u)
+					// User exists and is active - but verify workspace access
+					// This prevents cross-workspace session leakage when cookies are shared
+					if sm.workspaceChecker != nil {
+						wsID, isApex := sm.workspaceChecker(r)
+						if !isApex && !u.IsSuperAdmin {
+							// User is on a workspace subdomain and is not a superadmin
+							// Verify they belong to this workspace
+							if u.WorkspaceID != wsID {
+								// User's session is for a different workspace - don't authenticate
+								sm.logger.Debug("session workspace mismatch",
+									zap.String("user_id", userID),
+									zap.String("user_workspace", u.WorkspaceID),
+									zap.String("request_workspace", wsID),
+									zap.String("path", r.URL.Path))
+								u = nil // Treat as unauthenticated for this workspace
+							}
+						}
+					}
+
+					if u != nil {
+						// User passed workspace validation - inject into context
+						// Also extract session token for MongoDB session tracking
+						u.Token = getString(sess, sessionTokenKey)
+						r = withUser(r, u)
+					}
 				} else {
 					// User not found, disabled, or deleted - clear session
 					sm.logger.Info("session invalidated: user not found or disabled",

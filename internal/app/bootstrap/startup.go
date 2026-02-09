@@ -203,14 +203,15 @@ func ptrString(s string) *string {
 func migrateDataToWorkspace(ctx context.Context, deps DBDeps, workspaceID primitive.ObjectID, logger *zap.Logger) error {
 	db := deps.StrataHubMongoDatabase
 
-	// Collections that need workspace_id
+	// Collections that need workspace_id (excluding users which needs special handling)
 	collections := []string{
-		"users",
 		"organizations",
 		"groups",
 		"resources",
 		"materials",
 		"site_settings",
+		"announcements",
+		"audit_events",
 	}
 
 	// Filter: documents without workspace_id field, with null value, or with NilObjectID
@@ -243,6 +244,32 @@ func migrateDataToWorkspace(ctx context.Context, deps DBDeps, workspaceID primit
 				zap.Int64("count", result.ModifiedCount),
 				zap.String("workspace_id", workspaceID.Hex()))
 		}
+	}
+
+	// Migrate users separately, excluding superadmins (they should have no workspace_id)
+	userFilter := bson.M{
+		"$and": []bson.M{
+			{
+				"$or": []bson.M{
+					{"workspace_id": bson.M{"$exists": false}},
+					{"workspace_id": nil},
+					{"workspace_id": primitive.NilObjectID},
+				},
+			},
+			{"role": bson.M{"$ne": "superadmin"}},
+		},
+	}
+	userColl := db.Collection("users")
+	result, err := userColl.UpdateMany(ctx, userFilter, update)
+	if err != nil {
+		logger.Error("failed to migrate users to workspace", zap.Error(err))
+		return err
+	}
+	if result.ModifiedCount > 0 {
+		logger.Info("migrated documents to workspace",
+			zap.String("collection", "users"),
+			zap.Int64("count", result.ModifiedCount),
+			zap.String("workspace_id", workspaceID.Hex()))
 	}
 
 	return nil

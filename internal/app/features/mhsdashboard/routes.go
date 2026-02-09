@@ -6,7 +6,7 @@ import (
 	"github.com/go-chi/chi/v5"
 )
 
-// Routes returns the router for the MHS dashboard feature.
+// Routes returns the router for the MHS dashboard 3 feature.
 func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 	r := chi.NewRouter()
 

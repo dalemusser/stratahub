@@ -43,8 +43,10 @@ func FetchOrgPane(
 ) (OrgPaneData, error) {
 	var result OrgPaneData
 
-	// Build base filter for search
+	// Build base filter for search with workspace scoping
 	orgBase := bson.M{}
+	workspace.FilterCtx(ctx, orgBase)
+
 	if orgQ != "" {
 		q := text.Fold(orgQ)
 		hi := q + "\uffff"

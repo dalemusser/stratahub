@@ -161,8 +161,9 @@ func NewBaseVM(r *http.Request, db *mongo.Database, title, backDefault string) B
 		}
 	}
 
-	// Load active announcements only if logged in and loader is configured
-	if signedIn && announcementLoader != nil {
+	// Load active announcements only if logged in, not on apex, and loader is configured
+	// Apex domain is for workspace management - don't show workspace-specific announcements
+	if signedIn && !isApex && announcementLoader != nil {
 		vm.Announcements = announcementLoader(r.Context())
 	}
 

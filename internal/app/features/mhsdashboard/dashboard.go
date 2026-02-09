@@ -3,7 +3,6 @@ package mhsdashboard
 
 import (
 	"context"
-	"math/rand"
 	"net/http"
 	"sort"
 	"time"
@@ -21,7 +20,7 @@ import (
 	"go.uber.org/zap"
 )
 
-// ServeDashboard renders the main MHS dashboard page.
+// ServeDashboard renders the main MHS dashboard 3 page.
 func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 	role, _, userID, ok := authz.UserCtx(r)
 	if !ok {
@@ -75,6 +74,16 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 		selectedGroup = groups[0].ID.Hex()
 	}
 
+	// Get sort parameters from query, default to name ascending
+	sortBy := r.URL.Query().Get("sort")
+	if sortBy == "" {
+		sortBy = "name"
+	}
+	sortDir := r.URL.Query().Get("dir")
+	if sortDir != "desc" {
+		sortDir = "asc"
+	}
+
 	// Build group options for dropdown
 	groupOptions := make([]GroupOption, len(groups))
 	var selectedGroupName string
@@ -102,7 +111,7 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 		groupOptions[0].Selected = true
 	}
 
-	members, err := h.getMembersForGroup(ctx, r, selectedOID)
+	members, err := h.getMembersForGroup(ctx, r, selectedOID, sortDir)
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "failed to load members", err, "A database error occurred.", "/dashboard")
 		return
@@ -111,8 +120,8 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 	// Get organization timezone and format the time
 	lastUpdated, tzAbbr := h.formatTimeInOrgTimezone(ctx, selectedGroupOrgID)
 
-	// Generate mock progress data
-	memberRows := h.generateMockProgress(members, cfg)
+	// Build progress rows with real grade data
+	memberRows := h.buildProgressRows(ctx, members, cfg)
 
 	base := viewdata.LoadBase(r, h.DB)
 	data := DashboardData{
@@ -126,6 +135,8 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 		UnitHeaders:   unitHeaders,
 		PointHeaders:  pointHeaders,
 		Members:       memberRows,
+		SortBy:        sortBy,
+		SortDir:       sortDir,
 	}
 
 	templates.Render(w, r, "mhsdashboard_view", data)
@@ -181,6 +192,16 @@ func (h *Handler) ServeGrid(w http.ResponseWriter, r *http.Request) {
 		selectedGroup = groups[0].ID.Hex()
 	}
 
+	// Get sort parameters from query, default to name ascending
+	sortBy := r.URL.Query().Get("sort")
+	if sortBy == "" {
+		sortBy = "name"
+	}
+	sortDir := r.URL.Query().Get("dir")
+	if sortDir != "desc" {
+		sortDir = "asc"
+	}
+
 	selectedOID, err := primitive.ObjectIDFromHex(selectedGroup)
 	if err != nil {
 		selectedOID = groups[0].ID
@@ -198,7 +219,7 @@ func (h *Handler) ServeGrid(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	members, err := h.getMembersForGroup(ctx, r, selectedOID)
+	members, err := h.getMembersForGroup(ctx, r, selectedOID, sortDir)
 	if err != nil {
 		h.Log.Error("failed to load members", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -208,7 +229,7 @@ func (h *Handler) ServeGrid(w http.ResponseWriter, r *http.Request) {
 	// Get organization timezone and format the time
 	lastUpdated, _ := h.formatTimeInOrgTimezone(ctx, groupOrgID)
 
-	memberRows := h.generateMockProgress(members, cfg)
+	memberRows := h.buildProgressRows(ctx, members, cfg)
 
 	data := GridData{
 		SelectedGroup: selectedGroup,
@@ -219,6 +240,8 @@ func (h *Handler) ServeGrid(w http.ResponseWriter, r *http.Request) {
 		PointHeaders:  pointHeaders,
 		Members:       memberRows,
 		CSRFToken:     csrf.Token(r),
+		SortBy:        sortBy,
+		SortDir:       sortDir,
 	}
 
 	templates.Render(w, r, "mhsdashboard_grid", data)
@@ -306,8 +329,9 @@ func (h *Handler) getGroupsForUser(ctx context.Context, r *http.Request, userID 
 	return groups, nil
 }
 
-// getMembersForGroup returns all members of the given group.
-func (h *Handler) getMembersForGroup(ctx context.Context, r *http.Request, groupID primitive.ObjectID) ([]models.User, error) {
+// getMembersForGroup returns all members of the given group, sorted by name.
+// sortDir should be "asc" for A-Z or "desc" for Z-A.
+func (h *Handler) getMembersForGroup(ctx context.Context, r *http.Request, groupID primitive.ObjectID, sortDir string) ([]models.User, error) {
 	wsID := workspace.IDFromRequest(r)
 
 	// Get member user IDs from memberships
@@ -354,10 +378,16 @@ func (h *Handler) getMembersForGroup(ctx context.Context, r *http.Request, group
 		return nil, err
 	}
 
-	// Sort by name
-	sort.Slice(users, func(i, j int) bool {
-		return users[i].FullName < users[j].FullName
-	})
+	// Sort by name based on direction (case-insensitive using FullNameCI)
+	if sortDir == "desc" {
+		sort.Slice(users, func(i, j int) bool {
+			return users[i].FullNameCI > users[j].FullNameCI
+		})
+	} else {
+		sort.Slice(users, func(i, j int) bool {
+			return users[i].FullNameCI < users[j].FullNameCI
+		})
+	}
 
 	return users, nil
 }
@@ -388,61 +418,150 @@ func (h *Handler) buildHeaders(cfg *ProgressConfig) ([]UnitHeader, []PointHeader
 	return unitHeaders, pointHeaders
 }
 
-// generateMockProgress generates random progress data for demonstration.
-// Progress follows a realistic pattern: green/yellow until a point, then white.
-func (h *Handler) generateMockProgress(members []models.User, cfg *ProgressConfig) []MemberRow {
+// ProgressGradeDoc represents a document from the progress_point_grades collection.
+type ProgressGradeDoc struct {
+	Game        string                       `bson:"game"`
+	PlayerID    string                       `bson:"playerId"`
+	Grades      map[string]ProgressGradeItem `bson:"grades"`
+	LastUpdated time.Time                    `bson:"lastUpdated"`
+}
+
+// ProgressGradeItem represents a single grade within the grades map.
+type ProgressGradeItem struct {
+	Color      string         `bson:"color"`      // "green" or "yellow"
+	ComputedAt time.Time      `bson:"computedAt"`
+	RuleID     string         `bson:"ruleId"`
+	ReasonCode string         `bson:"reasonCode,omitempty"` // Only for yellow grades
+	Metrics    map[string]any `bson:"metrics,omitempty"`    // Only for yellow grades
+}
+
+// reasonCodeToMessage maps reason codes to human-readable messages.
+var reasonCodeToMessage = map[string]string{
+	"TOO_MANY_TARGETS":       "Student used more targets than allowed for efficient problem-solving.",
+	"TOO_MANY_TESTS":         "Student ran more tests than expected, may need guidance on efficiency.",
+	"TOO_MANY_NEGATIVE":      "Student received too many negative responses during the activity.",
+	"BAD_FEEDBACK":           "Student's responses indicate areas needing improvement.",
+	"SCORE_BELOW_THRESHOLD":  "Student's score was below the expected threshold.",
+	"YELLOW_NODES_EXIST":     "Student completed with some areas still needing attention.",
+	"INCOMPLETE":             "Student did not complete all required components.",
+	"HINT_OR_TOO_MANY_GUESSES": "Student needed hints or made too many incorrect attempts.",
+}
+
+// loadProgressGrades fetches progress grades from the mhsgrader database for the given player IDs.
+func (h *Handler) loadProgressGrades(ctx context.Context, playerIDs []string) (map[string]*ProgressGradeDoc, error) {
+	if h.GradesDB == nil {
+		h.Log.Warn("mhsgrader database not configured, returning empty grades")
+		return make(map[string]*ProgressGradeDoc), nil
+	}
+
+	h.Log.Debug("loading progress grades",
+		zap.Int("playerCount", len(playerIDs)),
+		zap.Strings("playerIDs", playerIDs),
+	)
+
+	filter := bson.M{
+		"game":     "mhs",
+		"playerId": bson.M{"$in": playerIDs},
+	}
+
+	cur, err := h.GradesDB.Collection("progress_point_grades").Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+
+	grades := make(map[string]*ProgressGradeDoc)
+	for cur.Next(ctx) {
+		var doc ProgressGradeDoc
+		if err := cur.Decode(&doc); err != nil {
+			h.Log.Warn("failed to decode progress grade document", zap.Error(err))
+			continue
+		}
+		grades[doc.PlayerID] = &doc
+	}
+
+	h.Log.Debug("loaded progress grades",
+		zap.Int("foundCount", len(grades)),
+	)
+
+	return grades, nil
+}
+
+// buildProgressRows builds the progress rows for the given members using real grade data.
+func (h *Handler) buildProgressRows(ctx context.Context, members []models.User, cfg *ProgressConfig) []MemberRow {
 	totalPoints := cfg.TotalProgressPoints()
 	result := make([]MemberRow, len(members))
 
-	// Use a seeded random for consistent-ish results per session
-	rng := rand.New(rand.NewSource(time.Now().UnixNano()))
+	// Collect player IDs (login IDs) for batch lookup
+	// The playerId in mhsgrader matches the login_id in stratahub
+	playerIDs := make([]string, 0, len(members))
+	for _, member := range members {
+		if member.LoginID != nil && *member.LoginID != "" {
+			playerIDs = append(playerIDs, *member.LoginID)
+		}
+	}
 
-	// Build unit start indices
-	unitStartIdx := make([]int, 0)
-	idx := 0
-	for _, unit := range cfg.Units {
-		unitStartIdx = append(unitStartIdx, idx)
-		idx += len(unit.ProgressPoints)
+	// Load grades from mhsgrader database
+	grades, err := h.loadProgressGrades(ctx, playerIDs)
+	if err != nil {
+		h.Log.Error("failed to load progress grades", zap.Error(err))
+		// Continue with empty grades rather than failing
+		grades = make(map[string]*ProgressGradeDoc)
 	}
 
 	for i, member := range members {
-		// Each student has completed somewhere between 30% and 90% of progress points
-		completedCount := int(float64(totalPoints) * (0.3 + rng.Float64()*0.6))
-		if completedCount > totalPoints {
-			completedCount = totalPoints
+		cells := make([]CellData, totalPoints)
+		var gradeDoc *ProgressGradeDoc
+		if member.LoginID != nil {
+			gradeDoc = grades[*member.LoginID]
 		}
 
-		cells := make([]CellData, totalPoints)
 		pointIdx := 0
 		for _, unit := range cfg.Units {
-			for j := range unit.ProgressPoints {
+			for j, point := range unit.ProgressPoints {
 				var value int
-				if pointIdx < completedCount {
-					// 85% green (2), 15% yellow (1)
-					if rng.Float64() < 0.85 {
-						value = 2 // green
-					} else {
-						value = 1 // yellow
+				var cellClass, borderClass, reviewReason string
+
+				// Look up the grade for this progress point
+				var gradeItem *ProgressGradeItem
+				if gradeDoc != nil {
+					if item, ok := gradeDoc.Grades[point.ID]; ok {
+						gradeItem = &item
 					}
-				} else {
-					value = 0 // white (not started)
 				}
 
-				cellClass := "mhs-cell-empty"
-				borderClass := "border-gray-200 dark:border-gray-600"
-				if value == 2 {
+				if gradeItem == nil {
+					// No grade - white (not started)
+					value = 0
+					cellClass = "mhs-cell-empty"
+					borderClass = "border-gray-200 dark:border-gray-600"
+				} else if gradeItem.Color == "green" {
+					value = 2
 					cellClass = "mhs-cell-success"
 					borderClass = "border-green-300"
-				} else if value == 1 {
+				} else if gradeItem.Color == "yellow" {
+					value = 1
 					cellClass = "mhs-cell-warning"
 					borderClass = "border-yellow-300"
+					// Get human-readable message from reason code
+					if msg, ok := reasonCodeToMessage[gradeItem.ReasonCode]; ok {
+						reviewReason = msg
+					} else if gradeItem.ReasonCode != "" {
+						reviewReason = "Needs improvement: " + gradeItem.ReasonCode
+					} else {
+						reviewReason = "This progress point needs review."
+					}
 				}
 
 				cells[pointIdx] = CellData{
-					Value:       value,
-					IsUnitStart: j == 0,
-					CellClass:   cellClass,
-					BorderClass: borderClass,
+					Value:        value,
+					IsUnitStart:  j == 0,
+					CellClass:    cellClass,
+					BorderClass:  borderClass,
+					PointID:      point.ID,
+					PointTitle:   point.ShortName,
+					StudentName:  member.FullName,
+					ReviewReason: reviewReason,
 				}
 				pointIdx++
 			}

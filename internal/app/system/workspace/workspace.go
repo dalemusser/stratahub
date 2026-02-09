@@ -204,6 +204,18 @@ func IDFromRequest(r *http.Request) primitive.ObjectID {
 	return ws.ID
 }
 
+// CheckerFromRequest returns the workspace ID (as hex string) and whether this is the apex domain.
+// This function can be used as an auth.WorkspaceChecker callback.
+// Returns ("", true) for apex domain or if no workspace context.
+// Returns (workspaceIDHex, false) for workspace subdomain requests.
+func CheckerFromRequest(r *http.Request) (string, bool) {
+	ws := FromRequest(r)
+	if ws == nil || ws.IsApex {
+		return "", true
+	}
+	return ws.ID.Hex(), false
+}
+
 // withWorkspace adds workspace info to the request context.
 func withWorkspace(r *http.Request, ws *Info) *http.Request {
 	return r.WithContext(context.WithValue(r.Context(), workspaceKey, ws))
@@ -359,6 +371,18 @@ func FilterCtx(ctx context.Context, filter map[string]interface{}) {
 		return
 	}
 	filter["workspace_id"] = ws.ID
+}
+
+// IDPtrFromCtx returns a pointer to the workspace ID from the context.
+// Returns nil if no workspace context is set or if on apex domain.
+// Use this when setting workspace_id on new documents that use pointer types.
+func IDPtrFromCtx(ctx context.Context) *primitive.ObjectID {
+	ws := FromContext(ctx)
+	if ws == nil || ws.IsApex {
+		return nil
+	}
+	id := ws.ID
+	return &id
 }
 
 // MustFilter adds workspace_id to a bson.M filter map and returns true if a workspace

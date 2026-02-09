@@ -33,10 +33,14 @@ type GroupOption struct {
 
 // CellData represents a single cell in the progress grid.
 type CellData struct {
-	Value       int    // 0 = not started, 1 = needs review, 2 = completed
-	IsUnitStart bool   // True if this is the first cell in a unit
-	CellClass   string // CSS class for the cell background
-	BorderClass string // CSS class for the border
+	Value        int    // 0 = not started, 1 = needs review, 2 = completed
+	IsUnitStart  bool   // True if this is the first cell in a unit
+	CellClass    string // CSS class for the cell background
+	BorderClass  string // CSS class for the border
+	PointID      string // Progress point ID (e.g., "u1p1")
+	PointTitle   string // Progress point title
+	StudentName  string // Student name for this row
+	ReviewReason string // Reason for needing review (only for warning cells)
 }
 
 // MemberRow represents a single row of progress data for a member.
@@ -77,6 +81,9 @@ type DashboardData struct {
 	UnitHeaders  []UnitHeader
 	PointHeaders []PointHeader
 	Members      []MemberRow
+
+	SortBy  string // Sort field (currently only "name")
+	SortDir string // Sort direction: "asc" or "desc"
 }
 
 // GridData is the view model for the HTMX-refreshed grid content.
@@ -92,4 +99,7 @@ type GridData struct {
 
 	// CSRF token for refresh requests
 	CSRFToken string
+
+	SortBy  string // Sort field (currently only "name")
+	SortDir string // Sort direction: "asc" or "desc"
 }

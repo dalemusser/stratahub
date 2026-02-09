@@ -1,9 +1,5 @@
 {{ define "mhsdashboard_grid" }}
-<div hx-get="/mhsdashboard/grid?group={{ .SelectedGroup }}"
-     hx-trigger="every 30s"
-     hx-target="#mhs-grid"
-     hx-swap="innerHTML"
-     class="mhs-grid-container h-full">
+<div class="mhs-grid-container h-full">
 
   {{ if not .Members }}
   <!-- Empty state -->
@@ -20,17 +16,26 @@
 
   <!-- Top-Left Corner (frozen both ways) -->
   <div class="mhs-name-width mhs-header-height bg-[#0c2d48] z-20 shadow-[2px_2px_8px_-2px_rgba(0,0,0,0.2)]">
-    <!-- Row 1: Name header (40px) -->
+    <!-- Row 1: Name header (40px) with sort control -->
     <div class="mhs-h1 flex items-center px-3 border-b border-[#145374]">
-      <div>
-        <div class="font-bold text-white text-sm">Name</div>
-        <div class="text-[10px] text-[#b1d4e0]">Student</div>
-      </div>
+      <a hx-get="/mhsdashboard/grid?group={{ $.SelectedGroup }}&sort=name&dir={{ if eq $.SortDir "asc" }}desc{{ else }}asc{{ end }}"
+         hx-target="#mhs-grid"
+         hx-swap="innerHTML"
+         class="flex items-center gap-1 cursor-pointer hover:text-[#b1d4e0] transition-colors">
+        <div>
+          <div class="font-bold text-white text-sm">Name</div>
+          <div class="text-[10px] text-[#b1d4e0]">Student</div>
+        </div>
+        {{ if eq $.SortDir "asc" }}
+        <span class="text-[#b1d4e0] text-xs ml-1" title="Sorted A-Z (click for Z-A)">&#9660;</span>
+        {{ else }}
+        <span class="text-[#b1d4e0] text-xs ml-1" title="Sorted Z-A (click for A-Z)">&#9650;</span>
+        {{ end }}
+      </a>
     </div>
-    <!-- Row 2: Empty space matching progress IDs (28px) -->
-    <div class="mhs-h2 bg-[#145374] border-b border-[#2e8bc0]"></div>
-    <!-- Row 3: Progress Points label (80px) -->
-    <div class="mhs-h3 bg-[#2e8bc0] flex items-end px-3 pb-2 border-b border-[#b1d4e0]">
+    <!-- Row 2: Progress Points label (120px) -->
+    <div class="mhs-h3 bg-[#2e8bc0] flex flex-col justify-between px-3 py-2 border-b border-[#b1d4e0]">
+      <span class="text-[#e8f4f8] text-[9px] opacity-80">Click title for details</span>
       <span class="text-[#e8f4f8] font-medium text-[10px]">Progress Points &rarr;</span>
     </div>
   </div>
@@ -49,20 +54,14 @@
         </div>
         {{ end }}
       </div>
-      <!-- Row 2: Progress point IDs (28px) -->
-      <div class="flex mhs-h2 bg-[#145374]">
-        {{ range .PointHeaders }}
-        <div class="mhs-cell-width flex items-center justify-center text-[9px] font-mono text-white {{ if .IsUnitStart }}border-l border-[#2e8bc0]{{ end }}">
-          {{ .ID }}
-        </div>
-        {{ end }}
-      </div>
-      <!-- Row 3: Descriptions with vertical text (80px) -->
+      <!-- Row 2: Descriptions with vertical text (120px) -->
       <div class="flex mhs-h3 bg-[#2e8bc0]">
         {{ range .PointHeaders }}
-        <div class="mhs-cell-width flex items-center justify-center cursor-help {{ if .IsUnitStart }}border-l border-[#b1d4e0]{{ end }}"
-             title="{{ .Description }}">
-          <div class="mhs-vertical-text text-[9px] text-white font-medium truncate">{{ .ShortName }}</div>
+        <div class="mhs-cell-width mhs-vertical-cell mhs-progress-point {{ if .IsUnitStart }}border-l border-[#b1d4e0]{{ end }}"
+             data-point-id="{{ .ID }}"
+             data-point-title="{{ .ShortName }}"
+             data-point-description="{{ .Description }}">
+          <div class="mhs-vertical-text text-[9px] text-white font-medium">{{ .ShortName }}</div>
         </div>
         {{ end }}
       </div>
@@ -88,7 +87,15 @@
       <div class="flex mhs-row-height {{ if .IsEven }}bg-slate-50{{ else }}bg-white{{ end }}">
         {{ range .Cells }}
         <div class="mhs-cell-width p-0.5 border-b border-slate-200 {{ if .IsUnitStart }}border-l border-slate-300{{ end }}">
+          {{ if eq .Value 1 }}
+          <div class="{{ .CellClass }} w-full h-full rounded border {{ .BorderClass }} mhs-review-cell cursor-pointer hover:opacity-80 transition-opacity"
+               data-student-name="{{ .StudentName }}"
+               data-point-id="{{ .PointID }}"
+               data-point-title="{{ .PointTitle }}"
+               data-review-reason="{{ .ReviewReason }}"></div>
+          {{ else }}
           <div class="{{ .CellClass }} w-full h-full rounded border {{ .BorderClass }}"></div>
+          {{ end }}
         </div>
         {{ end }}
       </div>
