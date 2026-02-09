@@ -20,6 +20,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/timezones"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
@@ -59,12 +60,16 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Build query filter
+	// Build query filter with workspace scoping
 	filter := audit.QueryFilter{
 		Category:  category,
 		EventType: eventType,
 		Limit:     pageSize,
 		Offset:    int64((page - 1) * pageSize),
+	}
+	// Add workspace filter
+	if ws := workspace.FromRequest(r); ws != nil && !ws.IsApex {
+		filter.WorkspaceID = &ws.ID
 	}
 
 	// Parse dates in user's selected timezone

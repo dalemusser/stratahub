@@ -8,6 +8,7 @@ package reportqueries
 import (
 	"context"
 
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -98,6 +99,10 @@ func CountMembershipStats(
 	userMatch := bson.M{"user.role": "member"}
 	if memberStatus == "active" || memberStatus == "disabled" {
 		userMatch["user.status"] = memberStatus
+	}
+	// Add workspace filtering via the joined user
+	if ws := workspace.FromContext(ctx); ws != nil && !ws.IsApex {
+		userMatch["user.workspace_id"] = ws.ID
 	}
 
 	// Count total memberships

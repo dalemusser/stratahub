@@ -24,8 +24,6 @@ import (
 	materialsfeature "github.com/dalemusser/stratahub/internal/app/features/materials"
 	membersfeature "github.com/dalemusser/stratahub/internal/app/features/members"
 	mhsdashboardfeature "github.com/dalemusser/stratahub/internal/app/features/mhsdashboard"
-	mhsdashboard2feature "github.com/dalemusser/stratahub/internal/app/features/mhsdashboard2"
-	mhsdashboard3feature "github.com/dalemusser/stratahub/internal/app/features/mhsdashboard3"
 	organizationsfeature "github.com/dalemusser/stratahub/internal/app/features/organizations"
 	pagesfeature "github.com/dalemusser/stratahub/internal/app/features/pages"
 	reportsfeature "github.com/dalemusser/stratahub/internal/app/features/reports"
@@ -87,6 +85,12 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	// Set up the UserFetcher so LoadSessionUser fetches fresh user data on each request.
 	// This ensures role changes, disabled accounts, and profile updates take effect immediately.
 	sessionMgr.SetUserFetcher(userstore.NewFetcher(deps.StrataHubMongoDatabase, logger))
+
+	// Set up workspace validation for multi-workspace mode.
+	// This prevents cross-workspace session leakage when cookies are shared across subdomains.
+	if appCfg.MultiWorkspace {
+		sessionMgr.SetWorkspaceChecker(workspace.CheckerFromRequest)
+	}
 
 	// Initialize and boot the template engine once at startup.
 	// Dev mode enables template reloading for faster iteration.
@@ -150,10 +154,12 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	// CSRF protection: validates token on all POST/PUT/PATCH/DELETE requests.
 	// Token is injected into templates via BaseVM.CSRFToken.
 	// HTMX requests send token via X-CSRF-Token header.
+	// Cookie name is "stratahub_csrf" to avoid collisions with other services
+	// on the same domain (e.g., log.adroit.games, save.adroit.games).
 	csrfOpts := []csrf.Option{
 		csrf.Secure(secure),
 		csrf.Path("/"),
-		csrf.CookieName("csrf_token"),
+		csrf.CookieName("stratahub_csrf"),
 		csrf.FieldName("csrf_token"),
 		csrf.SameSite(csrf.SameSiteLaxMode),
 		csrf.ErrorHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -363,16 +369,8 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		wsr.Mount("/activity", activityfeature.Routes(activityHandler, sessionMgr))
 
 		// MHS Leader Dashboard (Mission HydroSci progress tracking)
-		mhsDashboardHandler := mhsdashboardfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
+		mhsDashboardHandler := mhsdashboardfeature.NewHandler(deps.StrataHubMongoDatabase, deps.MHSGraderDatabase, errLog, logger)
 		wsr.Mount("/mhsdashboard", mhsdashboardfeature.Routes(mhsDashboardHandler, sessionMgr))
-
-		// MHS Leader Dashboard 2 (experimental version)
-		mhsDashboard2Handler := mhsdashboard2feature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
-		wsr.Mount("/mhsdashboard2", mhsdashboard2feature.Routes(mhsDashboard2Handler, sessionMgr))
-
-		// MHS Leader Dashboard 3 (colorblind-friendly version)
-		mhsDashboard3Handler := mhsdashboard3feature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
-		wsr.Mount("/mhsdashboard3", mhsdashboard3feature.Routes(mhsDashboard3Handler, sessionMgr))
 
 		// Announcements management (admin only)
 		announcementsHandler := announcementsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)

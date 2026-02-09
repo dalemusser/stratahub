@@ -28,6 +28,9 @@ type DBDeps struct {
 	StrataHubMongoClient   *mongo.Client
 	StrataHubMongoDatabase *mongo.Database
 
+	// MHSGrader database for reading progress grades (same cluster, different database)
+	MHSGraderDatabase *mongo.Database
+
 	// FileStorage for material file uploads
 	FileStorage storage.Store
 

@@ -49,8 +49,12 @@ func ConnectDB(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig
 
 	db := client.Database(appCfg.MongoDatabase)
 
+	// Also get reference to the MHSGrader database (same cluster, different database)
+	mhsGraderDB := client.Database(appCfg.MHSGraderDatabase)
+
 	logger.Info("connected to MongoDB",
 		zap.String("database", appCfg.MongoDatabase),
+		zap.String("mhsgrader_database", appCfg.MHSGraderDatabase),
 		zap.Uint64("max_pool_size", poolCfg.MaxPoolSize),
 		zap.Uint64("min_pool_size", poolCfg.MinPoolSize),
 	)
@@ -63,6 +67,8 @@ func ConnectDB(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig
 			Region:                   appCfg.StorageS3Region,
 			Bucket:                   appCfg.StorageS3Bucket,
 			Prefix:                   appCfg.StorageS3Prefix,
+			DefaultACL:               appCfg.StorageS3ACL,
+			BaseURL:                  appCfg.StorageCFURL, // Use CloudFront URL for public URLs
 			CloudFrontURL:            appCfg.StorageCFURL,
 			CloudFrontKeyPairID:      appCfg.StorageCFKeyPairID,
 			CloudFrontPrivateKeyPath: appCfg.StorageCFKeyPath,
@@ -107,6 +113,7 @@ func ConnectDB(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig
 	return DBDeps{
 		StrataHubMongoClient:   client,
 		StrataHubMongoDatabase: db,
+		MHSGraderDatabase:      mhsGraderDB,
 		FileStorage:            store,
 		Mailer:                 mail,
 	}, nil

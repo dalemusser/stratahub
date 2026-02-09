@@ -12,6 +12,7 @@ import (
 
 	"github.com/dalemusser/stratahub/internal/app/store/audit"
 	"github.com/dalemusser/stratahub/internal/app/system/ratelimit"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 )
@@ -82,6 +83,11 @@ func (l *Logger) logToZap(event audit.Event) {
 func (l *Logger) Log(ctx context.Context, event audit.Event) {
 	if l == nil {
 		return
+	}
+
+	// Set workspace_id from context if not already set
+	if event.WorkspaceID == nil {
+		event.WorkspaceID = workspace.IDPtrFromCtx(ctx)
 	}
 
 	// Determine which config setting applies based on event category

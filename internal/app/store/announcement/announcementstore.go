@@ -5,6 +5,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -22,16 +23,17 @@ const (
 
 // Announcement represents a system announcement.
 type Announcement struct {
-	ID          primitive.ObjectID `bson:"_id,omitempty"`
-	Title       string             `bson:"title"`
-	Content     string             `bson:"content"`
-	Type        Type               `bson:"type"`
-	Dismissible bool               `bson:"dismissible"`
-	Active      bool               `bson:"active"`
-	StartsAt    *time.Time         `bson:"starts_at,omitempty"`
-	EndsAt      *time.Time         `bson:"ends_at,omitempty"`
-	CreatedAt   time.Time          `bson:"created_at"`
-	UpdatedAt   time.Time          `bson:"updated_at"`
+	ID          primitive.ObjectID  `bson:"_id,omitempty"`
+	WorkspaceID *primitive.ObjectID `bson:"workspace_id,omitempty"`
+	Title       string              `bson:"title"`
+	Content     string              `bson:"content"`
+	Type        Type                `bson:"type"`
+	Dismissible bool                `bson:"dismissible"`
+	Active      bool                `bson:"active"`
+	StartsAt    *time.Time          `bson:"starts_at,omitempty"`
+	EndsAt      *time.Time          `bson:"ends_at,omitempty"`
+	CreatedAt   time.Time           `bson:"created_at"`
+	UpdatedAt   time.Time           `bson:"updated_at"`
 }
 
 // Store provides access to the announcements collection.
@@ -50,7 +52,7 @@ func New(db *mongo.Database) *Store {
 func (s *Store) EnsureIndexes(ctx context.Context) error {
 	indexes := []mongo.IndexModel{
 		{
-			Keys:    bson.D{{Key: "active", Value: 1}},
+			Keys:    bson.D{{Key: "workspace_id", Value: 1}, {Key: "active", Value: 1}},
 			Options: options.Index(),
 		},
 		{
@@ -83,6 +85,7 @@ func (s *Store) Create(ctx context.Context, input CreateInput) (*Announcement, e
 	now := time.Now()
 	ann := Announcement{
 		ID:          primitive.NewObjectID(),
+		WorkspaceID: workspace.IDPtrFromCtx(ctx),
 		Title:       input.Title,
 		Content:     input.Content,
 		Type:        input.Type,
@@ -157,9 +160,12 @@ func (s *Store) Delete(ctx context.Context, id primitive.ObjectID) error {
 	return err
 }
 
-// List returns all announcements, sorted by creation date descending.
+// List returns all announcements for the current workspace, sorted by creation date descending.
 func (s *Store) List(ctx context.Context) ([]Announcement, error) {
-	cursor, err := s.c.Find(ctx, bson.M{},
+	filter := bson.M{}
+	workspace.FilterCtx(ctx, filter)
+
+	cursor, err := s.c.Find(ctx, filter,
 		options.Find().SetSort(bson.D{{Key: "created_at", Value: -1}}))
 	if err != nil {
 		return nil, err
@@ -174,11 +180,11 @@ func (s *Store) List(ctx context.Context) ([]Announcement, error) {
 	return announcements, nil
 }
 
-// GetActive returns all currently active announcements that should be displayed.
+// GetActive returns all currently active announcements for the current workspace.
 // This performs all time-based filtering in MongoDB for efficiency.
 func (s *Store) GetActive(ctx context.Context) ([]Announcement, error) {
 	now := time.Now()
-	// Filter in MongoDB: active=true, starts_at is null or <= now, ends_at is null or > now
+	// Filter in MongoDB: workspace scoped, active=true, starts_at is null or <= now, ends_at is null or > now
 	filter := bson.M{
 		"active": true,
 		"$and": []bson.M{
@@ -194,6 +200,7 @@ func (s *Store) GetActive(ctx context.Context) ([]Announcement, error) {
 			}},
 		},
 	}
+	workspace.FilterCtx(ctx, filter)
 
 	cursor, err := s.c.Find(ctx, filter,
 		options.Find().SetSort(bson.D{{Key: "type", Value: -1}, {Key: "created_at", Value: -1}}))

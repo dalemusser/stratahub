@@ -11,6 +11,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/dalemusser/waffle/pantry/text"
@@ -72,8 +73,9 @@ func (h *Handler) ServeOrgPicker(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Base filter: active organizations
+	// Base filter: active organizations with workspace scoping
 	base := bson.M{"status": "active"}
+	workspace.FilterCtx(ctx, base)
 
 	// Search clause
 	if query != "" {

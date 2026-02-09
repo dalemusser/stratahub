@@ -72,6 +72,7 @@ const (
 // Event represents an audit event.
 type Event struct {
 	ID             primitive.ObjectID  `bson:"_id,omitempty"`
+	WorkspaceID    *primitive.ObjectID `bson:"workspace_id,omitempty"`
 	Timestamp      time.Time           `bson:"timestamp"`
 	OrganizationID *primitive.ObjectID `bson:"organization_id,omitempty"`
 
@@ -97,6 +98,7 @@ type Event struct {
 
 // QueryFilter defines filters for querying audit events.
 type QueryFilter struct {
+	WorkspaceID     *primitive.ObjectID   // Workspace filter
 	OrganizationID  *primitive.ObjectID   // Single org filter
 	OrganizationIDs []primitive.ObjectID  // Multiple orgs filter (for coordinators)
 	UserID          *primitive.ObjectID
@@ -168,6 +170,9 @@ func (s *Store) Log(ctx context.Context, event Event) error {
 func (s *Store) Query(ctx context.Context, filter QueryFilter) ([]Event, error) {
 	query := bson.M{}
 
+	if filter.WorkspaceID != nil {
+		query["workspace_id"] = filter.WorkspaceID
+	}
 	if len(filter.OrganizationIDs) > 0 {
 		query["organization_id"] = bson.M{"$in": filter.OrganizationIDs}
 	} else if filter.OrganizationID != nil {
@@ -223,6 +228,9 @@ func (s *Store) Query(ctx context.Context, filter QueryFilter) ([]Event, error) 
 func (s *Store) CountByFilter(ctx context.Context, filter QueryFilter) (int64, error) {
 	query := bson.M{}
 
+	if filter.WorkspaceID != nil {
+		query["workspace_id"] = filter.WorkspaceID
+	}
 	if len(filter.OrganizationIDs) > 0 {
 		query["organization_id"] = bson.M{"$in": filter.OrganizationIDs}
 	} else if filter.OrganizationID != nil {
