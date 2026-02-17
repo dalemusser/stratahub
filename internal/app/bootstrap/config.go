@@ -79,6 +79,9 @@ var appConfigKeys = []config.AppKey{
 
 	// SuperAdmin bootstrap
 	{Name: "superadmin_email", Default: "", Desc: "Email of the superadmin user (promotes/creates on startup)"},
+
+	// MHS Content Delivery
+	{Name: "mhs_cdn_base_url", Default: "", Desc: "CDN base URL for MHS game builds (e.g., https://cdn.adroit.games/mhs)"},
 }
 
 // LoadConfig loads WAFFLE core config and app-specific config.
@@ -164,6 +167,9 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 
 		// SuperAdmin
 		SuperAdminEmail: appValues.String("superadmin_email"),
+
+		// MHS Content Delivery
+		MHSCDNBaseURL: appValues.String("mhs_cdn_base_url"),
 	}
 
 	// Auto-derive session domain in multi-workspace mode if not explicitly set.

@@ -120,9 +120,9 @@ func (h *MemberHandler) ServeViewResource(w http.ResponseWriter, r *http.Request
 		instructions = res.DefaultInstructions
 	}
 
-	// Build launch URL with id (email), group (name), org (name)
+	// Build launch URL with id (login_id), group (name), org (name)
 	launch := urlutil.AddOrSetQueryParams(res.LaunchURL, map[string]string{
-		"id":    member.Email,
+		"id":    member.LoginID,
 		"group": groupName,
 		"org":   orgName,
 	})
@@ -181,7 +181,7 @@ func (h *MemberHandler) ServeViewResource(w http.ResponseWriter, r *http.Request
 	data := viewResourceData{
 		common: common{
 			BaseVM: viewdata.NewBaseVM(r, h.DB, "View Resource", "/member/resources"),
-			UserID: member.Email,
+			UserID: member.LoginID,
 		},
 		ResourceID:          res.ID.Hex(),
 		ResourceTitle:       res.Title,
@@ -342,7 +342,7 @@ func (h *MemberHandler) HandleDownload(w http.ResponseWriter, r *http.Request) {
 	if res.LaunchURL != "" {
 		orgName, _, _ := resolveMemberOrgLocation(ctx, db, member.OrganizationID)
 		launch := urlutil.AddOrSetQueryParams(res.LaunchURL, map[string]string{
-			"id":    member.Email,
+			"id":    member.LoginID,
 			"group": assignment.GroupName,
 			"org":   orgName,
 		})
@@ -447,12 +447,20 @@ func (h *MemberHandler) HandleLaunch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Build launch URL with id (email), group (name), org (name)
+	// Build launch URL with id (login_id), group (name), org (name)
 	launch := urlutil.AddOrSetQueryParams(res.LaunchURL, map[string]string{
-		"id":    member.Email,
+		"id":    member.LoginID,
 		"group": assignment.GroupName,
 		"org":   orgName,
 	})
+
+	h.Log.Info("resource launch redirect",
+		zap.String("resource_id", resourceID),
+		zap.String("original_url", res.LaunchURL),
+		zap.String("redirect_url", launch),
+		zap.String("member_login_id", member.LoginID),
+		zap.String("group_name", assignment.GroupName),
+		zap.String("org_name", orgName))
 
 	http.Redirect(w, r, launch, http.StatusSeeOther)
 }

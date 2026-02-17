@@ -73,28 +73,28 @@
       "progress_points": [
         {
           "id": "u3p1",
-          "short_name": "Point 1",
-          "description": "Description of progress point u3p1"
+          "short_name": "Good Morning Cadet + Establishing a Foothold",
+          "description": "Identify the direction of water flow based on a map of the watershed"
         },
         {
           "id": "u3p2",
-          "short_name": "Point 2",
-          "description": "Description of progress point u3p2"
+          "short_name": "Pollution Solution",
+          "description": "Predict the spread of dissolved materials through a watershed"
         },
         {
           "id": "u3p3",
-          "short_name": "Point 3",
-          "description": "Description of progress point u3p3"
+          "short_name": "Pollution Argument",
+          "description": "Construct an argument with reasoning that links a claim with evidence"
         },
         {
           "id": "u3p4",
-          "short_name": "Point 4",
-          "description": "Description of progress point u3p4"
+          "short_name": "Forsaken Facility",
+          "description": "Predict the spread of dissolved materials"
         },
         {
           "id": "u3p5",
-          "short_name": "Point 5",
-          "description": "Description of progress point u3p5"
+          "short_name": "Plant the Superfruit Seeds",
+          "description": "Predict the spread of dissolved materials through a watershed"
         }
       ]
     },

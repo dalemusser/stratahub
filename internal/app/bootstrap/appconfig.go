@@ -97,4 +97,7 @@ type AppConfig struct {
 
 	// SuperAdmin bootstrap configuration
 	SuperAdminEmail string // Email of the superadmin user (if set, promotes/creates this user on startup)
+
+	// MHS Content Delivery
+	MHSCDNBaseURL string // CDN base URL for MHS game builds (e.g., "https://cdn.adroit.games/mhs")
 }

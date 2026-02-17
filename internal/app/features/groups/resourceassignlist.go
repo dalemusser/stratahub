@@ -77,7 +77,7 @@ func (h *Handler) ServeAssignResources(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	assigned, avail, shown, total, nextCur, prevCur, hasNext, hasPrev, err := h.buildAssignments(ctx, group, q, typeFilter, after, before)
+	assigned, avail, shown, total, nextCur, prevCur, hasNext, hasPrev, err := h.buildAssignments(ctx, r, group, q, typeFilter, after, before)
 	if err != nil {
 		h.Log.Warn("buildAssignments", zap.Error(err))
 		uierrors.RenderForbidden(w, r, "A database error occurred.", httpnav.ResolveBackURL(r, "/groups/"+group.ID.Hex()+"/manage"))
@@ -173,7 +173,7 @@ func (h *Handler) ServeSearchResources(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	assigned, avail, shown, total, nextCur, prevCur, hasNext, hasPrev, err := h.buildAssignments(ctx, group, q, typeFilter, after, before)
+	assigned, avail, shown, total, nextCur, prevCur, hasNext, hasPrev, err := h.buildAssignments(ctx, r, group, q, typeFilter, after, before)
 	if err != nil {
 		uierrors.RenderForbidden(w, r, "A database error occurred.", httpnav.ResolveBackURL(r, "/groups/"+group.ID.Hex()+"/manage"))
 		return

@@ -53,7 +53,7 @@ func (h *MemberHandler) ServeListResources(w http.ResponseWriter, r *http.Reques
 		templates.Render(w, r, "member_resources_list", resourceListData{
 			common: common{
 				BaseVM: viewdata.NewBaseVM(r, h.DB, "My Resources", "/"),
-				UserID: member.Email,
+				UserID: member.LoginID,
 			},
 			TimeZone: tzLabel,
 		})
@@ -81,7 +81,7 @@ func (h *MemberHandler) ServeListResources(w http.ResponseWriter, r *http.Reques
 		}
 
 		launchURL := urlutil.AddOrSetQueryParams(row.Resource.LaunchURL, map[string]string{
-			"id":    member.Email,
+			"id":    member.LoginID,
 			"group": row.GroupName,
 			"org":   orgName,
 		})
@@ -104,7 +104,7 @@ func (h *MemberHandler) ServeListResources(w http.ResponseWriter, r *http.Reques
 	templates.Render(w, r, "member_resources_list", resourceListData{
 		common: common{
 			BaseVM: viewdata.NewBaseVM(r, h.DB, "My Resources", "/"),
-			UserID: member.Email,
+			UserID: member.LoginID,
 		},
 		Resources: items,
 		TimeZone:  tzLabel,

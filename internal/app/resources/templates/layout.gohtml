@@ -6,6 +6,7 @@
     <title>{{ if .SiteName }}{{ .SiteName }}{{ else }}StrataHub{{ end }}</title>
     <link rel="stylesheet" href="/assets/css/tailwind.css">
     <link rel="stylesheet" href="/assets/css/tiptap.css">
+    <link rel="manifest" href="/manifest.json">
     <script src="/assets/js/htmx.min.js"></script>
     {{ if .CSRFToken }}<meta name="csrf-token" content="{{ .CSRFToken }}">{{ end }}
     <script>

@@ -24,6 +24,7 @@ import (
 // MemberInfo contains the member data needed for resource access checks.
 type MemberInfo struct {
 	ID             primitive.ObjectID
+	LoginID        string
 	Email          string
 	OrganizationID *primitive.ObjectID
 }
@@ -49,7 +50,8 @@ func VerifyMemberAccess(ctx context.Context, db *mongo.Database, r *http.Request
 
 	var result struct {
 		ID             primitive.ObjectID  `bson:"_id"`
-		Email          string              `bson:"email"`
+		LoginID        *string             `bson:"login_id"`
+		Email          *string             `bson:"email"`
 		OrganizationID *primitive.ObjectID `bson:"organization_id"`
 	}
 
@@ -65,9 +67,19 @@ func VerifyMemberAccess(ctx context.Context, db *mongo.Database, r *http.Request
 		return nil, err
 	}
 
+	loginID := ""
+	if result.LoginID != nil {
+		loginID = *result.LoginID
+	}
+	email := ""
+	if result.Email != nil {
+		email = *result.Email
+	}
+
 	return &MemberInfo{
 		ID:             result.ID,
-		Email:          result.Email,
+		LoginID:        loginID,
+		Email:          email,
 		OrganizationID: result.OrganizationID,
 	}, nil
 }

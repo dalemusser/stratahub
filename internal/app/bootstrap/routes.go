@@ -24,6 +24,7 @@ import (
 	materialsfeature "github.com/dalemusser/stratahub/internal/app/features/materials"
 	membersfeature "github.com/dalemusser/stratahub/internal/app/features/members"
 	mhsdashboardfeature "github.com/dalemusser/stratahub/internal/app/features/mhsdashboard"
+	mhsdeliveryfeature "github.com/dalemusser/stratahub/internal/app/features/mhsdelivery"
 	organizationsfeature "github.com/dalemusser/stratahub/internal/app/features/organizations"
 	pagesfeature "github.com/dalemusser/stratahub/internal/app/features/pages"
 	reportsfeature "github.com/dalemusser/stratahub/internal/app/features/reports"
@@ -217,6 +218,15 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		r.Handle(appCfg.StorageLocalURL+"/*", fileserver.Handler(appCfg.StorageLocalURL, appCfg.StorageLocalPath))
 	}
 
+	// MHS Content Delivery: root-level routes for PWA support.
+	// /sw.js must be at root for service worker scope.
+	// /manifest.json is the PWA manifest.
+	// /mhs/content/* is the CDN fallback redirect (no auth required; SW intercepts when active).
+	mhsRootHandler := mhsdeliveryfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, appCfg.MHSCDNBaseURL, logger)
+	r.Get("/sw.js", mhsRootHandler.ServeServiceWorker)
+	r.Get("/manifest.json", mhsRootHandler.ServeManifest)
+	r.Handle("/mhs/content/*", mhsRootHandler.ContentFallback())
+
 	// Public pages
 	homeHandler := homefeature.NewHandler(deps.StrataHubMongoDatabase, logger)
 	r.Mount("/", homefeature.Routes(homeHandler))
@@ -371,6 +381,10 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		// MHS Leader Dashboard (Mission HydroSci progress tracking)
 		mhsDashboardHandler := mhsdashboardfeature.NewHandler(deps.StrataHubMongoDatabase, deps.MHSGraderDatabase, errLog, logger)
 		wsr.Mount("/mhsdashboard", mhsdashboardfeature.Routes(mhsDashboardHandler, sessionMgr))
+
+		// MHS Content Delivery (PWA for downloading and playing Unity WebGL builds)
+		mhsDeliveryHandler := mhsdeliveryfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, appCfg.MHSCDNBaseURL, logger)
+		wsr.Mount("/mhs", mhsdeliveryfeature.Routes(mhsDeliveryHandler, sessionMgr))
 
 		// Announcements management (admin only)
 		announcementsHandler := announcementsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
