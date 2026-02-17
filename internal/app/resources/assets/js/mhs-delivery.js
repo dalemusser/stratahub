@@ -18,7 +18,8 @@
 
   /**
    * Initializes the delivery manager: registers SW, fetches manifest,
-   * sets up BroadcastChannel listener, checks initial cache status.
+   * sets up BroadcastChannel listener, checks initial cache status,
+   * and reconnects to any active Background Fetches.
    */
   MHSDeliveryManager.prototype.init = async function() {
     // Register service worker
@@ -47,6 +48,17 @@
 
     // Check initial cache status for all units
     await this.checkAllCacheStatus();
+
+    // Reconnect to any active Background Fetches
+    await this._reconnectActiveDownloads();
+
+    // Re-check cache status when page becomes visible (e.g., user switches back to this tab)
+    var self = this;
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'visible') {
+        self.checkAllCacheStatus();
+      }
+    });
   };
 
   /**
@@ -110,7 +122,75 @@
   };
 
   /**
-   * Starts downloading a unit's files via the service worker.
+   * Reconnects to any active Background Fetches and attaches progress listeners.
+   * This handles the case where the page was closed/reopened during a download.
+   */
+  MHSDeliveryManager.prototype._reconnectActiveDownloads = async function() {
+    if (!navigator.serviceWorker) return;
+
+    try {
+      var reg = await navigator.serviceWorker.ready;
+      if (!reg.backgroundFetch) return;
+
+      var ids = await reg.backgroundFetch.getIds();
+      var self = this;
+
+      for (var i = 0; i < ids.length; i++) {
+        var fetchId = ids[i];
+        if (!fetchId.startsWith('mhs-')) continue;
+
+        var bgFetch = await reg.backgroundFetch.get(fetchId);
+        if (!bgFetch) continue;
+
+        // Parse unit ID from fetch ID (format: "mhs-unit1-v1.0.0" or legacy "mhs-unit1")
+        var unitId = this._parseUnitIdFromFetchId(fetchId);
+        if (!unitId) continue;
+
+        var unit = this.manifest ? this.manifest.units.find(function(u) { return u.id === unitId; }) : null;
+        var totalSize = unit ? unit.totalSize : 0;
+
+        if (bgFetch.result === '') {
+          // Still in progress — attach progress listener
+          console.log('Reconnecting to active download:', fetchId);
+          this._fireStatus(unitId, 'downloading', {
+            downloaded: bgFetch.downloaded,
+            downloadTotal: totalSize,
+            percent: totalSize > 0 ? Math.round((bgFetch.downloaded / totalSize) * 100) : 0
+          });
+
+          (function(uid, ts) {
+            bgFetch.addEventListener('progress', function() {
+              var pct = ts > 0 ? Math.round((bgFetch.downloaded / ts) * 100) : 0;
+              self._fireStatus(uid, 'downloading', {
+                downloaded: bgFetch.downloaded,
+                downloadTotal: ts,
+                percent: pct
+              });
+            });
+          })(unitId, totalSize);
+        } else if (bgFetch.result === 'success') {
+          // Completed while page was closed — SW should have cached, re-check
+          await this.checkAllCacheStatus();
+        }
+      }
+    } catch (err) {
+      console.error('Error reconnecting to active downloads:', err);
+    }
+  };
+
+  /**
+   * Extracts the unit ID from a Background Fetch ID.
+   * "mhs-unit1-v1.0.0" -> "unit1", "mhs-unit1" -> "unit1"
+   */
+  MHSDeliveryManager.prototype._parseUnitIdFromFetchId = function(fetchId) {
+    var match = fetchId.match(/^mhs-(.+)-v\d+\.\d+\.\d+$/);
+    if (match) return match[1];
+    if (fetchId.startsWith('mhs-')) return fetchId.replace('mhs-', '');
+    return null;
+  };
+
+  /**
+   * Starts downloading a unit's files via Background Fetch.
    */
   MHSDeliveryManager.prototype.downloadUnit = async function(unitId) {
     if (!this.manifest) {
@@ -140,10 +220,12 @@
         return new Request(cdnBaseUrl + '/' + file.path, { mode: 'cors' });
       });
 
-      var fetchId = 'mhs-' + unit.id;
+      // Fetch ID encodes unit ID and version so the SW success handler
+      // can cache responses without needing to fetch the manifest.
+      var fetchId = 'mhs-' + unit.id + '-v' + unit.version;
       var self = this;
 
-      // Abort any existing Background Fetch with the same ID (e.g., from a previous download)
+      // Abort any existing Background Fetch with the same ID
       var existing = await reg.backgroundFetch.get(fetchId);
       if (existing) {
         await existing.abort();
@@ -187,13 +269,27 @@
   };
 
   /**
-   * Deletes a unit's cache.
+   * Deletes a unit's cache and aborts any active download for it.
    */
   MHSDeliveryManager.prototype.deleteUnit = async function(unitId) {
     if (!this.manifest) return;
 
     var unit = this.manifest.units.find(function(u) { return u.id === unitId; });
     if (!unit) return;
+
+    // Abort any active Background Fetch for this unit
+    try {
+      var reg = await navigator.serviceWorker.ready;
+      if (reg.backgroundFetch) {
+        var fetchId = 'mhs-' + unit.id + '-v' + unit.version;
+        var existing = await reg.backgroundFetch.get(fetchId);
+        if (existing) {
+          await existing.abort();
+        }
+      }
+    } catch (err) {
+      // Ignore — just best-effort cleanup
+    }
 
     var cacheName = UNIT_CACHE_PREFIX + unit.id + '-v' + unit.version;
     await caches.delete(cacheName);
