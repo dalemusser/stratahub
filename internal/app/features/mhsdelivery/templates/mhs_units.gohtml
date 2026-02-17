@@ -1,0 +1,266 @@
+{{ define "mhs_units" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full">
+  <!-- Install banner (hidden by default, shown when PWA is installable) -->
+  <div id="install-banner" class="mb-4 hidden bg-blue-600 text-white rounded-lg shadow p-3 flex items-center justify-between">
+    <div class="flex items-center gap-2">
+      <span class="text-lg">💧</span>
+      <span class="text-sm font-medium">Install Mission HydroSci for the best experience</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <button id="install-btn" onclick="mhsInstall()" class="px-3 py-1 text-sm bg-white text-blue-600 font-medium rounded hover:bg-blue-50">Install</button>
+      <button id="install-dismiss" onclick="mhsDismissInstall()" class="text-white opacity-70 hover:opacity-100 text-lg leading-none px-1">&times;</button>
+    </div>
+  </div>
+
+  <div class="mb-4 flex items-center justify-between">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Mission HydroSci</h1>
+    <div id="sw-status" class="text-xs text-gray-400 dark:text-gray-500"></div>
+  </div>
+
+  <!-- Storage quota bar -->
+  <div id="storage-info" class="mb-4 hidden">
+    <div class="bg-white dark:bg-gray-800 rounded shadow p-3">
+      <div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 mb-1">
+        <span>Device Storage</span>
+        <span id="storage-text"></span>
+      </div>
+      <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+        <div id="storage-bar" class="bg-blue-600 h-2 rounded-full transition-all" style="width: 0%"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Unit cards -->
+  <div class="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-3">
+    {{ range .Units }}
+    <div id="unit-card-{{ .ID }}" class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 flex flex-col">
+      <div class="flex items-center justify-between mb-2">
+        <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ .Title }}</h2>
+        <span class="text-xs text-gray-500 dark:text-gray-400">{{ .SizeLabel }}</span>
+      </div>
+
+      <!-- Status indicator -->
+      <div id="status-{{ .ID }}" class="mb-3 text-sm text-gray-500 dark:text-gray-400">
+        Checking...
+      </div>
+
+      <!-- Progress bar (hidden by default) -->
+      <div id="progress-wrap-{{ .ID }}" class="mb-3 hidden">
+        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+          <div id="progress-bar-{{ .ID }}" class="bg-blue-600 h-2.5 rounded-full transition-all" style="width: 0%"></div>
+        </div>
+        <div id="progress-text-{{ .ID }}" class="text-xs text-gray-500 dark:text-gray-400 mt-1">0%</div>
+      </div>
+
+      <!-- Action buttons -->
+      <div class="mt-auto flex gap-2">
+        <button
+          id="download-btn-{{ .ID }}"
+          data-unit-id="{{ .ID }}"
+          onclick="mhsDownload('{{ .ID }}')"
+          class="flex-1 px-3 py-2 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed hidden"
+        >
+          Download
+        </button>
+        <a
+          id="play-btn-{{ .ID }}"
+          href="/mhs/play/{{ .ID }}"
+          onclick="return mhsPlay(this)"
+          class="flex-1 px-3 py-2 text-sm text-center bg-green-600 text-white rounded hover:bg-green-700 hidden no-loader"
+        >
+          Play
+        </a>
+        <button
+          id="clear-btn-{{ .ID }}"
+          data-unit-id="{{ .ID }}"
+          onclick="mhsClearCache('{{ .ID }}')"
+          class="px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-50 dark:hover:bg-gray-700 hidden"
+        >
+          Clear
+        </button>
+      </div>
+    </div>
+    {{ end }}
+  </div>
+</div>
+
+<script src="/assets/js/mhs-delivery.js"></script>
+<script>
+(function() {
+  var manager = new MHSDeliveryManager();
+
+  // Status callback: update UI for each unit
+  manager.onStatus(function(unitId, status, detail) {
+    var statusEl = document.getElementById('status-' + unitId);
+    var progressWrap = document.getElementById('progress-wrap-' + unitId);
+    var progressBar = document.getElementById('progress-bar-' + unitId);
+    var progressText = document.getElementById('progress-text-' + unitId);
+    var downloadBtn = document.getElementById('download-btn-' + unitId);
+    var playBtn = document.getElementById('play-btn-' + unitId);
+    var clearBtn = document.getElementById('clear-btn-' + unitId);
+
+    if (!statusEl) return;
+
+    switch (status) {
+      case 'cached':
+        statusEl.textContent = 'Ready to play';
+        statusEl.className = 'mb-3 text-sm text-green-600 dark:text-green-400 font-medium';
+        progressWrap.classList.add('hidden');
+        downloadBtn.classList.add('hidden');
+        playBtn.classList.remove('hidden');
+        clearBtn.classList.remove('hidden');
+        break;
+
+      case 'not_cached':
+        statusEl.textContent = 'Not downloaded';
+        statusEl.className = 'mb-3 text-sm text-gray-500 dark:text-gray-400';
+        progressWrap.classList.add('hidden');
+        downloadBtn.classList.remove('hidden');
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = 'Download';
+        playBtn.classList.add('hidden');
+        clearBtn.classList.add('hidden');
+        break;
+
+      case 'partial':
+        statusEl.textContent = 'Partially downloaded';
+        statusEl.className = 'mb-3 text-sm text-yellow-600 dark:text-yellow-400';
+        progressWrap.classList.add('hidden');
+        downloadBtn.classList.remove('hidden');
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = 'Re-download';
+        playBtn.classList.add('hidden');
+        clearBtn.classList.remove('hidden');
+        break;
+
+      case 'downloading':
+        var pct = detail.percent || 0;
+        statusEl.textContent = 'Downloading...';
+        statusEl.className = 'mb-3 text-sm text-blue-600 dark:text-blue-400';
+        progressWrap.classList.remove('hidden');
+        progressBar.style.width = pct + '%';
+        progressText.textContent = pct + '%';
+        downloadBtn.classList.remove('hidden');
+        downloadBtn.disabled = true;
+        downloadBtn.textContent = 'Downloading...';
+        playBtn.classList.add('hidden');
+        clearBtn.classList.add('hidden');
+        break;
+
+      case 'error':
+        statusEl.textContent = detail.error || 'Download failed';
+        statusEl.className = 'mb-3 text-sm text-red-600 dark:text-red-400';
+        progressWrap.classList.add('hidden');
+        downloadBtn.classList.remove('hidden');
+        downloadBtn.disabled = false;
+        downloadBtn.textContent = 'Retry';
+        playBtn.classList.add('hidden');
+        clearBtn.classList.add('hidden');
+        break;
+    }
+
+    updateStorageInfo();
+  });
+
+  // Initialize
+  manager.init().then(function() {
+    // Show SW status
+    var swStatus = document.getElementById('sw-status');
+    if (manager.swRegistration) {
+      swStatus.textContent = 'Service worker active';
+    } else {
+      swStatus.textContent = 'Service worker not available';
+    }
+  });
+
+  // Expose download/clear functions to button onclick handlers
+  window.mhsDownload = function(unitId) {
+    manager.downloadUnit(unitId);
+  };
+
+  window.mhsClearCache = function(unitId) {
+    if (confirm('Remove downloaded files for this unit?')) {
+      manager.deleteUnit(unitId);
+    }
+  };
+
+  // Storage info display
+  function updateStorageInfo() {
+    manager.getStorageEstimate().then(function(estimate) {
+      if (!estimate) return;
+
+      var storageInfo = document.getElementById('storage-info');
+      var storageText = document.getElementById('storage-text');
+      var storageBar = document.getElementById('storage-bar');
+
+      storageInfo.classList.remove('hidden');
+
+      var usedMB = Math.round(estimate.usage / (1024 * 1024));
+      var quotaMB = Math.round(estimate.quota / (1024 * 1024));
+      var pct = Math.round((estimate.usage / estimate.quota) * 100);
+
+      storageText.textContent = usedMB + ' MB / ' + quotaMB + ' MB (' + pct + '%)';
+      storageBar.style.width = pct + '%';
+
+      if (pct > 80) {
+        storageBar.className = 'bg-red-600 h-2 rounded-full transition-all';
+      } else if (pct > 60) {
+        storageBar.className = 'bg-yellow-500 h-2 rounded-full transition-all';
+      } else {
+        storageBar.className = 'bg-blue-600 h-2 rounded-full transition-all';
+      }
+    });
+  }
+  updateStorageInfo();
+
+  // PWA Install prompt
+  var deferredPrompt = null;
+
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    deferredPrompt = e;
+    // Don't show banner if user previously dismissed it this session
+    if (!sessionStorage.getItem('mhs-install-dismissed')) {
+      document.getElementById('install-banner').classList.remove('hidden');
+    }
+  });
+
+  window.addEventListener('appinstalled', function() {
+    deferredPrompt = null;
+    document.getElementById('install-banner').classList.add('hidden');
+  });
+
+  // Detect if running as installed PWA
+  var isStandalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+
+  window.mhsPlay = function(link) {
+    if (isStandalone) {
+      // In PWA: navigate in same window
+      window.location.href = link.href;
+    } else {
+      // In browser: open new tab
+      window.open(link.href, '_blank');
+    }
+    return false;
+  };
+
+  window.mhsInstall = function() {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    deferredPrompt.userChoice.then(function(result) {
+      deferredPrompt = null;
+      document.getElementById('install-banner').classList.add('hidden');
+    });
+  };
+
+  window.mhsDismissInstall = function() {
+    document.getElementById('install-banner').classList.add('hidden');
+    sessionStorage.setItem('mhs-install-dismissed', '1');
+  };
+})();
+</script>
+{{ end }}

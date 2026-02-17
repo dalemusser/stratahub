@@ -17,7 +17,7 @@ var FS embed.FS
 
 // Embed assets (CSS, JS) for bundling into the binary.
 //
-//go:embed assets/css/*.css assets/js/*.js
+//go:embed assets/css/*.css assets/js/*.js assets/mhs/*
 var AssetsFS embed.FS
 
 var registerOnce sync.Once

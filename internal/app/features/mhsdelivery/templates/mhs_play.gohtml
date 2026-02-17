@@ -1,0 +1,220 @@
+{{ define "mhs_play" }}
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>{{ .UnitTitle }} - Mission HydroSci</title>
+    <link rel="stylesheet" href="/assets/css/tailwind.css">
+    <link rel="manifest" href="/manifest.json">
+    <style>
+      html, body {
+        background: #000;
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+        padding: 0;
+        margin: 0;
+      }
+      #unity-container {
+        background: transparent;
+        position: absolute;
+      }
+      #unity-container canvas {
+        position: absolute;
+      }
+      #loading-overlay {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background: #1e3a5f;
+        color: white;
+        font-family: sans-serif;
+        z-index: 10;
+      }
+      #loading-overlay.hidden { display: none; }
+      .loading-bar-bg {
+        width: 300px;
+        height: 8px;
+        background: rgba(255,255,255,0.2);
+        border-radius: 4px;
+        margin-top: 16px;
+        overflow: hidden;
+      }
+      .loading-bar-fill {
+        height: 100%;
+        background: #60a5fa;
+        border-radius: 4px;
+        transition: width 0.3s;
+      }
+      #fullscreen-btn {
+        position: fixed;
+        top: 8px;
+        right: 8px;
+        z-index: 20;
+        background: rgba(0,0,0,0.4);
+        color: white;
+        border: none;
+        border-radius: 50%;
+        width: 32px;
+        height: 32px;
+        font-size: 18px;
+        line-height: 32px;
+        text-align: center;
+        cursor: pointer;
+        opacity: 0.5;
+        transition: opacity 0.2s;
+        padding: 0;
+      }
+      #fullscreen-btn:hover { opacity: 1; }
+    </style>
+  </head>
+  <body>
+    <button id="fullscreen-btn" onclick="toggleFullscreen()" title="Fullscreen">⛶</button>
+
+    <div id="unity-container">
+      <div id="loading-overlay">
+        <h2>Loading {{ .UnitTitle }}...</h2>
+        <div class="loading-bar-bg">
+          <div id="loading-bar" class="loading-bar-fill" style="width: 0%"></div>
+        </div>
+        <p id="loading-text" style="margin-top:8px; font-size:14px; opacity:0.7;">Initializing...</p>
+      </div>
+      <canvas id="unity-canvas" width="1400" height="800" tabindex="-1"></canvas>
+    </div>
+
+    <script>
+    (function() {
+      var unitId = '{{ .UnitID }}';
+      var unitVersion = '{{ .UnitVersion }}';
+      // Files are served from /mhs/content/{unit}/v{version}/
+      // The service worker intercepts these and serves from cache or falls through to CDN redirect.
+      var contentUrl = '/mhs/content/' + unitId + '/v' + unitVersion;
+      var buildUrl = contentUrl + '/Build';
+      var loaderUrl = buildUrl + '/' + unitId + '.loader.js';
+
+      var canvas = document.getElementById('unity-canvas');
+      var loadingBar = document.getElementById('loading-bar');
+      var loadingText = document.getElementById('loading-text');
+      var loadingOverlay = document.getElementById('loading-overlay');
+
+      // Aspect-ratio-preserving resize (matches dev build: 1400x800, 7:5 ratio)
+      var scaleToFit = true;
+      function onResize() {
+        var container = canvas.parentElement;
+        var w, h;
+
+        if (scaleToFit) {
+          w = window.innerWidth;
+          h = window.innerHeight;
+          var r = 800 / 1400;
+
+          if (w * r > window.innerHeight) {
+            w = Math.min(w, Math.ceil(h / r));
+          }
+          h = Math.floor(w * r);
+        } else {
+          w = 1400;
+          h = 800;
+        }
+
+        container.style.width = canvas.style.width = w + 'px';
+        container.style.height = canvas.style.height = h + 'px';
+        container.style.top = Math.floor((window.innerHeight - h) / 2) + 'px';
+        container.style.left = Math.floor((window.innerWidth - w) / 2) + 'px';
+        window.focus();
+      }
+
+      window.addEventListener('resize', onResize);
+      onResize();
+
+      // Mobile viewport
+      if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+        var meta = document.createElement('meta');
+        meta.name = 'viewport';
+        meta.content = 'width=device-width, height=device-height, initial-scale=1.0, user-scalable=no, shrink-to-fit=yes';
+        document.getElementsByTagName('head')[0].appendChild(meta);
+      }
+
+      // Load the Unity loader script
+      var script = document.createElement('script');
+      script.src = loaderUrl;
+      script.onload = function() {
+        loadingText.textContent = 'Starting Unity...';
+
+        createUnityInstance(canvas, {
+          dataUrl: buildUrl + '/' + unitId + '.data.unityweb',
+          frameworkUrl: buildUrl + '/' + unitId + '.framework.js.unityweb',
+          codeUrl: buildUrl + '/' + unitId + '.wasm.unityweb',
+          streamingAssetsUrl: contentUrl + '/StreamingAssets',
+          companyName: 'Adroit',
+          productName: 'Mission HydroSci',
+          productVersion: '1.0',
+          autoSyncPersistentDataPath: true,
+        }, function(progress) {
+          loadingBar.style.width = (progress * 100) + '%';
+          if (progress < 0.5) {
+            loadingText.textContent = 'Loading assets...';
+          } else if (progress < 0.9) {
+            loadingText.textContent = 'Compiling...';
+          } else {
+            loadingText.textContent = 'Almost ready...';
+          }
+        }).then(function(instance) {
+          canvas = instance.Module.canvas;
+          loadingOverlay.classList.add('hidden');
+          onResize();
+        }).catch(function(err) {
+          loadingText.textContent = 'Error: ' + err.message;
+          loadingBar.style.width = '100%';
+          loadingBar.style.background = '#ef4444';
+          console.error('Unity load error:', err);
+        });
+      };
+      script.onerror = function() {
+        loadingText.textContent = 'Failed to load game. Is this unit downloaded?';
+        loadingBar.style.width = '100%';
+        loadingBar.style.background = '#ef4444';
+      };
+      document.body.appendChild(script);
+    })();
+
+    function toggleFullscreen() {
+      var btn = document.getElementById('fullscreen-btn');
+      var canvas = document.getElementById('unity-canvas');
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().then(function() {
+          btn.textContent = '\u2716';
+          btn.title = 'Exit fullscreen';
+          btn.blur();
+          canvas.focus();
+        });
+      } else {
+        document.exitFullscreen().then(function() {
+          btn.textContent = '\u26F6';
+          btn.title = 'Fullscreen';
+          canvas.focus();
+        });
+      }
+    }
+
+    document.addEventListener('fullscreenchange', function() {
+      var btn = document.getElementById('fullscreen-btn');
+      if (document.fullscreenElement) {
+        btn.textContent = '\u2716';
+        btn.title = 'Exit fullscreen';
+      } else {
+        btn.textContent = '\u26F6';
+        btn.title = 'Fullscreen';
+      }
+    });
+    </script>
+  </body>
+</html>
+{{ end }}

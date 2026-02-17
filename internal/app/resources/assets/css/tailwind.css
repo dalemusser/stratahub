@@ -30,6 +30,7 @@
     --color-amber-100: oklch(96.2% 0.059 95.617);
     --color-amber-300: oklch(87.9% 0.169 91.605);
     --color-amber-400: oklch(82.8% 0.189 84.429);
+    --color-amber-500: oklch(76.9% 0.188 70.08);
     --color-amber-600: oklch(66.6% 0.179 58.318);
     --color-amber-700: oklch(55.5% 0.163 48.998);
     --color-amber-800: oklch(47.3% 0.137 46.201);
@@ -390,9 +391,6 @@
   .-mx-2 {
     margin-inline: calc(var(--spacing) * -2);
   }
-  .-mx-4 {
-    margin-inline: calc(var(--spacing) * -4);
-  }
   .mx-2 {
     margin-inline: calc(var(--spacing) * 2);
   }
@@ -401,9 +399,6 @@
   }
   .my-4 {
     margin-block: calc(var(--spacing) * 4);
-  }
-  .-mt-2 {
-    margin-top: calc(var(--spacing) * -2);
   }
   .mt-0\.5 {
     margin-top: calc(var(--spacing) * 0.5);
@@ -504,6 +499,12 @@
   .table {
     display: table;
   }
+  .h-2 {
+    height: calc(var(--spacing) * 2);
+  }
+  .h-2\.5 {
+    height: calc(var(--spacing) * 2.5);
+  }
   .h-3 {
     height: calc(var(--spacing) * 3);
   }
@@ -522,9 +523,6 @@
   .h-12 {
     height: calc(var(--spacing) * 12);
   }
-  .h-\[calc\(100vh-184px\)\] {
-    height: calc(100vh - 184px);
-  }
   .h-full {
     height: 100%;
   }
@@ -542,6 +540,9 @@
   }
   .max-h-\[calc\(100vh-12rem\)\] {
     max-height: calc(100vh - 12rem);
+  }
+  .min-h-0 {
+    min-height: calc(var(--spacing) * 0);
   }
   .min-h-\[1\.5rem\] {
     min-height: 1.5rem;
@@ -943,9 +944,6 @@
     border-left-style: var(--tw-border-style);
     border-left-width: 0px;
   }
-  .border-\[\#2e8bc0\] {
-    border-color: #2e8bc0;
-  }
   .border-\[\#145374\] {
     border-color: #145374;
   }
@@ -1020,9 +1018,6 @@
   }
   .bg-\[\#2e8bc0\] {
     background-color: #2e8bc0;
-  }
-  .bg-\[\#145374\] {
-    background-color: #145374;
   }
   .bg-\[\#e8f4f8\] {
     background-color: #e8f4f8;
@@ -1320,6 +1315,9 @@
   .text-\[\#e8f4f8\] {
     color: #e8f4f8;
   }
+  .text-amber-500 {
+    color: var(--color-amber-500);
+  }
   .text-amber-600 {
     color: var(--color-amber-600);
   }
@@ -1374,6 +1372,9 @@
   .text-green-800 {
     color: var(--color-green-800);
   }
+  .text-indigo-200 {
+    color: var(--color-indigo-200);
+  }
   .text-indigo-600 {
     color: var(--color-indigo-600);
   }
@@ -1427,6 +1428,12 @@
   }
   .text-white {
     color: var(--color-white);
+  }
+  .text-yellow-100 {
+    color: var(--color-yellow-100);
+  }
+  .text-yellow-200 {
+    color: var(--color-yellow-200);
   }
   .text-yellow-600 {
     color: var(--color-yellow-600);
@@ -1511,6 +1518,11 @@
   }
   .transition {
     transition-property: color, background-color, border-color, outline-color, text-decoration-color, fill, stroke, --tw-gradient-from, --tw-gradient-via, --tw-gradient-to, opacity, box-shadow, transform, translate, scale, rotate, filter, -webkit-backdrop-filter, backdrop-filter, display, content-visibility, overlay, pointer-events;
+    transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
+    transition-duration: var(--tw-duration, var(--default-transition-duration));
+  }
+  .transition-all {
+    transition-property: all;
     transition-timing-function: var(--tw-ease, var(--default-transition-timing-function));
     transition-duration: var(--tw-duration, var(--default-transition-duration));
   }
@@ -1599,6 +1611,13 @@
       }
     }
   }
+  .hover\:text-\[\#b1d4e0\] {
+    &:hover {
+      @media (hover: hover) {
+        color: #b1d4e0;
+      }
+    }
+  }
   .hover\:text-gray-900 {
     &:hover {
       @media (hover: hover) {
@@ -1631,6 +1650,13 @@
     &:hover {
       @media (hover: hover) {
         text-decoration-line: underline;
+      }
+    }
+  }
+  .hover\:opacity-80 {
+    &:hover {
+      @media (hover: hover) {
+        opacity: 80%;
       }
     }
   }
@@ -1676,6 +1702,11 @@
       outline-style: none;
     }
   }
+  .disabled\:cursor-not-allowed {
+    &:disabled {
+      cursor: not-allowed;
+    }
+  }
   .disabled\:opacity-50 {
     &:disabled {
       opacity: 50%;
@@ -1684,6 +1715,11 @@
   .sm\:col-span-2 {
     @media (width >= 40rem) {
       grid-column: span 2 / span 2;
+    }
+  }
+  .sm\:grid-cols-1 {
+    @media (width >= 40rem) {
+      grid-template-columns: repeat(1, minmax(0, 1fr));
     }
   }
   .sm\:grid-cols-2 {

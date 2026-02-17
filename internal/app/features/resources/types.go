@@ -140,7 +140,7 @@ type viewData struct {
 // common holds fields shared by the member list and detail pages.
 type common struct {
 	viewdata.BaseVM
-	UserID string // login id used by the member (email)
+	UserID string // login id used by the member
 }
 
 // resourceListItem is a single row in the member "My Resources" list.

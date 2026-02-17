@@ -4,6 +4,7 @@ package groups
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"sort"
 	"strings"
 	"time"
@@ -11,6 +12,7 @@ import (
 	resourceassignstore "github.com/dalemusser/stratahub/internal/app/store/resourceassign"
 	resourcestore "github.com/dalemusser/stratahub/internal/app/store/resources"
 	"github.com/dalemusser/stratahub/internal/app/system/paging"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	wafflemongo "github.com/dalemusser/waffle/pantry/mongo"
 	"github.com/dalemusser/waffle/pantry/text"
@@ -22,7 +24,7 @@ import (
 
 // buildAssignments composes the assigned + available resources lists, including
 // availability summaries, paging state, and filters.
-func (h *Handler) buildAssignments(ctx context.Context, g models.Group, q, typeFilter, after, before string) (
+func (h *Handler) buildAssignments(ctx context.Context, r *http.Request, g models.Group, q, typeFilter, after, before string) (
 	assigned []assignedResourceItem,
 	avail []availableResourceItem,
 	shown int,
@@ -96,20 +98,21 @@ func (h *Handler) buildAssignments(ctx context.Context, g models.Group, q, typeF
 	})
 
 	// load available resources with paging/search (status:active only; do not exclude assigned)
-	avail, shown, total, nextCursor, prevCursor, hasNext, hasPrev, err = h.fetchAvailableResourcesPaged(ctx, q, typeFilter, after, before)
+	avail, shown, total, nextCursor, prevCursor, hasNext, hasPrev, err = h.fetchAvailableResourcesPaged(ctx, r, q, typeFilter, after, before)
 	return
 }
 
 // fetchAvailableResourcesPaged returns a page of available resources with optional
 // search and type filters, using keyset pagination on (title_ci, _id).
 func (h *Handler) fetchAvailableResourcesPaged(
-	ctx context.Context,
+	ctx context.Context, r *http.Request,
 	qRaw, typeFilter, after, before string,
 ) (resources []availableResourceItem, shown int, total int64, nextCursor, prevCursor string, hasNext, hasPrev bool, err error) {
 	db := h.DB
 	resStore := resourcestore.New(db)
 
 	filter := bson.M{"status": "active"}
+	workspace.Filter(r, filter)
 	if strings.TrimSpace(typeFilter) != "" {
 		filter["type"] = strings.TrimSpace(typeFilter)
 	}
