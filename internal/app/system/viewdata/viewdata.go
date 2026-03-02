@@ -68,6 +68,10 @@ type BaseVM struct {
 
 	// Announcements for banner display
 	Announcements []AnnouncementVM
+
+	// EnabledApps maps app IDs to true for apps enabled for this user's groups.
+	// Only populated for members; admin/coordinator/leader menus are static.
+	EnabledApps map[string]bool
 }
 
 // storageProvider is set by Init and used to generate logo URLs.
@@ -123,22 +127,28 @@ func NewBaseVM(r *http.Request, db *mongo.Database, title, backDefault string) B
 	isApex := ws != nil && ws.IsApex
 
 	vm := BaseVM{
-		SiteName:    models.DefaultSiteName,
-		IsLoggedIn:  signedIn,
-		Role:        effectiveRole,
-		UserName:    name,
-		IsApex:      isApex,
-		Title:       title,
-		BackURL:     httpnav.ResolveBackURL(r, backDefault),
-		CurrentPath: httpnav.CurrentPath(r),
-		CSRFToken:   csrf.Token(r),
+		SiteName:     models.DefaultSiteName,
+		IsLoggedIn:   signedIn,
+		Role:         effectiveRole,
+		UserName:     name,
+		IsApex:       isApex,
+		Title:        title,
+		BackURL:      httpnav.ResolveBackURL(r, backDefault),
+		CurrentPath:  httpnav.CurrentPath(r),
+		CSRFToken:    csrf.Token(r),
 	}
 
-	// Get LoginID and organization name from session if logged in
+	// Get LoginID, organization name, and enabled apps from session if logged in
 	if user, ok := auth.CurrentUser(r); ok {
 		vm.LoginID = user.LoginID
 		if user.OrganizationName != "" {
 			vm.UserOrg = user.OrganizationName
+		}
+		if len(user.EnabledApps) > 0 {
+			vm.EnabledApps = make(map[string]bool, len(user.EnabledApps))
+			for _, appID := range user.EnabledApps {
+				vm.EnabledApps[appID] = true
+			}
 		}
 	}
 

@@ -13,6 +13,7 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 	r.Group(func(pr chi.Router) {
 		pr.Use(sm.RequireSignedIn)
 		pr.Use(sm.RequireRole("member", "leader", "admin", "coordinator", "superadmin"))
+		pr.Use(RequireApp("mhs_units"))
 
 		pr.Get("/units", h.ServeUnits)
 		pr.Get("/play/{unit}", h.ServePlay)

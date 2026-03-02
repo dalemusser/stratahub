@@ -27,6 +27,8 @@ type PlayData struct {
 	UnitTitle   string
 	UnitVersion string
 	CDNBaseURL  string
+	UserName    string // Injected into page for Unity identity bridge
+	UserLoginID string // Injected into page for Unity identity bridge
 }
 
 // OfflineData is the view model for the offline fallback page.

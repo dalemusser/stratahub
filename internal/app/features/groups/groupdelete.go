@@ -7,6 +7,7 @@ import (
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/policy/grouppolicy"
+	groupappstore "github.com/dalemusser/stratahub/internal/app/store/groupapps"
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
 	membershipstore "github.com/dalemusser/stratahub/internal/app/store/memberships"
 	resourceassignstore "github.com/dalemusser/stratahub/internal/app/store/resourceassign"
@@ -79,6 +80,7 @@ func (h *Handler) HandleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 	// Use transaction for atomic deletion of group and related data.
 	memStore := membershipstore.New(db)
 	rasStore := resourceassignstore.New(db)
+	appSettingsStore := groupappstore.New(db)
 	if err := txn.Run(ctx, db, h.Log, func(ctx context.Context) error {
 		// 1) Remove all memberships for this group.
 		if _, err := memStore.DeleteByGroup(ctx, groupOID); err != nil {
@@ -88,7 +90,11 @@ func (h *Handler) HandleDeleteGroup(w http.ResponseWriter, r *http.Request) {
 		if _, err := rasStore.DeleteByGroup(ctx, groupOID); err != nil {
 			return err
 		}
-		// 3) Delete the group itself.
+		// 3) Remove all app settings for this group.
+		if _, err := appSettingsStore.DeleteByGroup(ctx, groupOID); err != nil {
+			return err
+		}
+		// 4) Delete the group itself.
 		if _, err := grpStore.Delete(ctx, groupOID); err != nil {
 			return err
 		}

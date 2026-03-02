@@ -7,6 +7,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/dalemusser/waffle/pantry/assets"
 	"github.com/dalemusser/waffle/pantry/templates"
 )
 
@@ -19,6 +20,18 @@ var FS embed.FS
 //
 //go:embed assets/css/*.css assets/js/*.js assets/mhs/*
 var AssetsFS embed.FS
+
+var (
+	tailwindVersion = assets.ContentHash(AssetsFS, "assets/css/tailwind.css")
+	tiptapVersion   = assets.ContentHash(AssetsFS, "assets/css/tiptap.css")
+	htmxVersion     = assets.ContentHash(AssetsFS, "assets/js/htmx.min.js")
+)
+
+func init() {
+	templates.RegisterFunc("tailwindVersion", func() string { return tailwindVersion })
+	templates.RegisterFunc("tiptapVersion", func() string { return tiptapVersion })
+	templates.RegisterFunc("htmxVersion", func() string { return htmxVersion })
+}
 
 var registerOnce sync.Once
 

@@ -4,10 +4,10 @@
   <head>
     <meta charset="UTF-8" />
     <title>{{ if .SiteName }}{{ .SiteName }}{{ else }}StrataHub{{ end }}</title>
-    <link rel="stylesheet" href="/assets/css/tailwind.css">
-    <link rel="stylesheet" href="/assets/css/tiptap.css">
+    <link rel="stylesheet" href="/assets/css/tailwind.css?v={{ tailwindVersion }}">
+    <link rel="stylesheet" href="/assets/css/tiptap.css?v={{ tiptapVersion }}">
     <link rel="manifest" href="/manifest.json">
-    <script src="/assets/js/htmx.min.js"></script>
+    <script src="/assets/js/htmx.min.js?v={{ htmxVersion }}"></script>
     {{ if .CSRFToken }}<meta name="csrf-token" content="{{ .CSRFToken }}">{{ end }}
     <script>
       // CSRF token injection for HTMX requests

@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StrataHub Identity Test</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #f3f4f6;
+      color: #1f2937;
+      padding: 2rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 0.5rem;
+      color: #1e3a5f;
+    }
+    .subtitle {
+      font-size: 0.875rem;
+      color: #6b7280;
+      margin-bottom: 2rem;
+    }
+    .hosted-on {
+      font-size: 0.75rem;
+      color: #9ca3af;
+      margin-bottom: 2rem;
+    }
+    .card {
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 1rem;
+    }
+    .card-title {
+      font-size: 1rem;
+      font-weight: 600;
+    }
+    .status {
+      font-size: 0.75rem;
+      font-weight: 500;
+      padding: 2px 8px;
+      border-radius: 9999px;
+    }
+    .status-pending { background: #fef3c7; color: #92400e; }
+    .status-success { background: #d1fae5; color: #065f46; }
+    .status-error { background: #fee2e2; color: #991b1b; }
+    .url {
+      font-family: 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 0.8rem;
+      color: #6366f1;
+      background: #eef2ff;
+      padding: 4px 8px;
+      border-radius: 4px;
+      margin-bottom: 1rem;
+      display: inline-block;
+      word-break: break-all;
+    }
+    .result {
+      background: #f9fafb;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 1rem;
+      font-family: 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: 400px;
+      overflow-y: auto;
+      line-height: 1.5;
+    }
+    .result.error {
+      background: #fef2f2;
+      border-color: #fecaca;
+      color: #991b1b;
+    }
+    .meta {
+      font-size: 0.75rem;
+      color: #9ca3af;
+      margin-top: 0.5rem;
+    }
+    .btn {
+      display: inline-block;
+      background: #1e3a5f;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 8px 20px;
+      font-size: 0.875rem;
+      cursor: pointer;
+      margin-top: 1rem;
+    }
+    .btn:hover { background: #2d4a73; }
+    .note {
+      font-size: 0.8rem;
+      color: #6b7280;
+      background: #fffbeb;
+      border: 1px solid #fde68a;
+      border-radius: 6px;
+      padding: 0.75rem 1rem;
+      margin-bottom: 1.5rem;
+      line-height: 1.5;
+    }
+  </style>
+</head>
+<body>
+  <h1>StrataHub Identity Test</h1>
+  <p class="subtitle">Cross-origin /api/user calls from CDN-hosted page</p>
+  <p class="hosted-on">This page hosted on: <strong id="hosted-origin"></strong></p>
+
+  <div class="note">
+    This page tests whether a page hosted on S3/CloudFront can retrieve user identity
+    from StrataHub via the <code>/api/user</code> endpoint. Requires <code>credentials: 'include'</code>
+    and the server must return <code>Access-Control-Allow-Credentials: true</code>.
+  </div>
+
+  <div id="card-mhs" class="card">
+    <div class="card-header">
+      <span class="card-title">mhs.adroit.games</span>
+      <span id="status-mhs" class="status status-pending">Pending</span>
+    </div>
+    <div class="url">https://mhs.adroit.games/api/user</div>
+    <div id="result-mhs" class="result">Waiting...</div>
+    <div id="meta-mhs" class="meta"></div>
+  </div>
+
+  <div id="card-apex" class="card">
+    <div class="card-header">
+      <span class="card-title">adroit.games</span>
+      <span id="status-apex" class="status status-pending">Pending</span>
+    </div>
+    <div class="url">https://adroit.games/api/user</div>
+    <div id="result-apex" class="result">Waiting...</div>
+    <div id="meta-apex" class="meta"></div>
+  </div>
+
+  <div id="card-dev" class="card">
+    <div class="card-header">
+      <span class="card-title">dev.adroit.games</span>
+      <span id="status-dev" class="status status-pending">Pending</span>
+    </div>
+    <div class="url">https://dev.adroit.games/api/user</div>
+    <div id="result-dev" class="result">Waiting...</div>
+    <div id="meta-dev" class="meta"></div>
+  </div>
+
+  <button class="btn" onclick="runTests()">Run Again</button>
+
+  <script>
+    document.getElementById('hosted-origin').textContent = window.location.origin || window.location.href;
+
+    var endpoints = [
+      { id: 'mhs', url: 'https://mhs.adroit.games/api/user' },
+      { id: 'apex', url: 'https://adroit.games/api/user' },
+      { id: 'dev', url: 'https://dev.adroit.games/api/user' }
+    ];
+
+    async function testEndpoint(ep) {
+      var statusEl = document.getElementById('status-' + ep.id);
+      var resultEl = document.getElementById('result-' + ep.id);
+      var metaEl = document.getElementById('meta-' + ep.id);
+
+      statusEl.textContent = 'Fetching...';
+      statusEl.className = 'status status-pending';
+      resultEl.textContent = 'Fetching...';
+      resultEl.className = 'result';
+      metaEl.textContent = '';
+
+      var startTime = performance.now();
+
+      try {
+        var response = await fetch(ep.url, {
+          method: 'GET',
+          credentials: 'include',
+          mode: 'cors'
+        });
+
+        var elapsed = Math.round(performance.now() - startTime);
+        var contentType = response.headers.get('content-type') || '';
+        var corsHeader = response.headers.get('access-control-allow-origin') || '(not exposed)';
+        var credsHeader = response.headers.get('access-control-allow-credentials') || '(not exposed)';
+
+        if (!response.ok) {
+          statusEl.textContent = 'HTTP ' + response.status;
+          statusEl.className = 'status status-error';
+          resultEl.textContent = 'HTTP ' + response.status + ' ' + response.statusText;
+          resultEl.className = 'result error';
+          metaEl.textContent = elapsed + 'ms | CORS origin: ' + corsHeader + ' | Credentials: ' + credsHeader;
+          return;
+        }
+
+        var body;
+        if (contentType.indexOf('json') !== -1) {
+          var json = await response.json();
+          body = JSON.stringify(json, null, 2);
+        } else {
+          body = await response.text();
+        }
+
+        statusEl.textContent = 'HTTP ' + response.status;
+        statusEl.className = 'status status-success';
+        resultEl.textContent = body;
+        metaEl.textContent = elapsed + 'ms | CORS origin: ' + corsHeader + ' | Credentials: ' + credsHeader;
+      } catch (err) {
+        var elapsed = Math.round(performance.now() - startTime);
+        statusEl.textContent = 'Error';
+        statusEl.className = 'status status-error';
+        resultEl.textContent = err.name + ': ' + err.message + '\n\nThis usually means:\n- CORS is not configured on the server for this origin\n- The server is not reachable\n- credentials/cookies are being blocked';
+        resultEl.className = 'result error';
+        metaEl.textContent = elapsed + 'ms';
+      }
+    }
+
+    function runTests() {
+      endpoints.forEach(function(ep) {
+        testEndpoint(ep);
+      });
+    }
+
+    runTests();
+  </script>
+</body>
+</html>

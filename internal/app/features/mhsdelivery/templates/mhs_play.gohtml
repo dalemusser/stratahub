@@ -5,7 +5,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{{ .UnitTitle }} - Mission HydroSci</title>
-    <link rel="stylesheet" href="/assets/css/tailwind.css">
+    <link rel="stylesheet" href="/assets/css/tailwind.css?v={{ tailwindVersion }}">
     <link rel="manifest" href="/manifest.json">
     <style>
       html, body {
@@ -88,6 +88,150 @@
       </div>
       <canvas id="unity-canvas" width="1400" height="800" tabindex="-1"></canvas>
     </div>
+
+    <!-- Identity bridge: intercept Unity jslib calls to /api/user -->
+    <script>
+    (function() {
+      // User identity injected server-side from StrataHub session.
+      // Unity's jslib calls /api/user (often cross-origin to adroit.games)
+      // which fails due to cookie scoping. We intercept and return this data directly.
+      var __mhsUser = {
+        isAuthenticated: {{ if .UserLoginID }}true{{ else }}false{{ end }},
+        name: '{{ .UserName }}',
+        email: '{{ .UserLoginID }}',
+        login_id: '{{ .UserLoginID }}'
+      };
+      var __mhsUserJSON = JSON.stringify(__mhsUser);
+
+      function isUserApiRequest(url) {
+        try {
+          var parsed = new URL(url, window.location.origin);
+          return parsed.pathname === '/api/user';
+        } catch (e) {
+          return false;
+        }
+      }
+
+      // Intercept XMLHttpRequest
+      var _XHROpen = XMLHttpRequest.prototype.open;
+      var _XHRSend = XMLHttpRequest.prototype.send;
+
+      XMLHttpRequest.prototype.open = function(method, url) {
+        this.__mhsIntercepted = isUserApiRequest(url);
+        if (!this.__mhsIntercepted) {
+          return _XHROpen.apply(this, arguments);
+        }
+        // Store but don't actually open
+        this.__mhsMethod = method;
+        this.__mhsUrl = url;
+      };
+
+      XMLHttpRequest.prototype.send = function() {
+        if (!this.__mhsIntercepted) {
+          return _XHRSend.apply(this, arguments);
+        }
+        // Simulate a successful response
+        var self = this;
+        Object.defineProperty(self, 'readyState', { get: function() { return 4; }, configurable: true });
+        Object.defineProperty(self, 'status', { get: function() { return 200; }, configurable: true });
+        Object.defineProperty(self, 'statusText', { get: function() { return 'OK'; }, configurable: true });
+        Object.defineProperty(self, 'responseText', { get: function() { return __mhsUserJSON; }, configurable: true });
+        Object.defineProperty(self, 'response', { get: function() { return __mhsUserJSON; }, configurable: true });
+        self.getResponseHeader = function(name) {
+          if (name.toLowerCase() === 'content-type') return 'application/json';
+          return null;
+        };
+        self.getAllResponseHeaders = function() { return 'content-type: application/json\r\n'; };
+        setTimeout(function() {
+          if (typeof self.onreadystatechange === 'function') self.onreadystatechange();
+          if (typeof self.onload === 'function') self.onload();
+          self.dispatchEvent(new Event('readystatechange'));
+          self.dispatchEvent(new Event('load'));
+          self.dispatchEvent(new Event('loadend'));
+        }, 0);
+      };
+
+      // Intercept fetch
+      var _fetch = window.fetch;
+      window.fetch = function(input, init) {
+        var url = (typeof input === 'string') ? input : (input instanceof Request ? input.url : String(input));
+        if (isUserApiRequest(url)) {
+          return Promise.resolve(new Response(__mhsUserJSON, {
+            status: 200,
+            statusText: 'OK',
+            headers: { 'Content-Type': 'application/json' }
+          }));
+        }
+        return _fetch.apply(this, arguments);
+      };
+
+      console.log('MHS identity bridge active:', __mhsUser.login_id || '(not authenticated)');
+    })();
+    </script>
+
+    <!-- Block unit-to-unit transitions that try to navigate to external game URLs -->
+    <script>
+    (function() {
+      function isExternalGameUrl(url) {
+        try {
+          var parsed = new URL(url, window.location.origin);
+          var host = parsed.hostname;
+          return host !== window.location.hostname && (
+            host.indexOf('adroit.games') !== -1 ||
+            host.indexOf('cloudfront.net') !== -1
+          );
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function showUnitComplete() {
+        var overlay = document.getElementById('unit-complete-overlay');
+        if (overlay) overlay.classList.remove('hidden');
+      }
+
+      // Navigation API (Chrome 102+ / Chromebooks) — intercepts window.location changes
+      if (window.navigation) {
+        navigation.addEventListener('navigate', function(event) {
+          if (isExternalGameUrl(event.destination.url)) {
+            event.preventDefault();
+            console.log('MHS: blocked external navigation to', event.destination.url);
+            showUnitComplete();
+          }
+        });
+      }
+
+      // Also intercept window.open (used by Unity's Application.OpenURL)
+      var _windowOpen = window.open;
+      window.open = function(url) {
+        if (isExternalGameUrl(url)) {
+          console.log('MHS: blocked window.open to', url);
+          showUnitComplete();
+          return null;
+        }
+        return _windowOpen.apply(this, arguments);
+      };
+    })();
+    </script>
+
+    <!-- Unit complete overlay (hidden by default) -->
+    <div id="unit-complete-overlay" class="hidden" style="
+      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.85); z-index: 100;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      font-family: sans-serif; color: white; text-align: center;
+    ">
+      <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Unit Complete</h2>
+      <p style="font-size: 1rem; opacity: 0.8; margin-bottom: 1.5rem;">Return to MHS Units to continue to the next unit.</p>
+      <a href="/mhs/units" style="
+        display: inline-block; padding: 10px 24px;
+        background: #2563eb; color: white; text-decoration: none;
+        border-radius: 6px; font-size: 0.95rem;
+      ">Back to MHS Units</a>
+    </div>
+    <style>
+      #unit-complete-overlay.hidden { display: none !important; }
+    </style>
 
     <script>
     (function() {

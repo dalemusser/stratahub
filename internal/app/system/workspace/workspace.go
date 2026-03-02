@@ -83,23 +83,6 @@ func Middleware(primaryDomain string, store WorkspaceStore, multiWorkspace bool,
 
 			// Check if apex domain
 			if host == primaryDomain {
-				// For API requests on apex domain, fall back to default workspace
-				// This supports legacy game clients that use apex domain for /api/* endpoints
-				if strings.HasPrefix(r.URL.Path, "/api/") {
-					ws, err := store.GetFirst(ctx)
-					if err == nil {
-						r = withWorkspace(r, &Info{
-							ID:        ws.ID,
-							Subdomain: ws.Subdomain,
-							Name:      ws.Name,
-							Status:    ws.Status,
-							IsApex:    false, // Treat as workspace request for API purposes
-						})
-						next.ServeHTTP(w, r)
-						return
-					}
-					// Fall through to apex handling if no workspace found
-				}
 				r = withWorkspace(r, &Info{IsApex: true})
 				next.ServeHTTP(w, r)
 				return
@@ -286,11 +269,14 @@ func RedirectNonSuperadminFromApex(store WorkspaceLookup, primaryDomain string, 
 				return
 			}
 
-			// Allow certain paths to prevent redirect loops and ensure assets load
+			// Allow certain paths to prevent redirect loops and ensure assets load.
+			// /api/ is exempt so that game clients can call /api/user on the apex
+			// domain from any workspace (cross-origin with credentials).
 			path := r.URL.Path
 			if path == "/apex-denied" || path == "/logout" ||
 				strings.HasPrefix(path, "/static/") ||
-				strings.HasPrefix(path, "/assets/") {
+				strings.HasPrefix(path, "/assets/") ||
+				strings.HasPrefix(path, "/api/") {
 				next.ServeHTTP(w, r)
 				return
 			}
