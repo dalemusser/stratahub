@@ -71,6 +71,9 @@ func EnsureAll(ctx context.Context, db *mongo.Database) error {
 	if err := ensureSiteSettings(ctx, db); err != nil {
 		problems = append(problems, "site_settings: "+err.Error())
 	}
+	if err := ensureGroupAppSettings(ctx, db); err != nil {
+		problems = append(problems, "group_app_settings: "+err.Error())
+	}
 
 	if len(problems) > 0 {
 		return errors.New(strings.Join(problems, "; "))
@@ -887,6 +890,30 @@ func ensureSiteSettings(ctx context.Context, db *mongo.Database) error {
 			Options: options.Index().
 				SetUnique(true).
 				SetName("uniq_sitesettings_workspace"),
+		},
+	})
+}
+
+func ensureGroupAppSettings(ctx context.Context, db *mongo.Database) error {
+	c := db.Collection("group_app_settings")
+	return ensureIndexSet(ctx, c, []mongo.IndexModel{
+		// Unique: one document per (group, app)
+		{
+			Keys: bson.D{
+				{Key: "group_id", Value: 1},
+				{Key: "app_id", Value: 1},
+			},
+			Options: options.Index().
+				SetUnique(true).
+				SetName("uniq_groupapp_group_app"),
+		},
+		// Fast group lookups (cascade delete, list by group)
+		{
+			Keys: bson.D{
+				{Key: "group_id", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_groupapp_group"),
 		},
 	})
 }

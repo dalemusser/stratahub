@@ -54,15 +54,19 @@ const (
 // Returns (workspaceID, false) for workspace subdomain requests.
 type WorkspaceChecker func(r *http.Request) (workspaceID string, isApex bool)
 
+// ForbiddenRenderer renders a 403 page inline (no redirect).
+type ForbiddenRenderer func(w http.ResponseWriter, r *http.Request, msg string)
+
 // SessionManager encapsulates session store and configuration.
 // It provides middleware and utilities for session-based authentication.
 // Use NewSessionManager to create an instance.
 type SessionManager struct {
-	store            *sessions.CookieStore
-	logger           *zap.Logger
-	name             string
-	userFetcher      UserFetcher
-	workspaceChecker WorkspaceChecker
+	store             *sessions.CookieStore
+	logger            *zap.Logger
+	name              string
+	userFetcher       UserFetcher
+	workspaceChecker  WorkspaceChecker
+	forbiddenRenderer ForbiddenRenderer
 }
 
 // NewSessionManager creates a new SessionManager with the provided configuration.
@@ -172,6 +176,12 @@ func (sm *SessionManager) SetWorkspaceChecker(wc WorkspaceChecker) {
 	sm.workspaceChecker = wc
 }
 
+// SetForbiddenRenderer sets the callback used by RequireRole to render a 403 page
+// inline instead of redirecting to /forbidden.
+func (sm *SessionManager) SetForbiddenRenderer(fn ForbiddenRenderer) {
+	sm.forbiddenRenderer = fn
+}
+
 /*─────────────────────────────────────────────────────────────────────────────*
 | UserFetcher interface                                                       |
 *─────────────────────────────────────────────────────────────────────────────*/
@@ -208,6 +218,10 @@ type SessionUser struct {
 	WorkspaceID  string   // User's primary workspace (empty for superadmin)
 	WorkspaceIDs []string // All workspaces user has access to
 	IsSuperAdmin bool     // Quick check for superadmin role
+
+	// Group app settings: which apps are enabled for this member's groups.
+	// Only populated for members; nil means no apps enabled (fail closed).
+	EnabledApps []string
 
 	// Session token for MongoDB session tracking
 	Token string
@@ -418,21 +432,19 @@ func (sm *SessionManager) RequireRole(allowed ...string) func(http.Handler) http
 
 			// 3) Signed in but wrong role → 403 semantics
 			if _, has := set[userRole]; !has {
-				// HTMX: redirect (so the full page swaps)
 				if r.Header.Get("HX-Request") == "true" {
-					dest := "/forbidden"
-					w.Header().Set("HX-Redirect", dest)
+					// HTMX partial request — force full page reload so the
+					// forbidden page renders with layout at the current URL.
+					w.Header().Set("HX-Refresh", "true")
 					w.WriteHeader(http.StatusForbidden)
 					return
 				}
 
-				// HTML: redirect to a friendly page
-				if wantsHTML(r) {
-					http.Redirect(w, r, "/forbidden", http.StatusSeeOther)
+				if wantsHTML(r) && sm.forbiddenRenderer != nil {
+					sm.forbiddenRenderer(w, r, "You don't have permission to access this page.")
 					return
 				}
 
-				// Non-HTML (API): keep the status code
 				http.Error(w, "forbidden", http.StatusForbidden)
 				return
 			}

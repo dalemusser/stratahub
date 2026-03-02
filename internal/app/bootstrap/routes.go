@@ -93,6 +93,12 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		sessionMgr.SetWorkspaceChecker(workspace.CheckerFromRequest)
 	}
 
+	// Set up inline forbidden page rendering so RequireRole renders at the
+	// current URL instead of redirecting to /forbidden.
+	sessionMgr.SetForbiddenRenderer(func(w http.ResponseWriter, r *http.Request, msg string) {
+		errorsfeature.RenderForbidden(w, r, msg, "/")
+	})
+
 	// Initialize and boot the template engine once at startup.
 	// Dev mode enables template reloading for faster iteration.
 	eng := templates.New(coreCfg.Env == "dev")
@@ -152,6 +158,28 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	// This makes the current user available to all handlers via auth.CurrentUser(r).
 	r.Use(sessionMgr.LoadSessionUser)
 
+	// Stale cookie cleanup: remove old generic cookie names from before per-app naming.
+	// This runs on every request but only sets headers when old cookies are actually present.
+	// Once the browser deletes them, this becomes a no-op on subsequent requests.
+	r.Use(func(next http.Handler) http.Handler {
+		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			for _, name := range []string{"csrf_token", "_gorilla_csrf"} {
+				if _, err := r.Cookie(name); err == nil {
+					http.SetCookie(w, &http.Cookie{
+						Name:     name,
+						Value:    "",
+						Path:     "/",
+						Domain:   appCfg.SessionDomain,
+						MaxAge:   -1,
+						Secure:   secure,
+						HttpOnly: true,
+					})
+				}
+			}
+			next.ServeHTTP(w, r)
+		})
+	})
+
 	// CSRF protection: validates token on all POST/PUT/PATCH/DELETE requests.
 	// Token is injected into templates via BaseVM.CSRFToken.
 	// HTMX requests send token via X-CSRF-Token header.
@@ -174,7 +202,9 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 				w.WriteHeader(http.StatusForbidden)
 				return
 			}
-			http.Error(w, "CSRF token invalid or missing", http.StatusForbidden)
+			errorsfeature.RenderForbidden(w, r,
+				"Your session has expired or is invalid. Please go back and try again, or log in again.",
+				"/login")
 		})),
 	}
 	// In multi-workspace mode, set CSRF cookie domain to match session domain.
@@ -298,7 +328,34 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	errorsHandler := errorsfeature.NewHandler()
 	r.Get("/forbidden", errorsHandler.Forbidden)
 	r.Get("/unauthorized", errorsHandler.Unauthorized)
+	r.Get("/troubleshooting", errorsHandler.Troubleshooting)
 	r.Get("/apex-denied", errorsHandler.ApexDenied)
+
+	// Clear session: one-click recovery from CSRF/session errors.
+	// GET (not POST) because the user may not have a valid CSRF token.
+	r.Get("/clear-session", func(w http.ResponseWriter, r *http.Request) {
+		sess, err := sessionMgr.GetSession(r)
+		if err == nil {
+			opts := sessionMgr.Store().Options
+			if opts != nil {
+				sess.Options.Domain = opts.Domain
+				sess.Options.Path = opts.Path
+				sess.Options.Secure = opts.Secure
+				sess.Options.HttpOnly = opts.HttpOnly
+				sess.Options.SameSite = opts.SameSite
+			}
+			sess.Options.MaxAge = -1
+			_ = sess.Save(r, w)
+		}
+		for _, name := range []string{"stratahub_csrf", "csrf_token", "_gorilla_csrf", "theme_pref"} {
+			http.SetCookie(w, &http.Cookie{
+				Name: name, Value: "", Path: "/",
+				Domain: appCfg.SessionDomain, MaxAge: -1,
+				Secure: secure, HttpOnly: true,
+			})
+		}
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+	})
 
 	// Workspace management (superadmin only, apex domain - no workspace required)
 	workspacesHandler := workspacesfeature.NewHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, auditLogger, appCfg.PrimaryDomain, logger)

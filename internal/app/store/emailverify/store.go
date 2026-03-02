@@ -38,8 +38,10 @@ const (
 )
 
 var (
-	// ErrNotFound is returned when a verification record is not found or expired.
-	ErrNotFound = errors.New("verification not found or expired")
+	// ErrNotFound is returned when a verification record is not found.
+	ErrNotFound = errors.New("verification not found")
+	// ErrExpired is returned when a verification record exists but has expired.
+	ErrExpired = errors.New("verification code expired")
 	// ErrInvalidCode is returned when the code doesn't match.
 	ErrInvalidCode = errors.New("invalid verification code")
 	// ErrTooManyAttempts is returned when too many verification attempts have been made.
@@ -190,18 +192,25 @@ func (s *Store) Create(ctx context.Context, userID primitive.ObjectID, email str
 
 // VerifyCode verifies a code for a user and returns the verification record if valid.
 // The record is deleted after successful verification.
-// Returns ErrTooManyAttempts if the maximum number of attempts has been exceeded.
+// Returns ErrExpired if the code exists but has expired, ErrNotFound if no record exists,
+// and ErrTooManyAttempts if the maximum number of attempts has been exceeded.
 func (s *Store) VerifyCode(ctx context.Context, userID primitive.ObjectID, code string) (*Verification, error) {
+	// Two-step lookup: first find by user_id only (without expires_at filter)
+	// so we can distinguish "expired" from "not found".
 	var v Verification
 	err := s.c.FindOne(ctx, bson.M{
-		"user_id":    userID,
-		"expires_at": bson.M{"$gt": time.Now()},
+		"user_id": userID,
 	}).Decode(&v)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, ErrNotFound
 		}
 		return nil, err
+	}
+
+	// Check if the record has expired
+	if time.Now().After(v.ExpiresAt) {
+		return nil, ErrExpired
 	}
 
 	// Check if too many attempts have been made

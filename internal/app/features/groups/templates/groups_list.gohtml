@@ -329,6 +329,11 @@
       >Users</a>
 
       <a
+        href="/groups/{{ .GroupID }}/apps?return={{ .BackURL | urlquery }}"
+        class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
+      >Apps</a>
+
+      <a
         href="/groups/{{ .GroupID }}/assign_resources?return={{ .BackURL | urlquery }}"
         class="px-3 py-1 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700"
       >Resources</a>

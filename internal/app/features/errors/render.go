@@ -5,6 +5,7 @@ import (
 	"html"
 	"net/http"
 
+	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/domain/models"
@@ -15,6 +16,9 @@ import (
 )
 
 // pageData is the basic view model for error pages.
+// It mirrors the fields from viewdata.BaseVM that the layout and menu templates
+// access, plus error-specific extras. We can't embed BaseVM directly because
+// NewBaseVM requires DB access that the render helpers don't have.
 type pageData struct {
 	Title      string
 	IsLoggedIn bool
@@ -29,7 +33,11 @@ type pageData struct {
 	FooterHTML    string
 	IsApex        bool
 	CSRFToken     string
-	Announcements []viewdata.AnnouncementVM // Empty for error pages
+	LoginID       string
+	UserOrg       string
+	CurrentPath   string
+	EnabledApps   map[string]bool
+	Announcements []viewdata.AnnouncementVM
 
 	// Additional fields for specific error pages
 	ActualRole string // The user's actual role (for display when Role is overridden for menu)
@@ -46,6 +54,21 @@ func NewErrorLogger(logger *zap.Logger) *ErrorLogger {
 	return &ErrorLogger{logger: logger}
 }
 
+// userFields extracts session-user fields needed by the layout/menu templates.
+func userFields(r *http.Request) (loginID, userOrg string, enabledApps map[string]bool) {
+	if u, ok := auth.CurrentUser(r); ok {
+		loginID = u.LoginID
+		userOrg = u.OrganizationName
+		if len(u.EnabledApps) > 0 {
+			enabledApps = make(map[string]bool, len(u.EnabledApps))
+			for _, id := range u.EnabledApps {
+				enabledApps[id] = true
+			}
+		}
+	}
+	return
+}
+
 // logError logs an error with context.
 func (el *ErrorLogger) logError(r *http.Request, context string, err error) {
 	if el.logger == nil || err == nil {
@@ -57,9 +80,31 @@ func (el *ErrorLogger) logError(r *http.Request, context string, err error) {
 		zap.String("method", r.Method))
 }
 
+// RenderTroubleshooting shows the "Having Trouble?" self-service troubleshooting page.
+func RenderTroubleshooting(w http.ResponseWriter, r *http.Request) {
+	role, name, _, signed := authz.UserCtx(r)
+	lid, uorg, eapps := userFields(r)
+
+	data := pageData{
+		Title:         "Having Trouble?",
+		IsLoggedIn:    signed,
+		Role:          role,
+		UserName:      name,
+		SiteName:      models.DefaultSiteName,
+		LoginID:       lid,
+		UserOrg:       uorg,
+		EnabledApps:   eapps,
+		CSRFToken:     csrf.Token(r),
+		Announcements: viewdata.GetAnnouncements(r.Context()),
+	}
+
+	templates.Render(w, r, "errors/troubleshooting", data)
+}
+
 // RenderApexDenied shows a page telling non-superadmin users they need to use their workspace domain.
 func RenderApexDenied(w http.ResponseWriter, r *http.Request) {
 	role, name, _, signed := authz.UserCtx(r)
+	lid, uorg, eapps := userFields(r)
 
 	data := pageData{
 		Title:         "Wrong Domain",
@@ -69,18 +114,22 @@ func RenderApexDenied(w http.ResponseWriter, r *http.Request) {
 		SiteName:      models.DefaultSiteName,
 		IsApex:        true,
 		ActualRole:    role,
+		LoginID:       lid,
+		UserOrg:       uorg,
+		EnabledApps:   eapps,
 		CSRFToken:     csrf.Token(r),
 		Announcements: viewdata.GetAnnouncements(r.Context()),
 	}
 
 	w.WriteHeader(http.StatusForbidden)
-	templates.Render(w, r, "error_apex_denied", data)
+	templates.Render(w, r, "errors/apex_denied", data)
 }
 
 // RenderUnauthorized shows a friendly "sign in required" page.
 // If backURL is empty, it will default to /login.
 func RenderUnauthorized(w http.ResponseWriter, r *http.Request, backURL string) {
 	role, name, _, signed := authz.UserCtx(r)
+	lid, uorg, eapps := userFields(r)
 	if backURL == "" {
 		backURL = "/login"
 	}
@@ -93,42 +142,50 @@ func RenderUnauthorized(w http.ResponseWriter, r *http.Request, backURL string) 
 		Message:       "Please sign in to continue.",
 		BackURL:       backURL,
 		SiteName:      models.DefaultSiteName,
+		LoginID:       lid,
+		UserOrg:       uorg,
+		EnabledApps:   eapps,
 		CSRFToken:     csrf.Token(r),
 		Announcements: viewdata.GetAnnouncements(r.Context()),
 	}
 
 	w.WriteHeader(http.StatusUnauthorized)
-	templates.Render(w, r, "error_forbidden", data)
+	templates.Render(w, r, "errors/forbidden", data)
 }
 
 // RenderForbidden shows a friendly access error page with a message.
 // If backURL is empty, it resolves a safe back URL with a default fallback.
 func RenderForbidden(w http.ResponseWriter, r *http.Request, msg, backURL string) {
 	role, name, _, signed := authz.UserCtx(r)
+	lid, uorg, eapps := userFields(r)
 	if backURL == "" {
 		backURL = httpnav.ResolveBackURL(r, "/")
 	}
 
 	data := pageData{
-		Title:         "Access denied",
+		Title:         "Access Denied",
 		IsLoggedIn:    signed,
 		Role:          role,
 		UserName:      name,
 		Message:       msg,
 		BackURL:       backURL,
 		SiteName:      models.DefaultSiteName,
+		LoginID:       lid,
+		UserOrg:       uorg,
+		EnabledApps:   eapps,
 		CSRFToken:     csrf.Token(r),
 		Announcements: viewdata.GetAnnouncements(r.Context()),
 	}
 
 	w.WriteHeader(http.StatusForbidden)
-	templates.Render(w, r, "error_forbidden", data)
+	templates.Render(w, r, "errors/forbidden", data)
 }
 
 // RenderServerError shows a friendly server error page.
 // If backURL is empty, it resolves a safe back URL with a default fallback.
 func RenderServerError(w http.ResponseWriter, r *http.Request, msg, backURL string) {
 	role, name, _, signed := authz.UserCtx(r)
+	lid, uorg, eapps := userFields(r)
 	if backURL == "" {
 		backURL = httpnav.ResolveBackURL(r, "/")
 	}
@@ -144,18 +201,22 @@ func RenderServerError(w http.ResponseWriter, r *http.Request, msg, backURL stri
 		Message:       msg,
 		BackURL:       backURL,
 		SiteName:      models.DefaultSiteName,
+		LoginID:       lid,
+		UserOrg:       uorg,
+		EnabledApps:   eapps,
 		CSRFToken:     csrf.Token(r),
 		Announcements: viewdata.GetAnnouncements(r.Context()),
 	}
 
 	w.WriteHeader(http.StatusInternalServerError)
-	templates.Render(w, r, "error_server", data)
+	templates.Render(w, r, "errors/internal", data)
 }
 
 // RenderBadRequest shows a friendly bad request error page.
 // If backURL is empty, it resolves a safe back URL with a default fallback.
 func RenderBadRequest(w http.ResponseWriter, r *http.Request, msg, backURL string) {
 	role, name, _, signed := authz.UserCtx(r)
+	lid, uorg, eapps := userFields(r)
 	if backURL == "" {
 		backURL = httpnav.ResolveBackURL(r, "/")
 	}
@@ -171,18 +232,22 @@ func RenderBadRequest(w http.ResponseWriter, r *http.Request, msg, backURL strin
 		Message:       msg,
 		BackURL:       backURL,
 		SiteName:      models.DefaultSiteName,
+		LoginID:       lid,
+		UserOrg:       uorg,
+		EnabledApps:   eapps,
 		CSRFToken:     csrf.Token(r),
 		Announcements: viewdata.GetAnnouncements(r.Context()),
 	}
 
 	w.WriteHeader(http.StatusBadRequest)
-	templates.Render(w, r, "error_forbidden", data)
+	templates.Render(w, r, "errors/forbidden", data)
 }
 
 // RenderNotFound shows a friendly not found error page.
 // If backURL is empty, it resolves a safe back URL with a default fallback.
 func RenderNotFound(w http.ResponseWriter, r *http.Request, msg, backURL string) {
 	role, name, _, signed := authz.UserCtx(r)
+	lid, uorg, eapps := userFields(r)
 	if backURL == "" {
 		backURL = httpnav.ResolveBackURL(r, "/")
 	}
@@ -198,12 +263,15 @@ func RenderNotFound(w http.ResponseWriter, r *http.Request, msg, backURL string)
 		Message:       msg,
 		BackURL:       backURL,
 		SiteName:      models.DefaultSiteName,
+		LoginID:       lid,
+		UserOrg:       uorg,
+		EnabledApps:   eapps,
 		CSRFToken:     csrf.Token(r),
 		Announcements: viewdata.GetAnnouncements(r.Context()),
 	}
 
 	w.WriteHeader(http.StatusNotFound)
-	templates.Render(w, r, "error_not_found", data)
+	templates.Render(w, r, "errors/not_found", data)
 }
 
 // isHTMXRequest checks if the request is an HTMX partial request.

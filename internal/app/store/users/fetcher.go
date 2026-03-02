@@ -7,6 +7,7 @@ package userstore
 import (
 	"context"
 
+	groupappstore "github.com/dalemusser/stratahub/internal/app/store/groupapps"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/normalize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
@@ -21,6 +22,7 @@ import (
 // Fetcher implements auth.UserFetcher to load fresh user data on each request.
 // It fetches user and organization data from MongoDB.
 type Fetcher struct {
+	db               *mongo.Database
 	users            *mongo.Collection
 	orgs             *mongo.Collection
 	coordAssignments *mongo.Collection
@@ -31,6 +33,7 @@ type Fetcher struct {
 // NewFetcher creates a UserFetcher that queries the given database.
 func NewFetcher(db *mongo.Database, logger *zap.Logger) *Fetcher {
 	return &Fetcher{
+		db:               db,
 		users:            db.Collection("users"),
 		orgs:             db.Collection("organizations"),
 		coordAssignments: db.Collection("coordinator_assignments"),
@@ -137,6 +140,18 @@ func (f *Fetcher) FetchUser(ctx context.Context, userID string) *auth.SessionUse
 			}
 		}
 		// If query fails, coordinator will have empty org list (safe fallback)
+	}
+
+	// For members, fetch which apps are enabled for their groups.
+	// Fail closed: on error, leave EnabledApps nil (member sees no apps).
+	if su.Role == "member" {
+		apps, err := groupappstore.EnabledAppIDsForUser(ctx, f.db, oid)
+		if err != nil {
+			f.logger.Warn("failed to fetch enabled apps for member",
+				zap.Error(err), zap.String("user_id", userID))
+		} else {
+			su.EnabledApps = apps
+		}
 	}
 
 	return su

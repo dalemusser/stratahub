@@ -67,6 +67,8 @@ const (
 	EventMaterialAssigned             = "material_assigned"
 	EventMaterialAssignmentUpdated    = "material_assignment_updated"
 	EventMaterialUnassigned           = "material_unassigned"
+	EventGroupAppEnabled              = "group_app_enabled"
+	EventGroupAppDisabled             = "group_app_disabled"
 )
 
 // Event represents an audit event.

@@ -828,6 +828,46 @@ func (l *Logger) MaterialUnassigned(ctx context.Context, r *http.Request, actorI
 	})
 }
 
+// --- Group App Events ---
+
+// GroupAppEnabled logs when an app is enabled for a group.
+func (l *Logger) GroupAppEnabled(ctx context.Context, r *http.Request, actorID, groupID primitive.ObjectID, orgID *primitive.ObjectID, actorRole, groupName, appID string) {
+	l.Log(ctx, audit.Event{
+		Category:       audit.CategoryAdmin,
+		EventType:      audit.EventGroupAppEnabled,
+		ActorID:        &actorID,
+		OrganizationID: orgID,
+		IP:             ratelimit.ClientIP(r),
+		UserAgent:      r.UserAgent(),
+		Success:        true,
+		Details: map[string]string{
+			"actor_role": actorRole,
+			"group_id":   groupID.Hex(),
+			"group_name": groupName,
+			"app_id":     appID,
+		},
+	})
+}
+
+// GroupAppDisabled logs when an app is disabled for a group.
+func (l *Logger) GroupAppDisabled(ctx context.Context, r *http.Request, actorID, groupID primitive.ObjectID, orgID *primitive.ObjectID, actorRole, groupName, appID string) {
+	l.Log(ctx, audit.Event{
+		Category:       audit.CategoryAdmin,
+		EventType:      audit.EventGroupAppDisabled,
+		ActorID:        &actorID,
+		OrganizationID: orgID,
+		IP:             ratelimit.ClientIP(r),
+		UserAgent:      r.UserAgent(),
+		Success:        true,
+		Details: map[string]string{
+			"actor_role": actorRole,
+			"group_id":   groupID.Hex(),
+			"group_name": groupName,
+			"app_id":     appID,
+		},
+	})
+}
+
 // --- Helper functions ---
 
 func boolToString(b bool) string {

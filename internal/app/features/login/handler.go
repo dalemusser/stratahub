@@ -1053,10 +1053,17 @@ func (h *Handler) HandleVerifyEmailSubmit(w http.ResponseWriter, r *http.Request
 			h.renderVerifyEmailFormWithError(w, r, "Too many incorrect attempts. Please request a new verification code.", pendingLoginID, pendingEmail, returnURL)
 			return
 		}
+		if errors.Is(err, emailverify.ErrExpired) {
+			h.Log.Warn("expired verification code", zap.String("user_id", pendingUserID))
+			// Audit log: verification code failed - expired
+			h.AuditLog.VerificationCodeFailed(ctx, r, oid, nil, "expired code")
+			h.renderVerifyEmailFormWithError(w, r, "Your verification code has expired. Please request a new one.", pendingLoginID, pendingEmail, returnURL)
+			return
+		}
 		h.Log.Warn("invalid verification code", zap.Error(err), zap.String("user_id", pendingUserID))
-		// Audit log: verification code failed - invalid or expired
-		h.AuditLog.VerificationCodeFailed(ctx, r, oid, nil, "invalid or expired code")
-		h.renderVerifyEmailFormWithError(w, r, "Invalid or expired verification code. Please try again.", pendingLoginID, pendingEmail, returnURL)
+		// Audit log: verification code failed - invalid
+		h.AuditLog.VerificationCodeFailed(ctx, r, oid, nil, "invalid code")
+		h.renderVerifyEmailFormWithError(w, r, "Invalid verification code. Please try again.", pendingLoginID, pendingEmail, returnURL)
 		return
 	}
 

@@ -4,6 +4,7 @@ package mhsdelivery
 import (
 	"net/http"
 
+	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
@@ -28,12 +29,21 @@ func (h *Handler) ServePlay(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Get current user for identity bridge (Unity jslib calls /api/user)
+	var userName, userLoginID string
+	if user, ok := auth.CurrentUser(r); ok {
+		userName = user.Name
+		userLoginID = user.LoginID
+	}
+
 	data := PlayData{
 		BaseVM:      viewdata.LoadBase(r, h.DB),
 		UnitID:      unitID,
 		UnitTitle:   unitTitle,
 		UnitVersion: unitVersion,
 		CDNBaseURL:  h.CDNBaseURL,
+		UserName:    userName,
+		UserLoginID: userLoginID,
 	}
 	data.Title = unitTitle
 
