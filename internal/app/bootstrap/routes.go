@@ -25,6 +25,7 @@ import (
 	membersfeature "github.com/dalemusser/stratahub/internal/app/features/members"
 	mhsdashboardfeature "github.com/dalemusser/stratahub/internal/app/features/mhsdashboard"
 	mhsdeliveryfeature "github.com/dalemusser/stratahub/internal/app/features/mhsdelivery"
+	missionhydroscifeature "github.com/dalemusser/stratahub/internal/app/features/missionhydrosci"
 	organizationsfeature "github.com/dalemusser/stratahub/internal/app/features/organizations"
 	pagesfeature "github.com/dalemusser/stratahub/internal/app/features/pages"
 	reportsfeature "github.com/dalemusser/stratahub/internal/app/features/reports"
@@ -257,6 +258,12 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	r.Get("/manifest.json", mhsRootHandler.ServeManifest)
 	r.Handle("/mhs/content/*", mhsRootHandler.ContentFallback())
 
+	// Mission HydroSci (experimental copy of MHS delivery for admin/coordinator development)
+	missionHydroSciHandler := missionhydroscifeature.NewHandler(deps.StrataHubMongoDatabase, errLog, appCfg.MHSCDNBaseURL, logger)
+	r.Get("/missionhydrosci-sw.js", missionHydroSciHandler.ServeServiceWorker)
+	r.Get("/missionhydrosci-manifest.json", missionHydroSciHandler.ServeManifest)
+	r.Handle("/missionhydrosci/content/*", missionHydroSciHandler.ContentFallback())
+
 	// Public pages
 	homeHandler := homefeature.NewHandler(deps.StrataHubMongoDatabase, logger)
 	r.Mount("/", homefeature.Routes(homeHandler))
@@ -442,6 +449,9 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		// MHS Content Delivery (PWA for downloading and playing Unity WebGL builds)
 		mhsDeliveryHandler := mhsdeliveryfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, appCfg.MHSCDNBaseURL, logger)
 		wsr.Mount("/mhs", mhsdeliveryfeature.Routes(mhsDeliveryHandler, sessionMgr))
+
+		// Mission HydroSci (experimental copy of MHS delivery for admin/coordinator development)
+		wsr.Mount("/missionhydrosci", missionhydroscifeature.Routes(missionHydroSciHandler, sessionMgr))
 
 		// Announcements management (admin only)
 		announcementsHandler := announcementsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)

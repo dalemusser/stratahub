@@ -3,13 +3,32 @@
 (function() {
   'use strict';
 
-  var MHS_CHANNEL_NAME = 'mhs-delivery';
-  var UNIT_CACHE_PREFIX = 'mhs-unit-';
+  var DEFAULT_SW_URL = '/sw.js';
+  var DEFAULT_SW_SCOPE = '/';
+  var DEFAULT_MANIFEST_URL = '/mhs/api/manifest';
+  var DEFAULT_CONTENT_PREFIX = '/mhs/content/';
+  var DEFAULT_CHANNEL_NAME = 'mhs-delivery';
+  var DEFAULT_UNIT_CACHE_PREFIX = 'mhs-unit-';
+  var DEFAULT_FETCH_ID_PREFIX = 'mhs-';
 
   /**
    * MHSDeliveryManager manages content downloads and cache status.
+   * @param {Object} [opts] - Optional configuration overrides.
+   * @param {string} [opts.swUrl] - Service worker URL (default: '/sw.js')
+   * @param {string} [opts.manifestUrl] - Content manifest API URL (default: '/mhs/api/manifest')
+   * @param {string} [opts.contentPrefix] - Content path prefix (default: '/mhs/content/')
+   * @param {string} [opts.channelName] - BroadcastChannel name (default: 'mhs-delivery')
+   * @param {string} [opts.unitCachePrefix] - Cache name prefix (default: 'mhs-unit-')
    */
-  function MHSDeliveryManager() {
+  function MHSDeliveryManager(opts) {
+    opts = opts || {};
+    this._swUrl = opts.swUrl || DEFAULT_SW_URL;
+    this._swScope = opts.swScope || DEFAULT_SW_SCOPE;
+    this._manifestUrl = opts.manifestUrl || DEFAULT_MANIFEST_URL;
+    this._contentPrefix = opts.contentPrefix || DEFAULT_CONTENT_PREFIX;
+    this._channelName = opts.channelName || DEFAULT_CHANNEL_NAME;
+    this._unitCachePrefix = opts.unitCachePrefix || DEFAULT_UNIT_CACHE_PREFIX;
+    this._fetchIdPrefix = opts.fetchIdPrefix || DEFAULT_FETCH_ID_PREFIX;
     this.manifest = null;
     this.swRegistration = null;
     this.channel = null;
@@ -25,8 +44,8 @@
     // Register service worker
     if ('serviceWorker' in navigator) {
       try {
-        this.swRegistration = await navigator.serviceWorker.register('/sw.js', {
-          scope: '/'
+        this.swRegistration = await navigator.serviceWorker.register(this._swUrl, {
+          scope: this._swScope
         });
         console.log('MHS Service Worker registered');
       } catch (err) {
@@ -36,7 +55,7 @@
 
     // Set up BroadcastChannel for status updates from SW
     if (typeof BroadcastChannel !== 'undefined') {
-      this.channel = new BroadcastChannel(MHS_CHANNEL_NAME);
+      this.channel = new BroadcastChannel(this._channelName);
       var self = this;
       this.channel.addEventListener('message', function(event) {
         self._handleStatusUpdate(event.data);
@@ -66,7 +85,7 @@
    */
   MHSDeliveryManager.prototype.refreshManifest = async function() {
     try {
-      var response = await fetch('/mhs/api/manifest');
+      var response = await fetch(this._manifestUrl);
       this.manifest = await response.json();
     } catch (err) {
       console.error('Failed to fetch MHS content manifest:', err);
@@ -102,13 +121,13 @@
   MHSDeliveryManager.prototype._checkUnitCache = async function(unit) {
     if (!('caches' in window)) return 'not_cached';
 
-    var cacheName = UNIT_CACHE_PREFIX + unit.id + '-v' + unit.version;
+    var cacheName = this._unitCachePrefix + unit.id + '-v' + unit.version;
     try {
       var cache = await caches.open(cacheName);
       var found = 0;
 
       for (var i = 0; i < unit.files.length; i++) {
-        var key = '/mhs/content/' + unit.files[i].path;
+        var key = this._contentPrefix + unit.files[i].path;
         var match = await cache.match(key);
         if (match) found++;
       }
@@ -137,7 +156,7 @@
 
       for (var i = 0; i < ids.length; i++) {
         var fetchId = ids[i];
-        if (!fetchId.startsWith('mhs-')) continue;
+        if (!fetchId.startsWith(this._fetchIdPrefix)) continue;
 
         var bgFetch = await reg.backgroundFetch.get(fetchId);
         if (!bgFetch) continue;
@@ -183,9 +202,11 @@
    * "mhs-unit1-v1.0.0" -> "unit1", "mhs-unit1" -> "unit1"
    */
   MHSDeliveryManager.prototype._parseUnitIdFromFetchId = function(fetchId) {
-    var match = fetchId.match(/^mhs-(.+)-v\d+\.\d+\.\d+$/);
+    var prefix = this._fetchIdPrefix;
+    var re = new RegExp('^' + prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(.+)-v\\d+\\.\\d+\\.\\d+$');
+    var match = fetchId.match(re);
     if (match) return match[1];
-    if (fetchId.startsWith('mhs-')) return fetchId.replace('mhs-', '');
+    if (fetchId.startsWith(prefix)) return fetchId.substring(prefix.length);
     return null;
   };
 
@@ -222,7 +243,7 @@
 
       // Fetch ID encodes unit ID and version so the SW success handler
       // can cache responses without needing to fetch the manifest.
-      var fetchId = 'mhs-' + unit.id + '-v' + unit.version;
+      var fetchId = this._fetchIdPrefix + unit.id + '-v' + unit.version;
       var self = this;
 
       // Abort any existing Background Fetch with the same ID
@@ -281,7 +302,7 @@
     try {
       var reg = await navigator.serviceWorker.ready;
       if (reg.backgroundFetch) {
-        var fetchId = 'mhs-' + unit.id + '-v' + unit.version;
+        var fetchId = this._fetchIdPrefix + unit.id + '-v' + unit.version;
         var existing = await reg.backgroundFetch.get(fetchId);
         if (existing) {
           await existing.abort();
@@ -291,7 +312,7 @@
       // Ignore — just best-effort cleanup
     }
 
-    var cacheName = UNIT_CACHE_PREFIX + unit.id + '-v' + unit.version;
+    var cacheName = this._unitCachePrefix + unit.id + '-v' + unit.version;
     await caches.delete(cacheName);
     this._fireStatus(unitId, 'not_cached', {});
   };

@@ -6,7 +6,7 @@
     <title>{{ if .SiteName }}{{ .SiteName }}{{ else }}StrataHub{{ end }}</title>
     <link rel="stylesheet" href="/assets/css/tailwind.css?v={{ tailwindVersion }}">
     <link rel="stylesheet" href="/assets/css/tiptap.css?v={{ tiptapVersion }}">
-    <link rel="manifest" href="/manifest.json">
+    {{ block "manifest" . }}<link rel="manifest" href="/manifest.json">{{ end }}
     <script src="/assets/js/htmx.min.js?v={{ htmxVersion }}"></script>
     {{ if .CSRFToken }}<meta name="csrf-token" content="{{ .CSRFToken }}">{{ end }}
     <script>
@@ -222,6 +222,33 @@
             requestCount = 0;
             loader.classList.remove('active');
           }
+        });
+      })();
+    </script>
+    <script>
+      // iOS PWA navigation fix: iOS opens same-origin links in an in-app Safari
+      // browser when they fall outside the PWA's manifest scope. Programmatic
+      // navigation via window.location.href stays within the PWA. This intercepts
+      // regular link clicks in standalone mode and navigates programmatically.
+      (function() {
+        var isStandalone = window.navigator.standalone ||
+          window.matchMedia('(display-mode: standalone)').matches;
+        if (!isStandalone) return;
+
+        document.addEventListener('click', function(e) {
+          var link = e.target.closest('a[href]');
+          if (!link) return;
+          var href = link.getAttribute('href');
+          if (!href || href.charAt(0) === '#' || href.indexOf('javascript:') === 0 ||
+              href.indexOf('mailto:') === 0 || href.indexOf('tel:') === 0) return;
+          if (link.getAttribute('target') === '_blank' || link.hasAttribute('download')) return;
+          // Only intercept same-origin links
+          try {
+            var url = new URL(href, window.location.origin);
+            if (url.origin !== window.location.origin) return;
+          } catch (ex) { return; }
+          e.preventDefault();
+          window.location.href = href;
         });
       })();
     </script>
