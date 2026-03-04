@@ -1,0 +1,120 @@
+{
+  "cdnBaseUrl": "",
+  "units": [
+    {
+      "id": "unit1",
+      "title": "Unit 1: Water Cycle",
+      "version": "1.0.0",
+      "files": [
+        { "path": "unit1/v1.0.0/Build/unit1.loader.js", "size": 47338 },
+        { "path": "unit1/v1.0.0/Build/unit1.framework.js.unityweb", "size": 95999 },
+        { "path": "unit1/v1.0.0/Build/unit1.data.unityweb", "size": 90702588 },
+        { "path": "unit1/v1.0.0/Build/unit1.wasm.unityweb", "size": 12883102 },
+        { "path": "unit1/v1.0.0/StreamingAssets/UnityServicesProjectConfiguration.json", "size": 1075 },
+        { "path": "unit1/v1.0.0/StreamingAssets/aa/catalog.bin", "size": 10365 },
+        { "path": "unit1/v1.0.0/StreamingAssets/aa/catalog.hash", "size": 32 },
+        { "path": "unit1/v1.0.0/StreamingAssets/aa/settings.json", "size": 3696 },
+        { "path": "unit1/v1.0.0/StreamingAssets/aa/WebGL/d6f764f6c7517dce0bac8c1e4f3831d8_monoscripts_314487d01e3859e453439f5fed4827fd.bundle", "size": 26037 },
+        { "path": "unit1/v1.0.0/StreamingAssets/aa/WebGL/d6f764f6c7517dce0bac8c1e4f3831d8_unitybuiltinassets_37a606a8c17b700cd18d4235565ff884.bundle", "size": 296025 },
+        { "path": "unit1/v1.0.0/StreamingAssets/aa/WebGL/localization-assets-shared_assets_all.bundle", "size": 1294 },
+        { "path": "unit1/v1.0.0/StreamingAssets/aa/WebGL/localization-locales_assets_all.bundle", "size": 1323 },
+        { "path": "unit1/v1.0.0/StreamingAssets/aa/WebGL/localization-string-tables-english(en)_assets_all.bundle", "size": 1364 },
+        { "path": "unit1/v1.0.0/StreamingAssets/aa/WebGL/localization-string-tables-spanish(es)_assets_all_8c30b7ec75faa266b485f4df63d1af19.bundle", "size": 1350 },
+        { "path": "unit1/v1.0.0/StreamingAssets/aa/AddressablesLink/link.xml", "size": 74150 }
+      ],
+      "totalSize": 104145738
+    },
+    {
+      "id": "unit2",
+      "title": "Unit 2: Water Quality",
+      "version": "1.0.0",
+      "files": [
+        { "path": "unit2/v1.0.0/Build/unit2.loader.js", "size": 47338 },
+        { "path": "unit2/v1.0.0/Build/unit2.framework.js.unityweb", "size": 95999 },
+        { "path": "unit2/v1.0.0/Build/unit2.data.unityweb", "size": 198897620 },
+        { "path": "unit2/v1.0.0/Build/unit2.wasm.unityweb", "size": 12883102 },
+        { "path": "unit2/v1.0.0/StreamingAssets/UnityServicesProjectConfiguration.json", "size": 1075 },
+        { "path": "unit2/v1.0.0/StreamingAssets/aa/catalog.bin", "size": 10365 },
+        { "path": "unit2/v1.0.0/StreamingAssets/aa/catalog.hash", "size": 32 },
+        { "path": "unit2/v1.0.0/StreamingAssets/aa/settings.json", "size": 3696 },
+        { "path": "unit2/v1.0.0/StreamingAssets/aa/WebGL/d6f764f6c7517dce0bac8c1e4f3831d8_monoscripts_314487d01e3859e453439f5fed4827fd.bundle", "size": 26037 },
+        { "path": "unit2/v1.0.0/StreamingAssets/aa/WebGL/d6f764f6c7517dce0bac8c1e4f3831d8_unitybuiltinassets_37a606a8c17b700cd18d4235565ff884.bundle", "size": 296025 },
+        { "path": "unit2/v1.0.0/StreamingAssets/aa/WebGL/localization-assets-shared_assets_all.bundle", "size": 1294 },
+        { "path": "unit2/v1.0.0/StreamingAssets/aa/WebGL/localization-locales_assets_all.bundle", "size": 1323 },
+        { "path": "unit2/v1.0.0/StreamingAssets/aa/WebGL/localization-string-tables-english(en)_assets_all.bundle", "size": 1364 },
+        { "path": "unit2/v1.0.0/StreamingAssets/aa/WebGL/localization-string-tables-spanish(es)_assets_all_8c30b7ec75faa266b485f4df63d1af19.bundle", "size": 1350 },
+        { "path": "unit2/v1.0.0/StreamingAssets/aa/AddressablesLink/link.xml", "size": 74150 }
+      ],
+      "totalSize": 212340770
+    },
+    {
+      "id": "unit3",
+      "title": "Unit 3: Watersheds",
+      "version": "1.0.0",
+      "files": [
+        { "path": "unit3/v1.0.0/Build/unit3.loader.js", "size": 47338 },
+        { "path": "unit3/v1.0.0/Build/unit3.framework.js.unityweb", "size": 95999 },
+        { "path": "unit3/v1.0.0/Build/unit3.data.unityweb", "size": 132094650 },
+        { "path": "unit3/v1.0.0/Build/unit3.wasm.unityweb", "size": 12883102 },
+        { "path": "unit3/v1.0.0/StreamingAssets/UnityServicesProjectConfiguration.json", "size": 1075 },
+        { "path": "unit3/v1.0.0/StreamingAssets/aa/catalog.bin", "size": 10365 },
+        { "path": "unit3/v1.0.0/StreamingAssets/aa/catalog.hash", "size": 32 },
+        { "path": "unit3/v1.0.0/StreamingAssets/aa/settings.json", "size": 3696 },
+        { "path": "unit3/v1.0.0/StreamingAssets/aa/WebGL/d6f764f6c7517dce0bac8c1e4f3831d8_monoscripts_314487d01e3859e453439f5fed4827fd.bundle", "size": 26037 },
+        { "path": "unit3/v1.0.0/StreamingAssets/aa/WebGL/d6f764f6c7517dce0bac8c1e4f3831d8_unitybuiltinassets_37a606a8c17b700cd18d4235565ff884.bundle", "size": 296025 },
+        { "path": "unit3/v1.0.0/StreamingAssets/aa/WebGL/localization-assets-shared_assets_all.bundle", "size": 1294 },
+        { "path": "unit3/v1.0.0/StreamingAssets/aa/WebGL/localization-locales_assets_all.bundle", "size": 1323 },
+        { "path": "unit3/v1.0.0/StreamingAssets/aa/WebGL/localization-string-tables-english(en)_assets_all.bundle", "size": 1364 },
+        { "path": "unit3/v1.0.0/StreamingAssets/aa/WebGL/localization-string-tables-spanish(es)_assets_all_8c30b7ec75faa266b485f4df63d1af19.bundle", "size": 1350 },
+        { "path": "unit3/v1.0.0/StreamingAssets/aa/AddressablesLink/link.xml", "size": 74150 }
+      ],
+      "totalSize": 145536800
+    },
+    {
+      "id": "unit4",
+      "title": "Unit 4: Flooding",
+      "version": "1.0.0",
+      "files": [
+        { "path": "unit4/v1.0.0/Build/unit4.loader.js", "size": 47338 },
+        { "path": "unit4/v1.0.0/Build/unit4.framework.js.unityweb", "size": 95999 },
+        { "path": "unit4/v1.0.0/Build/unit4.data.unityweb", "size": 112201907 },
+        { "path": "unit4/v1.0.0/Build/unit4.wasm.unityweb", "size": 12821182 },
+        { "path": "unit4/v1.0.0/StreamingAssets/UnityServicesProjectConfiguration.json", "size": 1075 },
+        { "path": "unit4/v1.0.0/StreamingAssets/aa/catalog.bin", "size": 10365 },
+        { "path": "unit4/v1.0.0/StreamingAssets/aa/catalog.hash", "size": 32 },
+        { "path": "unit4/v1.0.0/StreamingAssets/aa/settings.json", "size": 3696 },
+        { "path": "unit4/v1.0.0/StreamingAssets/aa/WebGL/d6f764f6c7517dce0bac8c1e4f3831d8_monoscripts_314487d01e3859e453439f5fed4827fd.bundle", "size": 26037 },
+        { "path": "unit4/v1.0.0/StreamingAssets/aa/WebGL/d6f764f6c7517dce0bac8c1e4f3831d8_unitybuiltinassets_37a606a8c17b700cd18d4235565ff884.bundle", "size": 296025 },
+        { "path": "unit4/v1.0.0/StreamingAssets/aa/WebGL/localization-assets-shared_assets_all.bundle", "size": 1294 },
+        { "path": "unit4/v1.0.0/StreamingAssets/aa/WebGL/localization-locales_assets_all.bundle", "size": 1323 },
+        { "path": "unit4/v1.0.0/StreamingAssets/aa/WebGL/localization-string-tables-english(en)_assets_all.bundle", "size": 1364 },
+        { "path": "unit4/v1.0.0/StreamingAssets/aa/WebGL/localization-string-tables-spanish(es)_assets_all_8c30b7ec75faa266b485f4df63d1af19.bundle", "size": 1350 },
+        { "path": "unit4/v1.0.0/StreamingAssets/aa/AddressablesLink/link.xml", "size": 74150 }
+      ],
+      "totalSize": 125582137
+    },
+    {
+      "id": "unit5",
+      "title": "Unit 5: Water Resources",
+      "version": "1.0.0",
+      "files": [
+        { "path": "unit5/v1.0.0/Build/unit5.loader.js", "size": 47338 },
+        { "path": "unit5/v1.0.0/Build/unit5.framework.js.unityweb", "size": 95999 },
+        { "path": "unit5/v1.0.0/Build/unit5.data.unityweb", "size": 106457695 },
+        { "path": "unit5/v1.0.0/Build/unit5.wasm.unityweb", "size": 12881007 },
+        { "path": "unit5/v1.0.0/StreamingAssets/UnityServicesProjectConfiguration.json", "size": 1075 },
+        { "path": "unit5/v1.0.0/StreamingAssets/aa/catalog.bin", "size": 10365 },
+        { "path": "unit5/v1.0.0/StreamingAssets/aa/catalog.hash", "size": 32 },
+        { "path": "unit5/v1.0.0/StreamingAssets/aa/settings.json", "size": 3696 },
+        { "path": "unit5/v1.0.0/StreamingAssets/aa/WebGL/d6f764f6c7517dce0bac8c1e4f3831d8_monoscripts_314487d01e3859e453439f5fed4827fd.bundle", "size": 26037 },
+        { "path": "unit5/v1.0.0/StreamingAssets/aa/WebGL/d6f764f6c7517dce0bac8c1e4f3831d8_unitybuiltinassets_37a606a8c17b700cd18d4235565ff884.bundle", "size": 296025 },
+        { "path": "unit5/v1.0.0/StreamingAssets/aa/WebGL/localization-assets-shared_assets_all.bundle", "size": 1294 },
+        { "path": "unit5/v1.0.0/StreamingAssets/aa/WebGL/localization-locales_assets_all.bundle", "size": 1323 },
+        { "path": "unit5/v1.0.0/StreamingAssets/aa/WebGL/localization-string-tables-english(en)_assets_all.bundle", "size": 1364 },
+        { "path": "unit5/v1.0.0/StreamingAssets/aa/WebGL/localization-string-tables-spanish(es)_assets_all_8c30b7ec75faa266b485f4df63d1af19.bundle", "size": 1350 },
+        { "path": "unit5/v1.0.0/StreamingAssets/aa/AddressablesLink/link.xml", "size": 74150 }
+      ],
+      "totalSize": 119897350
+    }
+  ]
+}

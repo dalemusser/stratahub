@@ -1,4 +1,4 @@
-{{ define "mhs_play" }}
+{{ define "missionhydrosci_play" }}
 <!DOCTYPE html>
 <html lang="en" class="h-full">
   <head>
@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{{ .UnitTitle }} - Mission HydroSci</title>
     <link rel="stylesheet" href="/assets/css/tailwind.css?v={{ tailwindVersion }}">
-    <link rel="manifest" href="/manifest.json">
+    <link rel="manifest" href="/missionhydrosci-manifest.json?v={{ missionhydrosciManifestVersion }}">
     <style>
       html, body {
         background: #000;
@@ -53,10 +53,9 @@
         border-radius: 4px;
         transition: width 0.3s;
       }
-      #fullscreen-btn {
+      #back-btn, #fullscreen-btn {
         position: fixed;
         top: 8px;
-        right: 8px;
         z-index: 20;
         background: rgba(0,0,0,0.4);
         color: white;
@@ -71,14 +70,75 @@
         opacity: 0.5;
         transition: opacity 0.2s;
         padding: 0;
+        text-decoration: none;
       }
-      #fullscreen-btn:hover { opacity: 1; }
+      #back-btn { left: 8px; }
+      #fullscreen-btn { right: 8px; }
+      #back-btn:hover, #fullscreen-btn:hover { opacity: 1; }
+
+      /* Fullscreen sizing via CSS viewport units — bypasses iPad Safari's
+         unreliable JS dimension reporting during fullscreen transitions.
+         The 1.75 ratio = 1400/800 (Unity canvas aspect ratio).
+         We fullscreen #unity-container (not <html>) so that keyboard
+         events route directly to the container's subtree and reach the
+         Unity canvas — fullscreening <html> causes browsers to intercept
+         letter keys (W/A/S/D) at the document level.
+         The canvas stays position:absolute (which Unity expects for input
+         handling) and is centered using the absolute-centering technique
+         (all edges 0 + margin auto) instead of flexbox, which avoids
+         changing the canvas layout context that Unity relies on. */
+      #unity-container:fullscreen,
+      #unity-container:-webkit-full-screen {
+        position: fixed !important;
+        top: 0 !important;
+        left: 0 !important;
+        width: 100vw !important;
+        height: 100vh !important;
+        background: #000 !important;
+      }
+      #unity-container:fullscreen #unity-canvas,
+      #unity-container:-webkit-full-screen #unity-canvas {
+        width: min(100vw, calc(100vh * 1.75)) !important;
+        height: min(100vh, calc(100vw / 1.75)) !important;
+        top: 0 !important;
+        right: 0 !important;
+        bottom: 0 !important;
+        left: 0 !important;
+        margin: auto !important;
+      }
     </style>
   </head>
   <body>
-    <button id="fullscreen-btn" onclick="toggleFullscreen()" title="Fullscreen">⛶</button>
+    <!-- Audio cleanup: track all AudioContext instances so we can close them
+         when leaving the page. Must run before Unity loads (Unity creates
+         AudioContexts via the Web Audio API for game audio). Without this,
+         iOS PWA preserves the page in bfcache on navigation, and the
+         AudioContexts keep playing in the background indefinitely. -->
+    <script>
+    (function() {
+      var OrigAC = window.AudioContext || window.webkitAudioContext;
+      if (!OrigAC) return;
+
+      var tracked = [];
+      window.__mhsAudioContexts = tracked;
+
+      function TrackedAudioContext(options) {
+        var ctx = options ? new OrigAC(options) : new OrigAC();
+        tracked.push(ctx);
+        return ctx;
+      }
+      TrackedAudioContext.prototype = OrigAC.prototype;
+
+      window.AudioContext = TrackedAudioContext;
+      if (window.webkitAudioContext) {
+        window.webkitAudioContext = TrackedAudioContext;
+      }
+    })();
+    </script>
 
     <div id="unity-container">
+      <a id="back-btn" href="/missionhydrosci/units" title="Back to Units">&#x2190;</a>
+      <button id="fullscreen-btn" onclick="toggleFullscreen()" title="Fullscreen">⛶</button>
       <div id="loading-overlay">
         <h2>Loading {{ .UnitTitle }}...</h2>
         <div class="loading-bar-bg">
@@ -87,6 +147,22 @@
         <p id="loading-text" style="margin-top:8px; font-size:14px; opacity:0.7;">Initializing...</p>
       </div>
       <canvas id="unity-canvas" width="1400" height="800" tabindex="-1"></canvas>
+
+      <!-- Unit complete overlay (hidden by default, inside container so it's visible in fullscreen) -->
+      <div id="unit-complete-overlay" class="hidden" style="
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.85); z-index: 100;
+        display: flex; flex-direction: column; align-items: center; justify-content: center;
+        font-family: sans-serif; color: white; text-align: center;
+      ">
+        <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Unit Complete</h2>
+        <p style="font-size: 1rem; opacity: 0.8; margin-bottom: 1.5rem;">Return to MHS Units to continue to the next unit.</p>
+        <a href="/missionhydrosci/units" style="
+          display: inline-block; padding: 10px 24px;
+          background: #2563eb; color: white; text-decoration: none;
+          border-radius: 6px; font-size: 0.95rem;
+        ">Back to MHS Units</a>
+      </div>
     </div>
 
     <!-- Identity bridge: intercept Unity jslib calls to /api/user -->
@@ -214,21 +290,6 @@
     })();
     </script>
 
-    <!-- Unit complete overlay (hidden by default) -->
-    <div id="unit-complete-overlay" class="hidden" style="
-      position: fixed; top: 0; left: 0; right: 0; bottom: 0;
-      background: rgba(0,0,0,0.85); z-index: 100;
-      display: flex; flex-direction: column; align-items: center; justify-content: center;
-      font-family: sans-serif; color: white; text-align: center;
-    ">
-      <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Unit Complete</h2>
-      <p style="font-size: 1rem; opacity: 0.8; margin-bottom: 1.5rem;">Return to MHS Units to continue to the next unit.</p>
-      <a href="/mhs/units" style="
-        display: inline-block; padding: 10px 24px;
-        background: #2563eb; color: white; text-decoration: none;
-        border-radius: 6px; font-size: 0.95rem;
-      ">Back to MHS Units</a>
-    </div>
     <style>
       #unit-complete-overlay.hidden { display: none !important; }
     </style>
@@ -237,9 +298,9 @@
     (function() {
       var unitId = '{{ .UnitID }}';
       var unitVersion = '{{ .UnitVersion }}';
-      // Files are served from /mhs/content/{unit}/v{version}/
+      // Files are served from /missionhydrosci/content/{unit}/v{version}/
       // The service worker intercepts these and serves from cache or falls through to CDN redirect.
-      var contentUrl = '/mhs/content/' + unitId + '/v' + unitVersion;
+      var contentUrl = '/missionhydrosci/content/' + unitId + '/v' + unitVersion;
       var buildUrl = contentUrl + '/Build';
       var loaderUrl = buildUrl + '/' + unitId + '.loader.js';
 
@@ -248,9 +309,20 @@
       var loadingText = document.getElementById('loading-text');
       var loadingOverlay = document.getElementById('loading-overlay');
 
-      // Aspect-ratio-preserving resize (matches dev build: 1400x800, 7:5 ratio)
+      // Aspect-ratio-preserving resize (matches dev build: 1400x800, 7:4 ratio).
+      // In fullscreen mode, CSS handles sizing via viewport units (see <style> above)
+      // to avoid iPad Safari's unreliable JS dimension reporting. This JS path
+      // only runs for normal (non-fullscreen) mode.
       var scaleToFit = true;
+
+      function isFullscreenActive() {
+        return !!(document.fullscreenElement || document.webkitFullscreenElement);
+      }
+
       function onResize() {
+        // In fullscreen, CSS viewport units handle sizing reliably
+        if (isFullscreenActive()) return;
+
         var container = canvas.parentElement;
         var w, h;
 
@@ -259,7 +331,7 @@
           h = window.innerHeight;
           var r = 800 / 1400;
 
-          if (w * r > window.innerHeight) {
+          if (w * r > h) {
             w = Math.min(w, Math.ceil(h / r));
           }
           h = Math.floor(w * r);
@@ -272,7 +344,6 @@
         container.style.height = canvas.style.height = h + 'px';
         container.style.top = Math.floor((window.innerHeight - h) / 2) + 'px';
         container.style.left = Math.floor((window.innerWidth - w) / 2) + 'px';
-        window.focus();
       }
 
       window.addEventListener('resize', onResize);
@@ -311,6 +382,7 @@
             loadingText.textContent = 'Almost ready...';
           }
         }).then(function(instance) {
+          window.__unityInstance = instance;
           canvas = instance.Module.canvas;
           loadingOverlay.classList.add('hidden');
           onResize();
@@ -329,42 +401,176 @@
       document.body.appendChild(script);
     })();
 
+    // Focus the Unity canvas so it receives keyboard input.
+    // Uses a delay to run after the CSS layout reflow that occurs
+    // during fullscreen transitions (position: absolute → static).
+    function focusCanvas() {
+      var cvs = document.getElementById('unity-canvas');
+      if (cvs) cvs.focus();
+    }
+
     function toggleFullscreen() {
       var btn = document.getElementById('fullscreen-btn');
-      var canvas = document.getElementById('unity-canvas');
-      if (!document.fullscreenElement) {
-        document.documentElement.requestFullscreen().then(function() {
+      var fs = document.fullscreenElement || document.webkitFullscreenElement;
+      if (!fs) {
+        // Fullscreen the container (not <html>) so keyboard events
+        // route to the container subtree and reach the Unity canvas.
+        var el = document.getElementById('unity-container');
+        var p = el.requestFullscreen ? el.requestFullscreen() :
+                el.webkitRequestFullscreen ? el.webkitRequestFullscreen() :
+                Promise.reject();
+        p.then(function() {
           btn.textContent = '\u2716';
           btn.title = 'Exit fullscreen';
           btn.blur();
-          canvas.focus();
-        });
+          // Keyboard Lock API: ensure all key events (including letter keys)
+          // are delivered to the page and not intercepted by the browser.
+          // Required for Unity WebGL games in fullscreen where WASD input
+          // would otherwise be consumed by browser/OS input handling.
+          if (navigator.keyboard && navigator.keyboard.lock) {
+            navigator.keyboard.lock().catch(function() {});
+          }
+          setTimeout(focusCanvas, 100);
+        }).catch(function() {});
       } else {
-        document.exitFullscreen().then(function() {
+        var p = document.exitFullscreen ? document.exitFullscreen() :
+                document.webkitExitFullscreen ? document.webkitExitFullscreen() :
+                Promise.reject();
+        p.then(function() {
           btn.textContent = '\u26F6';
           btn.title = 'Fullscreen';
-          canvas.focus();
-        });
+          if (navigator.keyboard && navigator.keyboard.unlock) {
+            navigator.keyboard.unlock();
+          }
+          // Restore JS-based sizing after exiting fullscreen
+          onResize();
+          setTimeout(focusCanvas, 100);
+        }).catch(function() {});
       }
     }
 
-    document.addEventListener('fullscreenchange', function() {
+    function onFullscreenChange() {
       var btn = document.getElementById('fullscreen-btn');
-      if (document.fullscreenElement) {
+      var fs = document.fullscreenElement || document.webkitFullscreenElement;
+      if (fs) {
         btn.textContent = '\u2716';
         btn.title = 'Exit fullscreen';
       } else {
         btn.textContent = '\u26F6';
         btn.title = 'Fullscreen';
+        onResize();
       }
-      // iPad Safari updates window.innerWidth/innerHeight asynchronously
-      // after fullscreen transitions, so the resize event that fires
-      // immediately uses stale dimensions. Delayed calls let the
-      // viewport settle before we recalculate canvas sizing.
-      onResize();
-      setTimeout(onResize, 100);
-      setTimeout(onResize, 300);
+      // Refocus canvas after layout settles
+      setTimeout(focusCanvas, 150);
+    }
+
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+
+    // Register the service worker from the play page so it gets updated
+    // even when the PWA opens directly to a play URL.
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register('/missionhydrosci-sw.js', {
+        scope: '/missionhydrosci/'
+      }).catch(function() {});
+    }
+
+    // Audio lifecycle management for Unity WebGL on iOS.
+    //
+    // iOS doesn't automatically suspend/resume AudioContexts when the app
+    // is backgrounded (app switcher, switching apps). This causes two problems:
+    // 1. Audio keeps playing when the game isn't visible
+    // 2. When returning, iOS has suspended the AudioContext at the OS level
+    //    but Unity doesn't know — the game renders but audio is dead
+    //
+    // On page leave (back button, bfcache), we fully shut down Unity and
+    // close all AudioContexts to prevent zombie audio.
+
+    // Suspend all AudioContexts (pauses audio, resumable)
+    function suspendAllAudio() {
+      var contexts = window.__mhsAudioContexts || [];
+      for (var i = 0; i < contexts.length; i++) {
+        try { if (contexts[i].state === 'running') contexts[i].suspend(); } catch (e) {}
+      }
+      var media = document.querySelectorAll('audio, video');
+      for (var j = 0; j < media.length; j++) {
+        try { media[j].pause(); } catch (e) {}
+      }
+    }
+
+    // Resume all AudioContexts (restores audio after suspend)
+    function resumeAllAudio() {
+      var contexts = window.__mhsAudioContexts || [];
+      for (var i = 0; i < contexts.length; i++) {
+        try { if (contexts[i].state === 'suspended') contexts[i].resume(); } catch (e) {}
+      }
+    }
+
+    // Full shutdown: quit Unity and permanently close all AudioContexts
+    function cleanupUnity() {
+      if (window.__unityInstance) {
+        try { window.__unityInstance.Quit(); } catch (e) {}
+        window.__unityInstance = null;
+      }
+      var contexts = window.__mhsAudioContexts || [];
+      for (var i = 0; i < contexts.length; i++) {
+        try { contexts[i].close(); } catch (e) {}
+      }
+      var media = document.querySelectorAll('audio, video');
+      for (var j = 0; j < media.length; j++) {
+        try { media[j].pause(); media[j].src = ''; } catch (e) {}
+      }
+    }
+
+    // Suspend/resume audio when the page visibility changes (app switcher,
+    // switching to another app, locking the screen)
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'hidden') {
+        suspendAllAudio();
+      } else {
+        resumeAllAudio();
+      }
     });
+
+    // Full cleanup when the page is being navigated away or bfcached
+    window.addEventListener('pagehide', cleanupUnity);
+
+    // Clean up when the back button is clicked (before navigation starts)
+    var backBtn = document.getElementById('back-btn');
+    if (backBtn) {
+      backBtn.addEventListener('click', function(e) {
+        e.preventDefault();
+        cleanupUnity();
+        window.location.href = backBtn.href;
+      });
+    }
+
+    // Also clean up links in the unit-complete overlay
+    var overlayLink = document.querySelector('#unit-complete-overlay a');
+    if (overlayLink) {
+      overlayLink.addEventListener('click', function(e) {
+        e.preventDefault();
+        cleanupUnity();
+        window.location.href = overlayLink.href;
+      });
+    }
+
+    // Hide the fullscreen button when it's unnecessary or harmful:
+    // 1. Standalone (PWA) mode — no browser chrome to hide, fullscreen is redundant.
+    // 2. iPad Safari — fullscreen suppresses all letter key DOM events (WASD etc.),
+    //    a browser limitation with no JS workaround.
+    // Detection: standalone mode via display-mode media query or navigator.standalone;
+    // iPad via touch capability + Mac/iPad user agent (iPadOS reports as Macintosh).
+    (function() {
+      var isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
+        navigator.standalone === true;
+      var isIPad = navigator.maxTouchPoints > 0 &&
+        (/iPad/.test(navigator.userAgent) || /Macintosh/.test(navigator.userAgent));
+      if (isStandalone || isIPad) {
+        var btn = document.getElementById('fullscreen-btn');
+        if (btn) btn.style.display = 'none';
+      }
+    })();
     </script>
   </body>
 </html>
