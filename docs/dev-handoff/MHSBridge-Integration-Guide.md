@@ -34,7 +34,7 @@ This file contains four JavaScript functions that the C# script calls via `[DllI
 | Function | Purpose |
 |----------|---------|
 | `MHSBridge_NotifyUnitComplete` | Tells the host page a unit is done |
-| `MHSBridge_GetPlayerID` | Reads the `?id=` parameter from the URL |
+| `MHSBridge_GetPlayerID` | Reads the `?id=` parameter from the URL. Returns unmanaged UTF-8 pointer; freed via `MHSBridge_Free` (handled internally by `MHSBridge.GetPlayerID()`) |
 | `MHSBridge_Free` | Frees memory allocated by `GetPlayerID` |
 | `MHSBridge_NavigateToUnit` | Navigates to a relative URL, preserving `?id=` params |
 
