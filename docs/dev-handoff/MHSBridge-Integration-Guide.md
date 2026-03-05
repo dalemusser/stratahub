@@ -4,11 +4,22 @@
 
 MHSBridge is a small integration layer (one jslib file + one C# script) that connects the Mission HydroSci Unity WebGL game to its hosting environment. It provides three capabilities:
 
-1. **Player identity** — the game gets the player's login ID from the URL instead of calling `/api/user`
+1. **Player identity** — the game gets the player's login ID from the URL (`?id=johndoe`) instead of calling `/api/user`
 2. **Unit completion signaling** — the game tells the host page when a unit is complete
 3. **Two operating modes** — the same build works in the StrataHub PWA (managed transitions) and as a standalone URL (self-managed navigation)
 
 No changes to the Unity build pipeline are required. The jslib file is a standard Unity WebGL plugin.
+
+### Why Identity Is in the URL
+
+Putting the player's login ID in the URL (`?id=johndoe`) means identity works everywhere without depending on any particular hosting environment:
+
+- **Standalone/URL mode** — the game reads `?id=` from the URL. No server-side session, no cookies, no `/api/user` call needed.
+- **PWA mode** — StrataHub constructs the URL with `?id=` from the authenticated session. Same mechanism, same code path in the game.
+- **StrataHub resource link** — when the game is listed as a resource in StrataHub, the `?id=` parameter is automatically appended to the URL when a student launches it. No manual configuration needed.
+- **Testing** — anyone can test with identity by appending `?id=tester123` to the URL. No StrataHub account, no login, no server required. Open `unit1/index.html?id=tester123` on localhost or any web server and the game has a player ID.
+
+One identity mechanism, one code path, works in every context.
 
 ---
 
