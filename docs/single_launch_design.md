@@ -382,14 +382,13 @@ mergeInto(LibraryManager.library, {
     }
   },
 
-  // Called by C# to check if the game is running inside a PWA.
-  // Returns 1 (true) if OnPWAReady was called, 0 (false) otherwise.
-  MHSBridge_IsPWA: function() {
-    return window.__mhsIsPWA ? 1 : 0;
-  },
-
   // Called by C# to get the player's login ID from the URL parameters.
   // Returns a pointer to a C string. Returns empty string if not found.
+  //
+  // Memory: _malloc'd buffer is freed by Unity's IL2CPP string marshaller.
+  // When the C# return type is string, IL2CPP copies the UTF8 data and
+  // calls _free on the returned pointer. This is Unity's documented pattern
+  // for returning strings from jslib plugins.
   MHSBridge_GetPlayerID: function() {
     var params = new URLSearchParams(window.location.search);
     var id = params.get('id') || '';
@@ -399,13 +398,18 @@ mergeInto(LibraryManager.library, {
     return buffer;
   },
 
-  // Called by C# to navigate to the next unit (Mode 2 only).
-  // nextUnitPtr: pointer to a C string containing the relative URL (e.g., "../unit2/index.html")
+  // Called by C# to navigate to a unit using a relative URL.
+  // Resolves the relative URL against the current page and carries all
+  // URL parameters (?id=, ?group=, etc.) forward to the destination.
   MHSBridge_NavigateToUnit: function(nextUnitPtr) {
     var nextUnit = UTF8ToString(nextUnitPtr);
-    // Carry URL parameters (identity) through to the next unit
-    var search = window.location.search;
-    window.location.href = nextUnit + search;
+    // Resolve relative URL against current page, then merge current params
+    var url = new URL(nextUnit, window.location.href);
+    var currentParams = new URLSearchParams(window.location.search);
+    currentParams.forEach(function(value, key) {
+      url.searchParams.set(key, value);
+    });
+    window.location.href = url.href;
   }
 
 });
@@ -421,7 +425,7 @@ using UnityEngine;
 
 /// <summary>
 /// Bridge between the Unity game and the StrataHub PWA host page.
-/// Attach this script to a GameObject named "MHSBridge" in the scene.
+/// Attach this script to a GameObject named "MHSBridge" in the first scene that loads.
 /// </summary>
 public class MHSBridge : MonoBehaviour
 {
@@ -429,9 +433,6 @@ public class MHSBridge : MonoBehaviour
 
     [DllImport("__Internal")]
     private static extern void MHSBridge_NotifyUnitComplete(string unitId);
-
-    [DllImport("__Internal")]
-    private static extern int MHSBridge_IsPWA();
 
     [DllImport("__Internal")]
     private static extern string MHSBridge_GetPlayerID();
@@ -478,7 +479,10 @@ public class MHSBridge : MonoBehaviour
     /// In URL mode: navigates to the next unit using a relative URL.
     /// </summary>
     /// <param name="currentUnitId">The unit that was just completed, e.g., "unit3"</param>
-    /// <param name="nextUnitRelativeUrl">Relative URL to the next unit, e.g., "../unit4/index.html". Ignored in PWA mode.</param>
+    /// <param name="nextUnitRelativeUrl">
+    /// Relative URL to the next unit, e.g., "../unit4/index.html".
+    /// Ignored in PWA mode. Pass null or empty for the final unit in URL mode.
+    /// </param>
     public void CompleteUnit(string currentUnitId, string nextUnitRelativeUrl)
     {
 #if UNITY_WEBGL && !UNITY_EDITOR
@@ -510,6 +514,24 @@ public class MHSBridge : MonoBehaviour
         return "editor-test-user";
 #endif
     }
+
+    /// <summary>
+    /// Navigates to a unit by name (e.g., "unit1", "unit3").
+    /// Used by the loader to send the student to their current unit.
+    /// URL parameters (?id=...) are preserved automatically.
+    /// No-ops in PWA mode — StrataHub handles navigation directly.
+    /// </summary>
+    public void NavigateToUnit(string unitName)
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        if (_isPWA)
+        {
+            Debug.LogWarning("MHSBridge: NavigateToUnit ignored in PWA mode");
+            return;
+        }
+        MHSBridge_NavigateToUnit("../" + unitName + "/index.html");
+#endif
+    }
 }
 ```
 
@@ -534,6 +556,13 @@ string playerId = MHSBridge.Instance.GetPlayerID();
 MHSBridge.Instance.CompleteUnit("unit3", "../unit4/index.html");
 // In PWA mode: this notifies the host page. Do NOT navigate.
 // In URL mode: this navigates to the next unit with identity params preserved.
+```
+
+**Navigating to a unit (loader — URL mode only):**
+```csharp
+string playerId = MHSBridge.Instance.GetPlayerID();
+string currentUnit = DetermineCurrentUnit(playerId); // e.g., "unit1" or "unit3"
+MHSBridge.Instance.NavigateToUnit(currentUnit);       // navigates to ../unit3/index.html?id=johndoe
 ```
 
 **Checking mode (if needed):**
@@ -635,7 +664,7 @@ If the student launched with `?id=johndoe&group=Group1&org=MyOrg`, every unit th
 1. **All units must be sibling folders** under a common parent directory.
 2. **Each unit folder contains** `index.html`, `Build/`, and `StreamingAssets/`.
 3. **The loader is also a sibling folder** (not a parent of the unit folders).
-4. **Use `MHSBridge_NavigateToUnit`** instead of hardcoded fully-qualified URLs. The jslib function handles identity preservation automatically.
+4. **Use `MHSBridge.Instance.CompleteUnit()` for end-of-unit transitions and `MHSBridge.Instance.NavigateToUnit()` for the loader** instead of hardcoded fully-qualified URLs. These methods handle identity preservation automatically.
 5. **The same build works on any host** — `cdn.adroit.games`, `test.adroit.games`, or `localhost` — because all URLs are relative.
 
 ---

@@ -29,14 +29,13 @@ One identity mechanism, one code path, works in every context.
 
 Copy the provided `MHSBridge.jslib` file into your project at this exact path. Unity automatically includes `.jslib` files from `Plugins/WebGL/` in WebGL builds.
 
-This file contains four JavaScript functions that the C# script calls via `[DllImport("__Internal")]`:
+This file contains three JavaScript functions that the C# script calls via `[DllImport("__Internal")]`:
 
 | Function | Purpose |
 |----------|---------|
 | `MHSBridge_NotifyUnitComplete` | Tells the host page a unit is done |
-| `MHSBridge_IsPWA` | Returns whether the game is in PWA mode |
 | `MHSBridge_GetPlayerID` | Reads the `?id=` parameter from the URL |
-| `MHSBridge_NavigateToUnit` | Navigates to a relative URL (URL mode only) |
+| `MHSBridge_NavigateToUnit` | Navigates to a relative URL, preserving `?id=` params |
 
 ### 2. `Assets/Scripts/MHSBridge.cs`
 
@@ -105,7 +104,7 @@ The game operates in one of two modes. The mode is determined automatically — 
 
 - The game is loaded inside the StrataHub PWA play page.
 - After Unity finishes loading, the host page calls: `SendMessage('MHSBridge', 'OnPWAReady', '')`
-- This sets `MHSBridge.Instance.IsPWA = true`.
+- After this call, `MHSBridge.Instance.IsPWA` returns `true`.
 - When a unit is complete, call `CompleteUnit()`. The host page handles everything after that.
 - **Do NOT navigate between units.** The host page does it.
 - **Do NOT show a "loading next unit" screen.** The host page handles the transition.
@@ -199,9 +198,9 @@ The loader's job is to determine which unit the student should be playing and na
 **Loader flow:**
 
 1. The loader scene starts. MHSBridge initializes (no `OnPWAReady` call arrives — this is URL mode).
-2. The loader gets the player's ID: `MHSBridge.Instance.GetPlayerID()`
+2. The loader gets the player's ID via `MHSBridge.Instance.GetPlayerID()`.
 3. The loader queries the save service (save.adroit.games) using that player ID to determine what unit the student is currently on.
-4. The loader navigates to the correct unit using `MHSBridge.Instance.CompleteUnit()` — but since this isn't a "completion," use the navigation function directly:
+4. The loader navigates to the correct unit via `MHSBridge.Instance.NavigateToUnit()`, which constructs the relative URL and preserves the `?id=` parameter automatically.
 
 ```csharp
 // In the loader scene's startup script:
@@ -217,48 +216,9 @@ void Start()
     // If no save data exists (new student), default to unit1.
     string currentUnit = DetermineCurrentUnit(playerId); // Your implementation
 
-    // Navigate to the correct unit, carrying identity params forward.
-    // Use the jslib navigation function so ?id= is preserved.
-    NavigateToUnit(currentUnit);
-}
-
-void NavigateToUnit(string unitName)
-{
-#if UNITY_WEBGL && !UNITY_EDITOR
-    // This calls MHSBridge_NavigateToUnit in the jslib,
-    // which appends window.location.search (the ?id=... params) automatically.
-    Application.ExternalCall("MHSBridge_NavigateToUnit_Direct", "../" + unitName + "/index.html");
-#endif
-}
-```
-
-However, since `MHSBridge_NavigateToUnit` is a jslib function called through `[DllImport]`, the simplest approach is to add a public method to `MHSBridge.cs` for the loader to use:
-
-```csharp
-// Add this method to MHSBridge.cs:
-
-/// <summary>
-/// Navigates to a unit by name (e.g., "unit1", "unit3").
-/// Used by the loader to send the student to their current unit.
-/// URL parameters (?id=...) are preserved automatically.
-/// Only works in URL mode (in PWA mode, StrataHub handles navigation).
-/// </summary>
-public void NavigateToUnit(string unitName)
-{
-#if UNITY_WEBGL && !UNITY_EDITOR
-    MHSBridge_NavigateToUnit("../" + unitName + "/index.html");
-#endif
-}
-```
-
-Then the loader code is simply:
-
-```csharp
-void Start()
-{
-    string playerId = MHSBridge.Instance.GetPlayerID();
-    string currentUnit = DetermineCurrentUnit(playerId); // e.g., "unit1" or "unit3"
-    MHSBridge.Instance.NavigateToUnit(currentUnit);       // navigates to ../unit3/index.html?id=johndoe
+    // Navigate to the correct unit.
+    // This navigates to ../unit3/index.html?id=johndoe (URL params preserved automatically).
+    MHSBridge.Instance.NavigateToUnit(currentUnit); // e.g., "unit1" or "unit3"
 }
 ```
 
