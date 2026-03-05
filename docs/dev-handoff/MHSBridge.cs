@@ -107,4 +107,17 @@ public class MHSBridge : MonoBehaviour
         return "editor-test-user";
 #endif
     }
+
+    /// <summary>
+    /// Navigates to a unit by name (e.g., "unit1", "unit3").
+    /// Used by the loader to send the student to their current unit.
+    /// URL parameters (?id=...) are preserved automatically.
+    /// Only works in URL mode — in PWA mode, StrataHub handles navigation directly.
+    /// </summary>
+    public void NavigateToUnit(string unitName)
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        MHSBridge_NavigateToUnit("../" + unitName + "/index.html");
+#endif
+    }
 }

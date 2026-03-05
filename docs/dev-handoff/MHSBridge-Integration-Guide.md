@@ -129,41 +129,42 @@ Most game code doesn't need to check this. `CompleteUnit()` already does the rig
 
 ## S3 Directory Structure
 
-For URL mode to work with relative URLs, the build output must follow this directory structure:
+For URL mode to work with relative URLs, the build output must follow this directory structure. The example below uses `20260218-10634-WebResizeTest` as the build name:
 
 ```
-builds/
-  {build-name}/
-    loader/
-      index.html          <-- Entry point (this is the URL in StrataHub resources)
-      Build/
-      StreamingAssets/
-    unit1/
-      index.html
-      Build/
-      StreamingAssets/
-    unit2/
-      index.html
-      Build/
-      StreamingAssets/
-    unit3/
-      index.html
-      Build/
-      StreamingAssets/
-    unit4/
-      index.html
-      Build/
-      StreamingAssets/
-    unit5/
-      index.html
-      Build/
-      StreamingAssets/
+20260218-10634-WebResizeTest/
+  loader/
+    index.html          <-- Entry point (this is the URL in StrataHub resources)
+    Build/
+    StreamingAssets/
+  unit1/
+    index.html
+    Build/
+    StreamingAssets/
+  unit2/
+    index.html
+    Build/
+    StreamingAssets/
+  unit3/
+    index.html
+    Build/
+    StreamingAssets/
+  unit4/
+    index.html
+    Build/
+    StreamingAssets/
+  unit5/
+    index.html
+    Build/
+    StreamingAssets/
 ```
+
+The parent path above the build name folder doesn't matter — it could be `builds/20260218-10634-WebResizeTest/`, `releases/20260218-10634-WebResizeTest/`, or just `20260218-10634-WebResizeTest/` at the root. The relative URLs work regardless of where the build folder lives on the server.
 
 ### Key requirements:
 
-1. **All unit folders are siblings** — they share the same parent directory.
-2. **The loader is also a sibling** — it's `loader/`, not a parent of the unit folders.
+1. **Inside the build folder, `loader/`, `unit1/`, `unit2/`, etc. must be sibling folders.** This is what makes the relative URLs (`../unit2/index.html`) work — each folder navigates up to the shared parent and back down into a sibling.
+2. **The loader is a sibling of the unit folders** — it's `loader/`, not a parent of the unit folders.
 3. **Each folder contains** `index.html`, `Build/`, and `StreamingAssets/` (standard Unity WebGL build output).
 
 ### Why this structure matters
@@ -180,11 +181,79 @@ Because URLs are relative, the same build works on any host — `cdn.adroit.game
 
 ### What the loader does
 
-The loader is a lightweight page that:
-1. Reads the player's save data to determine their current unit.
-2. Navigates to that unit: `window.location.href = '../unit3/index.html' + window.location.search;`
+The loader is only used in URL mode (not in PWA mode — StrataHub launches the correct unit directly). It is the entry point URL that StrataHub resource links and direct URLs point to.
 
-The loader doesn't run the game — it's just a redirect. If the player has no save data, it navigates to `../unit1/index.html`.
+The loader's job is to determine which unit the student should be playing and navigate there. It runs as a Unity WebGL build with the MHSBridge GameObject, so it has access to `MHSBridge.Instance`.
+
+**Loader flow:**
+
+1. The loader scene starts. MHSBridge initializes (no `OnPWAReady` call arrives — this is URL mode).
+2. The loader gets the player's ID: `MHSBridge.Instance.GetPlayerID()`
+3. The loader queries the save service (save.adroit.games) using that player ID to determine what unit the student is currently on.
+4. The loader navigates to the correct unit using `MHSBridge.Instance.CompleteUnit()` — but since this isn't a "completion," use the navigation function directly:
+
+```csharp
+// In the loader scene's startup script:
+
+void Start()
+{
+    string playerId = MHSBridge.Instance.GetPlayerID();
+
+    // Query save.adroit.games to determine the student's current unit.
+    // This depends on your save data format — the key question is:
+    // "What unit should this student play next?"
+    //
+    // If no save data exists (new student), default to unit1.
+    string currentUnit = DetermineCurrentUnit(playerId); // Your implementation
+
+    // Navigate to the correct unit, carrying identity params forward.
+    // Use the jslib navigation function so ?id= is preserved.
+    NavigateToUnit(currentUnit);
+}
+
+void NavigateToUnit(string unitName)
+{
+#if UNITY_WEBGL && !UNITY_EDITOR
+    // This calls MHSBridge_NavigateToUnit in the jslib,
+    // which appends window.location.search (the ?id=... params) automatically.
+    Application.ExternalCall("MHSBridge_NavigateToUnit_Direct", "../" + unitName + "/index.html");
+#endif
+}
+```
+
+However, since `MHSBridge_NavigateToUnit` is a jslib function called through `[DllImport]`, the simplest approach is to add a public method to `MHSBridge.cs` for the loader to use:
+
+```csharp
+// Add this method to MHSBridge.cs:
+
+/// <summary>
+/// Navigates to a unit by name (e.g., "unit1", "unit3").
+/// Used by the loader to send the student to their current unit.
+/// URL parameters (?id=...) are preserved automatically.
+/// Only works in URL mode (in PWA mode, StrataHub handles navigation).
+/// </summary>
+public void NavigateToUnit(string unitName)
+{
+#if UNITY_WEBGL && !UNITY_EDITOR
+    MHSBridge_NavigateToUnit("../" + unitName + "/index.html");
+#endif
+}
+```
+
+Then the loader code is simply:
+
+```csharp
+void Start()
+{
+    string playerId = MHSBridge.Instance.GetPlayerID();
+    string currentUnit = DetermineCurrentUnit(playerId); // e.g., "unit1" or "unit3"
+    MHSBridge.Instance.NavigateToUnit(currentUnit);       // navigates to ../unit3/index.html?id=johndoe
+}
+```
+
+If there is no save data for this player, `DetermineCurrentUnit` should return `"unit1"`.
+
+The loader doesn't run the game — it checks save data and redirects. The student sees it only briefly (or not at all if the redirect is fast).
 
 ---
 
@@ -200,7 +269,16 @@ string playerId = MHSBridge.Instance.GetPlayerID();
 
 This is synchronous, instant, and works offline.
 
-### 2. Replace end-of-unit navigation
+### 2. Implement the loader (URL mode)
+
+The loader scene is the entry point for URL mode. It needs to:
+1. Get the player ID: `MHSBridge.Instance.GetPlayerID()`
+2. Check save data (save.adroit.games) to determine the player's current unit
+3. Navigate: `MHSBridge.Instance.NavigateToUnit("unit3")`
+
+If there's no save data, navigate to `"unit1"`. The loader is not used in PWA mode — StrataHub launches the correct unit directly.
+
+### 3. Replace end-of-unit navigation
 
 Wherever the game currently navigates to the next unit (setting `window.location`, calling `Application.OpenURL`, etc.), replace it with:
 
@@ -276,6 +354,7 @@ Open the browser console and confirm the player ID matches the `?id=` URL parame
 | Create GameObject | First loaded scene | Empty GameObject named "MHSBridge" with the script attached |
 | Get player ID | Wherever `/api/user` is called | Replace with `MHSBridge.Instance.GetPlayerID()` |
 | Signal unit complete | Wherever end-of-unit navigation happens | Replace with `MHSBridge.Instance.CompleteUnit(unitId, nextUrl)` |
+| Loader navigation | Loader scene startup | Query save data, call `MHSBridge.Instance.NavigateToUnit(unitName)` |
 | Build directory layout | S3 upload structure | Sibling folders: `loader/`, `unit1/`, `unit2/`, `unit3/`, `unit4/`, `unit5/` |
 
 Nothing else in the game needs to change. The existing save system (save.adroit.games), stratalog, gameplay, rendering, audio — all unchanged.
