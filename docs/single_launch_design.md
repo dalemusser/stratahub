@@ -383,12 +383,8 @@ mergeInto(LibraryManager.library, {
   },
 
   // Called by C# to get the player's login ID from the URL parameters.
-  // Returns a pointer to a C string. Returns empty string if not found.
-  //
-  // Memory: _malloc'd buffer is freed by Unity's IL2CPP string marshaller.
-  // When the C# return type is string, IL2CPP copies the UTF8 data and
-  // calls _free on the returned pointer. This is Unity's documented pattern
-  // for returning strings from jslib plugins.
+  // Returns a pointer to a _malloc'd UTF-8 C string (null-terminated).
+  // Caller MUST free the returned pointer via MHSBridge_Free().
   MHSBridge_GetPlayerID: function() {
     var params = new URLSearchParams(window.location.search);
     var id = params.get('id') || '';
@@ -396,6 +392,13 @@ mergeInto(LibraryManager.library, {
     var buffer = _malloc(bufferSize);
     stringToUTF8(id, buffer, bufferSize);
     return buffer;
+  },
+
+  // Called by C# to free any _malloc'd pointer returned by this plugin.
+  MHSBridge_Free: function(ptr) {
+    if (ptr) {
+      _free(ptr);
+    }
   },
 
   // Called by C# to navigate to a unit using a relative URL.
@@ -420,6 +423,7 @@ mergeInto(LibraryManager.library, {
 Create a file `Assets/Scripts/MHSBridge.cs`:
 
 ```csharp
+using System;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
@@ -435,7 +439,10 @@ public class MHSBridge : MonoBehaviour
     private static extern void MHSBridge_NotifyUnitComplete(string unitId);
 
     [DllImport("__Internal")]
-    private static extern string MHSBridge_GetPlayerID();
+    private static extern IntPtr MHSBridge_GetPlayerID();
+
+    [DllImport("__Internal")]
+    private static extern void MHSBridge_Free(IntPtr ptr);
 
     [DllImport("__Internal")]
     private static extern void MHSBridge_NavigateToUnit(string url);
@@ -477,6 +484,8 @@ public class MHSBridge : MonoBehaviour
     /// Call this when the current unit is complete.
     /// In PWA mode: notifies the host page, which handles the transition.
     /// In URL mode: navigates to the next unit using a relative URL.
+    ///              Passing empty or null for nextUnitRelativeUrl is a no-op
+    ///              (used for Unit 5, the final unit).
     /// </summary>
     /// <param name="currentUnitId">The unit that was just completed, e.g., "unit3"</param>
     /// <param name="nextUnitRelativeUrl">
@@ -499,17 +508,32 @@ public class MHSBridge : MonoBehaviour
                 MHSBridge_NavigateToUnit(nextUnitRelativeUrl);
             }
         }
+#else
+        Debug.Log($"MHSBridge: CompleteUnit(\"{currentUnitId}\") ignored in Editor");
 #endif
     }
 
     /// <summary>
-    /// Returns the player's login ID from the URL parameters.
-    /// Works in both PWA and URL modes.
+    /// Returns the player's login ID from the URL parameter ?id=value.
+    /// Works in both PWA and URL modes. No network call needed.
+    /// Use this instead of calling /api/user.
     /// </summary>
     public string GetPlayerID()
     {
 #if UNITY_WEBGL && !UNITY_EDITOR
-        return MHSBridge_GetPlayerID();
+        IntPtr ptr = IntPtr.Zero;
+        try
+        {
+            ptr = MHSBridge_GetPlayerID();
+            if (ptr == IntPtr.Zero)
+                return string.Empty;
+            return PtrToStringUTF8(ptr);
+        }
+        finally
+        {
+            if (ptr != IntPtr.Zero)
+                MHSBridge_Free(ptr);
+        }
 #else
         return "editor-test-user";
 #endif
@@ -529,8 +553,26 @@ public class MHSBridge : MonoBehaviour
             Debug.LogWarning("MHSBridge: NavigateToUnit ignored in PWA mode");
             return;
         }
+        if (string.IsNullOrEmpty(unitName))
+        {
+            Debug.LogError("MHSBridge: NavigateToUnit called with null or empty unitName");
+            return;
+        }
         MHSBridge_NavigateToUnit("../" + unitName + "/index.html");
 #endif
+    }
+
+    // --- Helpers ---
+
+    private static string PtrToStringUTF8(IntPtr ptr)
+    {
+        if (ptr == IntPtr.Zero) return string.Empty;
+        int len = 0;
+        while (Marshal.ReadByte(ptr, len) != 0) len++;
+        if (len == 0) return string.Empty;
+        byte[] bytes = new byte[len];
+        Marshal.Copy(ptr, bytes, 0, len);
+        return System.Text.Encoding.UTF8.GetString(bytes);
     }
 }
 ```

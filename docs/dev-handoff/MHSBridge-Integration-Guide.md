@@ -29,12 +29,13 @@ One identity mechanism, one code path, works in every context.
 
 Copy the provided `MHSBridge.jslib` file into your project at this exact path. Unity automatically includes `.jslib` files from `Plugins/WebGL/` in WebGL builds.
 
-This file contains three JavaScript functions that the C# script calls via `[DllImport("__Internal")]`:
+This file contains four JavaScript functions that the C# script calls via `[DllImport("__Internal")]`:
 
 | Function | Purpose |
 |----------|---------|
 | `MHSBridge_NotifyUnitComplete` | Tells the host page a unit is done |
 | `MHSBridge_GetPlayerID` | Reads the `?id=` parameter from the URL |
+| `MHSBridge_Free` | Frees memory allocated by `GetPlayerID` |
 | `MHSBridge_NavigateToUnit` | Navigates to a relative URL, preserving `?id=` params |
 
 ### 2. `Assets/Scripts/MHSBridge.cs`
@@ -77,7 +78,7 @@ MHSBridge.Instance.CompleteUnit("unit3", "../unit4/index.html");
 
 **Parameters:**
 - `currentUnitId` — the unit that was just completed: `"unit1"`, `"unit2"`, `"unit3"`, `"unit4"`, or `"unit5"`
-- `nextUnitRelativeUrl` — relative URL to the next unit's `index.html` (only used in URL mode, ignored in PWA mode)
+- `nextUnitRelativeUrl` — relative URL to the next unit's `index.html` (only used in URL mode, ignored in PWA mode). In URL mode, passing empty string is a no-op — used for Unit 5 where there is no next unit.
 
 **What happens depends on the mode:**
 
@@ -238,7 +239,7 @@ Wherever the game currently calls `/api/user` to get the player's identity for s
 string playerId = MHSBridge.Instance.GetPlayerID();
 ```
 
-This is synchronous, instant, and works offline.
+This is synchronous and instant — no network call needed. The ID is read directly from the page URL.
 
 ### 2. Implement the loader (URL mode)
 
@@ -284,7 +285,7 @@ MHSBridge.Instance.CompleteUnit("unit5", "");
 
 ### In the Unity Editor
 
-`GetPlayerID()` returns `"editor-test-user"`. `CompleteUnit()` does nothing (guarded by `#if UNITY_WEBGL && !UNITY_EDITOR`). Normal Unity Editor workflow is unaffected.
+`GetPlayerID()` returns `"editor-test-user"`. `CompleteUnit()` logs a message to the console but does not navigate (guarded by `#if UNITY_WEBGL && !UNITY_EDITOR`). Normal Unity Editor workflow is unaffected.
 
 ### WebGL Build — URL Mode (No StrataHub)
 

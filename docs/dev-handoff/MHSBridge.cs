@@ -1,3 +1,4 @@
+using System;
 using System.Runtime.InteropServices;
 using UnityEngine;
 
@@ -24,7 +25,10 @@ public class MHSBridge : MonoBehaviour
     private static extern void MHSBridge_NotifyUnitComplete(string unitId);
 
     [DllImport("__Internal")]
-    private static extern string MHSBridge_GetPlayerID();
+    private static extern IntPtr MHSBridge_GetPlayerID();
+
+    [DllImport("__Internal")]
+    private static extern void MHSBridge_Free(IntPtr ptr);
 
     [DllImport("__Internal")]
     private static extern void MHSBridge_NavigateToUnit(string url);
@@ -66,6 +70,8 @@ public class MHSBridge : MonoBehaviour
     /// Call this when the current unit is complete.
     /// In PWA mode: notifies the host page, which handles the transition.
     /// In URL mode: navigates to the next unit using a relative URL.
+    ///              Passing empty or null for nextUnitRelativeUrl is a no-op
+    ///              (used for Unit 5, the final unit).
     /// </summary>
     /// <param name="currentUnitId">The unit that was just completed, e.g., "unit3"</param>
     /// <param name="nextUnitRelativeUrl">
@@ -88,18 +94,32 @@ public class MHSBridge : MonoBehaviour
                 MHSBridge_NavigateToUnit(nextUnitRelativeUrl);
             }
         }
+#else
+        Debug.Log($"MHSBridge: CompleteUnit(\"{currentUnitId}\") ignored in Editor");
 #endif
     }
 
     /// <summary>
     /// Returns the player's login ID from the URL parameter ?id=value.
-    /// Works in both PWA and URL modes.
+    /// Works in both PWA and URL modes. No network call needed.
     /// Use this instead of calling /api/user.
     /// </summary>
     public string GetPlayerID()
     {
 #if UNITY_WEBGL && !UNITY_EDITOR
-        return MHSBridge_GetPlayerID();
+        IntPtr ptr = IntPtr.Zero;
+        try
+        {
+            ptr = MHSBridge_GetPlayerID();
+            if (ptr == IntPtr.Zero)
+                return string.Empty;
+            return PtrToStringUTF8(ptr);
+        }
+        finally
+        {
+            if (ptr != IntPtr.Zero)
+                MHSBridge_Free(ptr);
+        }
 #else
         return "editor-test-user";
 #endif
@@ -119,7 +139,29 @@ public class MHSBridge : MonoBehaviour
             Debug.LogWarning("MHSBridge: NavigateToUnit ignored in PWA mode");
             return;
         }
+        if (string.IsNullOrEmpty(unitName))
+        {
+            Debug.LogError("MHSBridge: NavigateToUnit called with null or empty unitName");
+            return;
+        }
         MHSBridge_NavigateToUnit("../" + unitName + "/index.html");
 #endif
+    }
+
+    // --- Helpers ---
+
+    /// <summary>
+    /// Reads a null-terminated UTF-8 string from an unmanaged pointer.
+    /// Compatible with all Unity .NET profiles (does not require .NET Standard 2.1).
+    /// </summary>
+    private static string PtrToStringUTF8(IntPtr ptr)
+    {
+        if (ptr == IntPtr.Zero) return string.Empty;
+        int len = 0;
+        while (Marshal.ReadByte(ptr, len) != 0) len++;
+        if (len == 0) return string.Empty;
+        byte[] bytes = new byte[len];
+        Marshal.Copy(ptr, bytes, 0, len);
+        return System.Text.Encoding.UTF8.GetString(bytes);
     }
 }
