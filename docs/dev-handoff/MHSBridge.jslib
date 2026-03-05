@@ -10,12 +10,8 @@ mergeInto(LibraryManager.library, {
   },
 
   // Called by C# to get the player's login ID from the URL parameters.
-  // Returns a pointer to a C string. Returns empty string if not found.
-  //
-  // Memory: _malloc'd buffer is freed by Unity's IL2CPP string marshaller.
-  // When the C# return type is string, IL2CPP copies the UTF8 data and
-  // calls _free on the returned pointer. This is Unity's documented pattern
-  // for returning strings from jslib plugins.
+  // Returns a pointer to a _malloc'd UTF-8 C string (null-terminated).
+  // Caller MUST free the returned pointer via MHSBridge_Free().
   MHSBridge_GetPlayerID: function() {
     var params = new URLSearchParams(window.location.search);
     var id = params.get('id') || '';
@@ -23,6 +19,13 @@ mergeInto(LibraryManager.library, {
     var buffer = _malloc(bufferSize);
     stringToUTF8(id, buffer, bufferSize);
     return buffer;
+  },
+
+  // Called by C# to free any _malloc'd pointer returned by this plugin.
+  MHSBridge_Free: function(ptr) {
+    if (ptr) {
+      _free(ptr);
+    }
   },
 
   // Called by C# to navigate to a unit using a relative URL.
