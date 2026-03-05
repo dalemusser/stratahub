@@ -9,14 +9,13 @@ mergeInto(LibraryManager.library, {
     }
   },
 
-  // Called by C# to check if the game is running inside a PWA.
-  // Returns 1 (true) if OnPWAReady was called, 0 (false) otherwise.
-  MHSBridge_IsPWA: function() {
-    return window.__mhsIsPWA ? 1 : 0;
-  },
-
   // Called by C# to get the player's login ID from the URL parameters.
   // Returns a pointer to a C string. Returns empty string if not found.
+  //
+  // Memory: _malloc'd buffer is freed by Unity's IL2CPP string marshaller.
+  // When the C# return type is string, IL2CPP copies the UTF8 data and
+  // calls _free on the returned pointer. This is Unity's documented pattern
+  // for returning strings from jslib plugins.
   MHSBridge_GetPlayerID: function() {
     var params = new URLSearchParams(window.location.search);
     var id = params.get('id') || '';
@@ -26,13 +25,18 @@ mergeInto(LibraryManager.library, {
     return buffer;
   },
 
-  // Called by C# to navigate to the next unit (Mode 2 only).
-  // nextUnitPtr: pointer to a C string containing the relative URL (e.g., "../unit2/index.html")
+  // Called by C# to navigate to a unit using a relative URL.
+  // Resolves the relative URL against the current page and carries all
+  // URL parameters (?id=, ?group=, etc.) forward to the destination.
   MHSBridge_NavigateToUnit: function(nextUnitPtr) {
     var nextUnit = UTF8ToString(nextUnitPtr);
-    // Carry URL parameters (identity) through to the next unit
-    var search = window.location.search;
-    window.location.href = nextUnit + search;
+    // Resolve relative URL against current page, then merge current params
+    var url = new URL(nextUnit, window.location.href);
+    var currentParams = new URLSearchParams(window.location.search);
+    currentParams.forEach(function(value, key) {
+      url.searchParams.set(key, value);
+    });
+    window.location.href = url.href;
   }
 
 });

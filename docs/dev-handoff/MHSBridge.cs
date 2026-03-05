@@ -24,9 +24,6 @@ public class MHSBridge : MonoBehaviour
     private static extern void MHSBridge_NotifyUnitComplete(string unitId);
 
     [DllImport("__Internal")]
-    private static extern int MHSBridge_IsPWA();
-
-    [DllImport("__Internal")]
     private static extern string MHSBridge_GetPlayerID();
 
     [DllImport("__Internal")]
@@ -112,11 +109,16 @@ public class MHSBridge : MonoBehaviour
     /// Navigates to a unit by name (e.g., "unit1", "unit3").
     /// Used by the loader to send the student to their current unit.
     /// URL parameters (?id=...) are preserved automatically.
-    /// Only works in URL mode — in PWA mode, StrataHub handles navigation directly.
+    /// No-ops in PWA mode — StrataHub handles navigation directly.
     /// </summary>
     public void NavigateToUnit(string unitName)
     {
 #if UNITY_WEBGL && !UNITY_EDITOR
+        if (_isPWA)
+        {
+            Debug.LogWarning("MHSBridge: NavigateToUnit ignored in PWA mode");
+            return;
+        }
         MHSBridge_NavigateToUnit("../" + unitName + "/index.html");
 #endif
     }
