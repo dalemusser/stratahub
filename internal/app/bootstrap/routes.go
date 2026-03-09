@@ -26,6 +26,7 @@ import (
 	mhsdashboardfeature "github.com/dalemusser/stratahub/internal/app/features/mhsdashboard"
 	mhsdeliveryfeature "github.com/dalemusser/stratahub/internal/app/features/mhsdelivery"
 	missionhydroscifeature "github.com/dalemusser/stratahub/internal/app/features/missionhydrosci"
+	missionhydroscixfeature "github.com/dalemusser/stratahub/internal/app/features/missionhydroscix"
 	organizationsfeature "github.com/dalemusser/stratahub/internal/app/features/organizations"
 	pagesfeature "github.com/dalemusser/stratahub/internal/app/features/pages"
 	reportsfeature "github.com/dalemusser/stratahub/internal/app/features/reports"
@@ -36,6 +37,7 @@ import (
 	uploadcsvfeature "github.com/dalemusser/stratahub/internal/app/features/uploadcsv"
 	userinfofeature "github.com/dalemusser/stratahub/internal/app/features/userinfo"
 	workspacesfeature "github.com/dalemusser/stratahub/internal/app/features/workspaces"
+	"github.com/dalemusser/stratahub/internal/app/loginactions"
 	appresources "github.com/dalemusser/stratahub/internal/app/resources"
 	"github.com/dalemusser/stratahub/internal/app/store/activity"
 	announcementstore "github.com/dalemusser/stratahub/internal/app/store/announcement"
@@ -159,6 +161,10 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	// This makes the current user available to all handlers via auth.CurrentUser(r).
 	r.Use(sessionMgr.LoadSessionUser)
 
+	// Login actions middleware: reads one-shot login_actions_js from session,
+	// passes it through context for layout template emission, then clears it.
+	r.Use(loginactions.Middleware(sessionMgr))
+
 	// Stale cookie cleanup: remove old generic cookie names from before per-app naming.
 	// This runs on every request but only sets headers when old cookies are actually present.
 	// Once the browser deletes them, this becomes a no-op on subsequent requests.
@@ -264,6 +270,12 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	r.Get("/missionhydrosci-manifest.json", missionHydroSciHandler.ServeManifest)
 	r.Handle("/missionhydrosci/content/*", missionHydroSciHandler.ContentFallback())
 
+	// Mission HydroSci X (second experimental copy, admin-only)
+	missionHydroSciXHandler := missionhydroscixfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, appCfg.MHSCDNBaseURL, logger)
+	r.Get("/missionhydroscix-sw.js", missionHydroSciXHandler.ServeServiceWorker)
+	r.Get("/missionhydroscix-manifest.json", missionHydroSciXHandler.ServeManifest)
+	r.Handle("/missionhydroscix/content/*", missionHydroSciXHandler.ContentFallback())
+
 	// Public pages
 	homeHandler := homefeature.NewHandler(deps.StrataHubMongoDatabase, logger)
 	r.Mount("/", homefeature.Routes(homeHandler))
@@ -278,6 +290,57 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		pr.Mount("/terms", pagesHandler.TermsRouter())
 		pr.Mount("/privacy", pagesHandler.PrivacyRouter())
 		pr.Mount("/pages", pagesfeature.EditRoutes(pagesHandler, sessionMgr))
+	})
+
+	// Login Actions Registry: features register post-login actions here.
+	loginActionsRegistry := loginactions.New(logger)
+
+	// Mission HydroSci early download: register SW and begin downloading on login.
+	loginActionsRegistry.RegisterClient(loginactions.ClientAction{
+		Name:        "missionhydrosci-early-download",
+		Description: "Register service worker and begin downloading game units",
+		ShouldRun: func(lc *loginactions.LoginContext) bool {
+			// Non-members (admin, coordinator, leader) always run
+			if lc.Role != "member" {
+				return true
+			}
+			// Members: check if missionhydrosci is in their enabled apps
+			for _, app := range lc.EnabledApps {
+				if app == "missionhydrosci" {
+					return true
+				}
+			}
+			return false
+		},
+		Script: func(lc *loginactions.LoginContext) string {
+			return `
+				if ('serviceWorker' in navigator) {
+					navigator.serviceWorker.register('/missionhydrosci-sw.js', { scope: '/missionhydrosci/' })
+						.then(function(reg) {
+							return fetch('/missionhydrosci/api/progress');
+						})
+						.then(function(resp) { return resp.json(); })
+						.then(function(progress) {
+							if (progress.current_unit && progress.current_unit !== 'complete') {
+								return fetch('/missionhydrosci/api/manifest')
+									.then(function(mr) { return mr.json(); })
+									.then(function(manifest) {
+										var unitFiles = manifest[progress.current_unit];
+										if (unitFiles && navigator.serviceWorker.controller) {
+											navigator.serviceWorker.controller.postMessage({
+												type: 'DOWNLOAD_UNIT',
+												unitId: progress.current_unit,
+												files: unitFiles,
+												fetchIdPrefix: 'missionhydrosci-'
+											});
+										}
+									});
+							}
+						})
+						.catch(function(e) { console.warn('MHS early download:', e); });
+				}
+			`
+		},
 	})
 
 	// Authentication
@@ -297,6 +360,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		appCfg.PrimaryDomain,
 		logger,
 	)
+	loginHandler.LoginActions = loginActionsRegistry
 	r.Mount("/login", loginfeature.Routes(loginHandler))
 
 	logoutHandler := logoutfeature.NewHandler(sessionMgr, auditLogger, sessionsStore, logger)
@@ -452,6 +516,9 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 
 		// Mission HydroSci (experimental copy of MHS delivery for admin/coordinator development)
 		wsr.Mount("/missionhydrosci", missionhydroscifeature.Routes(missionHydroSciHandler, sessionMgr))
+
+		// Mission HydroSci X (second experimental copy, admin-only)
+		wsr.Mount("/missionhydroscix", missionhydroscixfeature.Routes(missionHydroSciXHandler, sessionMgr))
 
 		// Announcements management (admin only)
 		announcementsHandler := announcementsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)

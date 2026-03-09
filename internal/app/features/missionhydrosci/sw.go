@@ -3,8 +3,11 @@ package missionhydrosci
 
 import (
 	"embed"
+	"fmt"
 	"io"
 	"net/http"
+
+	appresources "github.com/dalemusser/stratahub/internal/app/resources"
 )
 
 //go:embed static/sw.js static/sw-cache.js static/sw-background-fetch.js
@@ -35,4 +38,7 @@ func (h *Handler) ServeServiceWorker(w http.ResponseWriter, r *http.Request) {
 		f.Close()
 		w.Write([]byte("\n"))
 	}
+
+	// Append content hash so browser detects SW change when mhs-delivery.js changes
+	fmt.Fprintf(w, "\n// app-shell-hash: %s\n", appresources.MHSDeliveryVersion())
 }

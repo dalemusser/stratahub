@@ -2,6 +2,8 @@
 package mhsdashboard
 
 import (
+	"time"
+
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 )
 
@@ -43,12 +45,26 @@ type CellData struct {
 	ReviewReason string // Reason for needing review (only for warning cells)
 }
 
+// DeviceInfo represents a device's readiness status for display.
+type DeviceInfo struct {
+	DeviceType   string
+	PWAInstalled bool
+	UnitStatus   map[string]string // "unit1" → "cached" etc.
+	StorageUsage int64
+	StorageQuota int64
+	StoragePct   int // Pre-computed storage percentage (0-100)
+	LastSeen     time.Time
+	IsStale      bool // last_seen > 7 days ago
+}
+
 // MemberRow represents a single row of progress data for a member.
 type MemberRow struct {
-	ID      string
-	Name    string
-	IsEven  bool       // For alternating row colors
-	Cells   []CellData // Pre-computed cell data
+	ID           string
+	Name         string
+	IsEven       bool              // For alternating row colors
+	Cells        []CellData        // Pre-computed cell data
+	Devices      []DeviceInfo      // Device readiness info
+	UnitProgress map[string]string // unit ID → "completed"/"current"/"future"
 }
 
 // UnitHeader represents header info for a unit.

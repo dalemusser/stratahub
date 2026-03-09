@@ -20,6 +20,14 @@ var AvailableApps = []AppDefinition{
 		MenuPath:    "/mhs/units",
 		MenuTitle:   "Mission HydroSci",
 	},
+	{
+		ID:          "missionhydrosci",
+		Name:        "Mission HydroSci",
+		Description: "Mission HydroSci single launch experience with auto-download and progress tracking",
+		MenuIcon:    "\U0001F30A", // water wave emoji
+		MenuPath:    "/missionhydrosci/units",
+		MenuTitle:   "Mission HydroSci",
+	},
 }
 
 // FindApp looks up an app definition by ID.

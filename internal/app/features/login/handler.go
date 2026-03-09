@@ -14,6 +14,8 @@ import (
 	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	groupappstore "github.com/dalemusser/stratahub/internal/app/store/groupapps"
+	"github.com/dalemusser/stratahub/internal/app/loginactions"
 	"github.com/dalemusser/stratahub/internal/app/store/emailverify"
 	"github.com/dalemusser/stratahub/internal/app/store/sessions"
 	settingsstore "github.com/dalemusser/stratahub/internal/app/store/settings"
@@ -57,6 +59,9 @@ type Handler struct {
 	// Multi-workspace configuration
 	MultiWorkspace bool   // true = subdomain-based workspaces
 	PrimaryDomain  string // Apex domain for redirects (e.g., "adroit.games")
+
+	// Login Actions: optional registry for post-login actions
+	LoginActions *loginactions.Registry
 }
 
 /*─────────────────────────────────────────────────────────────────────────────*
@@ -409,6 +414,17 @@ func (h *Handler) createSessionAndRedirect(w http.ResponseWriter, r *http.Reques
 		SameSite: http.SameSiteLaxMode,
 	})
 
+	// Run login actions (if registry configured)
+	if h.LoginActions != nil {
+		h.LoginActions.RunServerActions(r.Context(), r)
+
+		lc := h.buildLoginContext(r.Context(), u, loginID)
+		if scripts := h.LoginActions.ClientScripts(lc); scripts != "" {
+			sess.Values["login_actions_js"] = scripts
+			sess.Save(r, w)
+		}
+	}
+
 	dest := urlutil.SafeReturn(returnURL, "", "/dashboard")
 	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
@@ -499,6 +515,17 @@ func (h *Handler) createSessionAndRenderMagicSuccess(w http.ResponseWriter, r *h
 		HttpOnly: false,
 		SameSite: http.SameSiteLaxMode,
 	})
+
+	// Run login actions (if registry configured)
+	if h.LoginActions != nil {
+		h.LoginActions.RunServerActions(r.Context(), r)
+
+		lc := h.buildLoginContext(r.Context(), u, loginID)
+		if scripts := h.LoginActions.ClientScripts(lc); scripts != "" {
+			sess.Values["login_actions_js"] = scripts
+			sess.Save(r, w)
+		}
+	}
 
 	// Get site name for branding
 	siteName := "StrataHub"
@@ -817,6 +844,23 @@ func (h *Handler) renderChangePasswordFormWithError(w http.ResponseWriter, r *ht
 // parseObjectID parses a hex string into a MongoDB ObjectID.
 func parseObjectID(hex string) (primitive.ObjectID, error) {
 	return primitive.ObjectIDFromHex(hex)
+}
+
+// buildLoginContext creates a LoginContext for login action evaluation.
+// For members, it loads their enabled apps so ShouldRun can check app assignment.
+func (h *Handler) buildLoginContext(ctx context.Context, u *models.User, loginID string) *loginactions.LoginContext {
+	lc := &loginactions.LoginContext{
+		UserID:  u.ID.Hex(),
+		LoginID: loginID,
+		Role:    normalize.Role(u.Role),
+	}
+	if lc.Role == "member" {
+		apps, err := groupappstore.EnabledAppIDsForUser(ctx, h.DB, u.ID)
+		if err == nil {
+			lc.EnabledApps = apps
+		}
+	}
+	return lc
 }
 
 /*─────────────────────────────────────────────────────────────────────────────*

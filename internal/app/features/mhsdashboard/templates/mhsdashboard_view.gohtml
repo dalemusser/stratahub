@@ -171,6 +171,53 @@
   .mhs-styled-scrollbar::-webkit-scrollbar-corner {
     background: #e8f4f8;
   }
+  /* Device readiness */
+  .mhs-device-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    display: inline-block;
+  }
+  .mhs-device-dot-cached { background: #3b82f6; }
+  .mhs-device-dot-downloading { border: 2px solid #60a5fa; background: transparent; }
+  .mhs-device-dot-none { background: #d1d5db; }
+  .mhs-device-dot-completed { background: #22c55e; }
+  .mhs-device-dot-current {
+    border: 2px solid #22c55e;
+    background: transparent;
+    width: 12px;
+    height: 12px;
+  }
+  .mhs-device-stale { opacity: 0.4; }
+  /* Tab styles */
+  .mhs-tab-active {
+    border-bottom: 2px solid #2e8bc0;
+    color: #0c2d48;
+    font-weight: 500;
+  }
+  .mhs-tab-inactive {
+    border-bottom: 2px solid transparent;
+    color: #64748b;
+  }
+  .mhs-tab-inactive:hover {
+    color: #334155;
+  }
+  .mhs-storage-bar {
+    height: 6px;
+    border-radius: 3px;
+    background: #e5e7eb;
+    overflow: hidden;
+    width: 60px;
+  }
+  .mhs-storage-fill {
+    height: 100%;
+    border-radius: 3px;
+    background: #3b82f6;
+    transition: width 0.3s;
+  }
+  .mhs-storage-fill.mhs-storage-warn { background: #f97316; }
+  .mhs-storage-fill.mhs-storage-danger { background: #ef4444; }
+
   /* Grid dimensions */
   .mhs-grid-container {
     display: grid;
@@ -348,6 +395,20 @@
     </div>
   </div>
 
+  <!-- Tab Bar -->
+  <div class="flex border-b border-slate-200 bg-white flex-shrink-0">
+    <button id="mhs-tab-btn-progress" type="button"
+            class="px-4 py-2 text-sm font-medium mhs-tab-active"
+            onclick="switchTab('progress')">
+      Progress
+    </button>
+    <button id="mhs-tab-btn-devices" type="button"
+            class="px-4 py-2 text-sm font-medium mhs-tab-inactive"
+            onclick="switchTab('devices')">
+      Devices
+    </button>
+  </div>
+
   <!-- Grid Container -->
   <div id="mhs-grid" class="flex-grow overflow-hidden" data-sort-dir="{{ .SortDir }}">
     {{ template "mhsdashboard_grid" . }}
@@ -463,6 +524,7 @@
 <script>
 (function() {
   var scrollPos = { x: 0, y: 0 };
+  var activeTab = 'progress';
   var countdown = 30;
   var countdownEl = document.getElementById('mhs-countdown');
   var refreshBtn = document.getElementById('mhs-refresh-btn');
@@ -540,6 +602,29 @@
     updateCountdown();
   }
 
+  // Tab switching
+  window.switchTab = function(tab) {
+    activeTab = tab;
+    var progressPanel = document.getElementById('mhs-tab-progress');
+    var devicesPanel = document.getElementById('mhs-tab-devices');
+    var progressBtn = document.getElementById('mhs-tab-btn-progress');
+    var devicesBtn = document.getElementById('mhs-tab-btn-devices');
+
+    if (!progressPanel || !devicesPanel) return;
+
+    if (tab === 'progress') {
+      progressPanel.classList.remove('hidden');
+      devicesPanel.classList.add('hidden');
+      progressBtn.className = 'px-4 py-2 text-sm font-medium mhs-tab-active';
+      devicesBtn.className = 'px-4 py-2 text-sm font-medium mhs-tab-inactive';
+    } else {
+      progressPanel.classList.add('hidden');
+      devicesPanel.classList.remove('hidden');
+      devicesBtn.className = 'px-4 py-2 text-sm font-medium mhs-tab-active';
+      progressBtn.className = 'px-4 py-2 text-sm font-medium mhs-tab-inactive';
+    }
+  };
+
   if (refreshBtn) {
     refreshBtn.addEventListener('click', doRefresh);
   }
@@ -606,6 +691,11 @@
       setupScrollSync();
       countdown = 30;
       updateCountdown();
+
+      // Restore active tab after HTMX swap
+      if (activeTab !== 'progress') {
+        switchTab(activeTab);
+      }
 
       // Update sort direction data attribute from the request URL
       var pathInfo = evt.detail.pathInfo;

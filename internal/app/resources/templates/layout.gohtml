@@ -551,6 +551,7 @@
       })();
       {{ end }}
     </script>
+    {{ if .LoginActionsJS }}<script>{{ .LoginActionsJS }}</script>{{ end }}
   </body>
 </html>
 {{ end }}

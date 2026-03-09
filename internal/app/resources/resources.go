@@ -22,15 +22,21 @@ var FS embed.FS
 var AssetsFS embed.FS
 
 var (
-	tailwindVersion = assets.ContentHash(AssetsFS, "assets/css/tailwind.css")
-	tiptapVersion   = assets.ContentHash(AssetsFS, "assets/css/tiptap.css")
-	htmxVersion     = assets.ContentHash(AssetsFS, "assets/js/htmx.min.js")
+	tailwindVersion    = assets.ContentHash(AssetsFS, "assets/css/tailwind.css")
+	tiptapVersion      = assets.ContentHash(AssetsFS, "assets/css/tiptap.css")
+	htmxVersion        = assets.ContentHash(AssetsFS, "assets/js/htmx.min.js")
+	mhsDeliveryVersion = assets.ContentHash(AssetsFS, "assets/js/mhs-delivery.js")
 )
+
+// MHSDeliveryVersion returns the content hash of mhs-delivery.js.
+// Used by the Mission HydroSci SW handler to trigger browser reinstallation when JS changes.
+func MHSDeliveryVersion() string { return mhsDeliveryVersion }
 
 func init() {
 	templates.RegisterFunc("tailwindVersion", func() string { return tailwindVersion })
 	templates.RegisterFunc("tiptapVersion", func() string { return tiptapVersion })
 	templates.RegisterFunc("htmxVersion", func() string { return htmxVersion })
+	templates.RegisterFunc("mhsDeliveryVersion", func() string { return mhsDeliveryVersion })
 }
 
 var registerOnce sync.Once

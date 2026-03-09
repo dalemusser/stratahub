@@ -125,6 +125,28 @@
       function TrackedAudioContext(options) {
         var ctx = options ? new OrigAC(options) : new OrigAC();
         tracked.push(ctx);
+
+        // Shadow the native onstatechange property with a safe wrapper.
+        // Unity's WEBAudio.audioContext.onstatechange handler calls
+        // WEBAudio.audioInstances.forEach() which crashes when audioInstances
+        // is an object (not an array) in some Unity versions. By intercepting
+        // the setter, we wrap any handler in try-catch so the crash is
+        // suppressed without affecting audio functionality.
+        var _handler = null;
+        Object.defineProperty(ctx, 'onstatechange', {
+          configurable: true,
+          enumerable: true,
+          get: function() { return _handler; },
+          set: function(fn) { _handler = fn; }
+        });
+        ctx.addEventListener('statechange', function(e) {
+          if (_handler) {
+            try { _handler.call(ctx, e); } catch (err) {
+              console.warn('Suppressed audio statechange error:', err.message);
+            }
+          }
+        });
+
         return ctx;
       }
       TrackedAudioContext.prototype = OrigAC.prototype;
@@ -155,13 +177,19 @@
         display: flex; flex-direction: column; align-items: center; justify-content: center;
         font-family: sans-serif; color: white; text-align: center;
       ">
-        <h2 style="font-size: 1.5rem; margin-bottom: 0.5rem;">Unit Complete</h2>
-        <p style="font-size: 1rem; opacity: 0.8; margin-bottom: 1.5rem;">Return to MHS Units to continue to the next unit.</p>
-        <a href="/missionhydrosci/units" style="
-          display: inline-block; padding: 10px 24px;
+        <h2 id="overlay-title" style="font-size: 1.5rem; margin-bottom: 0.5rem;">Unit Complete</h2>
+        <p id="overlay-message" style="font-size: 1rem; opacity: 0.8; margin-bottom: 1rem;">Loading next unit...</p>
+        <div id="overlay-download-bar" style="display: none; width: 240px; margin-bottom: 1.5rem;">
+          <div style="width: 100%; height: 6px; background: rgba(255,255,255,0.2); border-radius: 3px; overflow: hidden;">
+            <div id="overlay-download-fill" style="height: 100%; background: #60a5fa; border-radius: 3px; transition: width 0.3s; width: 0%;"></div>
+          </div>
+          <p id="overlay-download-text" style="font-size: 0.75rem; opacity: 0.6; margin-top: 4px; text-align: center;">0%</p>
+        </div>
+        <a id="overlay-link" href="/missionhydrosci/units" style="
+          display: none; padding: 10px 24px;
           background: #2563eb; color: white; text-decoration: none;
           border-radius: 6px; font-size: 0.95rem;
-        ">Back to MHS Units</a>
+        ">Back to Mission HydroSci</a>
       </div>
     </div>
 
@@ -245,9 +273,17 @@
     })();
     </script>
 
-    <!-- Block unit-to-unit transitions that try to navigate to external game URLs -->
+    <!-- Block unit-to-unit transitions and handle completion -->
+    <script src="/assets/js/mhs-delivery.js?v={{ mhsDeliveryVersion }}"></script>
     <script>
     (function() {
+      var unitId = '{{ .UnitID }}';
+      var csrfToken = '{{ .CSRFToken }}';
+      var loginId = '{{ .UserLoginID }}';
+      var nextUnitId = '{{ .NextUnitID }}';
+      var nextUnitVersion = '{{ .NextUnitVersion }}';
+      var completionHandled = false;
+
       function isExternalGameUrl(url) {
         try {
           var parsed = new URL(url, window.location.origin);
@@ -261,18 +297,170 @@
         }
       }
 
-      function showUnitComplete() {
+      // Detect same-host unit transition URLs produced when MHSBridge operates in
+      // URL mode: it navigates to ../unitN/index.html which resolves to
+      // /missionhydrosci/unitN/index.html on the same host.
+      function isUnitTransitionUrl(url) {
+        try {
+          var parsed = new URL(url, window.location.origin);
+          return /\/missionhydrosci\/unit\d+\/index\.html/i.test(parsed.pathname);
+        } catch (e) {
+          return false;
+        }
+      }
+
+      function shouldIntercept(url) {
+        return isExternalGameUrl(url) || isUnitTransitionUrl(url);
+      }
+
+      function handleUnitComplete() {
+        if (completionHandled) return;
+        completionHandled = true;
+
+        // Show overlay immediately
         var overlay = document.getElementById('unit-complete-overlay');
         if (overlay) overlay.classList.remove('hidden');
+
+        // Signal the units page (other tab) that progress changed.
+        // Set this before the POST so even if the user switches tabs
+        // immediately, the units page knows to reload for fresh state.
+        try { localStorage.setItem('missionhydrosci-progress-changed', '1'); } catch (e) {}
+
+        // POST completion to server
+        fetch('/missionhydrosci/api/progress/complete', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'X-CSRF-Token': csrfToken
+          },
+          body: JSON.stringify({ unit: unitId })
+        })
+        .then(function(resp) { return resp.json(); })
+        .then(function(data) {
+          completeAndTransition(data.next_unit, data.is_final);
+        })
+        .catch(function(err) {
+          console.error('MHS: completion POST failed, queuing offline', err);
+          // Offline fallback: store in queue, derive next unit locally
+          queueCompletion(unitId);
+          var isFinal = !nextUnitId;
+          completeAndTransition(nextUnitId, isFinal);
+        });
       }
+
+      function completeAndTransition(nextUnit, isFinal) {
+        cleanupUnity();
+        if (isFinal || !nextUnit) {
+          showGameComplete();
+          return;
+        }
+
+        // Check if next unit is already cached
+        var mgr = new MHSDeliveryManager({
+          manifestUrl: '/missionhydrosci/api/manifest',
+          contentPrefix: '/missionhydrosci/content/',
+          unitCachePrefix: 'missionhydrosci-unit-',
+          fetchIdPrefix: 'missionhydrosci-'
+        });
+
+        mgr.refreshManifest().then(function() {
+          return mgr.isCached(nextUnit);
+        }).then(function(status) {
+          if (status === 'cached') {
+            // Auto-cleanup completed unit then navigate
+            mgr.autoCleanup([nextUnit]).then(function() {
+              navigateToNext(nextUnit);
+            });
+          } else {
+            // Need to download — show progress on overlay
+            showDownloadProgress(mgr, nextUnit);
+          }
+        }).catch(function() {
+          // Manifest fetch failed — just navigate and let the units page handle it
+          navigateToNext(nextUnit);
+        });
+      }
+
+      function showDownloadProgress(mgr, nextUnit) {
+        var msg = document.getElementById('overlay-message');
+        var title = document.getElementById('overlay-title');
+        if (title) title.textContent = 'Unit Complete';
+        if (msg) msg.textContent = 'Downloading next unit...';
+
+        // Show a progress bar in the overlay
+        var bar = document.getElementById('overlay-download-bar');
+        var barFill = document.getElementById('overlay-download-fill');
+        var barText = document.getElementById('overlay-download-text');
+        if (bar) bar.style.display = 'block';
+
+        mgr.onStatus(function(uid, status, detail) {
+          if (uid !== nextUnit) return;
+          if (status === 'downloading') {
+            var pct = detail.percent || 0;
+            if (msg) msg.textContent = 'Downloading next unit... ' + pct + '%';
+            if (barFill) barFill.style.width = pct + '%';
+            if (barText) barText.textContent = pct + '%';
+          } else if (status === 'cached') {
+            if (msg) msg.textContent = 'Ready!';
+            if (barFill) barFill.style.width = '100%';
+            // Cleanup completed unit then navigate
+            mgr.autoCleanup([nextUnit]).then(function() {
+              navigateToNext(nextUnit);
+            });
+          } else if (status === 'error') {
+            if (msg) msg.textContent = 'Download failed. Redirecting...';
+            setTimeout(function() { navigateToNext(nextUnit); }, 1500);
+          }
+        });
+
+        // Need full SW init for Background Fetch
+        mgr._swUrl = '/missionhydrosci-sw.js';
+        mgr._swScope = '/missionhydrosci/';
+        mgr._channelName = 'missionhydrosci-delivery';
+        mgr.init().then(function() {
+          mgr.downloadUnit(nextUnit);
+        });
+      }
+
+      function navigateToNext(nextUnit) {
+        window.location.href = '/missionhydrosci/play/' + nextUnit + '?id=' + encodeURIComponent(loginId);
+      }
+
+      function showGameComplete() {
+        var title = document.getElementById('overlay-title');
+        var msg = document.getElementById('overlay-message');
+        var link = document.getElementById('overlay-link');
+        var bar = document.getElementById('overlay-download-bar');
+        if (title) title.textContent = 'Mission Complete';
+        if (msg) msg.textContent = 'You have completed Mission HydroSci.';
+        if (link) link.style.display = 'inline-block';
+        if (bar) bar.style.display = 'none';
+      }
+
+      function queueCompletion(unitId) {
+        var key = 'mhs-progress-queue';
+        var queue = JSON.parse(localStorage.getItem(key) || '[]');
+        queue.push({ unit: unitId, timestamp: new Date().toISOString() });
+        localStorage.setItem(key, JSON.stringify(queue));
+      }
+
+      // MHSBridge callback — the game calls this via jslib when a unit is completed.
+      // This is the primary completion signal (Phase 4).
+      window.mhsUnitComplete = function(completedUnitId) {
+        console.log('MHS: mhsUnitComplete called with', completedUnitId);
+        handleUnitComplete();
+      };
+
+      // Expose for cleanup script
+      window.__mhsHandleUnitComplete = handleUnitComplete;
 
       // Navigation API (Chrome 102+ / Chromebooks) — intercepts window.location changes
       if (window.navigation) {
         navigation.addEventListener('navigate', function(event) {
-          if (isExternalGameUrl(event.destination.url)) {
+          if (shouldIntercept(event.destination.url)) {
             event.preventDefault();
-            console.log('MHS: blocked external navigation to', event.destination.url);
-            showUnitComplete();
+            console.log('MHS: blocked navigation to', event.destination.url);
+            handleUnitComplete();
           }
         });
       }
@@ -280,9 +468,9 @@
       // Also intercept window.open (used by Unity's Application.OpenURL)
       var _windowOpen = window.open;
       window.open = function(url) {
-        if (isExternalGameUrl(url)) {
+        if (shouldIntercept(url)) {
           console.log('MHS: blocked window.open to', url);
-          showUnitComplete();
+          handleUnitComplete();
           return null;
         }
         return _windowOpen.apply(this, arguments);
@@ -364,9 +552,9 @@
         loadingText.textContent = 'Starting Unity...';
 
         createUnityInstance(canvas, {
-          dataUrl: buildUrl + '/' + unitId + '.data.unityweb',
-          frameworkUrl: buildUrl + '/' + unitId + '.framework.js.unityweb',
-          codeUrl: buildUrl + '/' + unitId + '.wasm.unityweb',
+          dataUrl: buildUrl + '/{{ .DataFile }}',
+          frameworkUrl: buildUrl + '/{{ .FrameworkFile }}',
+          codeUrl: buildUrl + '/{{ .CodeFile }}',
           streamingAssetsUrl: contentUrl + '/StreamingAssets',
           companyName: 'Adroit',
           productName: 'Mission HydroSci',
@@ -386,6 +574,9 @@
           canvas = instance.Module.canvas;
           loadingOverlay.classList.add('hidden');
           onResize();
+
+          // Tell MHSBridge this is PWA mode — game will use mhsUnitComplete callback
+          instance.SendMessage('MHSBridge', 'OnPWAReady', '');
         }).catch(function(err) {
           loadingText.textContent = 'Error: ' + err.message;
           loadingBar.style.width = '100%';
@@ -506,13 +697,21 @@
       }
     }
 
-    // Full shutdown: quit Unity and permanently close all AudioContexts
+    // Full shutdown: quit Unity and permanently close all AudioContexts.
+    // Order matters: detach Unity's onstatechange handlers BEFORE Quit(),
+    // because Quit() tears down WEBAudio internals. If we close() contexts
+    // after Quit(), the state change fires into a half-dead Unity module
+    // causing "WEBAudio.audioInstances.forEach is not a function".
     function cleanupUnity() {
+      var contexts = window.__mhsAudioContexts || [];
+      // Detach Unity's audio state-change callbacks before teardown
+      for (var i = 0; i < contexts.length; i++) {
+        try { contexts[i].onstatechange = null; } catch (e) {}
+      }
       if (window.__unityInstance) {
         try { window.__unityInstance.Quit(); } catch (e) {}
         window.__unityInstance = null;
       }
-      var contexts = window.__mhsAudioContexts || [];
       for (var i = 0; i < contexts.length; i++) {
         try { contexts[i].close(); } catch (e) {}
       }

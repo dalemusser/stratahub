@@ -29,10 +29,11 @@ async function startBackgroundFetch(unitId, version, files, cdnBaseUrl, title) {
   var totalSize = files.reduce(function(sum, f) { return sum + f.size; }, 0);
 
   try {
-    // Abort any existing fetch with the same ID
+    // Check for an existing fetch with the same ID
     var existing = await self.registration.backgroundFetch.get(fetchId);
-    if (existing) {
-      await existing.abort();
+    if (existing && existing.result === '') {
+      // Active fetch already in progress — let it continue
+      return true;
     }
 
     var bgFetch = await self.registration.backgroundFetch.fetch(fetchId, requests, {
@@ -75,6 +76,21 @@ async function fallbackFetch(unitId, version, files, cdnBaseUrl, title) {
   try {
     for (var i = 0; i < files.length; i++) {
       var file = files[i];
+      var cacheKey = cacheKeyFromPath(file.path);
+
+      // Skip files already in cache (e.g., from a previous partial download)
+      var existing = await cache.match(cacheKey);
+      if (existing) {
+        downloaded += file.size;
+        var percent = Math.round((downloaded / totalSize) * 100);
+        broadcastStatus(unitId, 'downloading', {
+          downloaded: downloaded,
+          downloadTotal: totalSize,
+          percent: percent
+        });
+        continue;
+      }
+
       var url = cdnBaseUrl + '/' + file.path;
       var response = await fetch(url, { mode: 'cors' });
 
@@ -82,7 +98,6 @@ async function fallbackFetch(unitId, version, files, cdnBaseUrl, title) {
         throw new Error('Failed to fetch ' + file.path + ': ' + response.status);
       }
 
-      var cacheKey = cacheKeyFromPath(file.path);
       await cache.put(cacheKey, response);
 
       downloaded += file.size;

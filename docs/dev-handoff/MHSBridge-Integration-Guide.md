@@ -44,10 +44,16 @@ Copy the provided `MHSBridge.cs` file into your project. This is the C# API that
 
 ### 3. GameObject Setup
 
-1. In the **first scene that loads** (the loader scene, or Unit 1's scene if there's no loader), create an empty GameObject.
+**The MHSBridge GameObject must exist in the first scene of every unit build** (unit1, unit2, unit3, unit4, unit5, and the loader).
+
+1. In each unit's **first scene that loads**, create an empty GameObject.
 2. Name it exactly: **`MHSBridge`** (case-sensitive — the host page calls `SendMessage('MHSBridge', ...)`)
 3. Attach the `MHSBridge` script to it.
-4. The script calls `DontDestroyOnLoad(gameObject)` so it persists across scene changes.
+4. The script calls `DontDestroyOnLoad(gameObject)` so it persists across scene changes within that unit.
+
+**Why every unit needs it:** In PWA mode, each unit is a separate page load — StrataHub navigates to a new URL for each unit, which creates a fresh Unity instance from scratch. `DontDestroyOnLoad` only persists objects across scene changes within the same Unity instance, not across page navigations. In URL mode, each unit's `index.html` also loads a fresh Unity instance.
+
+If the MHSBridge GameObject is missing, the host page's `SendMessage('MHSBridge', 'OnPWAReady', '')` call silently fails (Unity logs `"SendMessage: object MHSBridge not found!"` to the console), `IsPWA` stays `false`, and `CompleteUnit` falls through to URL-mode navigation — which breaks in StrataHub.
 
 ---
 
@@ -323,7 +329,7 @@ Open the browser console and confirm the player ID matches the `?id=` URL parame
 |------|-------|--------|
 | Add jslib | `Assets/Plugins/WebGL/MHSBridge.jslib` | New file (provided) |
 | Add C# script | `Assets/Scripts/MHSBridge.cs` | New file (provided) |
-| Create GameObject | First loaded scene | Empty GameObject named "MHSBridge" with the script attached |
+| Create GameObject | First scene of **every unit** (and the loader) | Empty GameObject named "MHSBridge" with the script attached |
 | Get player ID | Wherever `/api/user` is called | Replace with `MHSBridge.Instance.GetPlayerID()` |
 | Signal unit complete | Wherever end-of-unit navigation happens | Replace with `MHSBridge.Instance.CompleteUnit(unitId, nextUrl)` |
 | Loader navigation | Loader scene startup | Query save data, call `MHSBridge.Instance.NavigateToUnit(unitName)` |

@@ -20,6 +20,9 @@ import (
 	"go.uber.org/zap"
 )
 
+// staleDeviceThreshold is how old a device's last_seen can be before it's considered stale.
+const staleDeviceThreshold = 7 * 24 * time.Hour
+
 // ServeDashboard renders the main MHS dashboard 3 page.
 func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 	role, _, userID, ok := authz.UserCtx(r)
@@ -120,8 +123,11 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 	// Get organization timezone and format the time
 	lastUpdated, tzAbbr := h.formatTimeInOrgTimezone(ctx, selectedGroupOrgID)
 
+	// Load device status for all members
+	deviceMap := h.loadDeviceMap(ctx, r, members)
+
 	// Build progress rows with real grade data
-	memberRows := h.buildProgressRows(ctx, members, cfg)
+	memberRows := h.buildProgressRows(ctx, members, cfg, deviceMap)
 
 	base := viewdata.LoadBase(r, h.DB)
 	data := DashboardData{
@@ -229,7 +235,10 @@ func (h *Handler) ServeGrid(w http.ResponseWriter, r *http.Request) {
 	// Get organization timezone and format the time
 	lastUpdated, _ := h.formatTimeInOrgTimezone(ctx, groupOrgID)
 
-	memberRows := h.buildProgressRows(ctx, members, cfg)
+	// Load device status for all members
+	deviceMap := h.loadDeviceMap(ctx, r, members)
+
+	memberRows := h.buildProgressRows(ctx, members, cfg, deviceMap)
 
 	data := GridData{
 		SelectedGroup: selectedGroup,
@@ -487,8 +496,53 @@ func (h *Handler) loadProgressGrades(ctx context.Context, playerIDs []string) (m
 	return grades, nil
 }
 
+// loadDeviceMap fetches device status for all members and returns a map keyed by user ID hex.
+func (h *Handler) loadDeviceMap(ctx context.Context, r *http.Request, members []models.User) map[string][]DeviceInfo {
+	deviceMap := make(map[string][]DeviceInfo)
+	if len(members) == 0 {
+		return deviceMap
+	}
+
+	wsID := workspace.IDFromRequest(r)
+	userIDs := make([]primitive.ObjectID, len(members))
+	for i, m := range members {
+		userIDs[i] = m.ID
+	}
+
+	statuses, err := h.DeviceStatusStore.ListByUserIDs(ctx, wsID, userIDs)
+	if err != nil {
+		h.Log.Error("failed to load device statuses", zap.Error(err))
+		return deviceMap
+	}
+
+	now := time.Now()
+	for _, s := range statuses {
+		uid := s.UserID.Hex()
+		var pct int
+		if s.StorageQuota > 0 {
+			pct = int(s.StorageUsage * 100 / s.StorageQuota)
+		}
+		unitStatus := s.UnitStatus
+		if unitStatus == nil {
+			unitStatus = make(map[string]string)
+		}
+		deviceMap[uid] = append(deviceMap[uid], DeviceInfo{
+			DeviceType:   s.DeviceType,
+			PWAInstalled: s.PWAInstalled,
+			UnitStatus:   unitStatus,
+			StorageUsage: s.StorageUsage,
+			StorageQuota: s.StorageQuota,
+			StoragePct:   pct,
+			LastSeen:     s.LastSeen,
+			IsStale:      now.Sub(s.LastSeen) > staleDeviceThreshold,
+		})
+	}
+
+	return deviceMap
+}
+
 // buildProgressRows builds the progress rows for the given members using real grade data.
-func (h *Handler) buildProgressRows(ctx context.Context, members []models.User, cfg *ProgressConfig) []MemberRow {
+func (h *Handler) buildProgressRows(ctx context.Context, members []models.User, cfg *ProgressConfig, deviceMap map[string][]DeviceInfo) []MemberRow {
 	totalPoints := cfg.TotalProgressPoints()
 	result := make([]MemberRow, len(members))
 
@@ -567,11 +621,40 @@ func (h *Handler) buildProgressRows(ctx context.Context, members []models.User, 
 			}
 		}
 
+		// Compute unit-level progress status
+		unitProgress := make(map[string]string, len(cfg.Units))
+		foundCurrent := false
+		for _, unit := range cfg.Units {
+			allGreen := true
+			for _, point := range unit.ProgressPoints {
+				var isGreen bool
+				if gradeDoc != nil {
+					if item, ok := gradeDoc.Grades[point.ID]; ok && item.Color == "green" {
+						isGreen = true
+					}
+				}
+				if !isGreen {
+					allGreen = false
+					break
+				}
+			}
+			if allGreen {
+				unitProgress[unit.ID] = "completed"
+			} else if !foundCurrent {
+				unitProgress[unit.ID] = "current"
+				foundCurrent = true
+			} else {
+				unitProgress[unit.ID] = "future"
+			}
+		}
+
 		result[i] = MemberRow{
-			ID:     member.ID.Hex(),
-			Name:   member.FullName,
-			IsEven: i%2 == 0,
-			Cells:  cells,
+			ID:           member.ID.Hex(),
+			Name:         member.FullName,
+			IsEven:       i%2 == 0,
+			Cells:        cells,
+			Devices:      deviceMap[member.ID.Hex()],
+			UnitProgress: unitProgress,
 		}
 	}
 

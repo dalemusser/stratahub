@@ -74,6 +74,12 @@ func EnsureAll(ctx context.Context, db *mongo.Database) error {
 	if err := ensureGroupAppSettings(ctx, db); err != nil {
 		problems = append(problems, "group_app_settings: "+err.Error())
 	}
+	if err := ensureMHSUserProgress(ctx, db); err != nil {
+		problems = append(problems, "mhs_user_progress: "+err.Error())
+	}
+	if err := ensureMHSDeviceStatus(ctx, db); err != nil {
+		problems = append(problems, "mhs_device_status: "+err.Error())
+	}
 
 	if len(problems) > 0 {
 		return errors.New(strings.Join(problems, "; "))
@@ -914,6 +920,57 @@ func ensureGroupAppSettings(ctx context.Context, db *mongo.Database) error {
 			},
 			Options: options.Index().
 				SetName("idx_groupapp_group"),
+		},
+	})
+}
+
+func ensureMHSDeviceStatus(ctx context.Context, db *mongo.Database) error {
+	c := db.Collection("mhs_device_status")
+	return ensureIndexSet(ctx, c, []mongo.IndexModel{
+		// Unique per (workspace, user, device)
+		{
+			Keys: bson.D{
+				{Key: "workspace_id", Value: 1},
+				{Key: "user_id", Value: 1},
+				{Key: "device_id", Value: 1},
+			},
+			Options: options.Index().
+				SetUnique(true).
+				SetName("uniq_mhsdevice_workspace_user_device"),
+		},
+		// Dashboard queries: all devices in a workspace, most recent first
+		{
+			Keys: bson.D{
+				{Key: "workspace_id", Value: 1},
+				{Key: "last_seen", Value: -1},
+			},
+			Options: options.Index().
+				SetName("idx_mhsdevice_workspace_lastseen"),
+		},
+	})
+}
+
+func ensureMHSUserProgress(ctx context.Context, db *mongo.Database) error {
+	c := db.Collection("mhs_user_progress")
+	return ensureIndexSet(ctx, c, []mongo.IndexModel{
+		// Unique per user per workspace
+		{
+			Keys: bson.D{
+				{Key: "workspace_id", Value: 1},
+				{Key: "user_id", Value: 1},
+			},
+			Options: options.Index().
+				SetUnique(true).
+				SetName("uniq_mhsprogress_workspace_user"),
+		},
+		// Lookup by login_id (API queries)
+		{
+			Keys: bson.D{
+				{Key: "workspace_id", Value: 1},
+				{Key: "login_id", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_mhsprogress_workspace_loginid"),
 		},
 	})
 }
