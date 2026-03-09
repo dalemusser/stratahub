@@ -33,12 +33,14 @@
     this.swRegistration = null;
     this.channel = null;
     this.statusCallbacks = [];
+    this._activeDownloads = {}; // unitId -> true while a download is in progress
+    this._downloadMonitors = {}; // unitId -> intervalId for stall detection
+    this._stallState = {}; // unitId -> { lastDownloaded, stallCount } — exposed for reset on visibility change
   }
 
   /**
    * Initializes the delivery manager: registers SW, fetches manifest,
-   * sets up BroadcastChannel listener, checks initial cache status,
-   * and reconnects to any active Background Fetches.
+   * sets up BroadcastChannel listener, and checks initial cache status.
    */
   MHSDeliveryManager.prototype.init = async function() {
     // Register service worker
@@ -65,17 +67,26 @@
     // Fetch content manifest
     await this.refreshManifest();
 
+    // Reconnect to any active Background Fetches from previous sessions
+    await this._reconnectActiveDownloads();
+
     // Check initial cache status for all units
     await this.checkAllCacheStatus();
 
-    // Reconnect to any active Background Fetches
-    await this._reconnectActiveDownloads();
-
-    // Re-check cache status when page becomes visible (e.g., user switches back to this tab)
+    // When tab becomes visible: reset stall monitors, recheck BG fetch states, then cache status
     var self = this;
     document.addEventListener('visibilitychange', function() {
       if (document.visibilityState === 'visible') {
-        self.checkAllCacheStatus();
+        // Reset stall monitors — bgFetch.downloaded is stale after being hidden,
+        // so any check immediately after becoming visible would false-detect a stall.
+        // Setting lastDownloaded to -1 guarantees the first check sees "progress."
+        var ids = Object.keys(self._stallState);
+        for (var i = 0; i < ids.length; i++) {
+          self._stallState[ids[i]].stallCount = 0;
+          self._stallState[ids[i]].lastDownloaded = -1;
+        }
+        self._recheckActiveDownloads(); // Clear completed BG fetches from tracking
+        self.checkAllCacheStatus();      // Detect cached/not_cached for cleared units
       }
     });
   };
@@ -109,6 +120,8 @@
 
     for (var i = 0; i < this.manifest.units.length; i++) {
       var unit = this.manifest.units[i];
+      // Don't override status for units with an active download
+      if (this._activeDownloads[unit.id]) continue;
       var status = await this._checkUnitCache(unit);
       this._fireStatus(unit.id, status, {});
     }
@@ -141,77 +154,248 @@
   };
 
   /**
-   * Reconnects to any active Background Fetches and attaches progress listeners.
-   * This handles the case where the page was closed/reopened during a download.
+   * Waits for the service worker to become active, with a timeout.
+   * Returns the ServiceWorkerRegistration or null if the SW is not ready.
+   * This prevents navigator.serviceWorker.ready from hanging forever if the
+   * SW fails to install/activate (e.g., due to cache.addAll failure).
+   */
+  MHSDeliveryManager.prototype._waitForSW = function(timeoutMs) {
+    // Fast path: if our registered SW is already active, return it immediately
+    if (this.swRegistration && this.swRegistration.active) {
+      return Promise.resolve(this.swRegistration);
+    }
+
+    var ms = timeoutMs || 10000;
+    return Promise.race([
+      navigator.serviceWorker.ready,
+      new Promise(function(resolve) {
+        setTimeout(function() { resolve(null); }, ms);
+      })
+    ]);
+  };
+
+  /**
+   * Extracts the unit ID from a Background Fetch ID.
+   * e.g., "missionhydrosci-unit1-v1.0.0" -> "unit1"
+   */
+  MHSDeliveryManager.prototype._parseUnitIdFromFetchId = function(fetchId) {
+    var prefix = this._fetchIdPrefix;
+    if (!fetchId.startsWith(prefix)) return null;
+    var rest = fetchId.substring(prefix.length); // "unit1-v1.0.0"
+    var versionMatch = rest.match(/^(.+)-v\d+\.\d+\.\d+$/);
+    if (versionMatch) return versionMatch[1];
+    return rest; // Legacy format without version
+  };
+
+  /**
+   * Monitors a Background Fetch for stalls. If no progress is made for 30s
+   * (2 checks at 15s intervals), aborts the BG fetch and falls back to SW fetch.
+   */
+  MHSDeliveryManager.prototype._monitorDownload = function(unitId, bgFetch, unit) {
+    // Clear any existing monitor for this unit
+    if (this._downloadMonitors[unitId]) {
+      clearInterval(this._downloadMonitors[unitId]);
+      delete this._downloadMonitors[unitId];
+    }
+
+    // Stall state is on the manager (not closure) so the visibility handler can reset it
+    this._stallState[unitId] = { lastDownloaded: bgFetch.downloaded || 0, stallCount: 0 };
+    var self = this;
+
+    this._downloadMonitors[unitId] = setInterval(function() {
+      // BG fetch may have completed/failed — stop monitoring
+      if (!self._activeDownloads[unitId]) {
+        clearInterval(self._downloadMonitors[unitId]);
+        delete self._downloadMonitors[unitId];
+        delete self._stallState[unitId];
+        return;
+      }
+
+      // Don't check when page is hidden — Chrome doesn't reliably update
+      // bgFetch.downloaded on background pages, which causes false stall detection
+      if (document.visibilityState === 'hidden') return;
+
+      var state = self._stallState[unitId];
+      if (!state) return;
+
+      var current = bgFetch.downloaded || 0;
+      if (current === state.lastDownloaded) {
+        state.stallCount++;
+        if (state.stallCount >= 2) {
+          console.warn('Background Fetch stalled for', unitId, '- falling back to SW fetch');
+          clearInterval(self._downloadMonitors[unitId]);
+          delete self._downloadMonitors[unitId];
+          delete self._stallState[unitId];
+
+          // Abort the stalled BG fetch
+          try { bgFetch.abort(); } catch (e) { /* best effort */ }
+
+          // Fall back to SW sequential fetch
+          if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+            navigator.serviceWorker.controller.postMessage({
+              action: 'fallbackDownload',
+              unitId: unit.id,
+              version: unit.version,
+              files: unit.files,
+              cdnBaseUrl: self.manifest.cdnBaseUrl,
+              title: 'Downloading ' + unit.title
+            });
+          }
+        }
+      } else {
+        state.stallCount = 0;
+        state.lastDownloaded = current;
+      }
+    }, 15000);
+  };
+
+  /**
+   * Attaches progress listener and starts stall monitor for a BG fetch.
+   * Used by both downloadUnit and _reconnectActiveDownloads.
+   */
+  MHSDeliveryManager.prototype._attachBGFetchListeners = function(unitId, bgFetch, unit) {
+    var totalSize = unit.totalSize || unit.files.reduce(function(sum, f) { return sum + f.size; }, 0);
+    var self = this;
+
+    bgFetch.addEventListener('progress', function() {
+      if (totalSize > 0) {
+        var percent = Math.round((bgFetch.downloaded / totalSize) * 100);
+        self._fireStatus(unitId, 'downloading', {
+          downloaded: bgFetch.downloaded,
+          downloadTotal: totalSize,
+          percent: percent
+        });
+      }
+    });
+
+    this._monitorDownload(unitId, bgFetch, unit);
+  };
+
+  /**
+   * Reconnects to active Background Fetches from previous sessions.
+   * Instead of aborting all BG fetches, reconnects to in-progress ones
+   * and skips completed/failed ones (checkAllCacheStatus handles those).
    */
   MHSDeliveryManager.prototype._reconnectActiveDownloads = async function() {
     if (!navigator.serviceWorker) return;
 
     try {
-      var reg = await navigator.serviceWorker.ready;
-      if (!reg.backgroundFetch) return;
+      var reg = await this._waitForSW(5000);
+      if (!reg || !reg.backgroundFetch) return;
 
       var ids = await reg.backgroundFetch.getIds();
-      var self = this;
-
       for (var i = 0; i < ids.length; i++) {
-        var fetchId = ids[i];
-        if (!fetchId.startsWith(this._fetchIdPrefix)) continue;
+        if (!ids[i].startsWith(this._fetchIdPrefix)) continue;
 
-        var bgFetch = await reg.backgroundFetch.get(fetchId);
+        var bgFetch = await reg.backgroundFetch.get(ids[i]);
         if (!bgFetch) continue;
 
-        // Parse unit ID from fetch ID (format: "mhs-unit1-v1.0.0" or legacy "mhs-unit1")
-        var unitId = this._parseUnitIdFromFetchId(fetchId);
+        var unitId = this._parseUnitIdFromFetchId(ids[i]);
         if (!unitId) continue;
 
-        var unit = this.manifest ? this.manifest.units.find(function(u) { return u.id === unitId; }) : null;
-        var totalSize = unit ? unit.totalSize : 0;
-
         if (bgFetch.result === '') {
-          // Still in progress — attach progress listener
-          console.log('Reconnecting to active download:', fetchId);
-          this._fireStatus(unitId, 'downloading', {
-            downloaded: bgFetch.downloaded,
-            downloadTotal: totalSize,
-            percent: totalSize > 0 ? Math.round((bgFetch.downloaded / totalSize) * 100) : 0
-          });
+          // In progress — find matching manifest unit
+          var unit = this.manifest && this.manifest.units
+            ? this.manifest.units.find(function(u) { return u.id === unitId; })
+            : null;
 
-          (function(uid, ts) {
-            bgFetch.addEventListener('progress', function() {
-              var pct = ts > 0 ? Math.round((bgFetch.downloaded / ts) * 100) : 0;
-              self._fireStatus(uid, 'downloading', {
-                downloaded: bgFetch.downloaded,
-                downloadTotal: ts,
-                percent: pct
-              });
+          if (unit) {
+            // Reconnect: set active tracking, fire current progress, attach listeners
+            this._activeDownloads[unitId] = true;
+            var totalSize = unit.totalSize || unit.files.reduce(function(sum, f) { return sum + f.size; }, 0);
+            var percent = totalSize > 0 ? Math.round((bgFetch.downloaded / totalSize) * 100) : 0;
+            this._fireStatus(unitId, 'downloading', {
+              downloaded: bgFetch.downloaded,
+              downloadTotal: totalSize,
+              percent: percent
             });
-          })(unitId, totalSize);
-        } else if (bgFetch.result === 'success') {
-          // Completed while page was closed — SW should have cached, re-check
-          await this.checkAllCacheStatus();
+            this._attachBGFetchListeners(unitId, bgFetch, unit);
+            console.log('Reconnected to Background Fetch:', ids[i]);
+          } else {
+            // No matching manifest unit — genuinely stale, abort
+            console.log('Aborting stale Background Fetch (no manifest unit):', ids[i]);
+            await bgFetch.abort();
+          }
         }
+        // Completed/failed BG fetches are skipped — checkAllCacheStatus handles them
       }
     } catch (err) {
-      console.error('Error reconnecting to active downloads:', err);
+      // Background Fetch API may not be available — that's fine.
     }
   };
 
   /**
-   * Extracts the unit ID from a Background Fetch ID.
-   * "mhs-unit1-v1.0.0" -> "unit1", "mhs-unit1" -> "unit1"
+   * Rechecks active Background Fetches when tab becomes visible.
+   * Handles BG fetches that completed/failed while tab was hidden.
    */
-  MHSDeliveryManager.prototype._parseUnitIdFromFetchId = function(fetchId) {
-    var prefix = this._fetchIdPrefix;
-    var re = new RegExp('^' + prefix.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '(.+)-v\\d+\\.\\d+\\.\\d+$');
-    var match = fetchId.match(re);
-    if (match) return match[1];
-    if (fetchId.startsWith(prefix)) return fetchId.substring(prefix.length);
-    return null;
+  MHSDeliveryManager.prototype._recheckActiveDownloads = function() {
+    if (!navigator.serviceWorker) return;
+
+    var self = this;
+    var unitIds = Object.keys(this._activeDownloads);
+    if (unitIds.length === 0) return;
+
+    // Use _waitForSW as a promise — we need the registration
+    this._waitForSW(5000).then(function(reg) {
+      if (!reg || !reg.backgroundFetch) return;
+
+      var checks = unitIds.map(function(unitId) {
+        var unit = self.manifest && self.manifest.units
+          ? self.manifest.units.find(function(u) { return u.id === unitId; })
+          : null;
+        if (!unit) return Promise.resolve();
+
+        var fetchId = self._fetchIdPrefix + unit.id + '-v' + unit.version;
+        return reg.backgroundFetch.get(fetchId).then(function(bgFetch) {
+          if (!bgFetch) {
+            // BG fetch disappeared — clear tracking so checkAllCacheStatus can detect state
+            delete self._activeDownloads[unitId];
+            return;
+          }
+
+          if (bgFetch.result === 'success') {
+            // Completed while hidden — clear tracking so checkAllCacheStatus fires 'cached'
+            delete self._activeDownloads[unitId];
+            if (self._downloadMonitors[unitId]) {
+              clearInterval(self._downloadMonitors[unitId]);
+              delete self._downloadMonitors[unitId];
+            }
+          } else if (bgFetch.result === 'failure') {
+            // Failed while hidden — clear tracking and fire error
+            delete self._activeDownloads[unitId];
+            if (self._downloadMonitors[unitId]) {
+              clearInterval(self._downloadMonitors[unitId]);
+              delete self._downloadMonitors[unitId];
+            }
+            self._fireStatus(unitId, 'error', {
+              error: 'Download failed. Please check your connection and try again.'
+            });
+          } else {
+            // Still in progress — fire current progress for UI update
+            var totalSize = unit.totalSize || unit.files.reduce(function(sum, f) { return sum + f.size; }, 0);
+            var percent = totalSize > 0 ? Math.round((bgFetch.downloaded / totalSize) * 100) : 0;
+            self._fireStatus(unitId, 'downloading', {
+              downloaded: bgFetch.downloaded,
+              downloadTotal: totalSize,
+              percent: percent
+            });
+          }
+        }).catch(function() {
+          // Ignore errors for individual checks
+        });
+      });
+
+      return Promise.all(checks);
+    }).catch(function() {
+      // Ignore — best effort
+    });
   };
 
   /**
    * Starts downloading a unit's files via Background Fetch.
+   * If a BG fetch is already in progress for this unit, reconnects to it
+   * instead of aborting. Falls back to SW sequential fetch if BG Fetch
+   * API is unavailable or fails to start.
    */
   MHSDeliveryManager.prototype.downloadUnit = async function(unitId) {
     if (!this.manifest) {
@@ -230,53 +414,66 @@
       return;
     }
 
-    this._fireStatus(unitId, 'downloading', { percent: 0, downloaded: 0, downloadTotal: unit.totalSize });
+    // Prevent duplicate downloads — if already active, skip
+    if (this._activeDownloads[unitId]) {
+      return;
+    }
 
-    // Initiate Background Fetch directly from the page context.
-    // The SW handles backgroundfetchsuccess to re-key responses into cache.
+    this._activeDownloads[unitId] = true;
+    var totalSize = unit.totalSize || unit.files.reduce(function(sum, f) { return sum + f.size; }, 0);
+    this._fireStatus(unitId, 'downloading', { percent: 0, downloaded: 0, downloadTotal: totalSize });
+
     try {
-      var reg = await navigator.serviceWorker.ready;
-      var cdnBaseUrl = this.manifest.cdnBaseUrl;
-      var requests = unit.files.map(function(file) {
-        return new Request(cdnBaseUrl + '/' + file.path, { mode: 'cors' });
-      });
-
-      // Fetch ID encodes unit ID and version so the SW success handler
-      // can cache responses without needing to fetch the manifest.
-      var fetchId = this._fetchIdPrefix + unit.id + '-v' + unit.version;
-      var self = this;
-
-      // Abort any existing Background Fetch with the same ID
-      var existing = await reg.backgroundFetch.get(fetchId);
-      if (existing) {
-        await existing.abort();
+      var reg = await this._waitForSW(10000);
+      if (!reg) {
+        throw new Error('Service worker not ready. Please refresh the page and try again.');
       }
 
-      var bgFetch = await reg.backgroundFetch.fetch(fetchId, requests, {
-        title: 'Downloading ' + unit.title,
-        icons: [{ sizes: '192x192', src: '/assets/mhs/icon-192.png', type: 'image/png' }],
-        downloadTotal: 0
-      });
+      var fetchId = this._fetchIdPrefix + unit.id + '-v' + unit.version;
 
-      console.log('Background Fetch started:', fetchId);
-
-      bgFetch.addEventListener('progress', function() {
-        if (unit.totalSize > 0) {
-          var percent = Math.round((bgFetch.downloaded / unit.totalSize) * 100);
-          self._fireStatus(unitId, 'downloading', {
-            downloaded: bgFetch.downloaded,
-            downloadTotal: unit.totalSize,
+      // Check for an existing BG fetch with the same ID
+      if (reg.backgroundFetch) {
+        var existing = await reg.backgroundFetch.get(fetchId);
+        if (existing && existing.result === '') {
+          // Active fetch already in progress — reconnect instead of aborting
+          var percent = totalSize > 0 ? Math.round((existing.downloaded / totalSize) * 100) : 0;
+          this._fireStatus(unitId, 'downloading', {
+            downloaded: existing.downloaded,
+            downloadTotal: totalSize,
             percent: percent
           });
+          this._attachBGFetchListeners(unitId, existing, unit);
+          console.log('Reconnected to existing Background Fetch:', fetchId);
+          return;
         }
-      });
-    } catch (err) {
-      console.error('Background Fetch failed:', err);
-      // Fall back to SW-based regular fetch
+      }
+
+      // No existing fetch — start a new Background Fetch
+      if (reg.backgroundFetch) {
+        var requests = unit.files.map(function(file) {
+          return new Request(this.manifest.cdnBaseUrl + '/' + file.path, { mode: 'cors' });
+        }.bind(this));
+
+        try {
+          var bgFetch = await reg.backgroundFetch.fetch(fetchId, requests, {
+            title: 'Downloading ' + unit.title,
+            icons: [{ sizes: '192x192', src: '/assets/mhs/icon-192.png', type: 'image/png' }],
+            downloadTotal: 0
+          });
+
+          this._attachBGFetchListeners(unitId, bgFetch, unit);
+          console.log('Started Background Fetch:', fetchId);
+          return;
+        } catch (bgErr) {
+          console.warn('Background Fetch failed to start, falling back to SW fetch:', bgErr);
+          // Fall through to SW sequential fetch below
+        }
+      }
+
+      // Fallback: use SW sequential fetch
       if (navigator.serviceWorker.controller) {
-        console.log('Falling back to regular fetch via SW');
         navigator.serviceWorker.controller.postMessage({
-          action: 'download',
+          action: 'fallbackDownload',
           unitId: unit.id,
           version: unit.version,
           files: unit.files,
@@ -284,8 +481,12 @@
           title: 'Downloading ' + unit.title
         });
       } else {
-        this._fireStatus(unitId, 'error', { error: 'Download failed: ' + err.message });
+        throw new Error('Service worker not controlling the page. Please refresh and try again.');
       }
+    } catch (err) {
+      console.error('Download failed:', err);
+      this._activeDownloads[unitId] = false;
+      this._fireStatus(unitId, 'error', { error: 'Download failed: ' + err.message });
     }
   };
 
@@ -300,8 +501,8 @@
 
     // Abort any active Background Fetch for this unit
     try {
-      var reg = await navigator.serviceWorker.ready;
-      if (reg.backgroundFetch) {
+      var reg = await this._waitForSW(5000);
+      if (reg && reg.backgroundFetch) {
         var fetchId = this._fetchIdPrefix + unit.id + '-v' + unit.version;
         var existing = await reg.backgroundFetch.get(fetchId);
         if (existing) {
@@ -326,6 +527,68 @@
   };
 
   /**
+   * Checks if a unit is cached.
+   * @param {string} unitId
+   * @returns {Promise<string>} 'cached', 'not_cached', or 'partial'
+   */
+  MHSDeliveryManager.prototype.isCached = async function(unitId) {
+    if (!this.manifest || !this.manifest.units) return 'not_cached';
+    var unit = this.manifest.units.find(function(u) { return u.id === unitId; });
+    if (!unit) return 'not_cached';
+    return await this._checkUnitCache(unit);
+  };
+
+  /**
+   * Returns the next unit's ID from the manifest array, or null if last.
+   * @param {string} unitId
+   * @returns {string|null}
+   */
+  MHSDeliveryManager.prototype.getNextUnit = function(unitId) {
+    if (!this.manifest || !this.manifest.units) return null;
+    for (var i = 0; i < this.manifest.units.length; i++) {
+      if (this.manifest.units[i].id === unitId) {
+        if (i + 1 < this.manifest.units.length) {
+          return this.manifest.units[i + 1].id;
+        }
+        return null;
+      }
+    }
+    return null;
+  };
+
+  /**
+   * Deletes cached data and aborts active downloads for ALL units.
+   * Unlike autoCleanup, this does not check cache status first,
+   * ensuring active Background Fetches are also aborted.
+   */
+  MHSDeliveryManager.prototype.deleteAllUnits = async function() {
+    if (!this.manifest || !this.manifest.units) return;
+    for (var i = 0; i < this.manifest.units.length; i++) {
+      await this.deleteUnit(this.manifest.units[i].id);
+    }
+  };
+
+  /**
+   * Deletes cached data for all units NOT in the keepUnitIds array.
+   * @param {string[]} keepUnitIds - Unit IDs to keep cached
+   */
+  MHSDeliveryManager.prototype.autoCleanup = async function(keepUnitIds) {
+    if (!this.manifest || !this.manifest.units) return;
+    var keepSet = {};
+    for (var i = 0; i < keepUnitIds.length; i++) {
+      keepSet[keepUnitIds[i]] = true;
+    }
+    for (var j = 0; j < this.manifest.units.length; j++) {
+      var unit = this.manifest.units[j];
+      if (keepSet[unit.id]) continue;
+      var status = await this._checkUnitCache(unit);
+      if (status === 'cached' || status === 'partial') {
+        await this.deleteUnit(unit.id);
+      }
+    }
+  };
+
+  /**
    * Gets an estimate of storage usage.
    * @returns {Promise<{usage: number, quota: number}|null>}
    */
@@ -345,6 +608,15 @@
 
   // Internal: fire all status callbacks
   MHSDeliveryManager.prototype._fireStatus = function(unitId, status, detail) {
+    // Clear active download tracking and stall monitors on terminal statuses
+    if (status === 'cached' || status === 'error' || status === 'not_cached') {
+      delete this._activeDownloads[unitId];
+      if (this._downloadMonitors[unitId]) {
+        clearInterval(this._downloadMonitors[unitId]);
+        delete this._downloadMonitors[unitId];
+      }
+      delete this._stallState[unitId];
+    }
     for (var i = 0; i < this.statusCallbacks.length; i++) {
       try {
         this.statusCallbacks[i](unitId, status, detail || {});

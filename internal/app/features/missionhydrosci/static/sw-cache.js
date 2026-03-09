@@ -1,6 +1,6 @@
 // sw-cache.js — Cache utility functions for the Mission HydroSci service worker.
 
-const APP_SHELL_CACHE = 'missionhydrosci-app-shell-v2';
+const APP_SHELL_CACHE = 'missionhydrosci-app-shell-v5';
 const UNIT_CACHE_PREFIX = 'missionhydrosci-unit-';
 
 // App shell resources to pre-cache on install.

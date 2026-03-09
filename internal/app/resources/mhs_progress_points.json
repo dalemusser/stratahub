@@ -1,8 +1,8 @@
 {
   "units": [
     {
-      "id": "Unit 1",
-      "title": "Unit 1 Title",
+      "id": "unit1",
+      "title": "Unit 1",
       "progress_points": [
         {
           "id": "u1p1",
@@ -27,8 +27,8 @@
       ]
     },
     {
-      "id": "Unit 2",
-      "title": "Unit 2 Title",
+      "id": "unit2",
+      "title": "Unit 2",
       "progress_points": [
         {
           "id": "u2p1",
@@ -68,8 +68,8 @@
       ]
     },
     {
-      "id": "Unit 3",
-      "title": "Unit 3 Title",
+      "id": "unit3",
+      "title": "Unit 3",
       "progress_points": [
         {
           "id": "u3p1",
@@ -99,8 +99,8 @@
       ]
     },
     {
-      "id": "Unit 4",
-      "title": "Unit 4 Title",
+      "id": "unit4",
+      "title": "Unit 4",
       "progress_points": [
         {
           "id": "u4p1",
@@ -125,8 +125,8 @@
       ]
     },
     {
-      "id": "Unit 5",
-      "title": "Unit 5 Title",
+      "id": "unit5",
+      "title": "Unit 5",
       "progress_points": [
         {
           "id": "u5p1",

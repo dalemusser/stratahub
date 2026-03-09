@@ -6,6 +6,7 @@ import (
 	"html/template"
 	"net/http"
 
+	"github.com/dalemusser/stratahub/internal/app/loginactions"
 	settingsstore "github.com/dalemusser/stratahub/internal/app/store/settings"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
@@ -72,6 +73,10 @@ type BaseVM struct {
 	// EnabledApps maps app IDs to true for apps enabled for this user's groups.
 	// Only populated for members; admin/coordinator/leader menus are static.
 	EnabledApps map[string]bool
+
+	// LoginActionsJS contains one-shot JavaScript from login actions.
+	// Emitted once on the first page load after login, then cleared from session.
+	LoginActionsJS template.JS
 }
 
 // storageProvider is set by Init and used to generate logo URLs.
@@ -175,6 +180,11 @@ func NewBaseVM(r *http.Request, db *mongo.Database, title, backDefault string) B
 	// Apex domain is for workspace management - don't show workspace-specific announcements
 	if signedIn && !isApex && announcementLoader != nil {
 		vm.Announcements = announcementLoader(r.Context())
+	}
+
+	// One-shot login actions JavaScript (set by loginactions.Middleware)
+	if js := loginactions.ScriptsFromContext(r.Context()); js != "" {
+		vm.LoginActionsJS = template.JS(js)
 	}
 
 	return vm

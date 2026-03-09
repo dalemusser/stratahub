@@ -2,7 +2,7 @@
 // This file is concatenated with sw-cache.js and sw-background-fetch.js
 // by the Go handler before being served at /missionhydrosci-sw.js.
 
-const SW_VERSION = '1.0.1';
+const SW_VERSION = '1.0.5';
 
 // ---- Install ----
 self.addEventListener('install', function(event) {
@@ -98,7 +98,7 @@ async function serveMHSContent(request, path) {
  */
 async function cacheFirst(request, cacheName) {
   var cache = await caches.open(cacheName);
-  var match = await cache.match(request);
+  var match = await cache.match(request, { ignoreSearch: true });
   if (match) {
     return match;
   }
@@ -145,6 +145,18 @@ self.addEventListener('message', function(event) {
   if (data.action === 'download') {
     event.waitUntil(
       startBackgroundFetch(
+        data.unitId,
+        data.version,
+        data.files,
+        data.cdnBaseUrl,
+        data.title
+      )
+    );
+  } else if (data.action === 'fallbackDownload') {
+    // Direct fallback to regular sequential fetch (skips Background Fetch).
+    // Used when a Background Fetch stalls and the page needs to recover.
+    event.waitUntil(
+      fallbackFetch(
         data.unitId,
         data.version,
         data.files,
