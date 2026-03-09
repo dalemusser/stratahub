@@ -44,7 +44,7 @@ Copy the provided `MHSBridge.cs` file into your project. This is the C# API that
 
 ### 3. GameObject Setup
 
-**The MHSBridge GameObject must exist in the first scene of every unit build** (unit1, unit2, unit3, unit4, unit5, and the loader).
+**The MHSBridge GameObject must exist in the first scene of every unit build** (unit1, unit2, unit3, unit4, unit5).
 
 1. In each unit's **first scene that loads**, create an empty GameObject.
 2. Name it exactly: **`MHSBridge`** (case-sensitive — the host page calls `SendMessage('MHSBridge', ...)`)
