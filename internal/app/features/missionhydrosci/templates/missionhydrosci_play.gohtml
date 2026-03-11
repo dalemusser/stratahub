@@ -279,7 +279,6 @@
     (function() {
       var unitId = '{{ .UnitID }}';
       var csrfToken = '{{ .CSRFToken }}';
-      var loginId = '{{ .UserLoginID }}';
       var nextUnitId = '{{ .NextUnitID }}';
       var nextUnitVersion = '{{ .NextUnitVersion }}';
       var completionHandled = false;
@@ -423,7 +422,7 @@
       }
 
       function navigateToNext(nextUnit) {
-        window.location.href = '/missionhydrosci/play/' + nextUnit + '?id=' + encodeURIComponent(loginId);
+        window.location.href = '/missionhydrosci/play/' + nextUnit;
       }
 
       function showGameComplete() {

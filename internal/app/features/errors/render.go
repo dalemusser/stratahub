@@ -36,8 +36,9 @@ type pageData struct {
 	LoginID       string
 	UserOrg       string
 	CurrentPath   string
-	EnabledApps   map[string]bool
-	Announcements []viewdata.AnnouncementVM
+	EnabledApps    map[string]bool
+	Announcements  []viewdata.AnnouncementVM
+	LoginActionsJS string
 
 	// Additional fields for specific error pages
 	ActualRole string // The user's actual role (for display when Role is overridden for menu)
