@@ -87,7 +87,8 @@
       {{ range .Members }}
       <div class="flex mhs-row-height {{ if .IsEven }}bg-slate-50{{ else }}bg-white{{ end }}">
         {{ range .Cells }}
-        <div class="mhs-cell-width p-0.5 border-b border-slate-200 {{ if .IsUnitStart }}border-l border-slate-300{{ end }}">
+        <div class="mhs-cell-width p-0.5 border-b border-slate-200 {{ if .IsUnitStart }}border-l border-slate-300{{ end }}" style="position:relative;">
+          {{ if .IsInCurrentUnit }}<div class="mhs-in-unit-bar"></div>{{ end }}
           {{ if eq .Value 1 }}
           <div class="{{ .CellClass }} w-full h-full rounded border {{ .BorderClass }} mhs-review-cell cursor-pointer hover:opacity-80 transition-opacity"
                data-student-name="{{ .StudentName }}"

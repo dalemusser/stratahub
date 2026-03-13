@@ -175,7 +175,7 @@
       </div>
       {{ end }}
     </div>
-    {{ if ne .Role "member" }}
+    {{/* TODO: restore role check after testing: {{ if ne .Role "member" }} */}}
     <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
       <button
         id="reset-btn"
@@ -185,7 +185,7 @@
         Reset All Progress
       </button>
     </div>
-    {{ end }}
+    {{/* TODO: restore after testing: {{ end }} */}}
   </details>
 </div>
 
@@ -201,6 +201,53 @@
 
   // Track cache status for pipeline decisions
   var cacheStatus = {};
+
+  // Track manually downloaded units so autoCleanup preserves them
+  var MANUAL_DL_KEY = 'mhs-manual-downloads';
+
+  function loadManualDownloads() {
+    try { return JSON.parse(localStorage.getItem(MANUAL_DL_KEY) || '[]'); }
+    catch (e) { return []; }
+  }
+
+  function saveManualDownloads(arr) {
+    localStorage.setItem(MANUAL_DL_KEY, JSON.stringify(arr));
+  }
+
+  function addManualDownload(unitId) {
+    if (manualDownloads.indexOf(unitId) === -1) {
+      manualDownloads.push(unitId);
+      saveManualDownloads(manualDownloads);
+    }
+  }
+
+  function removeManualDownload(unitId) {
+    manualDownloads = manualDownloads.filter(function(id) { return id !== unitId; });
+    saveManualDownloads(manualDownloads);
+  }
+
+  var manualDownloads = loadManualDownloads();
+
+  // Prune manual downloads that are now auto-managed or completed
+  manualDownloads = manualDownloads.filter(function(id) {
+    if (id === currentUnit || id === nextUnit) return false;
+    var card = document.getElementById('unit-card-' + id);
+    if (card && card.getAttribute('data-unit-status') === 'completed') return false;
+    return true;
+  });
+  saveManualDownloads(manualDownloads);
+
+  // Build deduplicated keep list for autoCleanup
+  function buildKeepList() {
+    var keep = [currentUnit];
+    if (nextUnit) keep.push(nextUnit);
+    for (var k = 0; k < manualDownloads.length; k++) {
+      if (keep.indexOf(manualDownloads[k]) === -1) {
+        keep.push(manualDownloads[k]);
+      }
+    }
+    return keep;
+  }
 
   // Device reporting: identify this device and report status to server
   var csrfToken = '{{ .CSRFToken }}';
@@ -453,7 +500,42 @@
     }
 
     updateStorageInfo();
+    updateDownloadButtonVisibility();
   });
+
+  // Hide download buttons for units that would exceed available storage.
+  // Walks units in manifest order so earlier units claim space first.
+  function updateDownloadButtonVisibility() {
+    manager.getStorageEstimate().then(function(estimate) {
+      if (!estimate || !manager.manifest || !manager.manifest.units) return;
+
+      var available = estimate.quota - estimate.usage;
+      var keepList = buildKeepList();
+
+      for (var i = 0; i < manager.manifest.units.length; i++) {
+        var unit = manager.manifest.units[i];
+        var card = document.getElementById('unit-card-' + unit.id);
+        if (!card) continue;
+        if (card.getAttribute('data-unit-status') === 'completed') continue;
+
+        var btn = document.getElementById('download-btn-' + unit.id);
+        var cs = cacheStatus[unit.id];
+
+        // Already cached or downloading — space is already committed
+        if (cs === 'cached' || cs === 'downloading') continue;
+
+        var size = unit.totalSize || 0;
+        if (btn && size > available) {
+          btn.classList.add('hidden');
+        }
+
+        // Deduct space for units that are planned (auto-managed or manual)
+        if (keepList.indexOf(unit.id) !== -1) {
+          available -= size;
+        }
+      }
+    });
+  }
 
   // Auto-download pipeline
   function runPipeline() {
@@ -479,12 +561,11 @@
               manager.downloadUnit(nextUnit);
             }
 
-            // Auto-cleanup: keep current + next, delete others
-            var keep = [currentUnit, nextUnit];
-            manager.autoCleanup(keep);
+            // Auto-cleanup: keep current + next + manual downloads
+            manager.autoCleanup(buildKeepList());
           } else {
-            // No next unit — just keep current
-            manager.autoCleanup([currentUnit]);
+            // No next unit — keep current + manual downloads
+            manager.autoCleanup(buildKeepList());
           }
         }
       } finally {
@@ -504,6 +585,7 @@
 
     // Start the auto-download pipeline after init
     runPipeline();
+    updateDownloadButtonVisibility();
   });
 
   // Replay offline progress queue
@@ -511,11 +593,15 @@
 
   // Expose download/clear functions
   window.mhsDownload = function(unitId) {
+    if (unitId !== currentUnit && unitId !== nextUnit) {
+      addManualDownload(unitId);
+    }
     manager.downloadUnit(unitId);
   };
 
   window.mhsClearCache = function(unitId) {
     if (confirm('Remove downloaded files for this unit?')) {
+      removeManualDownload(unitId);
       manager.deleteUnit(unitId).then(function() {
         runPipeline();
       });
@@ -534,6 +620,8 @@
       return manager.deleteAllUnits();
     })
     .then(function() {
+      localStorage.removeItem(MANUAL_DL_KEY);
+      manualDownloads = [];
       window.location.reload();
     })
     .catch(function(err) {
