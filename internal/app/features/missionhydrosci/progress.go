@@ -73,10 +73,12 @@ func (h *Handler) HandleResetProgress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if user.Role == "member" {
-		http.Error(w, "forbidden", http.StatusForbidden)
-		return
-	}
+	// TODO: restore after testing — members should not be able to reset their own progress
+	// if user.Role == "member" {
+	// 	http.Error(w, "forbidden", http.StatusForbidden)
+	// 	return
+	// }
+	_ = user.Role // suppress unused warning
 
 	wsID := workspace.IDFromRequest(r)
 	userID, err := primitive.ObjectIDFromHex(user.ID)

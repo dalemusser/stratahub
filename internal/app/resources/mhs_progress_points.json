@@ -6,23 +6,23 @@
       "progress_points": [
         {
           "id": "u1p1",
-          "short_name": "Get Your Space Legs",
-          "description": "Description of progress point u1p1"
+          "short_name": "Getting Your Space Legs",
+          "description": "Meet your captain and get to know the game controls."
         },
         {
           "id": "u1p2",
           "short_name": "Info and Intros",
-          "description": "Description of progress point u1p2"
+          "description": "Meet your fellow cadets and collect the pieces needed to complete an argument."
         },
         {
           "id": "u1p3",
-          "short_name": "Defend Expedition",
-          "description": "Description of progress point u1p3"
+          "short_name": "Defend the Expedition",
+          "description": "Learn to use the argumentation engine and identify a claim in an argument."
         },
         {
           "id": "u1p4",
-          "short_name": "Unexpected Turbulence",
-          "description": "Description of progress point u1p4"
+          "short_name": "What Was That?",
+          "description": "Make contact with ancient aliens and escape the ship."
         }
       ]
     },
@@ -32,38 +32,38 @@
       "progress_points": [
         {
           "id": "u2p1",
-          "short_name": "Escape the Ruins + Topographic Glyph",
-          "description": "Description of progress point u2p1"
+          "short_name": "Escape the Ruin",
+          "description": "Navigate alien ruins and match topographic maps to elevation profiles."
         },
         {
           "id": "u2p2",
-          "short_name": "Foraged Forging + Finding Toppo",
-          "description": "Description of progress point u2p2"
+          "short_name": "Foraged Forging",
+          "description": "Build a hover board and find Toppo's location by reading a topographic map."
         },
         {
           "id": "u2p3",
-          "short_name": "Finding Tera & Aryn",
-          "description": "Description of progress point u2p3"
+          "short_name": "Getting the Band Back Together Part II",
+          "description": "Find Tera and Aryn's locations by reading a topographic map."
         },
         {
           "id": "u2p4",
-          "short_name": "Investigate the Temple & Watershed Glyph",
-          "description": "Description of progress point u2p4"
+          "short_name": "Investigate the Temple",
+          "description": "Navigate alien ruins to find Jasper and relate watershed size to flow rate through its main river."
         },
         {
           "id": "u2p5",
-          "short_name": "Getting the Band Back Together",
-          "description": "Description of progress point u2p5"
+          "short_name": "Classified Information",
+          "description": "Fix DANI by identifying the parts of a scientific argument."
         },
         {
           "id": "u2p6",
-          "short_name": "Drone Tutorial + Data Collection",
-          "description": "Description of progress point u2p6"
+          "short_name": "Which Watershed? Part I",
+          "description": "Collect evidence to construct an argument about watershed size."
         },
         {
           "id": "u2p7",
-          "short_name": "Watershed Argument",
-          "description": "Description of progress point u2p7"
+          "short_name": "Which Watershed? Part II",
+          "description": "Build an argument about which watershed is bigger by supporting a claim with evidence."
         }
       ]
     },
@@ -73,28 +73,28 @@
       "progress_points": [
         {
           "id": "u3p1",
-          "short_name": "Good Morning Cadet + Establishing a Foothold",
-          "description": "Identify the direction of water flow based on a map of the watershed"
+          "short_name": "Supply Run",
+          "description": "Send Tera's crates back to her by identifying the direction of water flow based on a map of the watershed."
         },
         {
           "id": "u3p2",
-          "short_name": "Pollution Solution",
-          "description": "Predict the spread of dissolved materials through a watershed"
+          "short_name": "Pollution Solution Part I",
+          "description": "Find the source of a pollutant by predicting the spread of dissolved materials through a watershed."
         },
         {
           "id": "u3p3",
-          "short_name": "Pollution Argument",
-          "description": "Construct an argument with reasoning that links a claim with evidence"
+          "short_name": "Pollution Solution Part II",
+          "description": "Construct an argument about the location of the pollutant that includes reasoning and links a claim with evidence."
         },
         {
           "id": "u3p4",
           "short_name": "Forsaken Facility",
-          "description": "Predict the spread of dissolved materials"
+          "description": "Navigate alien ruins and solve puzzles to demonstrate an understanding of how materials move through waterways."
         },
         {
           "id": "u3p5",
-          "short_name": "Plant the Superfruit Seeds",
-          "description": "Predict the spread of dissolved materials through a watershed"
+          "short_name": "Part of a Balanced Ecosystem",
+          "description": "Help Tera plant seeds in ideal locations by predicting the spread of a dissolved nutrient through a watershed."
         }
       ]
     },
@@ -104,23 +104,33 @@
       "progress_points": [
         {
           "id": "u4p1",
-          "short_name": "Point 1",
-          "description": "Description of progress point u4p1"
+          "short_name": "Well What Have We Here?",
+          "description": "Search for a water source in the desert and demonstrate understanding of the water table."
         },
         {
           "id": "u4p2",
-          "short_name": "Point 2",
-          "description": "Description of progress point u4p2"
+          "short_name": "Power Play- Floors 1 & 2",
+          "description": "Explore alien ruins and demonstrate understanding of the relationship between infiltration rate and soil type."
         },
         {
           "id": "u4p3",
-          "short_name": "Point 3",
-          "description": "Description of progress point u4p3"
+          "short_name": "Power Play- Floors 3 & 4",
+          "description": "Manipulate alien machines to demonstrate understanding of the relationship between infiltration rate and soil type."
         },
         {
           "id": "u4p4",
-          "short_name": "Point 4",
-          "description": "Description of progress point u4p4"
+          "short_name": "Power Play- Floor 5",
+          "description": "Manipulate alien machines to demonstrate understanding of the relationship between infiltration rate and soil type. Drill a well to access the water table."
+        },
+        {
+          "id": "u4p5",
+          "short_name": "Saving Cadet Anderson",
+          "description": "Construct a complete argument to convince Anderson to leave her base."
+        },
+        {
+          "id": "u4p6",
+          "short_name": "Desert Delicacies",
+          "description": "Demonstrate understanding of soil infiltration rates and holding capacity by helping Tera film seedlings in the ideal soil for their needs."
         }
       ]
     },
@@ -130,33 +140,23 @@
       "progress_points": [
         {
           "id": "u5p1",
-          "short_name": "Point 1",
-          "description": "Description of progress point u5p1"
+          "short_name": "If I Had a Nickel- Floors 1 & 2",
+          "description": "Solve puzzles in alien ruins using knowledge of evaporation rate and the water cycle."
         },
         {
           "id": "u5p2",
-          "short_name": "Point 2",
-          "description": "Description of progress point u5p2"
+          "short_name": "If I Had a Nickel- Floors 3 & 4",
+          "description": "Solve puzzles in alien ruins using knowledge of evaporation and condensation."
         },
         {
           "id": "u5p3",
-          "short_name": "Point 3",
-          "description": "Description of progress point u5p3"
+          "short_name": "What Happened Here?",
+          "description": "Provide a counter argument to Aryn's faulty claim using knowledge about the water cycle."
         },
         {
           "id": "u5p4",
-          "short_name": "Point 4",
-          "description": "Description of progress point u5p4"
-        },
-        {
-          "id": "u5p5",
-          "short_name": "Point 5",
-          "description": "Description of progress point u5p5"
-        },
-        {
-          "id": "u5p6",
-          "short_name": "Point 6",
-          "description": "Description of progress point u5p6"
+          "short_name": "Water Problems Require Water Solutions",
+          "description": "Help Aryn fix a solar still using knowledge of evaporation and condensation."
         }
       ]
     }

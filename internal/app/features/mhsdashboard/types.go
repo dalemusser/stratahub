@@ -35,14 +35,15 @@ type GroupOption struct {
 
 // CellData represents a single cell in the progress grid.
 type CellData struct {
-	Value        int    // 0 = not started, 1 = needs review, 2 = completed
-	IsUnitStart  bool   // True if this is the first cell in a unit
-	CellClass    string // CSS class for the cell background
-	BorderClass  string // CSS class for the border
-	PointID      string // Progress point ID (e.g., "u1p1")
-	PointTitle   string // Progress point title
-	StudentName  string // Student name for this row
-	ReviewReason string // Reason for needing review (only for warning cells)
+	Value           int    // 0 = pending, 1 = flagged, 2 = passed, 3 = active
+	IsUnitStart     bool   // True if this is the first cell in a unit
+	IsInCurrentUnit bool   // True if cell belongs to the unit the student is currently in
+	CellClass       string // CSS class for the cell background
+	BorderClass     string // CSS class for the border
+	PointID         string // Progress point ID (e.g., "u1p1")
+	PointTitle      string // Progress point title
+	StudentName     string // Student name for this row
+	ReviewReason    string // Reason for flagged cells
 }
 
 // DeviceInfo represents a device's readiness status for display.
@@ -65,6 +66,7 @@ type MemberRow struct {
 	Cells        []CellData        // Pre-computed cell data
 	Devices      []DeviceInfo      // Device readiness info
 	UnitProgress map[string]string // unit ID → "completed"/"current"/"future"
+	CurrentUnit  string            // Unit ID the student is currently in (from grader)
 }
 
 // UnitHeader represents header info for a unit.

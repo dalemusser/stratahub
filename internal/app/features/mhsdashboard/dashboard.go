@@ -432,28 +432,29 @@ type ProgressGradeDoc struct {
 	Game        string                       `bson:"game"`
 	PlayerID    string                       `bson:"playerId"`
 	Grades      map[string]ProgressGradeItem `bson:"grades"`
+	CurrentUnit string                       `bson:"currentUnit,omitempty"`
 	LastUpdated time.Time                    `bson:"lastUpdated"`
 }
 
 // ProgressGradeItem represents a single grade within the grades map.
 type ProgressGradeItem struct {
-	Color      string         `bson:"color"`      // "green" or "yellow"
+	Status     string         `bson:"status"`               // "active", "passed", or "flagged"
 	ComputedAt time.Time      `bson:"computedAt"`
 	RuleID     string         `bson:"ruleId"`
-	ReasonCode string         `bson:"reasonCode,omitempty"` // Only for yellow grades
-	Metrics    map[string]any `bson:"metrics,omitempty"`    // Only for yellow grades
+	ReasonCode string         `bson:"reasonCode,omitempty"` // Only for flagged grades
+	Metrics    map[string]any `bson:"metrics,omitempty"`    // Only for flagged grades
 }
 
 // reasonCodeToMessage maps reason codes to human-readable messages.
 var reasonCodeToMessage = map[string]string{
-	"TOO_MANY_TARGETS":       "Student used more targets than allowed for efficient problem-solving.",
-	"TOO_MANY_TESTS":         "Student ran more tests than expected, may need guidance on efficiency.",
-	"TOO_MANY_NEGATIVE":      "Student received too many negative responses during the activity.",
-	"BAD_FEEDBACK":           "Student's responses indicate areas needing improvement.",
-	"SCORE_BELOW_THRESHOLD":  "Student's score was below the expected threshold.",
-	"YELLOW_NODES_EXIST":     "Student completed with some areas still needing attention.",
-	"INCOMPLETE":             "Student did not complete all required components.",
+	"NO_TRIGGER":            "Student has not yet completed the trigger event for this activity.",
+	"TOO_MANY_TARGETS":      "Student used more targets than allowed for efficient problem-solving.",
+	"TOO_MANY_TESTS":        "Student ran more tests than expected, may need guidance on efficiency.",
+	"TOO_MANY_NEGATIVES":    "Student received too many negative responses during the activity.",
+	"MISSING_SUCCESS_NODE":  "Student did not reach the expected success outcome.",
+	"SCORE_BELOW_THRESHOLD": "Student's score was below the expected threshold.",
 	"HINT_OR_TOO_MANY_GUESSES": "Student needed hints or made too many incorrect attempts.",
+	"PUZZLE_TOO_SLOW":       "Student took longer than expected to complete the puzzle.",
 }
 
 // loadProgressGrades fetches progress grades from the mhsgrader database for the given player IDs.
@@ -570,6 +571,12 @@ func (h *Handler) buildProgressRows(ctx context.Context, members []models.User, 
 			gradeDoc = grades[*member.LoginID]
 		}
 
+		// Read current unit from grader (if available)
+		var currentUnit string
+		if gradeDoc != nil {
+			currentUnit = gradeDoc.CurrentUnit
+		}
+
 		pointIdx := 0
 		for _, unit := range cfg.Units {
 			for j, point := range unit.ProgressPoints {
@@ -585,15 +592,19 @@ func (h *Handler) buildProgressRows(ctx context.Context, members []models.User, 
 				}
 
 				if gradeItem == nil {
-					// No grade - white (not started)
+					// No grade — pending (not started)
 					value = 0
 					cellClass = "mhs-cell-empty"
 					borderClass = "border-gray-200 dark:border-gray-600"
-				} else if gradeItem.Color == "green" {
+				} else if gradeItem.Status == "passed" {
 					value = 2
 					cellClass = "mhs-cell-success"
 					borderClass = "border-green-300"
-				} else if gradeItem.Color == "yellow" {
+				} else if gradeItem.Status == "active" {
+					value = 3
+					cellClass = "mhs-cell-active"
+					borderClass = "border-blue-300"
+				} else if gradeItem.Status == "flagged" {
 					value = 1
 					cellClass = "mhs-cell-warning"
 					borderClass = "border-yellow-300"
@@ -608,14 +619,15 @@ func (h *Handler) buildProgressRows(ctx context.Context, members []models.User, 
 				}
 
 				cells[pointIdx] = CellData{
-					Value:        value,
-					IsUnitStart:  j == 0,
-					CellClass:    cellClass,
-					BorderClass:  borderClass,
-					PointID:      point.ID,
-					PointTitle:   point.ShortName,
-					StudentName:  member.FullName,
-					ReviewReason: reviewReason,
+					Value:           value,
+					IsUnitStart:     j == 0,
+					IsInCurrentUnit: currentUnit != "" && currentUnit == unit.ID,
+					CellClass:       cellClass,
+					BorderClass:     borderClass,
+					PointID:         point.ID,
+					PointTitle:      point.ShortName,
+					StudentName:     member.FullName,
+					ReviewReason:    reviewReason,
 				}
 				pointIdx++
 			}
@@ -625,20 +637,20 @@ func (h *Handler) buildProgressRows(ctx context.Context, members []models.User, 
 		unitProgress := make(map[string]string, len(cfg.Units))
 		foundCurrent := false
 		for _, unit := range cfg.Units {
-			allGreen := true
+			allPassed := true
 			for _, point := range unit.ProgressPoints {
-				var isGreen bool
+				var isPassed bool
 				if gradeDoc != nil {
-					if item, ok := gradeDoc.Grades[point.ID]; ok && item.Color == "green" {
-						isGreen = true
+					if item, ok := gradeDoc.Grades[point.ID]; ok && item.Status == "passed" {
+						isPassed = true
 					}
 				}
-				if !isGreen {
-					allGreen = false
+				if !isPassed {
+					allPassed = false
 					break
 				}
 			}
-			if allGreen {
+			if allPassed {
 				unitProgress[unit.ID] = "completed"
 			} else if !foundCurrent {
 				unitProgress[unit.ID] = "current"
@@ -655,6 +667,7 @@ func (h *Handler) buildProgressRows(ctx context.Context, members []models.User, 
 			Cells:        cells,
 			Devices:      deviceMap[member.ID.Hex()],
 			UnitProgress: unitProgress,
+			CurrentUnit:  currentUnit,
 		}
 	}
 

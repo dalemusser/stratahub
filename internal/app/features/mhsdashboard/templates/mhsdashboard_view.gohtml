@@ -115,8 +115,32 @@
   .mhs-cell-warning {
     background: var(--mhs-warning-bg);
   }
+  .mhs-cell-active {
+    background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+    position: relative;
+  }
+  .mhs-cell-active::after {
+    content: "\270E";
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 11px;
+    color: #4338ca;
+  }
   .mhs-cell-empty {
     background: #ffffff;
+  }
+
+  /* "In unit" bar indicator above progress cells */
+  .mhs-in-unit-bar {
+    position: absolute;
+    top: 0;
+    left: 2px;
+    right: 2px;
+    height: 3px;
+    background: #6366f1;
+    border-radius: 0 0 2px 2px;
   }
 
   /* Legend samples use theme colors */
@@ -372,15 +396,23 @@
     <div class="flex items-center gap-5 text-xs">
       <div class="flex items-center gap-1.5">
         <span class="w-4 h-4 flex-shrink-0 rounded mhs-legend-success border"></span>
-        <span class="text-slate-600">Completed</span>
+        <span class="text-slate-600">Passed</span>
       </div>
       <div class="flex items-center gap-1.5">
         <span class="w-4 h-4 flex-shrink-0 rounded mhs-legend-warning border"></span>
-        <span class="text-slate-600">Needs Review</span>
+        <span class="text-slate-600">Flagged</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-4 h-4 flex-shrink-0 rounded border border-indigo-300 mhs-cell-active" style="position:relative;"></span>
+        <span class="text-slate-600">In Progress</span>
       </div>
       <div class="flex items-center gap-1.5">
         <span class="w-4 h-4 flex-shrink-0 rounded border border-slate-300 bg-white"></span>
         <span class="text-slate-600">Not Started</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-8 h-1 flex-shrink-0 rounded-full bg-indigo-500"></span>
+        <span class="text-slate-600">In Unit</span>
       </div>
     </div>
     <!-- Right: Refresh controls -->

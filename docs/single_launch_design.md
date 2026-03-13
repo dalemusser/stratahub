@@ -1,12 +1,14 @@
 # Mission HydroSci — Single Launch Point Design
 
+> **Status:** Phases 1-4 are complete. Phase 5 (Student Reset) is not yet implemented and is the next phase to complete. See [Implementation Phases](#implementation-phases).
+
 ## Overview
 
 This document describes the design for a single-launch-point experience in Mission HydroSci within StrataHub. Instead of presenting users with 5 individual unit cards that they download and play independently, the user sees one Launch button that takes them to the correct unit based on their progress. Unit completion is detected, progress is stored, and the user is automatically transitioned to the next unit.
 
 The implementation targets **Mission HydroSci** (`missionhydrosci`). Mission XydroSci (`missionhydroscix`) remains as a frozen snapshot of the original multi-card experience for comparison and experimentation.
 
-The game operates in two modes: **Mode 1 (PWA)** where StrataHub manages everything, and **Mode 2 (URL)** where the game manages its own navigation. Both modes use URL parameters for identity.
+The game operates in two modes: **Mode 1 (PWA)** where StrataHub manages everything, and **Mode 2 (URL)** where the game manages its own navigation.
 
 ---
 
@@ -79,43 +81,30 @@ The game determines its mode by whether `SendMessage` is called after initializa
 
 ## Identity
 
-Both modes use URL parameters for identity. This provides a single mechanism that works everywhere: in the PWA, from a StrataHub resource link, and for standalone testing.
+The two modes use different identity mechanisms.
 
-### URL Parameters
+### Mode 1 (PWA) — Identity Bridge
 
-| Parameter | Always included | Source | Purpose |
-|---|---|---|---|
-| `id` | Yes | User's login_id | Logging and save state — the only field the game uses |
-| `group` | Yes (resource launch) | Group name | Used by survey/assessment apps |
-| `org` | Yes (resource launch) | Organization name | Used by survey/assessment apps |
-| `name` | Toggleable | User's full name | Future use — disabled if it causes issues with survey apps |
+In PWA mode, identity is provided via the **identity bridge**: the play page intercepts the game's XHR/fetch calls to `/api/user` and returns the authenticated user's identity (name, login_id) directly from the server-side session. No identity information is placed in the URL.
 
-### How Identity Flows
+This avoids a security and operational risk: URL-based identity (e.g., `?id=johndoe`) can be trivially modified by a student to impersonate another student, corrupting their save state and progress. The identity bridge is not susceptible to this because the identity comes from the authenticated StrataHub session, not the URL.
 
-**Mode 1 (PWA):**
-- The Launch button URL includes `?id=login_id`: `/missionhydrosci/play/unit3?id=johndoe`
-- StrataHub constructs this URL server-side using the authenticated session.
-- On unit transition, StrataHub navigates to the next unit with the same parameter.
-- The game reads `id` from `window.location.search` on startup.
-- The identity bridge (XHR/fetch intercept) remains as a backward-compatible fallback.
+### Mode 2 (URL) — URL Parameters
 
-**Mode 2 (URL):**
-- StrataHub's resource launch injects `?id=johndoe&group=Group1&org=MyOrg` into the URL.
-- Every navigation (loader→unit, unit→unit) carries the query string forward:
-  ```javascript
-  window.location.href = '../unit2/index.html' + window.location.search;
-  ```
-- For testing without StrataHub, append `?id=tester123` to any URL manually.
+In URL mode (game self-managed, not inside the PWA), identity comes from URL parameters injected by StrataHub's resource launch:
 
-### Toggleable Name Parameter
+| Parameter | Source | Purpose |
+|---|---|---|
+| `id` | User's login_id | Logging and save state — the only field the game uses |
+| `group` | Group name | Used by survey/assessment apps |
+| `org` | Organization name | Used by survey/assessment apps |
 
-The `name` parameter inclusion is controlled by a config flag in StrataHub's app config:
-
-```go
-MHSIncludeNameInURL bool // Whether to include the user's full name in play/resource URLs
+Every navigation (loader→unit, unit→unit) carries the query string forward:
+```javascript
+window.location.href = '../unit2/index.html' + window.location.search;
 ```
 
-When enabled, resource launch URLs and PWA play URLs include `&name=John+Doe`. When disabled, the parameter is omitted. This allows quick disabling if survey/assessment apps have issues with unexpected URL parameters.
+URL-based identity in Mode 2 is acceptable because resource launch URLs are generated server-side per user and the game manages its own navigation. The risk is lower than in Mode 1 because Mode 2 does not write to StrataHub's progress records.
 
 ---
 
@@ -1025,7 +1014,6 @@ window.location.href = '../unit3/index.html' + window.location.search;
 - Create `GET /missionhydrosci/api/progress` endpoint
 - Create `POST /missionhydrosci/api/progress/complete` endpoint (with idempotency)
 - Redesign units page: single Launch button, progress dots, current unit display
-- Add `?id=login_id` to play page URL
 - Wire completion signal (navigation interception) to progress API
 - Wire unit transition (teardown → navigate to next unit)
 - Show completion message after Unit 5
@@ -1065,13 +1053,11 @@ window.location.href = '../unit3/index.html' + window.location.search;
 - Keep navigation interception as fallback during transition
 - Remove navigation interception fallback once confirmed working
 
-### Phase 5: Toggleable Name Parameter
+### ~~Phase 5: Toggleable Name Parameter~~ (Removed)
 
-- Add `MHSIncludeNameInURL` config flag
-- Add `name` parameter to play page URL and resource launch URL when enabled
-- Test with survey/assessment apps
+**Removed.** URL-based identity (`?id=`, `?name=`) was dropped for PWA mode because it is trivially hackable — a student can modify the URL to impersonate another student, corrupting their save state and progress. Identity in PWA mode is provided exclusively via the identity bridge (server-side session). See the [Identity](#identity) section.
 
-### Phase 6: Student Reset
+### Phase 5: Student Reset
 
 - Add reset API and UI on teacher dashboard (see [Student Reset](#student-reset))
 - Integrate with stratasave database for save data deletion
@@ -1160,21 +1146,20 @@ On the teacher dashboard, next to each student row. A "Reset" button (or icon) t
 | `internal/app/store/mhsdevicestatus/store.go` | MongoDB store (upsert for device status) |
 | `internal/app/features/missionhydrosci/progress.go` | API handlers for progress endpoints |
 | `internal/app/features/missionhydrosci/device_status.go` | API handler for device status endpoint |
-| `internal/app/features/missionhydrosci/admin_reset.go` | API handler for student reset (Phase 6) |
+| `internal/app/features/missionhydrosci/admin_reset.go` | API handler for student reset (Phase 5) |
 
 ### Modified Files
 
 | File | Change |
 |---|---|
 | `internal/app/features/missionhydrosci/routes.go` | Add progress and device-status API routes |
-| `internal/app/features/missionhydrosci/units.go` | Pass progress data to template, add `id` to play URL |
+| `internal/app/features/missionhydrosci/units.go` | Pass progress data to template |
 | `internal/app/features/missionhydrosci/handler.go` | Add progress store and device status store dependencies |
 | `internal/app/features/missionhydrosci/templates/missionhydrosci_units.gohtml` | Single launch UI, progress dots, auto-download logic, manual override |
 | `internal/app/features/missionhydrosci/templates/missionhydrosci_play.gohtml` | Add `mhsUnitComplete` handler, `SendMessage` call, transition logic, offline queue |
 | `internal/app/features/mhsdashboard/` | Add device readiness columns (Phase 3) |
 | `internal/app/system/indexes/indexes.go` | Add `mhs_user_progress` and `mhs_device_status` indexes |
 | `internal/app/bootstrap/routes.go` | Wire login actions registry, progress store, device status store |
-| `internal/app/bootstrap/appconfig.go` | Add `MHSIncludeNameInURL` config flag |
 | `internal/app/features/login/handler.go` | Call login actions registry after session creation |
 
 ### Files for Dev Team (Not in StrataHub)
