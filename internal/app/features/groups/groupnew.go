@@ -241,11 +241,12 @@ func (h *Handler) HandleCreateGroup(w http.ResponseWriter, r *http.Request) {
 			col := db.Collection("group_memberships")
 			for _, lid := range leaders {
 				writes = append(writes, mongo.NewInsertOneModel().SetDocument(bson.M{
-					"group_id":   doc.ID,
-					"user_id":    lid,
-					"org_id":     orgID,
-					"role":       "leader",
-					"created_at": now,
+					"workspace_id": doc.WorkspaceID,
+					"group_id":     doc.ID,
+					"user_id":      lid,
+					"org_id":       orgID,
+					"role":         "leader",
+					"created_at":   now,
 				}))
 			}
 			if len(writes) > 0 {
