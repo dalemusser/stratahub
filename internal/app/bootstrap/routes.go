@@ -26,7 +26,7 @@ import (
 	mhsdashboardfeature "github.com/dalemusser/stratahub/internal/app/features/mhsdashboard"
 	mhsdeliveryfeature "github.com/dalemusser/stratahub/internal/app/features/mhsdelivery"
 	missionhydroscifeature "github.com/dalemusser/stratahub/internal/app/features/missionhydrosci"
-	missionhydroscixfeature "github.com/dalemusser/stratahub/internal/app/features/missionhydroscix"
+
 	organizationsfeature "github.com/dalemusser/stratahub/internal/app/features/organizations"
 	pagesfeature "github.com/dalemusser/stratahub/internal/app/features/pages"
 	reportsfeature "github.com/dalemusser/stratahub/internal/app/features/reports"
@@ -270,11 +270,6 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	r.Get("/missionhydrosci-manifest.json", missionHydroSciHandler.ServeManifest)
 	r.Handle("/missionhydrosci/content/*", missionHydroSciHandler.ContentFallback())
 
-	// Mission HydroSci X (second experimental copy, admin-only)
-	missionHydroSciXHandler := missionhydroscixfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, appCfg.MHSCDNBaseURL, logger)
-	r.Get("/missionhydroscix-sw.js", missionHydroSciXHandler.ServeServiceWorker)
-	r.Get("/missionhydroscix-manifest.json", missionHydroSciXHandler.ServeManifest)
-	r.Handle("/missionhydroscix/content/*", missionHydroSciXHandler.ContentFallback())
 
 	// Public pages
 	homeHandler := homefeature.NewHandler(deps.StrataHubMongoDatabase, logger)
@@ -517,8 +512,6 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		// Mission HydroSci (experimental copy of MHS delivery for admin/coordinator development)
 		wsr.Mount("/missionhydrosci", missionhydroscifeature.Routes(missionHydroSciHandler, sessionMgr))
 
-		// Mission HydroSci X (second experimental copy, admin-only)
-		wsr.Mount("/missionhydroscix", missionhydroscixfeature.Routes(missionHydroSciXHandler, sessionMgr))
 
 		// Announcements management (admin only)
 		announcementsHandler := announcementsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
