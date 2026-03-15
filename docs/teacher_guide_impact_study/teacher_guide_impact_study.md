@@ -69,20 +69,17 @@ Downloads are large (100–200 MB per unit) and require an internet connection. 
 
 ### In-Game Controls
 
-While playing, two small buttons appear in the corners of the screen:
-
-- **← (Back)** — top-left corner. Returns to the Units page. Use this if a student needs to stop playing mid-unit.
-- **⛶ (Fullscreen)** — top-right corner. Expands the game to fill the entire screen.
+While playing, a **← (Back)** button appears in the top-left corner of the screen. Click it to return to the Units page if a student needs to stop playing mid-unit.
 
 ![Back and Fullscreen buttons](mhs-guide-images/back-fullscreen.png)
 
 ### Fullscreen Mode
 
-Clicking the fullscreen button gives a fully immersive experience. To exit fullscreen, press the **Esc** key or click the **✕** button in the top-right corner.
+The installed app already provides a near-fullscreen experience without the browser address bar and tabs.
 
-**Important Chromebook note:** When in fullscreen mode, the **top-row keys** on the Chromebook keyboard (volume, brightness, back, forward, etc.) **stop working**. This is expected Chromebook behavior for fullscreen web apps — it is not a bug. Students can exit fullscreen to use those keys, or use on-screen controls within the game.
+**On a Chromebook**, use the **fullscreen key** on the top row of the keyboard (the key that looks like a rectangle, typically the 4th or 5th key from the left) to enter and exit fullscreen. This works in both the installed app and in the browser. All top-row keys (volume, brightness, etc.) continue to work normally. Students can also exit fullscreen by pressing and holding **Esc** for two seconds.
 
-The installed app (PWA) already provides a near-fullscreen experience, so the extra fullscreen button may not be necessary for most students.
+**On macOS or Windows** (no fullscreen key), an in-game fullscreen button (⛶) appears in the top-right corner of the screen. Click it to enter fullscreen. To exit, press and hold **Esc** for two seconds.
 
 ### Completing a Unit
 
@@ -153,8 +150,8 @@ Students should clear completed units they no longer need, or ask a teacher for 
 - Mission HydroSci appears in the left sidebar after login
 
 ### Top-row keys not working (volume, brightness, etc.)
-- Exit fullscreen mode by pressing **Esc** or clicking **✕**
-- The top-row keys will work again once fullscreen is exited
+- Use the Chromebook's **fullscreen key** (top row) to enter and exit fullscreen — top-row keys will work normally
+- If fullscreen was entered using the in-game ⛶ button (browser on macOS/Windows), exit by pressing and holding **Esc** for two seconds
 
 ### App looks different from the browser version
 - The installed app and the browser version are the same — the app just hides the browser chrome (address bar, tabs) for a cleaner experience
@@ -262,7 +259,7 @@ If a student has multiple devices, they'll appear on separate rows grouped under
 | Download a unit | Click the blue **Download** button |
 | Play a unit | Click the green **Launch** button |
 | Go back to units | Click **←** (top-left corner) |
-| Go fullscreen | Click **⛶** (top-right corner) |
-| Exit fullscreen | Press **Esc** or click **✕** |
+| Go fullscreen | Press the Chromebook **fullscreen key** (top row) |
+| Exit fullscreen | Press the **fullscreen key** again, or hold **Esc** for 2 seconds |
 | Check progress | Leaders: open **MHS Dashboard** |
 | Manage storage | Click **Manage downloads** on the Units page |

@@ -755,19 +755,34 @@
 
     // Hide the fullscreen button when it's unnecessary or harmful:
     // 1. Standalone (PWA) mode — no browser chrome to hide, fullscreen is redundant.
+    //    On ChromeOS, JS fullscreen + keyboard.lock() also disables top-row keys
+    //    (volume, brightness, etc.), so hiding the button avoids that issue.
     // 2. iPad Safari — fullscreen suppresses all letter key DOM events (WASD etc.),
     //    a browser limitation with no JS workaround.
     // Detection: standalone mode via display-mode media query or navigator.standalone;
     // iPad via touch capability + Mac/iPad user agent (iPadOS reports as Macintosh).
     (function() {
-      var isStandalone = window.matchMedia('(display-mode: standalone)').matches ||
-        navigator.standalone === true;
-      var isIPad = navigator.maxTouchPoints > 0 &&
-        (/iPad/.test(navigator.userAgent) || /Macintosh/.test(navigator.userAgent));
-      if (isStandalone || isIPad) {
+      function hideFullscreenBtn() {
         var btn = document.getElementById('fullscreen-btn');
         if (btn) btn.style.display = 'none';
       }
+
+      var isIPad = navigator.maxTouchPoints > 0 &&
+        (/iPad/.test(navigator.userAgent) || /Macintosh/.test(navigator.userAgent));
+      if (isIPad) {
+        hideFullscreenBtn();
+        return;
+      }
+
+      var mq = window.matchMedia('(display-mode: standalone)');
+      if (mq.matches || navigator.standalone === true) {
+        hideFullscreenBtn();
+      }
+      // Listen for display-mode changes — handles "Open App" in Chrome's URL bar,
+      // which transitions from browser to standalone after page load.
+      mq.addEventListener('change', function(e) {
+        if (e.matches) hideFullscreenBtn();
+      });
     })();
     </script>
   </body>
