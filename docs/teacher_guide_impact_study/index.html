@@ -1,0 +1,514 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mission HydroSci — Teacher Guide</title>
+  <style>
+    :root {
+      --blue: #2563eb;
+      --blue-light: #dbeafe;
+      --green: #16a34a;
+      --green-light: #dcfce7;
+      --yellow: #ca8a04;
+      --yellow-light: #fef9c3;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-800: #1f2937;
+      --gray-900: #111827;
+      --red-light: #fee2e2;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.7;
+      color: var(--gray-800);
+      background: var(--gray-50);
+    }
+
+    .container {
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem 4rem;
+    }
+
+    h1 {
+      font-size: 2rem;
+      color: var(--gray-900);
+      border-bottom: 3px solid var(--blue);
+      padding-bottom: 0.75rem;
+      margin-bottom: 2rem;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      color: var(--blue);
+      margin-top: 3rem;
+      margin-bottom: 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    h3 {
+      font-size: 1.15rem;
+      color: var(--gray-900);
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+    }
+
+    p { margin-bottom: 1rem; }
+
+    ol, ul {
+      margin-bottom: 1rem;
+      padding-left: 1.75rem;
+    }
+
+    li { margin-bottom: 0.4rem; }
+
+    strong { color: var(--gray-900); }
+
+    img {
+      display: block;
+      max-width: 100%;
+      height: auto;
+      margin: 1.25rem auto;
+      border-radius: 8px;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+    }
+
+    img.narrow {
+      max-width: 500px;
+    }
+
+    img.banner {
+      max-width: 600px;
+    }
+
+    .callout {
+      background: var(--blue-light);
+      border-left: 4px solid var(--blue);
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .callout p { margin-bottom: 0; }
+
+    .callout-warning {
+      background: var(--yellow-light);
+      border-left: 4px solid var(--yellow);
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .callout-warning p { margin-bottom: 0; }
+
+    .callout-note {
+      background: var(--gray-100);
+      border-left: 4px solid var(--gray-300);
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+      border-radius: 0 6px 6px 0;
+    }
+
+    .callout-note p { margin-bottom: 0; }
+
+    .reminders {
+      background: var(--red-light);
+      border: 1px solid #fca5a5;
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin: 1.5rem 0;
+    }
+
+    .reminders ul {
+      margin-bottom: 0;
+    }
+
+    .reminders li:last-child {
+      margin-bottom: 0;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0 1.5rem;
+      font-size: 0.95rem;
+    }
+
+    th {
+      background: var(--gray-800);
+      color: white;
+      text-align: left;
+      padding: 0.6rem 1rem;
+    }
+
+    td {
+      padding: 0.5rem 1rem;
+      border-bottom: 1px solid var(--gray-200);
+    }
+
+    tr:nth-child(even) td {
+      background: var(--gray-100);
+    }
+
+    .troubleshooting h3 {
+      background: var(--gray-100);
+      padding: 0.5rem 0.75rem;
+      border-radius: 6px;
+      font-size: 1.05rem;
+    }
+
+    .troubleshooting ul {
+      margin-top: 0.5rem;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid var(--gray-200);
+      margin: 2.5rem 0;
+    }
+
+    .badge {
+      display: inline-block;
+      padding: 0.15rem 0.5rem;
+      border-radius: 4px;
+      font-size: 0.85rem;
+      font-weight: 600;
+    }
+
+    .badge-blue { background: #3b82f6; color: white; }
+    .badge-green { background: #22c55e; color: white; }
+    .badge-yellow { background: #eab308; color: var(--gray-900); }
+    .badge-gray { background: var(--gray-200); color: var(--gray-700); }
+
+    .quick-ref {
+      background: white;
+      border: 1px solid var(--gray-200);
+      border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .quick-ref table {
+      margin: 0;
+    }
+
+    @media (max-width: 600px) {
+      .container { padding: 1rem; }
+      h1 { font-size: 1.5rem; }
+      h2 { font-size: 1.25rem; }
+      table { font-size: 0.85rem; }
+      th, td { padding: 0.4rem 0.6rem; }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <h1>Mission HydroSci — Teacher Guide (Impact Study)</h1>
+
+    <!-- ===== GETTING STARTED ===== -->
+    <h2>Getting Started</h2>
+
+    <h3>Accessing Mission HydroSci</h3>
+    <ol>
+      <li>On each student Chromebook, open Chrome and go to <strong>mhs.adroit.games</strong></li>
+      <li>Students log in with their <strong>Login ID</strong></li>
+      <li>After logging in, students will see a sidebar menu on the left. Click <strong>Mission HydroSci</strong> to open the game</li>
+    </ol>
+
+    <h3>Installing the App (Recommended)</h3>
+    <p>After logging in, students will see a blue banner at the top of the Mission HydroSci page:</p>
+
+    <div class="callout">
+      <p><strong>Install Mission HydroSci for the best experience</strong></p>
+    </div>
+
+    <img class="banner" src="mhs-guide-images/install-mhs.png" alt="Install banner showing Install Mission HydroSci for the best experience">
+
+    <ol>
+      <li>Click the <strong>Install</strong> button on the banner</li>
+      <li>Chrome will ask to confirm — click <strong>Install</strong></li>
+      <li>The app installs and can be found in the Chromebook's app launcher</li>
+    </ol>
+
+    <p><strong>Pinning to the shelf (bottom bar):</strong></p>
+    <ol start="4">
+      <li>Click the <strong>Launcher</strong> button (circle icon, bottom-left corner of the screen)</li>
+      <li>Find <strong>Mission HydroSci</strong> in the app list (or type it in the search bar)</li>
+      <li>Tap the trackpad with <strong>two fingers</strong> on the Mission HydroSci icon (this is how you right-click on a Chromebook)</li>
+      <li>Select <strong>Pin to shelf</strong></li>
+      <li>The icon now stays in the bottom bar for quick access</li>
+    </ol>
+
+    <img class="narrow" src="mhs-guide-images/pin-to-shelf.png" alt="Right-click context menu showing Pin to shelf option">
+
+    <p>Installing the app gives students a cleaner, near-fullscreen experience without the browser address bar and tabs.</p>
+
+    <div class="callout-note">
+      <p><strong>If the banner doesn't appear</strong>, the app may already be installed, or Chrome may not be ready yet. Students can still use Mission HydroSci in the browser — installation is not required to play.</p>
+    </div>
+
+    <hr>
+
+    <!-- ===== PLAYING THE GAME ===== -->
+    <h2>Playing the Game</h2>
+
+    <h3>The Units Page</h3>
+    <p>After opening Mission HydroSci, students see:</p>
+    <ul>
+      <li><strong>Progress dots</strong> at the top showing which units are complete (filled green), current (green outline), or upcoming (gray)</li>
+      <li>The <strong>current unit</strong> title and its status</li>
+      <li>A <strong>Download</strong> button (blue) and a <strong>Launch</strong> button (green)</li>
+    </ul>
+
+    <img class="narrow" src="mhs-guide-images/mission-hydrosci.png" alt="Units page showing progress dots, unit status, Launch button, and Manage downloads">
+
+    <h3>Downloading a Unit</h3>
+    <p>Before a unit can be played, it needs to be downloaded to the device:</p>
+    <ol>
+      <li>Click the blue <strong>Download</strong> button</li>
+      <li>A progress bar shows the download progress</li>
+      <li>When the status changes to <strong>Ready to play</strong>, the green <strong>Launch</strong> button appears</li>
+      <li>The next unit will begin downloading automatically in the background</li>
+    </ol>
+    <p>Downloads are large (100–200 MB per unit) and require an internet connection. Once downloaded, units load faster and more reliably from the device. <strong>Students should always be connected to the internet when playing</strong> — the game needs a connection to save progress and log activity.</p>
+
+    <div class="callout-note">
+      <p><strong>If a download fails</strong>, a <strong>Retry</strong> button will appear. Click it to try again. If downloads repeatedly fail, check the internet connection or see the Troubleshooting section below.</p>
+    </div>
+
+    <h3>Launching a Unit</h3>
+    <ol>
+      <li>Click the green <strong>Launch</strong> button</li>
+      <li>A loading screen appears with a progress bar — wait for it to finish</li>
+      <li>The game loads and fills the screen</li>
+    </ol>
+
+    <h3>In-Game Controls</h3>
+    <p>While playing, a <strong>← (Back)</strong> button appears in the top-left corner of the screen. Click it to return to the Units page if a student needs to stop playing mid-unit.</p>
+
+    <img src="mhs-guide-images/back-fullscreen.png" alt="Back button in top-left corner">
+
+    <h3>Fullscreen Mode</h3>
+    <p>The installed app already provides a near-fullscreen experience without the browser address bar and tabs.</p>
+
+    <p><strong>On a Chromebook</strong>, use the <strong>fullscreen key</strong> on the top row of the keyboard (the key that looks like a rectangle, typically the 4th or 5th key from the left) to enter and exit fullscreen. This works in both the installed app and in the browser. All top-row keys (volume, brightness, etc.) continue to work normally. Students can also exit fullscreen by pressing and holding <strong>Esc</strong> for two seconds.</p>
+
+    <p><strong>On macOS or Windows</strong> (no fullscreen key), an in-game fullscreen button (⛶) appears in the top-right corner of the screen. Click it to enter fullscreen. To exit, press and hold <strong>Esc</strong> for two seconds.</p>
+
+    <h3>Completing a Unit</h3>
+    <p>When a student finishes a unit:</p>
+    <ol>
+      <li>A <strong>Unit Complete</strong> overlay appears</li>
+      <li>The next unit downloads automatically (if not already downloaded)</li>
+      <li>Once ready, the next unit loads automatically</li>
+      <li>After the final unit, a <strong>Back to Mission HydroSci</strong> button appears</li>
+    </ol>
+    <p>Progress is saved automatically. If a student closes the app and returns later, they will resume from where they left off.</p>
+
+    <hr>
+
+    <!-- ===== IMPORTANT REMINDERS ===== -->
+    <h2>Important Reminders for Students</h2>
+
+    <div class="reminders">
+      <ul>
+        <li><strong>Always play while connected to the internet.</strong> The game needs a connection to save progress and log activity. If a student plays without a connection, their progress may not be saved.</li>
+        <li><strong>Don't share Login IDs.</strong> Each student's progress is tied to their Login ID. If two students use the same ID, their progress will overwrite each other.</li>
+        <li><strong>Don't clear the browser's data or cache.</strong> This deletes all downloaded units and the student would need to re-download everything.</li>
+        <li><strong>Progress saves at specific checkpoints within each unit</strong>, not continuously. If a student stops playing between save points, they will need to replay from the last save when they return.</li>
+      </ul>
+    </div>
+
+    <hr>
+
+    <!-- ===== MANAGING DOWNLOADS ===== -->
+    <h2>Managing Downloads and Storage</h2>
+
+    <h3>Viewing Storage</h3>
+    <p>On the Units page, students can see a <strong>Device Storage</strong> bar showing how much space is used on the device.</p>
+
+    <h3>Manage Downloads</h3>
+    <p>Click <strong>Manage downloads</strong> to expand a section showing all units with their download status:</p>
+    <ul>
+      <li><strong>Downloaded</strong> — ready to play</li>
+      <li><strong>Not downloaded</strong> — needs to be downloaded before playing</li>
+      <li><strong>Partial</strong> — download was interrupted</li>
+    </ul>
+    <p>From this section, students can:</p>
+    <ul>
+      <li>Download specific units manually</li>
+      <li><strong>Clear</strong> a downloaded unit to free up space (the unit will need to be re-downloaded to play again)</li>
+    </ul>
+
+    <h3>Low Storage</h3>
+    <p>If device storage is above 90% full, a warning appears:</p>
+    <div class="callout-warning">
+      <p><strong>Low storage — auto-download of next unit paused</strong></p>
+    </div>
+    <p>Students should clear completed units they no longer need, or ask a teacher for help freeing up space on the device.</p>
+
+    <hr>
+
+    <!-- ===== TROUBLESHOOTING ===== -->
+    <h2>Troubleshooting</h2>
+
+    <div class="troubleshooting">
+      <h3>"Download failed" or downloads won't start</h3>
+      <ul>
+        <li>Check the Chromebook's internet connection (Wi-Fi)</li>
+        <li>Try clicking <strong>Retry</strong></li>
+        <li>If storage is low, clear completed units from <strong>Manage downloads</strong></li>
+        <li>Restart Chrome and try again</li>
+      </ul>
+
+      <h3>Game won't load after clicking Launch</h3>
+      <ul>
+        <li>Make sure the unit shows <strong>Ready to play</strong> status</li>
+        <li>Try refreshing the page</li>
+        <li>If offline, the unit must be downloaded first</li>
+      </ul>
+
+      <h3>Student can't find Mission HydroSci in the menu</h3>
+      <ul>
+        <li>Make sure the student is logged in to the correct account</li>
+        <li>Mission HydroSci appears in the left sidebar after login</li>
+      </ul>
+
+      <h3>Top-row keys not working (volume, brightness, etc.)</h3>
+      <ul>
+        <li>Use the Chromebook's <strong>fullscreen key</strong> (top row) to enter and exit fullscreen — top-row keys will work normally</li>
+        <li>If fullscreen was entered using the in-game ⛶ button (browser on macOS/Windows), exit by pressing and holding <strong>Esc</strong> for two seconds</li>
+      </ul>
+
+      <h3>App looks different from the browser version</h3>
+      <ul>
+        <li>The installed app and the browser version are the same — the app just hides the browser chrome (address bar, tabs) for a cleaner experience</li>
+      </ul>
+
+      <h3>Student lost progress</h3>
+      <ul>
+        <li>Progress is saved automatically as units are completed</li>
+        <li>If a student is logged in to a different account, they will see that account's progress</li>
+        <li>Check that the student used the correct Login ID</li>
+      </ul>
+    </div>
+
+    <hr>
+
+    <!-- ===== MHS DASHBOARD ===== -->
+    <h2>MHS Dashboard (For Teachers)</h2>
+
+    <p>As a leader, you have access to the <strong>MHS Dashboard</strong> in the sidebar menu. The dashboard has two tabs: <strong>Progress</strong> and <strong>Devices</strong>.</p>
+    <p>Use the group selector dropdown at the top to choose which class you want to view.</p>
+
+    <img src="mhs-guide-images/mhs-dashboard.png" alt="MHS Dashboard showing the Progress tab with student grid">
+
+    <h3>Progress Tab</h3>
+    <p>The Progress tab shows a grid of student progress across all five units of Mission HydroSci.</p>
+
+    <p><strong>Reading the grid:</strong></p>
+    <ul>
+      <li><strong>Rows</strong> are students in the selected group, sorted alphabetically by name</li>
+      <li><strong>Columns</strong> are progress points — specific checkpoints within each unit where student performance is evaluated</li>
+      <li>Each unit contains multiple progress points (4–7 per unit, 26 total across all five units)</li>
+    </ul>
+
+    <p><strong>Cell colors indicate status:</strong></p>
+    <table>
+      <tr><th>Color</th><th>Meaning</th></tr>
+      <tr><td><span class="badge badge-blue">Blue</span> (solid)</td><td><strong>Passed</strong> — student completed this progress point successfully</td></tr>
+      <tr><td><span class="badge badge-yellow">Yellow</span> (solid)</td><td><strong>Flagged</strong> — student completed it but may need attention (see below)</td></tr>
+      <tr><td><span class="badge" style="background:#6366f1;color:white">Indigo</span> with ✎</td><td><strong>In Progress</strong> — student is currently working on this progress point</td></tr>
+      <tr><td><span class="badge badge-gray">Empty</span></td><td><strong>Not Started</strong> — student hasn't reached this point yet</td></tr>
+    </table>
+
+    <p>A horizontal bar above a row indicates which unit the student is currently in.</p>
+
+    <p><strong>Understanding flagged cells:</strong></p>
+    <p>A yellow/flagged cell means the student completed the progress point but their performance was outside expected bounds. Click any flagged cell to see details, including:</p>
+    <ul>
+      <li>What the issue was (e.g., "Student used more targets than allowed" or "Student needed hints or made too many incorrect attempts")</li>
+      <li>Suggested actions for the teacher</li>
+    </ul>
+    <p>Flagged cells are informational — they highlight students who may benefit from additional support or a conversation about the activity.</p>
+
+    <div class="callout-note">
+      <p><strong>Note:</strong> For <strong>Units 1–3</strong>, clicking a flagged cell shows specific information about what the student struggled with and suggested actions. For <strong>Units 4 and 5</strong>, the flagged cell will show a general statement that the student's performance was outside expected bounds, but will not include specific details about the issue. Detailed performance measures for Units 4 and 5 are still being developed.</p>
+    </div>
+
+    <p><strong>Other features:</strong></p>
+    <ul>
+      <li>Click any progress point column header to see a description of what that checkpoint covers</li>
+      <li>Click the <strong>Name</strong> column header to toggle sort order (A–Z or Z–A)</li>
+      <li>The dashboard auto-refreshes every 30 seconds, or click <strong>Refresh</strong> to update manually</li>
+      <li>Use the <strong>Theme</strong> dropdown to change colors for accessibility (colorblind-friendly options are available)</li>
+    </ul>
+
+    <h3>Devices Tab</h3>
+    <p>The Devices tab shows which students have their Chromebooks set up and ready to play.</p>
+
+    <p><strong>Columns:</strong></p>
+    <table>
+      <tr><th>Column</th><th>What it shows</th></tr>
+      <tr><td><strong>Student</strong></td><td>Student name</td></tr>
+      <tr><td><strong>Device</strong></td><td>Device type (e.g., "Chromebook")</td></tr>
+      <tr><td><strong>PWA</strong></td><td>&#10003; if the app is installed, — if not</td></tr>
+      <tr><td><strong>Unit 1–5</strong></td><td>Download/readiness status for each unit (see below)</td></tr>
+      <tr><td><strong>Storage</strong></td><td>How much device storage is used (bar + percentage)</td></tr>
+      <tr><td><strong>Last Seen</strong></td><td>When the device last connected</td></tr>
+    </table>
+
+    <p><strong>Unit readiness indicators (colored dots):</strong></p>
+    <table>
+      <tr><th>Dot</th><th>Meaning</th></tr>
+      <tr><td><span class="badge badge-blue">Blue solid</span></td><td>Downloaded and ready to play</td></tr>
+      <tr><td><span class="badge" style="background:white;color:#3b82f6;border:2px solid #3b82f6">Blue outline</span></td><td>Currently downloading</td></tr>
+      <tr><td><span class="badge badge-green">Green solid</span></td><td>Unit completed</td></tr>
+      <tr><td><span class="badge" style="background:white;color:#22c55e;border:2px solid #22c55e">Green outline</span></td><td>Current unit (in progress)</td></tr>
+      <tr><td><span class="badge badge-gray">Gray</span></td><td>Not downloaded — student needs to download this unit</td></tr>
+    </table>
+
+    <p><strong>How to use the Devices tab:</strong></p>
+    <p>Before a class session, check the Devices tab to confirm students are ready:</p>
+    <ol>
+      <li><strong>PWA column</strong> — students with &#10003; have the app installed. Students with — should follow the installation steps at the start of class.</li>
+      <li><strong>Unit dots</strong> — look for blue or green solid dots on the unit students will be playing. Gray dots mean the student needs to download that unit first.</li>
+      <li><strong>Storage</strong> — if a student's storage bar is red (above 90%), they may need to clear completed units to make room for new downloads.</li>
+      <li><strong>Last Seen</strong> — dates shown in faded/amber text are older than 7 days, meaning that device hasn't connected recently.</li>
+    </ol>
+    <p>If a student has multiple devices, they'll appear on separate rows grouped under the same name.</p>
+
+    <hr>
+
+    <!-- ===== QUICK REFERENCE ===== -->
+    <h2>Quick Reference</h2>
+
+    <div class="quick-ref">
+      <table>
+        <tr><th>Action</th><th>How</th></tr>
+        <tr><td>Access the app</td><td>Go to <strong>mhs.adroit.games</strong> in Chrome</td></tr>
+        <tr><td>Log in</td><td>Enter the student's <strong>Login ID</strong></td></tr>
+        <tr><td>Open the game</td><td>Click <strong>Mission HydroSci</strong> in the sidebar</td></tr>
+        <tr><td>Install the app</td><td>Click <strong>Install</strong> on the blue banner</td></tr>
+        <tr><td>Download a unit</td><td>Click the blue <strong>Download</strong> button</td></tr>
+        <tr><td>Play a unit</td><td>Click the green <strong>Launch</strong> button</td></tr>
+        <tr><td>Go back to units</td><td>Click <strong>←</strong> (top-left corner)</td></tr>
+        <tr><td>Go fullscreen</td><td>Press the Chromebook <strong>fullscreen key</strong> (top row)</td></tr>
+        <tr><td>Exit fullscreen</td><td>Press the <strong>fullscreen key</strong> again, or hold <strong>Esc</strong> for 2 seconds</td></tr>
+        <tr><td>Check progress</td><td>Leaders: open <strong>MHS Dashboard</strong></td></tr>
+        <tr><td>Manage storage</td><td>Click <strong>Manage downloads</strong> on the Units page</td></tr>
+      </table>
+    </div>
+
+  </div>
+</body>
+</html>
