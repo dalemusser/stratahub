@@ -1,4 +1,84 @@
-# Mission HydroSci — Teacher Guide (Impact Study)
+# Mission HydroSci - Guide
+
+---
+
+## Student Quick Start: Chrome App
+
+### Installation
+
+1. Open **Chrome** on the Chromebook and go to **mhs.adroit.games**
+2. Log in with your **Login ID** — on first login you will be asked to set your own password
+3. Tap **Mission HydroSci** in the sidebar menu
+4. Click the **Install** button in the blue banner at the top of the page
+5. Close the browser — you won't need it after this
+
+After installation, launch the app from the **Launcher** (click the circle icon at the bottom-left of the screen and find Mission HydroSci). To keep it handy, **two-finger tap** the app icon in the Launcher and select **Pin to shelf** — the icon will stay in the bottom bar for quick access. You can launch the app by clicking the water drop icon anywhere it appears: Launcher, Shelf, or recents.
+
+### Playing the Game
+
+1. Launch the app by clicking the **Mission HydroSci** icon (water drop)
+2. Go to **Mission HydroSci** in the menu, if not already there
+3. Click the green **Launch** button
+
+### During Gameplay
+
+- **Fullscreen** — enter and exit fullscreen using the **fullscreen key** on the top row of the Chromebook keyboard
+- **Esc (hold 2 seconds)** — exits fullscreen and releases the mouse cursor. Works in any situation
+- **Mouse cursor** — the cursor is not visible over the game area on Chromebooks. Move the mouse outside the game area to see it
+- **Volume** — adjust volume using the **volume keys** on the top row of the keyboard
+- **Back to menu** — click the **←** arrow in the upper-left corner to return to the Mission HydroSci Launch page
+
+### Uninstalling the App
+
+1. Open **Settings** (click the clock in the bottom-right corner, then click the gear icon)
+2. Go to **Apps** > **Manage Apps**
+3. Find and click **Mission HydroSci** (water drop icon)
+4. Click **Uninstall**
+5. A dialog will appear with a checkbox: **"Also delete browsing data…"**
+   - **Checked** — all app data is deleted, including any data saved in the browser (app and browser share the same data)
+   - **Unchecked** — data is kept and will still be available if you visit mhs.adroit.games in the browser
+
+---
+
+## Student Quick Start: Web Browser
+
+### Getting Started
+
+1. Open **Chrome** on the Chromebook and go to **mhs.adroit.games**
+2. Log in with your **Login ID** — on first login you will be asked to set your own password
+3. Tap **Mission HydroSci** in the sidebar menu
+
+To make it easy to return, you can bookmark the page or type **mhs.adroit.games** in the address bar each time.
+
+### Playing the Game
+
+1. Go to **mhs.adroit.games** in Chrome (or use your bookmark)
+2. Log in if prompted
+3. Tap **Mission HydroSci** in the sidebar menu
+4. Click the green **Launch** button
+
+### During Gameplay
+
+- **Fullscreen** — use the **fullscreen key** on the top row of the Chromebook keyboard or the **fullscreen icon** (⛶) in the top-right corner of the game to enter fullscreen. Use the fullscreen key to exit
+- **Esc (hold 2 seconds)** — exits fullscreen and releases the mouse cursor. Works in any situation
+- **Mouse cursor** — the cursor is not visible over the game area on Chromebooks. Move the mouse outside the game area to see it
+- **Volume** — adjust volume using the **volume keys** on the top row of the keyboard
+- **Back to menu** — click the **←** arrow in the upper-left corner to return to the Mission HydroSci page
+
+### Clearing Browser Data
+
+To remove all Mission HydroSci data from the browser:
+
+1. In Chrome, click the **three-dot menu** (top-right corner) and select **Settings**
+2. Go to **Privacy and security** > **Delete browsing data**
+3. Select **All time** and check **Cookies and other site data** and **Cached images and files**
+4. Click **Delete data**
+
+**Note:** This will also clear data for other sites. To clear only Mission HydroSci data, go to **Settings** > **Privacy and security** > **Site settings** > **View permissions and data stored across sites**, find **adroit.games**, and delete its data.
+
+---
+
+## Detailed Guide
 
 ## Getting Started
 

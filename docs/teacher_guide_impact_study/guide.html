@@ -189,6 +189,70 @@
     .badge-yellow { background: #eab308; color: var(--gray-900); }
     .badge-gray { background: var(--gray-200); color: var(--gray-700); }
 
+    .quick-start {
+      background: white;
+      border: 2px solid var(--blue);
+      border-radius: 12px;
+      padding: 1.75rem 2rem 1.5rem;
+      margin: 0 0 2.5rem;
+      box-shadow: 0 2px 12px rgba(37, 99, 235, 0.08);
+    }
+
+    .quick-start-heading {
+      color: white !important;
+      background: var(--blue);
+      margin: -1.75rem -2rem 1.5rem !important;
+      padding: 0.75rem 2rem !important;
+      border-radius: 9px 9px 0 0;
+      border-bottom: none !important;
+      font-size: 1.4rem !important;
+    }
+
+    .quick-start h3 {
+      color: var(--blue);
+      margin-top: 1.5rem;
+      padding-bottom: 0.25rem;
+      border-bottom: 1px solid var(--blue-light);
+    }
+
+    .quick-start h3:first-of-type {
+      margin-top: 0;
+    }
+
+    .quick-start-browser {
+      border-color: var(--green);
+      box-shadow: 0 2px 12px rgba(22, 163, 74, 0.08);
+    }
+
+    .quick-start-heading-browser {
+      background: var(--green) !important;
+    }
+
+    .quick-start-browser h3 {
+      color: var(--green);
+      border-bottom-color: var(--green-light);
+    }
+
+    .gameplay-controls {
+      margin: 1rem 0;
+    }
+
+    .gameplay-controls td:first-child {
+      width: 130px;
+      white-space: nowrap;
+      vertical-align: top;
+      color: var(--gray-900);
+    }
+
+    .detailed-heading {
+      color: var(--gray-600) !important;
+      font-size: 1.1rem !important;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 2px solid var(--gray-300) !important;
+      margin-bottom: 0 !important;
+    }
+
     .quick-ref {
       background: white;
       border: 1px solid var(--gray-200);
@@ -212,7 +276,126 @@
 <body>
   <div class="container">
 
-    <h1>Mission HydroSci — Teacher Guide (Impact Study)</h1>
+    <h1>Mission HydroSci - Guide</h1>
+
+    <!-- ===== STUDENT QUICK START ===== -->
+    <div class="quick-start">
+      <h2 class="quick-start-heading">Student Quick Start: Chrome App</h2>
+
+      <h3>Installation</h3>
+      <ol>
+        <li>Open <strong>Chrome</strong> on the Chromebook and go to <strong>mhs.adroit.games</strong></li>
+        <li>Log in with your <strong>Login ID</strong> — on first login you will be asked to set your own password</li>
+        <li>Tap <strong>Mission HydroSci</strong> in the sidebar menu</li>
+        <li>Click the <strong>Install</strong> button in the blue banner at the top of the page</li>
+        <li>Close the browser — you won't need it after this</li>
+      </ol>
+      <p>After installation, launch the app from the <strong>Launcher</strong> (click the circle icon at the bottom-left of the screen and find Mission HydroSci). To keep it handy, <strong>two-finger tap</strong> the app icon in the Launcher and select <strong>Pin to shelf</strong> — the icon will stay in the bottom bar for quick access. You can launch the app by clicking the water drop icon anywhere it appears: Launcher, Shelf, or recents.</p>
+
+      <h3>Playing the Game</h3>
+      <ol>
+        <li>Launch the app by clicking the <strong>Mission HydroSci</strong> icon (water drop)</li>
+        <li>Go to <strong>Mission HydroSci</strong> in the menu, if not already there</li>
+        <li>Click the green <strong>Launch</strong> button</li>
+      </ol>
+
+      <h3>During Gameplay</h3>
+      <table class="gameplay-controls">
+        <tr>
+          <td><strong>Fullscreen</strong></td>
+          <td>Enter and exit fullscreen using the <strong>fullscreen key</strong> on the top row of the Chromebook keyboard</td>
+        </tr>
+        <tr>
+          <td><strong>Esc</strong> (hold 2s)</td>
+          <td>Exits fullscreen and releases the mouse cursor. Works in any situation</td>
+        </tr>
+        <tr>
+          <td><strong>Mouse cursor</strong></td>
+          <td>The cursor is not visible over the game area on Chromebooks. Move the mouse outside the game area to see it</td>
+        </tr>
+        <tr>
+          <td><strong>Volume</strong></td>
+          <td>Adjust using the <strong>volume keys</strong> on the top row of the keyboard</td>
+        </tr>
+        <tr>
+          <td><strong>Back to menu</strong></td>
+          <td>Click the <strong>←</strong> arrow in the upper-left corner to return to the Launch page</td>
+        </tr>
+      </table>
+
+      <h3>Uninstalling the App</h3>
+      <ol>
+        <li>Open <strong>Settings</strong> (click the clock in the bottom-right corner, then click the gear icon)</li>
+        <li>Go to <strong>Apps</strong> &gt; <strong>Manage Apps</strong></li>
+        <li>Find and click <strong>Mission HydroSci</strong> (water drop icon)</li>
+        <li>Click <strong>Uninstall</strong></li>
+        <li>A dialog will appear with a checkbox: <strong>"Also delete browsing data…"</strong>
+          <ul style="margin-top: 0.4rem;">
+            <li><strong>Checked</strong> — all app data is deleted, including any data saved in the browser (app and browser share the same data)</li>
+            <li><strong>Unchecked</strong> — data is kept and will still be available if you visit mhs.adroit.games in the browser</li>
+          </ul>
+        </li>
+      </ol>
+    </div>
+
+    <!-- ===== STUDENT QUICK START: WEB BROWSER ===== -->
+    <div class="quick-start quick-start-browser">
+      <h2 class="quick-start-heading quick-start-heading-browser">Student Quick Start: Web Browser</h2>
+
+      <h3>Getting Started</h3>
+      <ol>
+        <li>Open <strong>Chrome</strong> on the Chromebook and go to <strong>mhs.adroit.games</strong></li>
+        <li>Log in with your <strong>Login ID</strong> — on first login you will be asked to set your own password</li>
+        <li>Tap <strong>Mission HydroSci</strong> in the sidebar menu</li>
+      </ol>
+      <p>To make it easy to return, you can bookmark the page or type <strong>mhs.adroit.games</strong> in the address bar each time.</p>
+
+      <h3>Playing the Game</h3>
+      <ol>
+        <li>Go to <strong>mhs.adroit.games</strong> in Chrome (or use your bookmark)</li>
+        <li>Log in if prompted</li>
+        <li>Tap <strong>Mission HydroSci</strong> in the sidebar menu</li>
+        <li>Click the green <strong>Launch</strong> button</li>
+      </ol>
+
+      <h3>During Gameplay</h3>
+      <table class="gameplay-controls">
+        <tr>
+          <td><strong>Fullscreen</strong></td>
+          <td>Use the <strong>fullscreen key</strong> on the top row of the Chromebook keyboard or the <strong>fullscreen icon</strong> (⛶) in the top-right corner of the game to enter fullscreen. Use the fullscreen key to exit</td>
+        </tr>
+        <tr>
+          <td><strong>Esc</strong> (hold 2s)</td>
+          <td>Exits fullscreen and releases the mouse cursor. Works in any situation</td>
+        </tr>
+        <tr>
+          <td><strong>Mouse cursor</strong></td>
+          <td>The cursor is not visible over the game area on Chromebooks. Move the mouse outside the game area to see it</td>
+        </tr>
+        <tr>
+          <td><strong>Volume</strong></td>
+          <td>Adjust using the <strong>volume keys</strong> on the top row of the keyboard</td>
+        </tr>
+        <tr>
+          <td><strong>Back to menu</strong></td>
+          <td>Click the <strong>←</strong> arrow in the upper-left corner to return to the Mission HydroSci page</td>
+        </tr>
+      </table>
+
+      <h3>Clearing Browser Data</h3>
+      <p>To remove all Mission HydroSci data from the browser:</p>
+      <ol>
+        <li>In Chrome, click the <strong>three-dot menu</strong> (top-right corner) and select <strong>Settings</strong></li>
+        <li>Go to <strong>Privacy and security</strong> &gt; <strong>Delete browsing data</strong></li>
+        <li>Select <strong>All time</strong> and check <strong>Cookies and other site data</strong> and <strong>Cached images and files</strong></li>
+        <li>Click <strong>Delete data</strong></li>
+      </ol>
+      <div class="callout-note" style="margin-bottom: 0;">
+        <p><strong>Note:</strong> This will also clear data for other sites. To clear only Mission HydroSci data, go to <strong>Settings</strong> &gt; <strong>Privacy and security</strong> &gt; <strong>Site settings</strong> &gt; <strong>View permissions and data stored across sites</strong>, find <strong>adroit.games</strong>, and delete its data.</p>
+      </div>
+    </div>
+
+    <h2 class="detailed-heading">Detailed Guide</h2>
 
     <!-- ===== GETTING STARTED ===== -->
     <h2>Getting Started</h2>

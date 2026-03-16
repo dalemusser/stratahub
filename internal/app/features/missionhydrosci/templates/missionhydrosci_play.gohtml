@@ -78,15 +78,13 @@
 
       /* Fullscreen sizing via CSS viewport units — bypasses iPad Safari's
          unreliable JS dimension reporting during fullscreen transitions.
-         The 1.75 ratio = 1400/800 (Unity canvas aspect ratio).
          We fullscreen #unity-container (not <html>) so that keyboard
          events route directly to the container's subtree and reach the
          Unity canvas — fullscreening <html> causes browsers to intercept
          letter keys (W/A/S/D) at the document level.
-         The canvas stays position:absolute (which Unity expects for input
-         handling) and is centered using the absolute-centering technique
-         (all edges 0 + margin auto) instead of flexbox, which avoids
-         changing the canvas layout context that Unity relies on. */
+         The canvas fills the entire screen — Unity WebGL renders to
+         whatever canvas size it's given. No aspect ratio constraint
+         so the game uses all available display space. */
       #unity-container:fullscreen,
       #unity-container:-webkit-full-screen {
         position: fixed !important;
@@ -98,13 +96,10 @@
       }
       #unity-container:fullscreen #unity-canvas,
       #unity-container:-webkit-full-screen #unity-canvas {
-        width: min(100vw, calc(100vh * 1.75)) !important;
-        height: min(100vh, calc(100vw / 1.75)) !important;
+        width: 100vw !important;
+        height: 100vh !important;
         top: 0 !important;
-        right: 0 !important;
-        bottom: 0 !important;
         left: 0 !important;
-        margin: auto !important;
       }
     </style>
   </head>
@@ -169,6 +164,73 @@
         <p id="loading-text" style="margin-top:8px; font-size:14px; opacity:0.7;">Initializing...</p>
       </div>
       <canvas id="unity-canvas" width="1400" height="800" tabindex="-1"></canvas>
+
+      <!-- Help overlay (toggle with ? key, inside container so it's visible in fullscreen) -->
+      <div id="help-overlay" style="
+        display: none;
+        position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+        background: rgba(0,0,0,0.88); z-index: 90;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        color: white;
+      ">
+        <div style="
+          position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+          max-width: 420px; width: 90%; padding: 2rem;
+          background: rgba(30,58,95,0.95); border-radius: 12px;
+          border: 1px solid rgba(255,255,255,0.15);
+        ">
+          <h2 style="margin: 0 0 0.5rem; font-size: 1.25rem; text-align: center; opacity: 0.95;">Game Controls</h2>
+          <table style="width: 100%; border-collapse: collapse; font-size: 0.9rem;">
+            <tr><td colspan="2" style="padding: 0.75rem 0 0.25rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.5;">Game</td></tr>
+            <tr>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); white-space: nowrap;"><kbd style="background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">W A S D</kbd></td>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); opacity: 0.85;">Move</td>
+            </tr>
+            <tr>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); white-space: nowrap;"><kbd style="background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">Mouse</kbd></td>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); opacity: 0.85;">Look around</td>
+            </tr>
+            <tr>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); white-space: nowrap;"><kbd style="background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">Space</kbd></td>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); opacity: 0.85;">Jump</td>
+            </tr>
+            <tr>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); white-space: nowrap;"><kbd style="background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">E</kbd> / <kbd style="background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">O</kbd></td>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); opacity: 0.85;">Interact</td>
+            </tr>
+            <tr>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); white-space: nowrap;"><kbd style="background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">H</kbd></td>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); opacity: 0.85;">Hoverboard</td>
+            </tr>
+            <tr>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); white-space: nowrap;"><kbd style="background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">M</kbd></td>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); opacity: 0.85;">Map</td>
+            </tr>
+            <tr>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); white-space: nowrap;"><kbd style="background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">Tab</kbd></td>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); opacity: 0.85;">DANI</td>
+            </tr>
+            <tr><td colspan="2" style="padding: 0.75rem 0 0.25rem; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; opacity: 0.5;">Chromebook</td></tr>
+            <tr>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); white-space: nowrap;"><kbd style="background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">Fullscreen key</kbd></td>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); opacity: 0.85;">Enter / exit fullscreen</td>
+            </tr>
+            <tr>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); white-space: nowrap;"><kbd style="background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">Esc</kbd> <span style="opacity: 0.6;">(hold 2s)</span></td>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); opacity: 0.85;">Release mouse / exit fullscreen</td>
+            </tr>
+            <tr>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); white-space: nowrap;"><kbd style="background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">Volume keys</kbd></td>
+              <td style="padding: 0.4rem 0.75rem; border-bottom: 1px solid rgba(255,255,255,0.1); opacity: 0.85;">Adjust volume</td>
+            </tr>
+            <tr>
+              <td style="padding: 0.4rem 0.75rem; white-space: nowrap;"><kbd style="background: rgba(255,255,255,0.15); padding: 2px 8px; border-radius: 4px; font-size: 0.85rem;">←</kbd> <span style="opacity: 0.6;">(top-left)</span></td>
+              <td style="padding: 0.4rem 0.75rem; opacity: 0.85;">Back to Mission HydroSci</td>
+            </tr>
+          </table>
+          <p style="text-align: center; margin: 1.25rem 0 0; font-size: 0.8rem; opacity: 0.5;">Press <kbd style="background: rgba(255,255,255,0.15); padding: 1px 6px; border-radius: 3px;">?</kbd> to close</p>
+        </div>
+      </div>
 
       <!-- Unit complete overlay (hidden by default, inside container so it's visible in fullscreen) -->
       <div id="unit-complete-overlay" class="hidden" style="
@@ -610,9 +672,7 @@
                 el.webkitRequestFullscreen ? el.webkitRequestFullscreen() :
                 Promise.reject();
         p.then(function() {
-          btn.textContent = '\u2716';
-          btn.title = 'Exit fullscreen';
-          btn.blur();
+          btn.style.display = 'none';
           // Keyboard Lock API: ensure all key events (including letter keys)
           // are delivered to the page and not intercepted by the browser.
           // Required for Unity WebGL games in fullscreen where WASD input
@@ -629,6 +689,7 @@
         p.then(function() {
           btn.textContent = '\u26F6';
           btn.title = 'Fullscreen';
+          btn.style.display = '';
           if (navigator.keyboard && navigator.keyboard.unlock) {
             navigator.keyboard.unlock();
           }
@@ -643,11 +704,11 @@
       var btn = document.getElementById('fullscreen-btn');
       var fs = document.fullscreenElement || document.webkitFullscreenElement;
       if (fs) {
-        btn.textContent = '\u2716';
-        btn.title = 'Exit fullscreen';
+        btn.style.display = 'none';
       } else {
         btn.textContent = '\u26F6';
         btn.title = 'Fullscreen';
+        btn.style.display = '';
         onResize();
       }
       // Refocus canvas after layout settles
@@ -783,6 +844,48 @@
       mq.addEventListener('change', function(e) {
         if (e.matches) hideFullscreenBtn();
       });
+    })();
+
+    // Help overlay: toggle with ? key (Shift+/)
+    (function() {
+      var overlay = document.getElementById('help-overlay');
+      var visible = false;
+
+      document.addEventListener('keydown', function(e) {
+        if (e.key === '?') {
+          visible = !visible;
+          overlay.style.display = visible ? 'block' : 'none';
+          e.preventDefault();
+          e.stopPropagation();
+        }
+      });
+
+      // Also dismiss by clicking the overlay
+      overlay.addEventListener('click', function() {
+        visible = false;
+        overlay.style.display = 'none';
+      });
+
+      // Show a brief hint after game loads
+      var hintShown = false;
+      var observer = new MutationObserver(function() {
+        var loadingOverlay = document.getElementById('loading-overlay');
+        if (loadingOverlay && loadingOverlay.classList.contains('hidden') && !hintShown) {
+          hintShown = true;
+          observer.disconnect();
+          var hint = document.createElement('div');
+          hint.id = 'help-hint';
+          hint.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:80;background:rgba(0,0,0,0.7);color:white;padding:8px 20px;border-radius:20px;font-family:sans-serif;font-size:0.85rem;opacity:1;transition:opacity 1s;pointer-events:none;';
+          hint.textContent = 'Press ? for help';
+          document.getElementById('unity-container').appendChild(hint);
+          setTimeout(function() { hint.style.opacity = '0'; }, 4000);
+          setTimeout(function() { hint.remove(); }, 5000);
+        }
+      });
+      var loadingEl = document.getElementById('loading-overlay');
+      if (loadingEl) {
+        observer.observe(loadingEl, { attributes: true, attributeFilter: ['class'] });
+      }
     })();
     </script>
   </body>
