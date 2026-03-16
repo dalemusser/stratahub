@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>{{ .UnitTitle }} - Mission HydroSci</title>
     <link rel="stylesheet" href="/assets/css/tailwind.css?v={{ tailwindVersion }}">
-    <link rel="manifest" href="/missionhydrosci-manifest.json?v={{ missionhydrosciManifestVersion }}">
+    <link rel="manifest" href="/manifest.json?v={{ missionhydrosciManifestVersion }}">
     <style>
       html, body {
         background: #000;
@@ -475,8 +475,8 @@
         });
 
         // Need full SW init for Background Fetch
-        mgr._swUrl = '/missionhydrosci-sw.js';
-        mgr._swScope = '/missionhydrosci/';
+        mgr._swUrl = '/sw.js';
+        mgr._swScope = '/';
         mgr._channelName = 'missionhydrosci-delivery';
         mgr.init().then(function() {
           mgr.downloadUnit(nextUnit);
@@ -721,8 +721,8 @@
     // Register the service worker from the play page so it gets updated
     // even when the PWA opens directly to a play URL.
     if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.register('/missionhydrosci-sw.js', {
-        scope: '/missionhydrosci/'
+      navigator.serviceWorker.register('/sw.js', {
+        scope: '/'
       }).catch(function() {});
     }
 

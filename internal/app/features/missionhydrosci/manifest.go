@@ -32,9 +32,9 @@ type pwaIcon struct {
 // manifestData is the canonical manifest, built once and reused by
 // both the HTTP handler and the content-hash template function.
 var manifestData = pwaManifest{
-	Name:            "Mission HydroSci (Dev)",
-	ShortName:       "MHS Dev",
-	Description:     "Mission HydroSci (Dev) - Science Adventure Game",
+	Name:            "Mission HydroSci",
+	ShortName:       "MHS",
+	Description:     "Mission HydroSci - Science Adventure Game",
 	StartURL:        "/missionhydrosci/units",
 	Scope:           "/",
 	Display:         "standalone",

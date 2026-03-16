@@ -6,7 +6,7 @@
     <title>{{ if .SiteName }}{{ .SiteName }}{{ else }}StrataHub{{ end }}</title>
     <link rel="stylesheet" href="/assets/css/tailwind.css?v={{ tailwindVersion }}">
     <link rel="stylesheet" href="/assets/css/tiptap.css?v={{ tiptapVersion }}">
-    {{ block "manifest" . }}<link rel="manifest" href="/manifest.json">{{ end }}
+    {{ block "manifest" . }}<link rel="manifest" href="/manifest.json?v={{ missionhydrosciManifestVersion }}">{{ end }}
     <script src="/assets/js/htmx.min.js?v={{ htmxVersion }}"></script>
     {{ if .CSRFToken }}<meta name="csrf-token" content="{{ .CSRFToken }}">{{ end }}
     <script>
@@ -18,6 +18,18 @@
           evt.detail.headers['X-CSRF-Token'] = token.content;
         }
       });
+    </script>
+    <script>
+      // Unregister old service workers at wrong URLs (cleanup from PWA consolidation)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.getRegistrations().then(function(regs) {
+          regs.forEach(function(reg) {
+            if (reg.active && reg.active.scriptURL && !reg.active.scriptURL.endsWith('/sw.js')) {
+              reg.unregister();
+            }
+          });
+        });
+      }
     </script>
     <script>
       // Initialize dark mode before page renders to prevent flash

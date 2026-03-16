@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reset All Progress &mdash; Mission HydroSci</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #1a1a2e;
+      --muted: #555;
+      --accent: #2563eb;
+      --border: #e5e7eb;
+      --code-bg: #f3f4f6;
+      --callout-bg: #eff6ff;
+      --callout-border: #bfdbfe;
+      --callout-text: #1e40af;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1a2e;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #60a5fa;
+        --border: #334155;
+        --code-bg: #1e293b;
+        --callout-bg: #1e293b;
+        --callout-border: #334155;
+        --callout-text: #93c5fd;
+      }
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--bg);
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+    h1 {
+      font-size: 1.75rem;
+      margin-bottom: 0.5rem;
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 0.5rem;
+    }
+    h2 {
+      font-size: 1.35rem;
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+      color: var(--accent);
+    }
+    h3 {
+      font-size: 1.1rem;
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    p { margin-bottom: 1rem; }
+    strong { font-weight: 600; }
+    code {
+      font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
+      font-size: 0.9em;
+      background: var(--code-bg);
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+    }
+    ul, ol {
+      margin-bottom: 1rem;
+      padding-left: 1.5rem;
+    }
+    li { margin-bottom: 0.35rem; }
+    .intro {
+      font-size: 1.05rem;
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+    }
+    .callout {
+      background: var(--callout-bg);
+      border-left: 4px solid var(--callout-border);
+      color: var(--callout-text);
+      padding: 0.75rem 1rem;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 1rem;
+      font-size: 0.95rem;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Reset All Progress &mdash; Mission HydroSci</h1>
+
+<h2>Overview</h2>
+<p>The "Reset All Progress" button in Mission HydroSci removes all downloaded unit files from the device and resets the client-side download state. It does not remove any data from servers.</p>
+<p>The button is located in the <strong>Manage downloads</strong> section at the bottom of the Mission HydroSci units page.</p>
+
+<div class="callout">
+  <strong>Testers/Devs:</strong> If you are logged in as a member, Reset All Progress requires a keyword. Get it from Discord or Jim Laffey.
+</div>
+
+<h2>What It Does</h2>
+<ol>
+  <li>Deletes all cached unit files from the device's storage</li>
+  <li>Clears local tracking data (manual download list)</li>
+  <li>Reloads the page to reflect the clean state</li>
+</ol>
+<p>This is a client-side reset only. Progress data saved on servers (save.adroit.games, log.adroit.games) is not affected. Developers who need to clear server-side progress can do so directly via <a href="https://save.adroit.games">save.adroit.games</a> and <a href="https://log.adroit.games">log.adroit.games</a>.</p>
+
+<h2>Access by Role</h2>
+
+<h3>Non-member roles (admin, leader, coordinator, superadmin)</h3>
+<p>The button works with a simple confirmation dialog: "Reset all progress and remove all downloads?" This allows staff to quickly reset progress during development, testing, or troubleshooting.</p>
+
+<h3>Members</h3>
+<p>Members are presented with a keyword prompt instead of a simple confirmation. Tapping "Reset All Progress" opens a modal with a <strong>password field</strong> (input is masked). The member &mdash; or more likely, the teacher standing at the member's device &mdash; must type the correct keyword to proceed. An incorrect keyword shows an error message and the reset does not execute.</p>
+
+<div class="callout">
+  The reset keyword is not published in documentation. Developers and testers should get it from Discord or Jim Laffey.
+</div>
+
+<p>The password field ensures that a teacher can type the keyword while the student is sitting in front of the screen without revealing it.</p>
+
+<h2>Why the Keyword Gate Exists</h2>
+<p>Students should not casually reset their downloads. A full reset during the impact study forces re-downloading all unit content, which is disruptive on constrained school networks. The keyword gate prevents accidental or impulsive resets while still allowing authorized resets when needed.</p>
+
+<h2>When Reset Is Useful</h2>
+<ul>
+  <li><strong>Testing:</strong> Members of the development and QA team can reset a test account to replay the full experience without creating new accounts.</li>
+  <li><strong>Troubleshooting:</strong> If a download fails in a way that blocks progress &mdash; due to unreliable school networks, Chromebook storage issues, or unexpected edge cases &mdash; a teacher can reset the member's state and let them start fresh. This is a safety net for scenarios that are difficult to anticipate in resource-constrained school environments.</li>
+</ul>
+
+</body>
+</html>

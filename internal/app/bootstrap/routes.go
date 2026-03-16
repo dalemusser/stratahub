@@ -255,21 +255,16 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		r.Handle(appCfg.StorageLocalURL+"/*", fileserver.Handler(appCfg.StorageLocalURL, appCfg.StorageLocalPath))
 	}
 
-	// MHS Content Delivery: root-level routes for PWA support.
-	// /sw.js must be at root for service worker scope.
-	// /manifest.json is the PWA manifest.
-	// /mhs/content/* is the CDN fallback redirect (no auth required; SW intercepts when active).
+	// MHS Content Delivery: CDN fallback redirect (no auth required; SW intercepts when active).
 	mhsRootHandler := mhsdeliveryfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, appCfg.MHSCDNBaseURL, logger)
-	r.Get("/sw.js", mhsRootHandler.ServeServiceWorker)
-	r.Get("/manifest.json", mhsRootHandler.ServeManifest)
 	r.Handle("/mhs/content/*", mhsRootHandler.ContentFallback())
 
-	// Mission HydroSci (experimental copy of MHS delivery for admin/coordinator development)
+	// Mission HydroSci: root-level PWA routes + content fallback.
+	// /sw.js and /manifest.json serve the Mission HydroSci PWA (used for the impact study).
 	missionHydroSciHandler := missionhydroscifeature.NewHandler(deps.StrataHubMongoDatabase, errLog, appCfg.MHSCDNBaseURL, logger)
-	r.Get("/missionhydrosci-sw.js", missionHydroSciHandler.ServeServiceWorker)
-	r.Get("/missionhydrosci-manifest.json", missionHydroSciHandler.ServeManifest)
+	r.Get("/sw.js", missionHydroSciHandler.ServeServiceWorker)
+	r.Get("/manifest.json", missionHydroSciHandler.ServeManifest)
 	r.Handle("/missionhydrosci/content/*", missionHydroSciHandler.ContentFallback())
-
 
 	// Public pages
 	homeHandler := homefeature.NewHandler(deps.StrataHubMongoDatabase, logger)
@@ -295,42 +290,62 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		Name:        "missionhydrosci-early-download",
 		Description: "Register service worker and begin downloading game units",
 		ShouldRun: func(lc *loginactions.LoginContext) bool {
-			// Non-members (admin, coordinator, leader) always run
-			if lc.Role != "member" {
-				return true
-			}
-			// Members: check if missionhydrosci is in their enabled apps
-			for _, app := range lc.EnabledApps {
-				if app == "missionhydrosci" {
-					return true
+			// Members with missionhydrosci enabled land on the units page,
+			// which handles downloads itself — skip the login action.
+			if lc.Role == "member" {
+				for _, app := range lc.EnabledApps {
+					if app == "missionhydrosci" {
+						return false
+					}
 				}
+				return false
 			}
-			return false
+			// Non-members (admin, coordinator, leader) always run
+			return true
 		},
 		Script: func(lc *loginactions.LoginContext) string {
 			return `
 				if ('serviceWorker' in navigator) {
-					navigator.serviceWorker.register('/missionhydrosci-sw.js', { scope: '/missionhydrosci/' })
+					navigator.serviceWorker.register('/sw.js', { scope: '/' })
 						.then(function(reg) {
-							return fetch('/missionhydrosci/api/progress');
-						})
-						.then(function(resp) { return resp.json(); })
-						.then(function(progress) {
-							if (progress.current_unit && progress.current_unit !== 'complete') {
-								return fetch('/missionhydrosci/api/manifest')
-									.then(function(mr) { return mr.json(); })
-									.then(function(manifest) {
-										var unitFiles = manifest[progress.current_unit];
-										if (unitFiles && navigator.serviceWorker.controller) {
-											navigator.serviceWorker.controller.postMessage({
-												type: 'DOWNLOAD_UNIT',
-												unitId: progress.current_unit,
-												files: unitFiles,
-												fetchIdPrefix: 'missionhydrosci-'
-											});
+							// Wait for the SW to become active (may not be controlling yet after fresh install)
+							var sw = reg.active || reg.installing || reg.waiting;
+							if (!sw) return;
+							function whenActive(sw) {
+								return new Promise(function(resolve) {
+									if (sw.state === 'activated') { resolve(sw); return; }
+									sw.addEventListener('statechange', function() {
+										if (sw.state === 'activated') resolve(sw);
+									});
+								});
+							}
+							return whenActive(sw).then(function(activeSW) {
+								return fetch('/missionhydrosci/api/progress')
+									.then(function(resp) { return resp.json(); })
+									.then(function(progress) {
+										if (progress.current_unit && progress.current_unit !== 'complete') {
+											return fetch('/missionhydrosci/api/manifest')
+												.then(function(mr) { return mr.json(); })
+												.then(function(manifest) {
+													var units = manifest.units || [];
+													var unit = null;
+													for (var i = 0; i < units.length; i++) {
+														if (units[i].id === progress.current_unit) { unit = units[i]; break; }
+													}
+													if (unit && unit.files) {
+														activeSW.postMessage({
+															action: 'download',
+															unitId: progress.current_unit,
+															version: unit.version,
+															files: unit.files,
+															cdnBaseUrl: manifest.cdnBaseUrl,
+															title: 'Downloading ' + unit.title
+														});
+													}
+												});
 										}
 									});
-							}
+							});
 						})
 						.catch(function(e) { console.warn('MHS early download:', e); });
 				}

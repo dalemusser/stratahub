@@ -43,8 +43,8 @@
    * sets up BroadcastChannel listener, and checks initial cache status.
    */
   MHSDeliveryManager.prototype.init = async function() {
-    // Register service worker
-    if ('serviceWorker' in navigator) {
+    // Register service worker (skip when swUrl is explicitly null/empty)
+    if (this._swUrl && 'serviceWorker' in navigator) {
       try {
         this.swRegistration = await navigator.serviceWorker.register(this._swUrl, {
           scope: this._swScope

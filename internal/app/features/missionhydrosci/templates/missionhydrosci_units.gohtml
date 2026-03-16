@@ -2,8 +2,6 @@
   {{ template "layout" . }}
 {{ end }}
 
-{{ define "manifest" }}<link rel="manifest" href="/missionhydrosci-manifest.json?v={{ missionhydrosciManifestVersion }}">{{ end }}
-
 {{ define "content" }}
 <div class="flex flex-col h-full">
   <!-- Install banner: Chromium (hidden by default, shown when beforeinstallprompt fires) -->
@@ -48,6 +46,20 @@
       </div>
       <div class="flex justify-start pt-2 border-t border-gray-200 dark:border-gray-700">
         <button type="button" class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" onclick="mhsCloseHelp()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Reset keyword modal (members only) -->
+  <div id="reset-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center">
+    <div class="absolute inset-0 bg-black/40" onclick="mhsCloseReset()"></div>
+    <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-300 dark:border-gray-600 max-w-sm w-full p-4 space-y-3 mx-4">
+      <h2 class="text-sm font-semibold text-gray-900 dark:text-gray-100">Enter reset keyword to confirm</h2>
+      <input id="reset-keyword" type="password" autocomplete="off" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-red-500" />
+      <div id="reset-error" class="text-xs text-red-600 dark:text-red-400 hidden">Incorrect keyword</div>
+      <div class="flex justify-end gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+        <button type="button" class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" onclick="mhsCloseReset()">Cancel</button>
+        <button type="button" class="px-3 py-1 bg-red-600 text-white rounded text-sm hover:bg-red-700" onclick="mhsConfirmReset()">Reset</button>
       </div>
     </div>
   </div>
@@ -175,7 +187,6 @@
       </div>
       {{ end }}
     </div>
-    {{/* TODO: restore role check after testing: {{ if ne .Role "member" }} */}}
     <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
       <button
         id="reset-btn"
@@ -185,7 +196,6 @@
         Reset All Progress
       </button>
     </div>
-    {{/* TODO: restore after testing: {{ end }} */}}
   </details>
 </div>
 
@@ -311,8 +321,8 @@
   }
 
   var manager = new MHSDeliveryManager({
-    swUrl: '/missionhydrosci-sw.js',
-    swScope: '/missionhydrosci/',
+    swUrl: '/sw.js',
+    swScope: '/',
     manifestUrl: '/missionhydrosci/api/manifest',
     contentPrefix: '/missionhydrosci/content/',
     channelName: 'missionhydrosci-delivery',
@@ -608,8 +618,9 @@
     }
   };
 
-  window.mhsResetProgress = function() {
-    if (!confirm('Reset all progress and remove all downloads?')) return;
+  var isMember = {{ if eq .Role "member" }}true{{ else }}false{{ end }};
+
+  function doReset() {
     var csrfToken = '{{ .CSRFToken }}';
     fetch('/missionhydrosci/api/progress/reset', {
       method: 'POST',
@@ -627,6 +638,32 @@
     .catch(function(err) {
       alert('Failed to reset progress: ' + err.message);
     });
+  }
+
+  window.mhsResetProgress = function() {
+    if (isMember) {
+      document.getElementById('reset-keyword').value = '';
+      document.getElementById('reset-error').classList.add('hidden');
+      document.getElementById('reset-modal').classList.remove('hidden');
+      document.getElementById('reset-keyword').focus();
+    } else {
+      if (!confirm('Reset all progress and remove all downloads?')) return;
+      doReset();
+    }
+  };
+
+  window.mhsCloseReset = function() {
+    document.getElementById('reset-modal').classList.add('hidden');
+  };
+
+  window.mhsConfirmReset = function() {
+    var input = document.getElementById('reset-keyword').value;
+    if (input.toLowerCase() !== 'hydroreset') {
+      document.getElementById('reset-error').classList.remove('hidden');
+      return;
+    }
+    document.getElementById('reset-modal').classList.add('hidden');
+    doReset();
   };
 
   // Storage info display

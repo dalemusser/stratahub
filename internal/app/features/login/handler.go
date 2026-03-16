@@ -425,7 +425,7 @@ func (h *Handler) createSessionAndRedirect(w http.ResponseWriter, r *http.Reques
 		}
 	}
 
-	dest := urlutil.SafeReturn(returnURL, "", "/dashboard")
+	dest := urlutil.SafeReturn(returnURL, "", h.defaultDest(r.Context(), u))
 	http.Redirect(w, r, dest, http.StatusSeeOther)
 }
 
@@ -539,7 +539,7 @@ func (h *Handler) createSessionAndRenderMagicSuccess(w http.ResponseWriter, r *h
 	}
 	cancel()
 
-	dest := urlutil.SafeReturn(returnURL, "", "/dashboard")
+	dest := urlutil.SafeReturn(returnURL, "", h.defaultDest(r.Context(), u))
 	templates.Render(w, r, "login_magic_link_success", magicLinkSuccessData{
 		SiteName:  siteName,
 		ReturnURL: dest,
@@ -844,6 +844,26 @@ func (h *Handler) renderChangePasswordFormWithError(w http.ResponseWriter, r *ht
 // parseObjectID parses a hex string into a MongoDB ObjectID.
 func parseObjectID(hex string) (primitive.ObjectID, error) {
 	return primitive.ObjectIDFromHex(hex)
+}
+
+// defaultDest returns the post-login landing page for the given user.
+// Members with Mission HydroSci enabled go straight to the game;
+// everyone else goes to the dashboard.
+func (h *Handler) defaultDest(ctx context.Context, u *models.User) string {
+	if normalize.Role(u.Role) == "member" {
+		apps, err := groupappstore.EnabledAppIDsForUser(ctx, h.DB, u.ID)
+		if err == nil {
+			for _, app := range apps {
+				if app == "missionhydrosci" {
+					return "/missionhydrosci/units"
+				}
+			}
+		}
+	}
+	if normalize.Role(u.Role) == "member" {
+		return "/member/resources"
+	}
+	return "/dashboard"
 }
 
 // buildLoginContext creates a LoginContext for login action evaluation.

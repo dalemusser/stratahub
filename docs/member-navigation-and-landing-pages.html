@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Member Navigation and Landing Pages</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #1a1a2e;
+      --muted: #555;
+      --accent: #2563eb;
+      --border: #e5e7eb;
+      --code-bg: #f3f4f6;
+      --table-stripe: #f9fafb;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1a2e;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #60a5fa;
+        --border: #334155;
+        --code-bg: #1e293b;
+        --table-stripe: #1e293b;
+      }
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--bg);
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+    h1 {
+      font-size: 1.75rem;
+      margin-bottom: 0.5rem;
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 0.5rem;
+    }
+    h2 {
+      font-size: 1.35rem;
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+      color: var(--accent);
+    }
+    h3 {
+      font-size: 1.1rem;
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    p { margin-bottom: 1rem; }
+    strong { font-weight: 600; }
+    code {
+      font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, monospace;
+      font-size: 0.9em;
+      background: var(--code-bg);
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+    }
+    ul, ol {
+      margin-bottom: 1rem;
+      padding-left: 1.5rem;
+    }
+    li { margin-bottom: 0.35rem; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1rem;
+      font-size: 0.95rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.6rem 0.75rem;
+      border: 1px solid var(--border);
+    }
+    th {
+      background: var(--code-bg);
+      font-weight: 600;
+    }
+    tr:nth-child(even) td { background: var(--table-stripe); }
+    .intro {
+      font-size: 1.05rem;
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Member Navigation and Landing Pages</h1>
+<p class="intro">How navigation and landing pages work for members during the impact study.</p>
+
+<p>Members fall into two groups based on their group's app assignments in <strong>Groups &gt; Manage &gt; Apps</strong>:</p>
+<ul>
+  <li><strong>Experimental group</strong> &mdash; Members assigned Mission HydroSci</li>
+  <li><strong>Control group</strong> &mdash; Members not assigned Mission HydroSci</li>
+</ul>
+
+<h2>Menu</h2>
+<p>The Dashboard has been removed from the member menu. It did not serve any meaningful purpose for members &mdash; they don't use the dashboard widgets, and it added an unnecessary step between login and their actual work.</p>
+
+<h3>Experimental group (Mission HydroSci assigned)</h3>
+<ol>
+  <li>Mission HydroSci</li>
+  <li>Resources</li>
+  <li>MHS Units (if assigned)</li>
+</ol>
+
+<h3>Control group (Mission HydroSci not assigned)</h3>
+<ol>
+  <li>Resources</li>
+  <li>MHS Units (if assigned)</li>
+</ol>
+
+<p>Mission HydroSci does not appear in the menu for control group members. They have no visibility into or access to Mission HydroSci.</p>
+
+<h2>Landing Pages</h2>
+
+<h3>After login</h3>
+<table>
+  <thead>
+    <tr><th>Group</th><th>Destination</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Experimental</td><td><code>/missionhydrosci/units</code> &mdash; the Mission HydroSci units page</td></tr>
+    <tr><td>Control</td><td><code>/member/resources</code> &mdash; the Resources page</td></tr>
+  </tbody>
+</table>
+<p>If a return URL is present (e.g., the member was redirected to login from a specific page), that URL takes precedence.</p>
+
+<h3>Visiting the base URL (<code>/</code>) while logged in</h3>
+<p>The same routing applies when a logged-in member navigates to the base URL of the workspace (e.g., <code>https://mhs.adroit.games</code>):</p>
+<table>
+  <thead>
+    <tr><th>Group</th><th>Destination</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Experimental</td><td>Redirected to <code>/missionhydrosci/units</code></td></tr>
+    <tr><td>Control</td><td>Redirected to <code>/member/resources</code></td></tr>
+  </tbody>
+</table>
+<p>Non-member roles (admin, leader, coordinator) continue to see the landing page as before.</p>
+
+<h3>Launching the installed Chrome App (PWA)</h3>
+<p>The PWA manifest sets <code>start_url</code> to <code>/missionhydrosci/units</code>. When a member launches the installed Chrome App:</p>
+<ul>
+  <li>If their session is still active, they land directly on the Mission HydroSci units page.</li>
+  <li>If their session has expired, they are redirected to the login page. After logging in, they are sent to <code>/missionhydrosci/units</code> (via the return URL preserved by the auth redirect).</li>
+</ul>
+<p>The PWA is only relevant to experimental group members. Control group members do not have the Mission HydroSci install banner and are not prompted to install the app.</p>
+
+<h2>Why This Was Done</h2>
+<p>The impact study requires a clean separation between experimental and control groups. Each group should land directly on the feature that matters to them:</p>
+<ul>
+  <li><strong>Experimental group:</strong> Mission HydroSci is their primary activity. Going straight to the game units page eliminates unnecessary clicks and reduces confusion.</li>
+  <li><strong>Control group:</strong> Resources is where they take tests, complete surveys, and access teacher-provided materials for traditional instruction. It serves a similar role for the control group as Mission HydroSci does for the experimental group.</li>
+</ul>
+<p>Removing the Dashboard simplifies the member experience and ensures that both groups start in the right place from the moment they log in.</p>
+
+<h2>Non-member Roles</h2>
+<p>These changes only affect members. Admin, leader, coordinator, and superadmin roles retain the Dashboard in their menu and continue to land on <code>/dashboard</code> after login. They can access all features regardless of app assignments.</p>
+
+</body>
+</html>

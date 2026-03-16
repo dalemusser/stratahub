@@ -1,6 +1,6 @@
 // sw.js — Main service worker entry point for Mission HydroSci content delivery.
 // This file is concatenated with sw-cache.js and sw-background-fetch.js
-// by the Go handler before being served at /missionhydrosci-sw.js.
+// by the Go handler before being served at /sw.js.
 
 const SW_VERSION = '1.0.5';
 

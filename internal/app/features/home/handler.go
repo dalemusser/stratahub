@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	settingsstore "github.com/dalemusser/stratahub/internal/app/store/settings"
+	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
@@ -42,6 +43,18 @@ type homeVM struct {
 *─────────────────────────────────────────────────────────────────────────────*/
 
 func (h *Handler) ServeRoot(w http.ResponseWriter, r *http.Request) {
+	// Members go straight to their primary destination.
+	if user, ok := auth.CurrentUser(r); ok && user.Role == "member" {
+		for _, app := range user.EnabledApps {
+			if app == "missionhydrosci" {
+				http.Redirect(w, r, "/missionhydrosci/units", http.StatusSeeOther)
+				return
+			}
+		}
+		http.Redirect(w, r, "/member/resources", http.StatusSeeOther)
+		return
+	}
+
 	baseVM := viewdata.NewBaseVM(r, h.DB, "Welcome", "/")
 
 	// Check if user can edit (admin or superadmin)

@@ -724,11 +724,6 @@
       countdown = 30;
       updateCountdown();
 
-      // Restore active tab after HTMX swap
-      if (activeTab !== 'progress') {
-        switchTab(activeTab);
-      }
-
       // Update sort direction data attribute from the request URL
       var pathInfo = evt.detail.pathInfo;
       if (pathInfo && pathInfo.requestPath) {
@@ -738,6 +733,16 @@
         if (gridEl) {
           gridEl.dataset.sortDir = dir;
         }
+      }
+    }
+  });
+
+  // Restore active tab after HTMX settle (must run after settle, not afterSwap,
+  // because the settle phase can re-apply the class="hidden" from the new HTML)
+  document.body.addEventListener('htmx:afterSettle', function(evt) {
+    if (evt.detail.target && evt.detail.target.id === 'mhs-grid') {
+      if (activeTab !== 'progress') {
+        switchTab(activeTab);
       }
     }
   });

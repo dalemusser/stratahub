@@ -212,14 +212,13 @@
 </div>
 
 <nav class="space-y-2 text-sm flex-1 pt-4 border-t border-gray-200 dark:border-gray-700">
-  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/dashboard" title="Dashboard"><span class="menu-icon mr-2">🎛️</span><span class="menu-text">Dashboard</span></a>
-  {{ if index .EnabledApps "mhs_units" }}
-  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/mhs/units" title="MHS Units"><span class="menu-icon mr-2">🎮</span><span class="menu-text">MHS Units</span></a>
-  {{ end }}
   {{ if index .EnabledApps "missionhydrosci" }}
   <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/missionhydrosci/units" title="Mission HydroSci"><span class="menu-icon mr-2">🧪</span><span class="menu-text">Mission HydroSci</span></a>
   {{ end }}
   <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/member/resources" title="Resources"><span class="menu-icon mr-2">📚</span><span class="menu-text">Resources</span></a>
+  {{ if index .EnabledApps "mhs_units" }}
+  <a class="menu-link flex items-center text-gray-700 dark:text-gray-300 hover:text-indigo-600 dark:hover:text-indigo-400" href="/mhs/units" title="MHS Units"><span class="menu-icon mr-2">🎮</span><span class="menu-text">MHS Units</span></a>
+  {{ end }}
   {{ template "menu_common" . }}
 </nav>
 
