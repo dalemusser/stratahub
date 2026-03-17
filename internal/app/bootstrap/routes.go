@@ -24,7 +24,6 @@ import (
 	materialsfeature "github.com/dalemusser/stratahub/internal/app/features/materials"
 	membersfeature "github.com/dalemusser/stratahub/internal/app/features/members"
 	mhsdashboardfeature "github.com/dalemusser/stratahub/internal/app/features/mhsdashboard"
-	mhsdeliveryfeature "github.com/dalemusser/stratahub/internal/app/features/mhsdelivery"
 	missionhydroscifeature "github.com/dalemusser/stratahub/internal/app/features/missionhydrosci"
 
 	organizationsfeature "github.com/dalemusser/stratahub/internal/app/features/organizations"
@@ -254,10 +253,6 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	if appCfg.StorageType == "local" || appCfg.StorageType == "" {
 		r.Handle(appCfg.StorageLocalURL+"/*", fileserver.Handler(appCfg.StorageLocalURL, appCfg.StorageLocalPath))
 	}
-
-	// MHS Content Delivery: CDN fallback redirect (no auth required; SW intercepts when active).
-	mhsRootHandler := mhsdeliveryfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, appCfg.MHSCDNBaseURL, logger)
-	r.Handle("/mhs/content/*", mhsRootHandler.ContentFallback())
 
 	// Mission HydroSci: root-level PWA routes + content fallback.
 	// /sw.js and /manifest.json serve the Mission HydroSci PWA (used for the impact study).
@@ -519,10 +514,6 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		// MHS Leader Dashboard (Mission HydroSci progress tracking)
 		mhsDashboardHandler := mhsdashboardfeature.NewHandler(deps.StrataHubMongoDatabase, deps.MHSGraderDatabase, errLog, logger)
 		wsr.Mount("/mhsdashboard", mhsdashboardfeature.Routes(mhsDashboardHandler, sessionMgr))
-
-		// MHS Content Delivery (PWA for downloading and playing Unity WebGL builds)
-		mhsDeliveryHandler := mhsdeliveryfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, appCfg.MHSCDNBaseURL, logger)
-		wsr.Mount("/mhs", mhsdeliveryfeature.Routes(mhsDeliveryHandler, sessionMgr))
 
 		// Mission HydroSci (experimental copy of MHS delivery for admin/coordinator development)
 		wsr.Mount("/missionhydrosci", missionhydroscifeature.Routes(missionHydroSciHandler, sessionMgr))

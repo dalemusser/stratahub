@@ -105,7 +105,7 @@ Until game builds are updated with the new jslib, the StrataHub launcher interce
 4. Any request to `/api/user` (on any domain) is intercepted and returns the injected identity
 5. The real network request is never made
 
-### StrataHub Launcher (`mhs_play.gohtml`)
+### StrataHub Launcher (`missionhydrosci_play.gohtml`)
 
 ```
 Go session → PlayData.UserName, PlayData.UserLoginID → template → JavaScript variables
@@ -141,7 +141,7 @@ index.html reads query params → same XHR/fetch interception → returns identi
 ### Phase 3: Remove Legacy Hacks
 - Remove the `/api/*` special case in `workspace.go` (lines 84-102) that routes apex API requests to the first workspace
 - Let apex `/api/*` requests be true apex requests (skip workspace validation)
-- Remove the identity bridge from `mhs_play.gohtml` (the jslib now calls same-origin)
+- Remove the identity bridge from `missionhydrosci_play.gohtml` (the jslib now calls same-origin)
 - Keep the CDN bridge for standalone CDN-hosted builds if needed
 
 ### Phase 4: Optional Enhancements
@@ -160,7 +160,7 @@ index.html reads query params → same XHR/fetch interception → returns identi
 | File | Purpose |
 |------|---------|
 | `internal/app/features/userinfo/handler.go` | `/api/user` endpoint |
-| `internal/app/features/mhsdelivery/play.go` | Injects identity into PlayData |
-| `internal/app/features/mhsdelivery/templates/mhs_play.gohtml` | Identity bridge (XHR/fetch interception) |
+| `internal/app/features/missionhydrosci/play.go` | Injects identity into PlayData |
+| `internal/app/features/missionhydrosci/templates/missionhydrosci_play.gohtml` | Identity bridge (XHR/fetch interception) |
 | `host-test/mhs-index-template.html` | CDN identity bridge template |
 | `internal/app/system/workspace/workspace.go` | Workspace middleware (contains `/api/*` special case to remove) |

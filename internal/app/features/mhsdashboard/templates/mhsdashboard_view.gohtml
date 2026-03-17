@@ -365,18 +365,54 @@
   <div class="bg-[#e8f4f8] px-4 py-2 border-b border-[#b1d4e0] flex items-center justify-between flex-shrink-0">
     <!-- Left: Group selector and Theme selector -->
     <div class="flex items-center gap-4">
-      {{ if .Groups }}
-      <select id="group-select"
-              class="text-sm border border-[#b1d4e0] rounded px-3 py-1.5 bg-white text-[#0c2d48] font-semibold"
-              hx-get="/mhsdashboard/grid"
-              hx-target="#mhs-grid"
-              hx-swap="innerHTML"
-              hx-vals='{"sort": "name", "dir": "{{ .SortDir }}"}'
-              name="group">
-        {{ range .Groups }}
-        <option value="{{ .ID }}" {{ if .Selected }}selected{{ end }}>{{ .Name }}</option>
-        {{ end }}
-      </select>
+      <input type="hidden" id="group-select" value="{{ .SelectedGroup }}">
+
+      {{ if .IsAdmin }}
+      {{/* Admin/Coordinator: organization dropdown */}}
+      <div class="relative" id="org-dropdown-container">
+        <button id="org-dropdown-btn" type="button"
+                class="text-sm border border-[#b1d4e0] rounded px-3 py-1.5 bg-white text-[#0c2d48] font-semibold flex items-center gap-2 min-w-[180px] cursor-pointer hover:border-[#2e8bc0] transition-colors">
+          <span id="org-dropdown-label" class="truncate">{{ range .Orgs }}{{ if .Selected }}{{ .Name }}{{ end }}{{ end }}</span>
+          <svg class="w-3.5 h-3.5 ml-auto flex-shrink-0 text-[#145374]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+        <div id="org-dropdown-panel" class="hidden absolute top-full left-0 mt-1 w-80 bg-white border border-[#b1d4e0] rounded-lg shadow-lg z-50 max-h-72 overflow-y-auto">
+          {{ range .Orgs }}
+          <button type="button"
+                  class="org-option w-full text-left px-3 py-2 flex items-center justify-between hover:bg-[#e8f4f8] transition-colors {{ if .Selected }}bg-[#e8f4f8]{{ end }}"
+                  data-org-id="{{ .ID }}">
+            <span class="font-medium text-[#0c2d48] truncate mr-2">{{ .Name }}</span>
+            <span class="text-xs text-slate-400 flex-shrink-0">{{ .GroupCount }} {{ if eq .GroupCount 1 }}group{{ else }}groups{{ end }}</span>
+          </button>
+          {{ end }}
+        </div>
+      </div>
+      {{ end }}
+
+      {{/* Group dropdown (all roles) */}}
+      {{ if .GroupsEx }}
+      <div class="relative" id="group-dropdown-container">
+        <button id="group-dropdown-btn" type="button"
+                class="text-sm border border-[#b1d4e0] rounded px-3 py-1.5 bg-white text-[#0c2d48] font-semibold flex items-center gap-2 min-w-[200px] cursor-pointer hover:border-[#2e8bc0] transition-colors">
+          <span id="group-dropdown-label" class="truncate">{{ .GroupName }}</span>
+          <span id="group-dropdown-count" class="text-xs text-slate-400 flex-shrink-0">{{ .MemberCount }} {{ if eq .MemberCount 1 }}member{{ else }}members{{ end }}</span>
+          <svg class="w-3.5 h-3.5 ml-auto flex-shrink-0 text-[#145374]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+          </svg>
+        </button>
+        <div id="group-dropdown-panel" class="hidden absolute top-full left-0 mt-1 w-80 bg-white border border-[#b1d4e0] rounded-lg shadow-lg z-50 max-h-72 overflow-y-auto">
+          {{ range .GroupsEx }}
+          <button type="button"
+                  class="group-option w-full text-left px-3 py-2 flex items-center justify-between hover:bg-[#e8f4f8] transition-colors {{ if .Selected }}bg-[#e8f4f8]{{ end }}"
+                  data-group-id="{{ .ID }}" data-org-id="{{ .OrgID }}" data-member-count="{{ .MemberCount }}"
+                  {{ if $.IsAdmin }}{{ if ne .OrgID $.SelectedOrg }}style="display:none;"{{ end }}{{ end }}>
+            <span class="font-medium text-[#0c2d48] truncate mr-2">{{ .Name }}</span>
+            <span class="text-xs text-slate-400 flex-shrink-0">{{ .MemberCount }} {{ if eq .MemberCount 1 }}member{{ else }}members{{ end }}</span>
+          </button>
+          {{ end }}
+        </div>
+      </div>
       {{ end }}
       <!-- Theme Selector -->
       <div class="flex items-center gap-1.5">
@@ -859,6 +895,160 @@
       }
     });
   }
+
+  // Custom dropdown logic (admin/coordinator view)
+  var orgBtn = document.getElementById('org-dropdown-btn');
+  var orgPanel = document.getElementById('org-dropdown-panel');
+  var groupBtn = document.getElementById('group-dropdown-btn');
+  var groupPanel = document.getElementById('group-dropdown-panel');
+  var hiddenGroupInput = document.getElementById('group-select');
+
+  function closeAllDropdowns() {
+    if (orgPanel) orgPanel.classList.add('hidden');
+    if (groupPanel) groupPanel.classList.add('hidden');
+  }
+
+  function selectGroup(opt) {
+    var groupId = opt.dataset.groupId;
+    var memberCount = opt.dataset.memberCount;
+    var memberWord = memberCount === '1' ? 'member' : 'members';
+    document.getElementById('group-dropdown-label').textContent =
+      opt.querySelector('.font-medium').textContent;
+    document.getElementById('group-dropdown-count').textContent =
+      memberCount + ' ' + memberWord;
+    hiddenGroupInput.value = groupId;
+
+    // Highlight selected group
+    groupPanel.querySelectorAll('.group-option').forEach(function(g) {
+      g.classList.remove('bg-[#e8f4f8]');
+    });
+    opt.classList.add('bg-[#e8f4f8]');
+
+    doRefresh();
+  }
+
+  // Org dropdown (admin/coordinator only)
+  if (orgBtn && orgPanel) {
+    orgBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var isOpen = !orgPanel.classList.contains('hidden');
+      closeAllDropdowns();
+      if (!isOpen) orgPanel.classList.remove('hidden');
+    });
+
+    orgPanel.addEventListener('click', function(e) {
+      var opt = e.target.closest('.org-option');
+      if (!opt) return;
+      var orgId = opt.dataset.orgId;
+
+      document.getElementById('org-dropdown-label').textContent =
+        opt.querySelector('.font-medium').textContent;
+
+      orgPanel.querySelectorAll('.org-option').forEach(function(o) {
+        o.classList.remove('bg-[#e8f4f8]');
+      });
+      opt.classList.add('bg-[#e8f4f8]');
+
+      var allGroupOpts = groupPanel.querySelectorAll('.group-option');
+      var firstVisible = null;
+      allGroupOpts.forEach(function(g) {
+        if (g.dataset.orgId === orgId) {
+          g.style.display = '';
+          if (!firstVisible) firstVisible = g;
+        } else {
+          g.style.display = 'none';
+        }
+      });
+
+      if (firstVisible) {
+        selectGroup(firstVisible);
+      }
+
+      closeAllDropdowns();
+    });
+
+    orgBtn.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        orgBtn.click();
+      }
+    });
+
+    orgPanel.addEventListener('keydown', function(e) {
+      var visible = Array.from(orgPanel.querySelectorAll('button:not([style*="display:none"])'));
+      var focused = document.activeElement;
+      var idx = visible.indexOf(focused);
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (idx < visible.length - 1) visible[idx + 1].focus();
+        else if (visible.length > 0) visible[0].focus();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (idx > 0) visible[idx - 1].focus();
+        else if (visible.length > 0) visible[visible.length - 1].focus();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (focused) focused.click();
+      }
+    });
+  }
+
+  // Group dropdown (all roles)
+  if (groupBtn && groupPanel) {
+    groupBtn.addEventListener('click', function(e) {
+      e.stopPropagation();
+      var isOpen = !groupPanel.classList.contains('hidden');
+      closeAllDropdowns();
+      if (!isOpen) groupPanel.classList.remove('hidden');
+    });
+
+    groupPanel.addEventListener('click', function(e) {
+      var opt = e.target.closest('.group-option');
+      if (!opt) return;
+      selectGroup(opt);
+      closeAllDropdowns();
+    });
+
+    groupBtn.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        groupBtn.click();
+      }
+    });
+
+    groupPanel.addEventListener('keydown', function(e) {
+      var visible = Array.from(groupPanel.querySelectorAll('button:not([style*="display:none"])'));
+      var focused = document.activeElement;
+      var idx = visible.indexOf(focused);
+      if (e.key === 'ArrowDown') {
+        e.preventDefault();
+        if (idx < visible.length - 1) visible[idx + 1].focus();
+        else if (visible.length > 0) visible[0].focus();
+      } else if (e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (idx > 0) visible[idx - 1].focus();
+        else if (visible.length > 0) visible[visible.length - 1].focus();
+      } else if (e.key === 'Enter') {
+        e.preventDefault();
+        if (focused) focused.click();
+      }
+    });
+  }
+
+  // Click outside closes dropdowns
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('#org-dropdown-container') &&
+        !e.target.closest('#group-dropdown-container')) {
+      closeAllDropdowns();
+    }
+  });
+
+  // Close dropdowns on Escape (extends existing Escape handler)
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape') {
+      closeAllDropdowns();
+    }
+  });
 
   // Initial setup
   startCountdown();

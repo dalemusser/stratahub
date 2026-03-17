@@ -39,6 +39,6 @@ func (h *Handler) ServeServiceWorker(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("\n"))
 	}
 
-	// Append content hash so browser detects SW change when mhs-delivery.js changes
-	fmt.Fprintf(w, "\n// app-shell-hash: %s\n", appresources.MHSDeliveryVersion())
+	// Append content hashes so browser detects SW change when cached assets change
+	fmt.Fprintf(w, "\n// app-shell-hash: %s %s\n", appresources.MHSDeliveryVersion(), appresources.TailwindVersion())
 }

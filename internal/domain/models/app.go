@@ -2,7 +2,7 @@ package models
 
 // AppDefinition describes an app that can be enabled/disabled per group.
 type AppDefinition struct {
-	ID          string // unique identifier (e.g., "mhs_units")
+	ID          string // unique identifier (e.g., "missionhydrosci")
 	Name        string // display name
 	Description string // brief description for admin UI
 	MenuIcon    string // emoji icon for sidebar menu
@@ -12,14 +12,6 @@ type AppDefinition struct {
 
 // AvailableApps is the registry of all apps that can be toggled per group.
 var AvailableApps = []AppDefinition{
-	{
-		ID:          "mhs_units",
-		Name:        "MHS Units",
-		Description: "Mission HydroSci interactive science units",
-		MenuIcon:    "\U0001F3AE", // game controller emoji
-		MenuPath:    "/mhs/units",
-		MenuTitle:   "Mission HydroSci",
-	},
 	{
 		ID:          "missionhydrosci",
 		Name:        "Mission HydroSci",

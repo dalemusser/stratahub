@@ -19,7 +19,6 @@
 
 | Key | Feature | Purpose |
 |-----|---------|---------|
-| `mhs-install-dismissed` | MHS Units | PWA install banner dismissed for this session |
 | `missionhydrosci-install-dismissed` | Mission HydroSci | PWA install banner dismissed for this session |
 | `missionhydrosci-ios-install-dismissed` | Mission HydroSci | iOS install banner dismissed for this session |
 | `missionhydroscix-install-dismissed` | Mission XydroSci | PWA install banner dismissed for this session |

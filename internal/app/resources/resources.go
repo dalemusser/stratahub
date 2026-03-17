@@ -32,6 +32,9 @@ var (
 // Used by the Mission HydroSci SW handler to trigger browser reinstallation when JS changes.
 func MHSDeliveryVersion() string { return mhsDeliveryVersion }
 
+// TailwindVersion returns the content hash of tailwind.css.
+func TailwindVersion() string { return tailwindVersion }
+
 func init() {
 	templates.RegisterFunc("tailwindVersion", func() string { return tailwindVersion })
 	templates.RegisterFunc("tiptapVersion", func() string { return tiptapVersion })

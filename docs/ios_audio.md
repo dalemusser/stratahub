@@ -127,7 +127,7 @@ The Unity instance is stored globally (`window.__unityInstance`) when `createUni
 
 ## Applicability
 
-This fix is applied in **Mission HydroSci** (`missionhydrosci_play.gohtml`). When Mission HydroSci replaces MHS Units, the fix carries over automatically.
+This fix is applied in **Mission HydroSci** (`missionhydrosci_play.gohtml`).
 
 The issue is specific to:
 - **iOS PWA** (Add to Home Screen) — regular Safari doesn't preserve pages in bfcache as aggressively

@@ -2,14 +2,9 @@
 
 ## Problem
 
-StrataHub currently has multiple competing PWA implementations on the same origin:
+StrataHub previously had multiple competing PWA implementations on the same origin. MHS Units (`mhsdelivery`) has been removed. Mission HydroSci (`/missionhydrosci-manifest.json`, `/missionhydrosci-sw.js`) is the sole game delivery path.
 
-- **mhsdelivery** (`/manifest.json`, `/sw.js`) — the original MHS Units feature
-- **missionhydrosci** (`/missionhydrosci-manifest.json`, `/missionhydrosci-sw.js`) — Mission HydroSci
-
-Each registers its own service worker and manifest. Chrome only supports one installed PWA per origin, so these conflict — installing from the wrong page picks up the wrong manifest, causing navigation overlay issues on Chromebooks and confusing the install experience.
-
-Additionally, the PWA is branded around a single game (Mission HydroSci), but StrataHub is a platform that hosts multiple features and will host additional games in the future.
+The PWA is currently branded around Mission HydroSci, but StrataHub is a platform that hosts multiple features and will host additional games in the future.
 
 ## End-State Architecture
 
@@ -117,7 +112,6 @@ When the installed PWA launches, the user should land where they need to be — 
 
 **`bootstrap/routes.go`**:
 
-- Remove: `r.Get("/manifest.json", mhsRootHandler.ServeManifest)` (mhsdelivery)
 - Remove: `r.Get("/missionhydrosci-manifest.json", ...)` (missionhydrosci)
 - Add: `r.Get("/manifest.json", pwaHandler.ServeManifest)`
 - Add: `r.Get("/pwa/icon-192.png", pwaHandler.ServeIcon192)`
@@ -329,7 +323,6 @@ func (h *Handler) ServeServiceWorker(w http.ResponseWriter, r *http.Request) {
 
 **`bootstrap/routes.go`** — all PWA routes must be at the root level, **outside** the auth middleware group (same location as the current `/sw.js` and `/manifest.json` routes). SW registration, manifest fetching, and offline fallback must work without authentication:
 
-- Remove: `r.Get("/sw.js", mhsRootHandler.ServeServiceWorker)` (mhsdelivery)
 - Remove: `r.Get("/missionhydrosci-sw.js", ...)` (missionhydrosci)
 - Add: `r.Get("/sw.js", pwaHandler.ServeServiceWorker)`
 - Add: `r.Get("/offline", pwaHandler.ServeOffline)`
@@ -770,20 +763,7 @@ When a second game is added, it would register its own login action following th
 
 ---
 
-### 8. mhsdelivery Feature Changes
-
-The mhsdelivery feature (`/mhs/*`) continues to exist as a route for students currently using it. Changes:
-
-- **Remove PWA infrastructure:** Delete `manifest.go`, `sw.go`, and `static/` directory from mhsdelivery
-- **Remove from bootstrap/routes.go:** The root-level routes for `/sw.js` and `/manifest.json` that point to mhsdelivery
-- **Keep routes:** `/mhs/units`, `/mhs/play/{unit}`, `/mhs/api/manifest` remain functional
-- **Templates:** Remove the `beforeinstallprompt` install banner from `mhs_units.gohtml` (the platform install flow replaces it, or mhsdelivery simply doesn't offer PWA install anymore)
-
-Students accessing `/mhs/units` in the browser continue to work. They just can't install a separate PWA for it (which is the desired behavior).
-
----
-
-### 9. missionhydrosci Feature Changes
+### 8. missionhydrosci Feature Changes
 
 - **Remove:** `manifest.go`, `sw.go`, `static/sw*.js` files — PWA infrastructure moves to `internal/app/pwa/`
 - **Remove:** `{{ define "manifest" }}` block override in `missionhydrosci_units.gohtml`
@@ -901,14 +881,6 @@ internal/app/pwa/
 ## Files Removed
 
 ```
-internal/app/features/mhsdelivery/
-  manifest.go         — replaced by pwa/manifest.go
-  sw.go               — replaced by pwa/sw.go
-  static/
-    sw.js             — replaced by pwa/static/sw.js
-    sw-cache.js       — replaced by pwa/static/sw-cache.js
-    sw-background-fetch.js — replaced by pwa/static/sw-background-fetch.js
-
 internal/app/features/missionhydrosci/
   manifest.go         — replaced by pwa/manifest.go
   sw.go               — replaced by pwa/sw.go
@@ -935,13 +907,6 @@ internal/app/features/missionhydrosci/templates/missionhydrosci_units.gohtml
       add cross-tab safety to auto-cleanup
 internal/app/features/missionhydrosci/templates/missionhydrosci_play.gohtml
     — add cache status pre-check before loading Unity player
-internal/app/features/mhsdelivery/templates/mhs_units.gohtml
-    — remove install banner
-internal/app/resources/assets/js/mhs-delivery.js
-    — rename to content-delivery.js (optional), add pre-download storage check,
-      add global download lock, add stale version cache cleanup,
-      add navigator.onLine check, add error categorization,
-      add error reporting to device status
 internal/app/resources/templates/layout.gohtml
     — add global beforeinstallprompt capture in layout JS,
       add old SW unregistration cleanup (for already-logged-in users
@@ -953,8 +918,6 @@ internal/app/features/missionhydrosci/device_status.go
 ## Files Also Removed (Cleanup)
 
 ```
-internal/app/features/mhsdelivery/templates/mhs_offline.gohtml
-    — replaced by pwa/templates/offline.gohtml (generic offline page)
 internal/app/features/missionhydrosci/templates/missionhydrosci_offline.gohtml
     — replaced by pwa/templates/offline.gohtml (generic offline page)
 ```
@@ -982,8 +945,7 @@ Note: These offline templates exist in the codebase but are **not currently rout
 ### Phase 3: Wire Up Routes
 
 11. Add platform PWA routes to `bootstrap/routes.go`
-12. Remove mhsdelivery PWA routes (manifest, SW)
-13. Remove missionhydrosci PWA routes (manifest, SW)
+12. Remove missionhydrosci PWA routes (manifest, SW)
 14. Register missionhydrosci as a feature in the platform SW registry
 15. Update login action to register `/sw.js` instead of `/missionhydrosci-sw.js`
 16. Add old SW unregistration logic to login action / layout JS
@@ -992,9 +954,7 @@ Note: These offline templates exist in the codebase but are **not currently rout
 
 17. Remove `{{ define "manifest" }}` override from `missionhydrosci_units.gohtml`
 18. Update `missionhydrosci_units.gohtml` install banner (if needed — it may work as-is since `beforeinstallprompt` fires from the platform manifest)
-19. Remove install banner from `mhs_units.gohtml`
-20. Remove `manifest.go`, `sw.go`, and `static/` from mhsdelivery feature
-21. Remove `manifest.go`, `sw.go`, and `static/` from missionhydrosci feature
+19. Remove `manifest.go`, `sw.go`, and `static/` from missionhydrosci feature
 22. Remove SW registration from `missionhydrosci_play.gohtml` (currently registers old `/missionhydrosci-sw.js`)
 
 ### Phase 5: Download Robustness (Delivery Manager + SW)
@@ -1027,8 +987,7 @@ Note: These offline templates exist in the codebase but are **not currently rout
 39. Test unit download and caching in PWA mode
 40. Test unit download and caching in browser mode
 41. Test on Chromebook — no more navigation overlay issue
-42. Test `/mhs/units` still works in browser (no PWA install offered)
-43. Test offline play
+42. Test offline play
 44. Test login action early download triggers on login
 45. Test storage-full scenario — verify specific error message, no partial download left behind
 46. Test download with lid-close/resume — verify stall detection recovers
@@ -1177,13 +1136,13 @@ If the switch happens before icons are configured, students will see a generic d
 
 ### Existing PWA Installations
 
-Users who have the old mhsdelivery or missionhydrosci PWA installed:
+Users who have the old missionhydrosci PWA installed:
 
 - Their installed app will pick up the new `/manifest.json` on next launch (Chrome checks manifests periodically)
 - The name and icon will update to the workspace branding
 - The new `/sw.js` will be registered by the login action or by visiting any feature page
 - **Old SW registrations must be explicitly unregistered.** Chrome uses the most specific matching scope — the old `/missionhydrosci-sw.js` registration at `scope: '/missionhydrosci/'` would take precedence over the new `/sw.js` at `scope: '/'` for all pages under `/missionhydrosci/*`. A 404 on update checks does NOT unregister the old SW; Chrome keeps it active. Fix: unregister old registrations during the new SW's activate event (see below)
-- Old app shell caches (`missionhydrosci-app-shell-v5`, `mhs-app-shell-v1`) should be cleaned up by the new SW's activate handler to reclaim storage
+- Old app shell caches (`missionhydrosci-app-shell-v5`) should be cleaned up by the new SW's activate handler to reclaim storage
 
 #### Old SW Unregistration
 

@@ -13,12 +13,10 @@ The Dashboard has been removed from the member menu. It did not serve any meanin
 
 1. Mission HydroSci
 2. Resources
-3. MHS Units (if assigned)
 
 ### Control group (Mission HydroSci not assigned)
 
 1. Resources
-2. MHS Units (if assigned)
 
 Mission HydroSci does not appear in the menu for control group members. They have no visibility into or access to Mission HydroSci.
 

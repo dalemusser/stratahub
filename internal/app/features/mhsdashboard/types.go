@@ -26,11 +26,28 @@ type ProgressConfig struct {
 	Units []Unit `json:"units"`
 }
 
-// GroupOption represents a group in the dropdown selector.
+// GroupOption represents a group in the dropdown selector (leader view).
 type GroupOption struct {
 	ID       string
 	Name     string
 	Selected bool
+}
+
+// OrgOption represents an organization in the org dropdown (admin view).
+type OrgOption struct {
+	ID         string
+	Name       string
+	GroupCount int
+	Selected   bool
+}
+
+// GroupOptionEx represents a group in the styled group dropdown (admin view).
+type GroupOptionEx struct {
+	ID          string
+	Name        string
+	OrgID       string
+	MemberCount int
+	Selected    bool
 }
 
 // CellData represents a single cell in the progress grid.
@@ -89,12 +106,18 @@ type PointHeader struct {
 type DashboardData struct {
 	viewdata.BaseVM
 
-	Groups        []GroupOption
+	Groups        []GroupOption   // Leader view: flat group list
 	SelectedGroup string
 	GroupName     string
 	MemberCount   int
 	LastUpdated   string
 	TimezoneAbbr  string // Timezone abbreviation (e.g., "MST", "EST")
+
+	// Admin/coordinator view: org + group dropdowns
+	IsAdmin     bool             // true for admin/coordinator/superadmin
+	Orgs        []OrgOption      // Organization options
+	SelectedOrg string           // Selected org ID hex
+	GroupsEx    []GroupOptionEx   // Groups with org association + member counts
 
 	UnitHeaders  []UnitHeader
 	PointHeaders []PointHeader

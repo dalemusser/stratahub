@@ -24,13 +24,13 @@ This document covers known risks to the MHS unit download system (Background Fet
 
 **Mitigation:** The fullscreen button is hidden on iPad. The play page already fills the viewport, so fullscreen only hides Safari's toolbar. For a fully chrome-free experience, users can install the PWA (Add to Home Screen), which runs without Safari UI and does not have this keyboard limitation.
 
-**Applies to:** `missionhydrosci_play.gohtml` (and `mhs_play.gohtml` if the same fix is applied later).
+**Applies to:** `missionhydrosci_play.gohtml`.
 
 ### Service Worker Scope Conflict (Fixed 2026-03-01)
 
-**Problem:** Both MHS Units (`mhsdelivery`) and Mission HydroSci (`missionhydrosci`) registered service workers at `scope: '/'`. Only one SW can be active per scope, so one would replace the other, causing cache key mismatches and download failures.
+**Problem:** Both MHS Units (now removed) and Mission HydroSci registered service workers at `scope: '/'`. Only one SW can be active per scope, so one would replace the other, causing cache key mismatches and download failures.
 
-**Fix:** Mission HydroSci SW uses `scope: '/missionhydrosci/'`. MHS Units SW remains at `scope: '/'`.
+**Fix:** Mission HydroSci SW uses `scope: '/missionhydrosci/'`. MHS Units has been removed.
 
 ---
 
@@ -115,7 +115,7 @@ If the service worker fails to register (browser restrictions, IT policy blockin
 **Impact:** Medium
 **Likelihood:** Low
 
-If `/mhs/api/manifest` (or `/missionhydrosci/api/manifest`) is unreachable when the units page loads (server restart, network issue, authentication expiry), the delivery manager cannot load the unit list. The page shows "Checking..." indefinitely for all units with no error state or retry.
+If `/missionhydrosci/api/manifest` is unreachable when the units page loads (server restart, network issue, authentication expiry), the delivery manager cannot load the unit list. The page shows "Checking..." indefinitely for all units with no error state or retry.
 
 **Symptoms:** All unit cards stuck on "Checking..." forever. No download or play buttons appear.
 

@@ -130,7 +130,7 @@ Neither `mhs.adroit.games` nor `dev.adroit.games` is in the allowed origins. Thi
 
 Rather than fixing cross-origin identity retrieval (which requires both the `/api/*` special case fix AND CORS changes), the game launcher now uses a server-side identity bridge:
 
-- **StrataHub launcher** (`mhs_play.gohtml`): Go handler injects user identity from the session into the page as JavaScript variables. XHR/fetch calls to `/api/user` are intercepted client-side and return the injected data. No cross-origin request needed.
+- **StrataHub launcher** (`missionhydrosci_play.gohtml`): Go handler injects user identity from the session into the page as JavaScript variables. XHR/fetch calls to `/api/user` are intercepted client-side and return the injected data. No cross-origin request needed.
 
 - **CDN-hosted builds** (`mhs-index-template.html`): Identity is passed via URL query parameters (`?name=...&login_id=...`). Same client-side interception technique.
 
@@ -158,5 +158,4 @@ The `/api/*` special case in `workspace.go` has been **removed**. Apex `/api/*` 
 | `internal/app/bootstrap/config.go` | Session domain auto-derivation (lines 175-181) |
 | `internal/app/store/users/fetcher.go` | User fetcher (queries by `_id`, no workspace filter) |
 | `internal/app/features/userinfo/handler.go` | `/api/user` endpoint handler |
-| `internal/app/features/mhsdelivery/templates/mhs_play.gohtml` | Identity bridge (XHR/fetch interception) |
 | `host-test/mhs-index-template.html` | CDN identity bridge (query param based) |

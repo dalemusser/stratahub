@@ -17,6 +17,7 @@ import (
 	"github.com/gorilla/csrf"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )
 
@@ -87,7 +88,9 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 		sortDir = "asc"
 	}
 
-	// Build group options for dropdown
+	isAdmin := role == "admin" || role == "coordinator" || role == "superadmin"
+
+	// Build group options for dropdown (leader view)
 	groupOptions := make([]GroupOption, len(groups))
 	var selectedGroupName string
 	var selectedGroupOrgID primitive.ObjectID
@@ -114,6 +117,40 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 		groupOptions[0].Selected = true
 	}
 
+	// Load member counts for styled group dropdown (all roles)
+	memberCounts, err := h.loadActiveMemberCounts(ctx, r, groups)
+	if err != nil {
+		h.ErrLog.LogServerError(w, r, "failed to load member counts", err, "A database error occurred.", "/dashboard")
+		return
+	}
+
+	groupsEx := make([]GroupOptionEx, len(groups))
+	for i, g := range groups {
+		groupsEx[i] = GroupOptionEx{
+			ID:          g.ID.Hex(),
+			Name:        g.Name,
+			OrgID:       g.OrganizationID.Hex(),
+			MemberCount: memberCounts[g.ID],
+			Selected:    g.ID.Hex() == selectedGroup,
+		}
+	}
+
+	// Build admin view data (org dropdown)
+	var orgs []OrgOption
+	var selectedOrg string
+	if isAdmin {
+		orgs, err = h.loadOrgsWithGroupCounts(ctx, groups)
+		if err != nil {
+			h.ErrLog.LogServerError(w, r, "failed to load organizations", err, "A database error occurred.", "/dashboard")
+			return
+		}
+
+		selectedOrg = selectedGroupOrgID.Hex()
+		for i := range orgs {
+			orgs[i].Selected = orgs[i].ID == selectedOrg
+		}
+	}
+
 	members, err := h.getMembersForGroup(ctx, r, selectedOID, sortDir)
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "failed to load members", err, "A database error occurred.", "/dashboard")
@@ -138,6 +175,10 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 		MemberCount:   len(members),
 		LastUpdated:   lastUpdated,
 		TimezoneAbbr:  tzAbbr,
+		IsAdmin:       isAdmin,
+		Orgs:          orgs,
+		SelectedOrg:   selectedOrg,
+		GroupsEx:       groupsEx,
 		UnitHeaders:   unitHeaders,
 		PointHeaders:  pointHeaders,
 		Members:       memberRows,
@@ -672,6 +713,114 @@ func (h *Handler) buildProgressRows(ctx context.Context, members []models.User, 
 	}
 
 	return result
+}
+
+// loadOrgsWithGroupCounts builds the organization dropdown options from the
+// already-loaded groups slice, fetching org names from the database.
+func (h *Handler) loadOrgsWithGroupCounts(ctx context.Context, groups []models.Group) ([]OrgOption, error) {
+	// Count groups per org and collect unique org IDs
+	orgGroupCount := make(map[primitive.ObjectID]int)
+	var orgIDs []primitive.ObjectID
+	seen := make(map[primitive.ObjectID]bool)
+	for _, g := range groups {
+		orgGroupCount[g.OrganizationID]++
+		if !seen[g.OrganizationID] {
+			seen[g.OrganizationID] = true
+			orgIDs = append(orgIDs, g.OrganizationID)
+		}
+	}
+
+	// Fetch org names
+	cur, err := h.DB.Collection("organizations").Find(ctx, bson.M{
+		"_id": bson.M{"$in": orgIDs},
+	})
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+
+	orgNames := make(map[primitive.ObjectID]string)
+	for cur.Next(ctx) {
+		var org struct {
+			ID   primitive.ObjectID `bson:"_id"`
+			Name string             `bson:"name"`
+		}
+		if err := cur.Decode(&org); err == nil {
+			orgNames[org.ID] = org.Name
+		}
+	}
+
+	// Build sorted options
+	orgs := make([]OrgOption, 0, len(orgIDs))
+	for _, id := range orgIDs {
+		name := orgNames[id]
+		if name == "" {
+			name = "Unknown Organization"
+		}
+		orgs = append(orgs, OrgOption{
+			ID:         id.Hex(),
+			Name:       name,
+			GroupCount: orgGroupCount[id],
+		})
+	}
+	sort.Slice(orgs, func(i, j int) bool {
+		return orgs[i].Name < orgs[j].Name
+	})
+
+	return orgs, nil
+}
+
+// loadActiveMemberCounts returns a map of group ID to active member count.
+// It joins group_memberships with users to count only active members,
+// matching the grid display.
+func (h *Handler) loadActiveMemberCounts(ctx context.Context, r *http.Request, groups []models.Group) (map[primitive.ObjectID]int, error) {
+	wsID := workspace.IDFromRequest(r)
+
+	groupIDs := make([]primitive.ObjectID, len(groups))
+	for i, g := range groups {
+		groupIDs[i] = g.ID
+	}
+
+	pipeline := mongo.Pipeline{
+		{{Key: "$match", Value: bson.M{
+			"group_id":     bson.M{"$in": groupIDs},
+			"role":         "member",
+			"workspace_id": wsID,
+		}}},
+		{{Key: "$lookup", Value: bson.M{
+			"from":         "users",
+			"localField":   "user_id",
+			"foreignField": "_id",
+			"as":           "user",
+		}}},
+		{{Key: "$unwind", Value: "$user"}},
+		{{Key: "$match", Value: bson.M{
+			"user.status": "active",
+		}}},
+		{{Key: "$group", Value: bson.M{
+			"_id":   "$group_id",
+			"count": bson.M{"$sum": 1},
+		}}},
+	}
+
+	cur, err := h.DB.Collection("group_memberships").Aggregate(ctx, pipeline)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+
+	counts := make(map[primitive.ObjectID]int)
+	for cur.Next(ctx) {
+		var result struct {
+			ID    primitive.ObjectID `bson:"_id"`
+			Count int                `bson:"count"`
+		}
+		if err := cur.Decode(&result); err == nil {
+			counts[result.ID] = result.Count
+		}
+	}
+
+	return counts, nil
 }
 
 // formatTimeInOrgTimezone formats the current time in the organization's timezone.
