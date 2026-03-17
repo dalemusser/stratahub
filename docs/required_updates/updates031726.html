@@ -1,0 +1,803 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Required Update: Game Identity — Shift from login_id to User ObjectID</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-alt: #f8fafc;
+      --bg-card: #ffffff;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --accent: #2563eb;
+      --accent-light: #eff6ff;
+      --green: #16a34a;
+      --green-light: #f0fdf4;
+      --green-border: #bbf7d0;
+      --red: #dc2626;
+      --red-light: #fef2f2;
+      --red-border: #fecaca;
+      --amber: #d97706;
+      --amber-light: #fffbeb;
+      --amber-border: #fde68a;
+      --purple: #7c3aed;
+      --purple-light: #f5f3ff;
+      --purple-border: #ddd6fe;
+      --code-bg: #f1f5f9;
+      --code-border: #cbd5e1;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg-alt);
+      padding: 2rem 1rem;
+    }
+
+    .container { max-width: 960px; margin: 0 auto; }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      padding-bottom: 2rem;
+      border-bottom: 2px solid var(--border);
+    }
+
+    h1 { font-size: 1.85rem; font-weight: 700; color: var(--text); margin-bottom: 0.25rem; }
+    .date { color: var(--text-muted); font-size: 0.95rem; }
+
+    h2 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      color: var(--accent);
+      margin: 2.5rem 0 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--border);
+    }
+
+    h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--text);
+      margin: 1.5rem 0 0.75rem;
+    }
+
+    p { margin-bottom: 0.75rem; }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.5rem;
+      margin-bottom: 1.25rem;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.04);
+    }
+
+    /* Problem cards */
+    .problem-card {
+      border-left: 4px solid var(--red);
+      background: var(--red-light);
+      border-color: var(--red-border);
+      border-left-color: var(--red);
+    }
+    .problem-card .problem-number {
+      display: inline-block;
+      background: var(--red);
+      color: white;
+      width: 1.6rem;
+      height: 1.6rem;
+      text-align: center;
+      border-radius: 50%;
+      font-size: 0.85rem;
+      font-weight: 700;
+      line-height: 1.6rem;
+      margin-right: 0.5rem;
+      flex-shrink: 0;
+    }
+    .problem-card h4 {
+      display: inline;
+      font-size: 1rem;
+      font-weight: 600;
+      color: var(--red);
+    }
+    .problem-card p { margin-top: 0.5rem; color: var(--text); }
+
+    /* Solution properties */
+    .solution-card {
+      border-left: 4px solid var(--green);
+      background: var(--green-light);
+      border-color: var(--green-border);
+      border-left-color: var(--green);
+    }
+    .solution-props {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0.75rem;
+      margin-top: 1rem;
+    }
+    .solution-prop {
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+    .solution-prop .check {
+      color: var(--green);
+      font-weight: 700;
+      font-size: 1.1rem;
+      line-height: 1.4;
+      flex-shrink: 0;
+    }
+    .solution-prop strong { color: var(--green); }
+
+    /* Code blocks */
+    code {
+      font-family: 'SF Mono', 'Fira Code', 'Fira Mono', Menlo, Consolas, monospace;
+      font-size: 0.88em;
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+      color: #0f172a;
+    }
+
+    pre {
+      background: #1e293b;
+      color: #e2e8f0;
+      padding: 1.25rem;
+      border-radius: 8px;
+      overflow-x: auto;
+      margin: 1rem 0;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+    pre code {
+      background: none;
+      border: none;
+      padding: 0;
+      color: inherit;
+      font-size: inherit;
+    }
+    .code-comment { color: #94a3b8; }
+    .code-string { color: #86efac; }
+    .code-keyword { color: #93c5fd; }
+    .code-key { color: #c4b5fd; }
+
+    /* File reference */
+    .file-ref {
+      display: inline-block;
+      background: var(--accent-light);
+      color: var(--accent);
+      font-family: 'SF Mono', Menlo, Consolas, monospace;
+      font-size: 0.82rem;
+      padding: 0.2em 0.6em;
+      border-radius: 4px;
+      margin-bottom: 0.5rem;
+      border: 1px solid #bfdbfe;
+    }
+
+    /* Change cards */
+    .change-card {
+      border-left: 4px solid var(--accent);
+    }
+    .change-card.no-change {
+      border-left-color: #94a3b8;
+      background: var(--bg-alt);
+    }
+    .no-change-badge {
+      display: inline-block;
+      background: #e2e8f0;
+      color: var(--text-muted);
+      font-size: 0.75rem;
+      font-weight: 600;
+      padding: 0.15em 0.5em;
+      border-radius: 4px;
+      margin-left: 0.5rem;
+      vertical-align: middle;
+    }
+
+    /* Migration steps */
+    .step {
+      display: flex;
+      gap: 1rem;
+      margin-bottom: 1rem;
+      align-items: flex-start;
+    }
+    .step-number {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 2rem;
+      height: 2rem;
+      background: var(--accent);
+      color: white;
+      border-radius: 50%;
+      font-weight: 700;
+      font-size: 0.9rem;
+      flex-shrink: 0;
+    }
+    .step-content { flex: 1; }
+    .step-content strong { color: var(--accent); }
+
+    /* Feasibility list */
+    .feasibility-list {
+      list-style: none;
+      padding: 0;
+      margin-top: 1rem;
+    }
+    .feasibility-list li {
+      padding: 0.4rem 0;
+      padding-left: 1.5rem;
+      position: relative;
+    }
+    .feasibility-list li::before {
+      content: "\2713";
+      position: absolute;
+      left: 0;
+      color: var(--green);
+      font-weight: 700;
+    }
+
+    /* Privacy benefits */
+    .benefit-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+    .benefit-item {
+      background: var(--purple-light);
+      border: 1px solid var(--purple-border);
+      border-radius: 6px;
+      padding: 0.85rem 1rem;
+    }
+    .benefit-item strong {
+      color: var(--purple);
+      display: block;
+      margin-bottom: 0.25rem;
+      font-size: 0.9rem;
+    }
+    .benefit-item span {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    /* Summary table */
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    .summary-table thead {
+      background: #1e293b;
+      color: white;
+    }
+    .summary-table th {
+      padding: 0.65rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+    .summary-table td {
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    .summary-table tbody tr:nth-child(even) { background: var(--bg-alt); }
+    .summary-table tbody tr:hover { background: var(--accent-light); }
+    .summary-table code { font-size: 0.82em; }
+    .change-badge {
+      display: inline-block;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 0.15em 0.5em;
+      border-radius: 4px;
+      vertical-align: middle;
+      margin-left: 0.25rem;
+    }
+    .badge-modify { background: #dbeafe; color: #1d4ed8; }
+    .badge-new { background: #dcfce7; color: #15803d; }
+    .badge-none { background: #f1f5f9; color: #64748b; }
+    .badge-migrate { background: #fef3c7; color: #92400e; }
+
+    /* Implementation order */
+    .impl-steps {
+      counter-reset: impl;
+      list-style: none;
+      padding: 0;
+    }
+    .impl-steps li {
+      counter-increment: impl;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.85rem;
+      padding: 0.85rem 0;
+      border-bottom: 1px solid var(--border);
+    }
+    .impl-steps li:last-child { border-bottom: none; }
+    .impl-steps li::before {
+      content: counter(impl);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 1.75rem;
+      height: 1.75rem;
+      background: var(--accent);
+      color: white;
+      border-radius: 50%;
+      font-weight: 700;
+      font-size: 0.85rem;
+    }
+    .impl-steps li strong { color: var(--accent); }
+
+    /* Callout */
+    .callout {
+      border: 2px solid var(--green-border);
+      background: var(--green-light);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin: 1.5rem 0;
+      text-align: center;
+    }
+    .callout strong { color: var(--green); }
+
+    /* Identity flow diagram */
+    .flow {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 0;
+      margin: 1.5rem 0;
+      flex-wrap: wrap;
+    }
+    .flow-box {
+      background: var(--bg-card);
+      border: 2px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6rem 1rem;
+      font-size: 0.85rem;
+      font-weight: 600;
+      text-align: center;
+      white-space: nowrap;
+    }
+    .flow-box.highlight {
+      border-color: var(--accent);
+      background: var(--accent-light);
+      color: var(--accent);
+    }
+    .flow-box.problem {
+      border-color: var(--red);
+      background: var(--red-light);
+      color: var(--red);
+    }
+    .flow-box.solution {
+      border-color: var(--green);
+      background: var(--green-light);
+      color: var(--green);
+    }
+    .flow-arrow {
+      font-size: 1.3rem;
+      color: var(--text-muted);
+      padding: 0 0.4rem;
+    }
+    .flow-label {
+      font-size: 0.72rem;
+      color: var(--text-muted);
+      text-align: center;
+      margin-top: 0.15rem;
+      font-weight: 400;
+    }
+
+    /* Workspace context info box */
+    .info-box {
+      border-left: 4px solid var(--accent);
+      background: var(--accent-light);
+      border-radius: 0 8px 8px 0;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+      font-size: 0.92rem;
+    }
+    .info-box strong { color: var(--accent); }
+
+    /* Tooling options */
+    .tool-options {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 0.75rem;
+      margin-top: 0.75rem;
+    }
+    .tool-option {
+      background: var(--amber-light);
+      border: 1px solid var(--amber-border);
+      border-radius: 6px;
+      padding: 0.85rem 1rem;
+      font-size: 0.85rem;
+      text-align: center;
+    }
+    .tool-option strong {
+      display: block;
+      color: var(--amber);
+      margin-bottom: 0.25rem;
+      font-size: 0.88rem;
+    }
+
+    @media (max-width: 700px) {
+      .solution-props, .benefit-grid { grid-template-columns: 1fr; }
+      .tool-options { grid-template-columns: 1fr; }
+    }
+
+    @media print {
+      body { background: white; padding: 0; font-size: 11pt; }
+      .card { box-shadow: none; break-inside: avoid; }
+      pre { font-size: 9pt; }
+    }
+  </style>
+</head>
+<body>
+<div class="container">
+
+  <header>
+    <h1>Required Update: Game Identity</h1>
+    <p style="font-size: 1.15rem; color: var(--text-muted); margin-top: 0.25rem;">Shift from <code>login_id</code> to User ObjectID</p>
+    <p class="date">March 17, 2026</p>
+  </header>
+
+  <!-- ============ THE PROBLEM ============ -->
+  <h2>The Problem</h2>
+
+  <p>StrataHub currently provides <code>login_id</code> (a human-readable string like <code>jsmith</code>) as the identity for Mission HydroSci. This value flows through the MHSBridge into the Unity game and is used as the key in save and log records.</p>
+
+  <div class="flow">
+    <div class="flow-box highlight">
+      StrataHub<br><span class="flow-label">session &rarr; MHSBridge</span>
+    </div>
+    <span class="flow-arrow">&rarr;</span>
+    <div class="flow-box">
+      Unity Game<br><span class="flow-label">/api/user intercept</span>
+    </div>
+    <span class="flow-arrow">&rarr;</span>
+    <div class="flow-box problem">
+      save / log services<br><span class="flow-label">keyed by <code>login_id</code></span>
+    </div>
+  </div>
+
+  <p>Three issues with using <code>login_id</code> as game identity:</p>
+
+  <div class="card problem-card">
+    <span class="problem-number">1</span>
+    <h4>Not Globally Unique</h4>
+    <p><code>login_id</code> is unique within a workspace but not across workspaces. If the same <code>login_id</code> exists in two workspaces, their save/log records collide. This hasn't caused real problems yet &mdash; only test/dev accounts have collisions &mdash; but it is structurally unsound.</p>
+  </div>
+
+  <div class="card problem-card">
+    <span class="problem-number">2</span>
+    <h4>Mutable</h4>
+    <p>An admin, coordinator, or leader can edit a user's <code>login_id</code>. When this happens, the user's save/log history is orphaned under the old ID and a new empty record begins under the new ID. The game has no way to detect or recover from this.</p>
+  </div>
+
+  <div class="card problem-card">
+    <span class="problem-number">3</span>
+    <h4>Exposes PII</h4>
+    <p><code>login_id</code> values are often based on real names (e.g., <code>jsmith</code>, <code>jane.doe</code>). Save and log data at <code>save.adroit.games</code> and <code>log.adroit.games</code> contains these identifiers in plain text. For student data (COPPA, FERPA), the save/log services should not store human-readable identifiers.</p>
+  </div>
+
+  <!-- ============ THE SOLUTION ============ -->
+  <h2>The Solution</h2>
+
+  <p>Replace <code>login_id</code> with the user's MongoDB ObjectID as the identity passed to the game:</p>
+
+  <pre><code>user_objectid</code></pre>
+
+  <p>For example: <code>65f1e2d3c4b5a6978899aabb</code></p>
+
+  <p>In StrataHub, user ObjectIDs are globally unique across all workspaces &mdash; each user has a single <code>_id</code> in MongoDB that never changes. This makes the user ObjectID sufficient as a standalone identity without needing to include the workspace.</p>
+
+  <div class="card solution-card">
+    <strong style="color: var(--green); font-size: 1rem;">This format is:</strong>
+    <div class="solution-props">
+      <div class="solution-prop">
+        <span class="check">&check;</span>
+        <div><strong>Globally unique</strong> &mdash; the user ObjectID is unique across all workspaces</div>
+      </div>
+      <div class="solution-prop">
+        <span class="check">&check;</span>
+        <div><strong>Immutable</strong> &mdash; MongoDB ObjectIDs never change regardless of <code>login_id</code> edits</div>
+      </div>
+      <div class="solution-prop">
+        <span class="check">&check;</span>
+        <div><strong>De-identified</strong> &mdash; no PII in the identifier; save/log data is opaque at rest</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="info-box">
+    <strong>Workspace context as a separate field:</strong> If save/log services need to know which workspace a user belongs to (e.g., for partitioning or per-workspace queries), the workspace ID can be passed as a separate field alongside the identity rather than embedded in it. This keeps the identity simple and avoids coupling structural information into the identifier.
+  </div>
+
+  <div class="flow" style="margin-top: 1.5rem;">
+    <div class="flow-box highlight">
+      StrataHub<br><span class="flow-label">session &rarr; MHSBridge</span>
+    </div>
+    <span class="flow-arrow">&rarr;</span>
+    <div class="flow-box">
+      Unity Game<br><span class="flow-label">/api/user intercept</span>
+    </div>
+    <span class="flow-arrow">&rarr;</span>
+    <div class="flow-box solution">
+      save / log services<br><span class="flow-label">keyed by <code>user_objectid</code></span>
+    </div>
+  </div>
+
+  <!-- ============ STRATAHUB CHANGES ============ -->
+  <h2>What Changes in StrataHub</h2>
+
+  <div class="card change-card">
+    <h3>MHSBridge Identity Injection</h3>
+    <div class="file-ref">internal/app/features/missionhydrosci/play.go</div>
+    <p>The play handler currently extracts <code>user.LoginID</code> and passes it to the template. It needs to pass the user's ObjectID instead:</p>
+    <pre><code><span class="code-comment">// Current</span>
+loginID := user.LoginID
+
+<span class="code-comment">// New</span>
+identity := user.ID.Hex()</code></pre>
+    <p>The user ID is already available as <code>user.ID</code> (a MongoDB ObjectID).</p>
+  </div>
+
+  <div class="card change-card">
+    <h3>MHSBridge Template</h3>
+    <div class="file-ref">internal/app/features/missionhydrosci/templates/missionhydrosci_play.gohtml</div>
+    <p>The template injects identity into JavaScript and monkey-patches <code>XMLHttpRequest</code> and <code>fetch</code> to intercept calls to <code>/api/user</code>. The intercepted response currently returns <code>login_id</code>. It needs to return the user ObjectID instead. The game treats whatever it receives as an opaque string.</p>
+  </div>
+
+  <div class="card change-card">
+    <h3><code>/api/user</code> Endpoint</h3>
+    <div class="file-ref">internal/app/features/userinfo/handler.go</div>
+    <p>Currently returns <code>login_id</code> as a string. Should be updated to return the user ObjectID for consistency, in case any code path calls this endpoint directly (not through the MHSBridge intercept).</p>
+  </div>
+
+  <div class="card change-card no-change">
+    <h3>Session Cookie <span class="no-change-badge">No Change Needed</span></h3>
+    <div class="file-ref">internal/app/system/auth/auth.go</div>
+    <p>The session cookie already stores <code>user_id</code> as a MongoDB ObjectID hex string. The cookie is set at <code>.adroit.games</code> and contains <code>user_id</code> and <code>is_authenticated</code>. The ObjectID is already available &mdash; it's just not being passed through to the game today.</p>
+  </div>
+
+  <!-- ============ SAVE/LOG CHANGES ============ -->
+  <h2>What Changes in Save/Log Services</h2>
+
+  <div class="card change-card">
+    <h3>Record Key</h3>
+    <p>Records at <code>save.adroit.games</code> and <code>log.adroit.games</code> are currently keyed by <code>login_id</code>. After the change, they will be keyed by the user ObjectID (e.g., <code>65f1e2d3c4b5a6978899aabb</code>).</p>
+  </div>
+
+  <div class="card change-card">
+    <h3>Optional: Store Workspace as a Separate Field</h3>
+    <p>If per-workspace queries are needed, save/log services can accept and store the workspace ID as a separate field alongside the user identity:</p>
+    <pre><code>{
+  <span class="code-key">"user_id"</span>: <span class="code-string">"65f1e2d3c4b5a6978899aabb"</span>,
+  <span class="code-key">"workspace_id"</span>: <span class="code-string">"65a1b2c3d4e5f6a7b8c9d0e1"</span>,
+  ...
+}</code></pre>
+    <p>This enables queries like "all records for this workspace" or "all records for this user across workspaces" without needing to call StrataHub.</p>
+  </div>
+
+  <!-- ============ DATA MIGRATION ============ -->
+  <h2>Data Migration</h2>
+
+  <p>A one-time migration script to convert existing save/log records from <code>login_id</code> keys to user ObjectID keys.</p>
+
+  <div class="card">
+    <h3>Steps</h3>
+    <div class="step">
+      <div class="step-number">1</div>
+      <div class="step-content"><strong>Export the user mapping from StrataHub</strong> &mdash; for each workspace, produce a mapping of <code>login_id</code> &rarr; <code>user_objectid</code>. This requires querying the <code>users</code> collection within each workspace's context.</div>
+    </div>
+    <div class="step">
+      <div class="step-number">2</div>
+      <div class="step-content"><strong>Identify and handle collisions</strong> &mdash; find <code>login_id</code> values that appear in more than one workspace. Based on current data, the only collisions are test/dev accounts. These records can be deleted.</div>
+    </div>
+    <div class="step">
+      <div class="step-number">3</div>
+      <div class="step-content"><strong>Transform save/log records</strong> &mdash; for each record, look up the <code>login_id</code> in the mapping and replace it with the user ObjectID. Records whose <code>login_id</code> does not appear in the mapping (deleted users, test accounts) can be archived or deleted.</div>
+    </div>
+    <div class="step">
+      <div class="step-number">4</div>
+      <div class="step-content"><strong>Verify</strong> &mdash; confirm that all migrated records resolve correctly and that the game can load save data for existing users under the new identity format.</div>
+    </div>
+  </div>
+
+  <div class="card" style="border-left: 4px solid var(--green);">
+    <h3>Feasibility</h3>
+    <ul class="feasibility-list">
+      <li>No real-user <code>login_id</code> collisions exist across workspaces &mdash; only test/dev accounts</li>
+      <li>Test/dev collision records can be deleted without impact</li>
+      <li>The mapping from <code>login_id</code> to user ObjectIDs is deterministic (query StrataHub's database)</li>
+      <li>The migration can be done while the system is live &mdash; old records are read-only during migration, new records use the new format immediately</li>
+    </ul>
+  </div>
+
+  <!-- ============ DEVELOPER TOOLING ============ -->
+  <h2>Developer Tooling</h2>
+
+  <p>With opaque ObjectIDs replacing human-readable <code>login_id</code> values, developers and researchers lose the ability to quickly identify whose data they're looking at in save/log records.</p>
+
+  <div class="card" style="border-left: 4px solid var(--amber);">
+    <h3>Needed: Lookup Tool</h3>
+    <p>A utility that maps between human-readable name / <code>login_id</code> and user ObjectID, in both directions. Should be restricted to admin/coordinator roles.</p>
+    <div class="tool-options">
+      <div class="tool-option">
+        <strong>CLI Tool</strong>
+        Go CLI that queries StrataHub's MongoDB directly
+      </div>
+      <div class="tool-option">
+        <strong>Admin API</strong>
+        Admin-only endpoint, e.g. <code style="font-size: 0.78em;">/admin/api/identity-lookup</code>
+      </div>
+      <div class="tool-option">
+        <strong>Admin View</strong>
+        Column in an existing admin dashboard
+      </div>
+    </div>
+  </div>
+
+  <!-- ============ PRIVACY ============ -->
+  <h2>Privacy and Compliance Benefit</h2>
+
+  <p>After this change, save and log data at <code>save.adroit.games</code> and <code>log.adroit.games</code> contains no PII. The records are keyed by opaque ObjectIDs that are meaningless without access to StrataHub's user database.</p>
+
+  <div class="benefit-grid">
+    <div class="benefit-item">
+      <strong>COPPA Compliance</strong>
+      <span>Student identifiers in game telemetry and save data are de-identified</span>
+    </div>
+    <div class="benefit-item">
+      <strong>FERPA Alignment</strong>
+      <span>Educational records in external services do not contain directly identifiable information</span>
+    </div>
+    <div class="benefit-item">
+      <strong>Data Breach Resilience</strong>
+      <span>If save/log data is exposed, it reveals nothing about the students' identities</span>
+    </div>
+    <div class="benefit-item">
+      <strong>Simpler Data Sharing</strong>
+      <span>Game telemetry can be shared with researchers without a de-identification step</span>
+    </div>
+  </div>
+
+  <!-- ============ GAME DEV TEAM IMPACTS ============ -->
+  <h2>Game Development Team Impacts</h2>
+
+  <p>The Unity game itself treats the identity value as an opaque string &mdash; it does not interpret or validate the format. However, several changes are required in the Unity project and the game dev team's workflow.</p>
+
+  <div class="card change-card">
+    <h3>1. Understanding the Identity Change</h3>
+    <p>The identity values that appear in save/log records will change from human-readable strings (e.g., <code>jsmith</code>) to opaque MongoDB ObjectIDs (e.g., <code>65f1e2d3c4b5a6978899aabb</code>). The game dev team needs to understand that these are the same users &mdash; just identified differently. Historical data will be migrated so existing save data is preserved under the new keys.</p>
+  </div>
+
+  <div class="card change-card">
+    <h3>2. Identity Lookup Tool</h3>
+    <p>A lookup tool will be provided to resolve ObjectIDs back to human-readable names, <code>login_id</code> values, and workspace names. The game dev team will need to use this tool when investigating player issues, reviewing save/log data, or debugging. The tool replaces the previous workflow of reading <code>login_id</code> values directly from the data.</p>
+  </div>
+
+  <div class="card change-card" style="border-left-color: var(--amber);">
+    <h3>3. New <code>.jslib</code> and C# Files</h3>
+    <p>The JSON structure returned by MHSBridge and <code>/api/user</code> is being cleaned up. The current response has a legacy issue: the field named <code>email</code> actually contains the <code>login_id</code>, a holdover from when identity was email-based. Not everyone has an email address, so identity moved to <code>login_id</code>, but the <code>email</code> field name was kept for backward compatibility with existing game builds.</p>
+    <p>The new response adds a properly named <code>user_id</code> field:</p>
+    <pre><code>{
+  <span class="code-key">"user_id"</span>: <span class="code-string">"65f1e2d3c4b5a6978899aabb"</span>,
+  <span class="code-key">"login_id"</span>: <span class="code-string">"jsmith"</span>,
+  <span class="code-key">"email"</span>: <span class="code-string">"jsmith"</span>
+}</code></pre>
+    <p>The game dev team needs to provide a new <code>.jslib</code> and C# file for the Unity project that reads <code>user_id</code> instead of <code>email</code> or <code>login_id</code>. This replaces the previous <code>.jslib</code> and C# file that handled identity.</p>
+  </div>
+
+  <div class="card change-card">
+    <h3>4. Transition Period &mdash; Old and New Builds Coexist</h3>
+    <p>During the transition, the MHSBridge response will include all three fields (<code>user_id</code>, <code>login_id</code>, and <code>email</code>) so that old game builds continue to work. Old builds read <code>email</code> or <code>login_id</code> and are unaffected. New builds read <code>user_id</code> and send it to save/log services.</p>
+    <p>Once all old builds are flushed out (PWA cache updates, no more cached old versions in the field), the legacy <code>login_id</code> and <code>email</code> fields can be removed from the response.</p>
+  </div>
+
+  <div class="card change-card">
+    <h3>5. Audit Other Identity References in the Unity Project</h3>
+    <p>Beyond the <code>.jslib</code> and C# file that handles <code>/api/user</code>, there may be other places in the Unity project that reference <code>email</code> or <code>login_id</code> &mdash; logging calls, analytics events, error reporting, or UI display. These should be audited and updated to use <code>user_id</code> where appropriate.</p>
+  </div>
+
+  <div class="card" style="border-left: 4px solid var(--amber);">
+    <h3>6. Build Coordination</h3>
+    <p>The rollout must be sequenced:</p>
+    <div class="step">
+      <div class="step-number">1</div>
+      <div class="step-content"><strong>StrataHub deploys first</strong> &mdash; MHSBridge begins serving all three fields (<code>user_id</code>, <code>login_id</code>, <code>email</code>). Old builds keep working.</div>
+    </div>
+    <div class="step">
+      <div class="step-number">2</div>
+      <div class="step-content"><strong>New Unity build is released</strong> &mdash; reads <code>user_id</code> from the response and sends it to save/log services.</div>
+    </div>
+    <div class="step">
+      <div class="step-number">3</div>
+      <div class="step-content"><strong>Save/log migration runs</strong> &mdash; existing records are rekeyed from <code>login_id</code> to user ObjectID.</div>
+    </div>
+    <div class="step">
+      <div class="step-number">4</div>
+      <div class="step-content"><strong>Old builds flush out</strong> &mdash; once no cached old builds remain in the field, legacy fields can be removed.</div>
+    </div>
+  </div>
+
+  <div class="card change-card">
+    <h3>7. Testing Environment</h3>
+    <p>A dev/staging StrataHub environment will be available that emits the new response format (with all three fields) so the game dev team can test the new <code>.jslib</code> and C# files before the production rollout. Testing should verify:</p>
+    <ul class="feasibility-list">
+      <li>The new build correctly reads <code>user_id</code> from the response</li>
+      <li>Save data is written and read using the new identity</li>
+      <li>Existing save data (migrated from <code>login_id</code>) loads correctly under the new identity</li>
+    </ul>
+  </div>
+
+  <!-- ============ SUMMARY TABLE ============ -->
+  <h2>Summary of Changes</h2>
+
+  <table class="summary-table">
+    <thead>
+      <tr>
+        <th>Component</th>
+        <th>Change</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>play.go</code> (MHSBridge) <span class="change-badge badge-modify">modify</span></td>
+        <td>Pass <code>user.ID.Hex()</code> instead of <code>user.LoginID</code></td>
+      </tr>
+      <tr>
+        <td>Play template (MHSBridge JS) <span class="change-badge badge-modify">modify</span></td>
+        <td>Serve <code>user_id</code>, <code>login_id</code>, and <code>email</code> in response during transition</td>
+      </tr>
+      <tr>
+        <td><code>/api/user</code> endpoint <span class="change-badge badge-modify">modify</span></td>
+        <td>Return user ObjectID (for consistency)</td>
+      </tr>
+      <tr>
+        <td>Save/log services <span class="change-badge badge-modify">modify</span></td>
+        <td>Key records by user ObjectID; optionally store workspace as separate field</td>
+      </tr>
+      <tr>
+        <td>Existing save/log data <span class="change-badge badge-migrate">migrate</span></td>
+        <td>One-time migration script to remap <code>login_id</code> &rarr; user ObjectID</td>
+      </tr>
+      <tr>
+        <td>Developer tooling <span class="change-badge badge-new">new</span></td>
+        <td>Build lookup utility for ObjectID &harr; human-readable name</td>
+      </tr>
+      <tr>
+        <td>Game (Unity) <span class="change-badge badge-modify">modify</span></td>
+        <td>New <code>.jslib</code> and C# file to read <code>user_id</code>; audit other identity references</td>
+      </tr>
+      <tr>
+        <td>Session cookie <span class="change-badge badge-none">none</span></td>
+        <td>No changes (already stores ObjectID)</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <!-- ============ IMPLEMENTATION ORDER ============ -->
+  <h2>Implementation Order</h2>
+
+  <div class="card">
+    <ol class="impl-steps">
+      <li><strong>Build the lookup tool first</strong> &mdash; developers need this before the migration</li>
+      <li><strong>Update StrataHub</strong> &mdash; MHSBridge and <code>/api/user</code> serve all three fields (<code>user_id</code>, <code>login_id</code>, <code>email</code>)</li>
+      <li><strong>Game dev team releases new Unity build</strong> &mdash; new <code>.jslib</code> and C# file read <code>user_id</code></li>
+      <li><strong>Update save/log services</strong> &mdash; accept and index the new format; optionally accept workspace as separate field</li>
+      <li><strong>Run migration</strong> &mdash; transform existing records</li>
+      <li><strong>Verify</strong> &mdash; confirm existing users can load their save data, new records use the new format</li>
+      <li><strong>Clean up</strong> &mdash; remove legacy <code>login_id</code> and <code>email</code> fields from MHSBridge response; remove <code>login_id</code> references from save/log service code</li>
+    </ol>
+  </div>
+
+</div>
+</body>
+</html>

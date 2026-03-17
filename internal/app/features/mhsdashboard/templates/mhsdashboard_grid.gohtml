@@ -90,13 +90,13 @@
         <div class="mhs-cell-width p-0.5 border-b border-slate-200 {{ if .IsUnitStart }}border-l border-slate-300{{ end }}" style="position:relative;">
           {{ if .IsInCurrentUnit }}<div class="mhs-in-unit-bar"></div>{{ end }}
           {{ if eq .Value 1 }}
-          <div class="{{ .CellClass }} w-full h-full rounded border {{ .BorderClass }} mhs-review-cell cursor-pointer hover:opacity-80 transition-opacity"
+          <div class="{{ .CellClass }} w-full h-full rounded border {{ .BorderClass }} mhs-review-cell cursor-pointer hover:opacity-80 transition-opacity relative z-[1]"
                data-student-name="{{ .StudentName }}"
                data-point-id="{{ .PointID }}"
                data-point-title="{{ .PointTitle }}"
                data-review-reason="{{ .ReviewReason }}"></div>
           {{ else }}
-          <div class="{{ .CellClass }} w-full h-full rounded border {{ .BorderClass }}"></div>
+          <div class="{{ .CellClass }} w-full h-full rounded border {{ .BorderClass }} relative z-[1]"></div>
           {{ end }}
         </div>
         {{ end }}

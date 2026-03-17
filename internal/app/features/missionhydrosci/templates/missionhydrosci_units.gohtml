@@ -780,7 +780,10 @@
   }
 
   window.mhsPlay = function(link) {
-    if (isStandalone) {
+    // Check standalone at click time — the page-load check can become stale
+    // after navigating away and back within the PWA.
+    var standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
+    if (standalone) {
       window.location.href = link.href;
     } else {
       window.open(link.href, '_blank');

@@ -2,7 +2,7 @@
 
 ## Concept
 
-Instead of Mission HydroSci living as a feature inside StrataHub, it would be a standalone PWA at its own origin (e.g., `game.missionhydrosci.org`). StrataHub would serve as the authorization and identity provider but would not be the context in which the game operates. The game lives in its own silo with just what it needs to support play.
+Instead of Mission HydroSci living as a feature inside StrataHub, it would be a standalone PWA at its own origin (e.g., `mhs.play.adroit.games`). StrataHub would serve as the authorization and identity provider but would not be the context in which the game operates. The game lives in its own silo with just what it needs to support play.
 
 The game has two needs from the outside:
 1. **Authorization** — am I allowed to be accessed?
@@ -12,7 +12,7 @@ StrataHub provides both, but the game runs independently.
 
 ## What It Would Look Like
 
-- Mission HydroSci lives at its own domain/origin (e.g., `game.missionhydrosci.org`)
+- Mission HydroSci lives at its own domain/origin (e.g., `mhs.play.adroit.games`)
 - It is a standalone PWA with its own manifest, service worker, install flow, and caching
 - StrataHub is the auth/identity provider — the game redirects to StrataHub for login (OAuth-style), gets back a token
 - The game talks to its own backend for progress, device status, and content delivery
@@ -43,13 +43,11 @@ OAuth 2.0 (Option A) is likely the right choice — it's standard, battle-tested
 
 ### Progress Data Flow
 
-The MHS Dashboard in StrataHub shows student progress, and the grading system reads progress data. If the game lives on its own, progress data needs to flow back to StrataHub somehow:
+Games manage their own progress data using their own services. Mission HydroSci already uses independent services (`log.adroit.games`, `save.adroit.games`) for logging and save data — these are not part of StrataHub. Other games could use whatever backend services fit their needs.
 
-- **Option A: Game calls StrataHub API** — the game's backend POSTs progress updates to a StrataHub webhook/API endpoint. StrataHub stores them. Simple but creates a runtime dependency (if StrataHub is down, progress recording might fail).
-- **Option B: Shared database** — both read/write the same progress collection. Avoids network calls but couples the data layer. Migration and schema changes become coordination problems.
-- **Option C: Event-based** — the game publishes progress events to a queue (e.g., Redis, SQS). StrataHub consumes them. Decoupled but adds infrastructure.
+For features that need game data (e.g., a teacher dashboard showing student progress), the game provides an API that StrataHub (or any other consumer) can call to retrieve what it needs. Alternatively, the teacher dashboard itself could live with the game rather than in StrataHub — the game knows its own data best and can present it directly.
 
-Option A (game calls StrataHub API) is the simplest starting point.
+This means there is no runtime dependency between the game and StrataHub for progress recording. The game's progress system works independently regardless of whether StrataHub is available.
 
 ### Content Delivery
 
@@ -62,7 +60,7 @@ Instead of one deployment (StrataHub), there are now two (StrataHub + the game).
 - Domain and TLS certificate
 - Deployment pipeline
 - Monitoring
-- Database (or shared database — see above)
+- Database
 
 This is manageable but not free. For a single game it may feel like overhead. For multiple games it pays for itself.
 
@@ -70,8 +68,6 @@ This is manageable but not free. For a single game it may feel like overhead. Fo
 
 - User accounts, login, authentication
 - Groups, workspaces, membership management
-- MHS Dashboard (reads progress data from wherever it's stored)
-- Grading system
 - Links to the game in menus / UI
 - App assignment (Groups > Manage > Apps)
 
@@ -81,8 +77,9 @@ This is manageable but not free. For a single game it may feel like overhead. Fo
 - Units page (download management, install banner)
 - Content manifest and CDN fallback
 - Service worker and caching (delivery manager, background fetch, offline support)
-- Progress tracking API (the game writes progress, StrataHub reads it)
+- Progress tracking and game services (logging, save data, etc.)
 - Device status reporting
+- Teacher dashboard (the game presents its own data to teachers directly)
 
 ## Compatibility with Current Work
 

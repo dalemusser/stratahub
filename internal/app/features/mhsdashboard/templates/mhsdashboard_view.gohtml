@@ -135,12 +135,12 @@
   /* "In unit" bar indicator above progress cells */
   .mhs-in-unit-bar {
     position: absolute;
-    top: 0;
-    left: 2px;
-    right: 2px;
-    height: 3px;
-    background: #6366f1;
-    border-radius: 0 0 2px 2px;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: #000000;
+    z-index: 0;
   }
 
   /* Legend samples use theme colors */
@@ -357,6 +357,154 @@
     color: white;
     border-color: #145374;
   }
+
+  /* ===== Dark Mode ===== */
+
+  /* Dark mode: cell adjustments */
+  .dark #mhs-dashboard .mhs-cell-active {
+    background: linear-gradient(135deg, #312e81 0%, #3730a3 100%);
+  }
+  .dark #mhs-dashboard .mhs-cell-active::after {
+    color: #a5b4fc;
+  }
+  .dark #mhs-dashboard .mhs-cell-empty {
+    background: #1e293b;
+  }
+
+  /* Dark mode: in-unit bar */
+  .dark #mhs-dashboard .mhs-in-unit-bar {
+    background: #ffffff;
+  }
+
+  /* Dark mode: scrollbar */
+  .dark #mhs-dashboard .mhs-styled-scrollbar {
+    scrollbar-color: #2e8bc0 #1e293b;
+  }
+  .dark #mhs-dashboard .mhs-styled-scrollbar::-webkit-scrollbar-track {
+    background: #1e293b;
+  }
+  .dark #mhs-dashboard .mhs-styled-scrollbar::-webkit-scrollbar-corner {
+    background: #1e293b;
+  }
+
+  /* Dark mode: tabs */
+  .dark #mhs-dashboard .mhs-tab-active {
+    color: #e2e8f0;
+  }
+  .dark #mhs-dashboard .mhs-tab-inactive {
+    color: #94a3b8;
+  }
+  .dark #mhs-dashboard .mhs-tab-inactive:hover {
+    color: #cbd5e1;
+  }
+
+  /* Dark mode: storage bar */
+  .dark #mhs-dashboard .mhs-storage-bar {
+    background: #374151;
+  }
+
+  /* Dark mode: device dots */
+  .dark #mhs-dashboard .mhs-device-dot-none {
+    background: #475569;
+  }
+
+  /* Dark mode: modals */
+  .dark #mhs-dashboard .mhs-modal {
+    background: #1e293b;
+    box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  }
+  .dark #mhs-dashboard .mhs-modal-backdrop {
+    background-color: rgba(0, 0, 0, 0.7);
+  }
+
+  /* Dark mode: theme info button */
+  .dark #mhs-dashboard .mhs-theme-info-btn {
+    background: #1e293b;
+    border-color: #475569;
+    color: #b1d4e0;
+  }
+  .dark #mhs-dashboard .mhs-theme-info-btn:hover {
+    background: #145374;
+    color: white;
+    border-color: #145374;
+  }
+
+  /* Dark mode: marker text adjustments */
+  .dark #mhs-dashboard .mhs-cell-warning::after {
+    color: #fbbf24 !important;
+    text-shadow: 0 0 2px rgba(0,0,0,0.5) !important;
+  }
+  .dark #mhs-dashboard .mhs-cell-success::after {
+    color: #93c5fd !important;
+    text-shadow: 0 0 2px rgba(0,0,0,0.5) !important;
+  }
+
+  /* Dark mode: vertical cell hover */
+  .dark #mhs-dashboard .mhs-vertical-cell:hover {
+    background-color: rgba(0, 0, 0, 0.2);
+  }
+
+  /* Dark mode: Tailwind utility overrides (scoped to dashboard) */
+  .dark #mhs-dashboard .bg-white {
+    background-color: #1e293b !important;
+  }
+  .dark #mhs-dashboard .bg-slate-50 {
+    background-color: #253348 !important;
+  }
+  .dark #mhs-dashboard .bg-\[\#e8f4f8\] {
+    background-color: #0f172a !important;
+  }
+  .dark #mhs-dashboard .text-slate-700 {
+    color: #cbd5e1 !important;
+  }
+  .dark #mhs-dashboard .text-slate-600 {
+    color: #94a3b8 !important;
+  }
+  .dark #mhs-dashboard .text-slate-500 {
+    color: #94a3b8 !important;
+  }
+  .dark #mhs-dashboard .text-slate-400 {
+    color: #64748b !important;
+  }
+  .dark #mhs-dashboard .text-gray-500 {
+    color: #94a3b8 !important;
+  }
+  .dark #mhs-dashboard .text-gray-400 {
+    color: #64748b !important;
+  }
+  .dark #mhs-dashboard .text-\[\#0c2d48\] {
+    color: #e2e8f0 !important;
+  }
+  .dark #mhs-dashboard .text-\[\#145374\] {
+    color: #7dd3fc !important;
+  }
+  .dark #mhs-dashboard .border-slate-200 {
+    border-color: #334155 !important;
+  }
+  .dark #mhs-dashboard .border-slate-300 {
+    border-color: #475569 !important;
+  }
+  .dark #mhs-dashboard .border-slate-100 {
+    border-color: #1e293b !important;
+  }
+  .dark #mhs-dashboard .border-\[\#b1d4e0\] {
+    border-color: #1e3a5f !important;
+  }
+  .dark #mhs-dashboard .hover\:bg-\[\#e8f4f8\]:hover {
+    background-color: #253348 !important;
+  }
+  .dark #mhs-dashboard .hover\:bg-white:hover {
+    background-color: #253348 !important;
+  }
+  .dark #mhs-dashboard select {
+    background-color: #1e293b !important;
+    color: #e2e8f0 !important;
+    border-color: #475569 !important;
+  }
+  .dark #mhs-dashboard select option {
+    background-color: #1e293b;
+    color: #e2e8f0;
+  }
 </style>
 
 <!-- Dashboard Card -->
@@ -447,7 +595,7 @@
         <span class="text-slate-600">Not Started</span>
       </div>
       <div class="flex items-center gap-1.5">
-        <span class="w-8 h-1 flex-shrink-0 rounded-full bg-indigo-500"></span>
+        <span class="w-8 h-1 flex-shrink-0 rounded-full mhs-in-unit-bar" style="position:static;"></span>
         <span class="text-slate-600">In Unit</span>
       </div>
     </div>
@@ -706,6 +854,8 @@
       dashboard.setAttribute('data-theme', this.value);
     });
   }
+
+
 
   // Theme info button
   var themeInfoBtn = document.getElementById('theme-info-btn');

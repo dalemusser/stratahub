@@ -1,0 +1,648 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PWA Architecture: Path Comparison</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --bg-alt: #f8fafc;
+      --bg-card: #ffffff;
+      --text: #1e293b;
+      --text-muted: #64748b;
+      --border: #e2e8f0;
+      --accent: #2563eb;
+      --accent-light: #eff6ff;
+      --green: #16a34a;
+      --green-light: #f0fdf4;
+      --green-border: #bbf7d0;
+      --red: #dc2626;
+      --red-light: #fef2f2;
+      --red-border: #fecaca;
+      --purple: #7c3aed;
+      --purple-light: #f5f3ff;
+      --purple-border: #ddd6fe;
+      --orange: #ea580c;
+      --orange-light: #fff7ed;
+      --orange-border: #fed7aa;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      line-height: 1.6;
+      color: var(--text);
+      background: var(--bg-alt);
+      padding: 2rem 1rem;
+    }
+
+    .container {
+      max-width: 960px;
+      margin: 0 auto;
+    }
+
+    header {
+      text-align: center;
+      margin-bottom: 2.5rem;
+      padding-bottom: 2rem;
+      border-bottom: 2px solid var(--border);
+    }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      color: var(--text);
+      margin-bottom: 0.75rem;
+    }
+
+    header p {
+      font-size: 1.05rem;
+      color: var(--text-muted);
+      max-width: 700px;
+      margin: 0 auto;
+    }
+
+    h2 {
+      font-size: 1.5rem;
+      font-weight: 700;
+      margin: 2.5rem 0 1rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 2px solid var(--border);
+    }
+
+    h3 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      margin: 1.5rem 0 0.75rem;
+      color: var(--text);
+    }
+
+    p {
+      margin-bottom: 0.75rem;
+    }
+
+    .option-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      margin: 1.5rem 0;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.06);
+    }
+
+    .option-card.option-a {
+      border-left: 4px solid var(--accent);
+    }
+
+    .option-card.option-b {
+      border-left: 4px solid var(--orange);
+    }
+
+    .option-card.option-c {
+      border-left: 4px solid var(--purple);
+    }
+
+    .option-header {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+    }
+
+    .option-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 36px;
+      height: 36px;
+      border-radius: 8px;
+      font-weight: 700;
+      font-size: 1rem;
+      color: white;
+      flex-shrink: 0;
+    }
+
+    .option-a .option-badge { background: var(--accent); }
+    .option-b .option-badge { background: var(--orange); }
+    .option-c .option-badge { background: var(--purple); }
+
+    .option-title {
+      font-size: 1.35rem;
+      font-weight: 700;
+    }
+
+    .option-subtitle {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+      margin-bottom: 1.25rem;
+    }
+
+    .how-it-works {
+      background: var(--bg-alt);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      margin-bottom: 1.5rem;
+    }
+
+    .how-it-works h3 {
+      margin-top: 0;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--text-muted);
+      margin-bottom: 0.75rem;
+    }
+
+    .how-it-works ul {
+      padding-left: 1.25rem;
+      margin: 0;
+    }
+
+    .how-it-works li {
+      margin-bottom: 0.4rem;
+      font-size: 0.95rem;
+    }
+
+    .pros-cons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+
+    .pros, .cons {
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+
+    .pros {
+      background: var(--green-light);
+      border: 1px solid var(--green-border);
+    }
+
+    .cons {
+      background: var(--red-light);
+      border: 1px solid var(--red-border);
+    }
+
+    .pros h3, .cons h3 {
+      margin-top: 0;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.75rem;
+    }
+
+    .pros h3 { color: var(--green); }
+    .cons h3 { color: var(--red); }
+
+    .pros ul, .cons ul {
+      padding-left: 1.25rem;
+      margin: 0;
+    }
+
+    .pros li, .cons li {
+      margin-bottom: 0.5rem;
+      font-size: 0.93rem;
+      line-height: 1.5;
+    }
+
+    .pros li strong, .cons li strong {
+      font-weight: 600;
+    }
+
+    /* Comparison Table */
+    .table-wrapper {
+      overflow-x: auto;
+      margin: 1.5rem 0;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.93rem;
+    }
+
+    thead {
+      background: #0f172a;
+      color: white;
+    }
+
+    thead th {
+      padding: 0.75rem 1rem;
+      text-align: left;
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    thead th:first-child {
+      border-radius: 7px 0 0 0;
+    }
+
+    thead th:last-child {
+      border-radius: 0 7px 0 0;
+    }
+
+    tbody tr {
+      border-bottom: 1px solid var(--border);
+    }
+
+    tbody tr:nth-child(even) {
+      background: var(--bg-alt);
+    }
+
+    tbody tr:last-child {
+      border-bottom: none;
+    }
+
+    tbody td {
+      padding: 0.65rem 1rem;
+      vertical-align: top;
+    }
+
+    tbody td:first-child {
+      font-weight: 600;
+      white-space: nowrap;
+    }
+
+    /* Decision Factors */
+    .factors {
+      display: grid;
+      gap: 1rem;
+      margin: 1.5rem 0;
+    }
+
+    .factor {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+
+    .factor h3 {
+      margin-top: 0;
+      font-size: 1rem;
+      color: var(--text);
+      margin-bottom: 0.4rem;
+    }
+
+    .factor p {
+      margin-bottom: 0;
+      font-size: 0.95rem;
+      color: var(--text-muted);
+    }
+
+    .factor .recommendation {
+      display: inline-block;
+      font-size: 0.8rem;
+      font-weight: 600;
+      padding: 0.15rem 0.6rem;
+      border-radius: 4px;
+      margin-top: 0.5rem;
+    }
+
+    .rec-a {
+      background: var(--accent-light);
+      color: var(--accent);
+    }
+
+    .rec-b {
+      background: var(--orange-light);
+      color: var(--orange);
+    }
+
+    .rec-c {
+      background: var(--purple-light);
+      color: var(--purple);
+    }
+
+    /* Current State */
+    .current-state {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 2rem;
+      margin: 1.5rem 0 2rem;
+    }
+
+    .current-state h2 {
+      margin-top: 0;
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    .current-state p {
+      font-size: 0.95rem;
+      color: var(--text-muted);
+    }
+
+    .current-state p:last-child {
+      margin-bottom: 0;
+    }
+
+    .detail-link {
+      font-size: 0.9rem;
+      color: var(--accent);
+      text-decoration: none;
+      font-style: italic;
+    }
+
+    .detail-link:hover {
+      text-decoration: underline;
+    }
+
+    @media (max-width: 700px) {
+      .pros-cons {
+        grid-template-columns: 1fr;
+      }
+
+      h1 {
+        font-size: 1.5rem;
+      }
+    }
+
+    @media print {
+      body {
+        background: white;
+        padding: 0;
+      }
+
+      .option-card, .current-state, .factor {
+        break-inside: avoid;
+        box-shadow: none;
+      }
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+
+    <header>
+      <h1>PWA Architecture: Path Comparison</h1>
+      <p>StrataHub hosts Mission HydroSci as a game delivery feature. The game requires PWA capabilities &mdash; offline play, background downloads, content caching, and installability. As we plan for additional games and long-term maintainability, we have three architectural paths for how games relate to StrataHub as a PWA.</p>
+    </header>
+
+    <!-- Option A -->
+    <div class="option-card option-a">
+      <div class="option-header">
+        <span class="option-badge">A</span>
+        <span class="option-title">Platform PWA (Games Inside StrataHub)</span>
+      </div>
+      <p class="option-subtitle"><strong>StrataHub is the PWA.</strong> Games are features that run inside StrataHub's service worker, manifest, and install flow. A feature registry lets games declare their caching needs without the SW knowing about specific games.</p>
+      <a class="detail-link" href="pwa_plan.md">Detailed design: pwa_plan.md</a>
+
+      <div class="how-it-works">
+        <h3>How It Works</h3>
+        <ul>
+          <li>One manifest (<code>/manifest.json</code>) and one service worker (<code>/sw.js</code>) for the entire site</li>
+          <li>Games register with a feature registry, declaring their content prefixes, page URLs, cache names, and broadcast channels</li>
+          <li>The SW routes requests based on the registry &mdash; cache-first for game content, network-first for pages, pass-through for everything else</li>
+          <li>A shared delivery manager JS handles downloads, background fetch, storage checks, and error reporting</li>
+          <li>Workspace settings control the PWA name, icon, and branding</li>
+          <li>Users install one app per workspace &mdash; it contains StrataHub and all assigned games</li>
+        </ul>
+      </div>
+
+      <div class="pros-cons">
+        <div class="pros">
+          <h3>Advantages</h3>
+          <ul>
+            <li><strong>Single deployment</strong> &mdash; one codebase, one server, one deploy pipeline</li>
+            <li><strong>Shared infrastructure</strong> &mdash; auth, sessions, cookies, user identity are already available (same origin)</li>
+            <li><strong>No auth handoff needed</strong> &mdash; the game runs in the same session as StrataHub</li>
+            <li><strong>Unified user experience</strong> &mdash; users install one app, navigate between platform and games seamlessly</li>
+            <li><strong>Lower operational cost</strong> &mdash; one domain, one TLS cert, one monitoring setup</li>
+            <li><strong>Progress data is local</strong> &mdash; the game writes directly to the same database StrataHub reads from</li>
+            <li><strong>Works today</strong> &mdash; the current architecture is a simpler version of this; the plan extends it</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Disadvantages</h3>
+          <ul>
+            <li><strong>PWA complexity in StrataHub</strong> &mdash; the service worker, caching, background fetch, and delivery manager all live in StrataHub's codebase</li>
+            <li><strong>Scope conflicts risk</strong> &mdash; all games share one SW scope; a bug in the SW can break the entire site</li>
+            <li><strong>Coupled deploys</strong> &mdash; a game update requires a StrataHub deploy</li>
+            <li><strong>Codebase growth</strong> &mdash; each new game adds feature code, routes, templates, and static assets to StrataHub</li>
+            <li><strong>Games are not portable</strong> &mdash; Mission HydroSci cannot be used outside of StrataHub without extracting it</li>
+            <li><strong>Content delivery shares resources</strong> &mdash; large Unity builds served through the same infrastructure as StrataHub's lightweight web pages</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Option B -->
+    <div class="option-card option-b">
+      <div class="option-header">
+        <span class="option-badge">B</span>
+        <span class="option-title">Standalone Game PWAs (Games Outside StrataHub)</span>
+      </div>
+      <p class="option-subtitle"><strong>Each game is its own PWA at its own origin.</strong> StrataHub provides authorization and identity. Games run independently with their own manifest, service worker, and content delivery.</p>
+      <a class="detail-link" href="standalone_game_implementation.md">Detailed design: standalone_game_implementation.md</a>
+
+      <div class="how-it-works">
+        <h3>How It Works</h3>
+        <ul>
+          <li>Each game lives at its own domain (e.g., <code>mhs.play.adroit.games</code>)</li>
+          <li>StrataHub acts as an OAuth 2.0 provider &mdash; the game redirects to StrataHub for login and receives an access token</li>
+          <li>The game has its own backend, service worker, manifest, and install flow</li>
+          <li>The game manages its own progress data using its own services (e.g., <code>log.adroit.games</code>, <code>save.adroit.games</code>); the teacher dashboard can live with the game</li>
+          <li>StrataHub's UI links to the game and manages app assignment (Groups &gt; Manage &gt; Apps)</li>
+          <li>Users install the game as a separate app from their device's perspective</li>
+        </ul>
+      </div>
+
+      <div class="pros-cons">
+        <div class="pros">
+          <h3>Advantages</h3>
+          <ul>
+            <li><strong>Clean separation</strong> &mdash; game code is entirely separate from StrataHub's codebase</li>
+            <li><strong>No PWA conflicts</strong> &mdash; each game owns its entire origin; no shared SW scope, no feature registry, no routing complexity</li>
+            <li><strong>Games are portable</strong> &mdash; Mission HydroSci can be used by other platforms, not just StrataHub</li>
+            <li><strong>Independent deploys</strong> &mdash; game updates don't touch StrataHub; StrataHub updates don't touch the game</li>
+            <li><strong>Independent scaling</strong> &mdash; game content delivery scales separately from StrataHub</li>
+            <li><strong>Focused codebases</strong> &mdash; StrataHub stays a platform; the game stays a game</li>
+            <li><strong>Simpler StrataHub</strong> &mdash; no service worker infrastructure, no delivery manager, no background fetch handling</li>
+            <li><strong>Natural multi-game scaling</strong> &mdash; adding a second game means creating a new project, not adding complexity to StrataHub</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Disadvantages</h3>
+          <ul>
+            <li><strong>Two deployments per game</strong> &mdash; each game needs its own server, domain, TLS, deploy pipeline, and monitoring</li>
+            <li><strong>Auth handoff required</strong> &mdash; cross-origin means no shared cookies/sessions; must implement OAuth 2.0 or signed tokens</li>
+            <li><strong>Dashboard moves with the game</strong> &mdash; the teacher dashboard for a game would live with the game rather than in StrataHub, since the game owns its own progress data. Alternatively, the game would need to implement a service/API that StrataHub could use to retrieve progress data for display</li>
+            <li><strong>Two apps to install</strong> &mdash; students may need to install both StrataHub and the game separately</li>
+            <li><strong>More infrastructure</strong> &mdash; additional domains, certificates, hosting costs, and monitoring per game</li>
+            <li><strong>Implementation effort</strong> &mdash; requires building OAuth provider, token validation, and progress API</li>
+            <li><strong>Navigation boundary</strong> &mdash; moving from StrataHub to the game is a cross-origin redirect, not an in-app transition</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Option C -->
+    <div class="option-card option-c">
+      <div class="option-header">
+        <span class="option-badge">C</span>
+        <span class="option-title">Hybrid (Support Both)</span>
+      </div>
+      <p class="option-subtitle"><strong>StrataHub supports both integrated and standalone games.</strong> Some games run inside StrataHub as features. Others run as standalone PWAs at their own origins. StrataHub provides the infrastructure for both patterns.</p>
+
+      <div class="how-it-works">
+        <h3>How It Works</h3>
+        <ul>
+          <li>StrataHub implements the platform PWA (Option A) with the feature registry for integrated games</li>
+          <li>StrataHub also implements an OAuth 2.0 provider and progress API for standalone games</li>
+          <li>Each game chooses which model fits: lightweight or tightly-coupled games run inside StrataHub; large or independently-developed games run standalone</li>
+          <li>Dashboard, grading, and app assignment work the same regardless &mdash; they read progress data from the database, whether written by an integrated feature or received via API</li>
+        </ul>
+      </div>
+
+      <div class="pros-cons">
+        <div class="pros">
+          <h3>Advantages</h3>
+          <ul>
+            <li><strong>Flexibility</strong> &mdash; the right architecture for each game, not a one-size-fits-all decision</li>
+            <li><strong>Incremental migration</strong> &mdash; Mission HydroSci can start integrated and move to standalone later</li>
+            <li><strong>Handles diverse games</strong> &mdash; a simple quiz can be a feature; a large Unity game can be standalone</li>
+            <li><strong>OAuth benefits other integrations</strong> &mdash; enables future integrations beyond games (external tools, partner platforms, LTI)</li>
+            <li><strong>No throwaway work</strong> &mdash; everything built for Option A and Option B has value</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h3>Disadvantages</h3>
+          <ul>
+            <li><strong>Most implementation work</strong> &mdash; requires building both the platform PWA infrastructure and the OAuth/progress API</li>
+            <li><strong>Two patterns to maintain</strong> &mdash; developers need to understand both the integrated and standalone models</li>
+            <li><strong>Testing surface</strong> &mdash; more code paths, more configurations, more edge cases</li>
+            <li><strong>Decision overhead</strong> &mdash; each new game requires an architecture decision</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+
+    <!-- Comparison Table -->
+    <h2>Comparison Summary</h2>
+    <div class="table-wrapper">
+      <table>
+        <thead>
+          <tr>
+            <th>Dimension</th>
+            <th>A: Platform PWA</th>
+            <th>B: Standalone Games</th>
+            <th>C: Hybrid</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>StrataHub complexity</td>
+            <td>Higher (SW, caching, delivery)</td>
+            <td>Lower (links + OAuth + API)</td>
+            <td>Highest (both)</td>
+          </tr>
+          <tr>
+            <td>Game portability</td>
+            <td>Not portable</td>
+            <td>Fully portable</td>
+            <td>Per-game choice</td>
+          </tr>
+          <tr>
+            <td>Deploy independence</td>
+            <td>Coupled</td>
+            <td>Independent</td>
+            <td>Per-game choice</td>
+          </tr>
+          <tr>
+            <td>Auth mechanism</td>
+            <td>None needed (same origin)</td>
+            <td>OAuth 2.0 / signed tokens</td>
+            <td>Both</td>
+          </tr>
+          <tr>
+            <td>Operational cost</td>
+            <td>One deployment</td>
+            <td>One per game + StrataHub</td>
+            <td>Varies</td>
+          </tr>
+          <tr>
+            <td>Multi-game scaling</td>
+            <td>Adds complexity to StrataHub</td>
+            <td>Each game is isolated</td>
+            <td>Best of both</td>
+          </tr>
+          <tr>
+            <td>User experience</td>
+            <td>Single app, seamless</td>
+            <td>Separate apps per game</td>
+            <td>Mixed</td>
+          </tr>
+          <tr>
+            <td>Upfront implementation</td>
+            <td>Moderate</td>
+            <td>Moderate-high</td>
+            <td>High</td>
+          </tr>
+          <tr>
+            <td>Risk of SW bugs</td>
+            <td>Affects entire site</td>
+            <td>Isolated to each game</td>
+            <td>Integrated games share risk</td>
+          </tr>
+          <tr>
+            <td>Progress data</td>
+            <td>Direct DB writes</td>
+            <td>Game owns its own services</td>
+            <td>Both paths</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <!-- Decision Factors -->
+    <h2>Factors for the Decision</h2>
+    <div class="factors">
+      <div class="factor">
+        <h3>If only Mission HydroSci for the foreseeable future</h3>
+        <p>Option A is simpler &mdash; one codebase, no OAuth, no cross-origin concerns. The platform PWA plan is well-defined and extends the current architecture.</p>
+        <span class="recommendation rec-a">Favors Option A</span>
+      </div>
+      <div class="factor">
+        <h3>If multiple games are planned</h3>
+        <p>Option B scales more naturally &mdash; each game is isolated, independently deployable, and doesn't add complexity to StrataHub. The upfront cost of OAuth and the progress API is paid once and reused.</p>
+        <span class="recommendation rec-b">Favors Option B</span>
+      </div>
+      <div class="factor">
+        <h3>If games may be used outside StrataHub</h3>
+        <p>Option B is necessary &mdash; a game that needs to work with other platforms cannot be embedded inside StrataHub.</p>
+        <span class="recommendation rec-b">Favors Option B</span>
+      </div>
+      <div class="factor">
+        <h3>If the team is small and wants to minimize operations</h3>
+        <p>Option A has fewer moving parts &mdash; one server, one deploy, one thing to monitor.</p>
+        <span class="recommendation rec-a">Favors Option A</span>
+      </div>
+      <div class="factor">
+        <h3>If long-term flexibility is valued over short-term simplicity</h3>
+        <p>Option C provides the most flexibility but at the cost of maintaining two integration patterns.</p>
+        <span class="recommendation rec-c">Favors Option C</span>
+      </div>
+    </div>
+
+    <!-- Current State -->
+    <div class="current-state">
+      <h2>Current State</h2>
+      <p>Mission HydroSci currently runs as an integrated feature in StrataHub with its own service worker and manifest (the simpler predecessor of Option A). The platform PWA plan (Option A) would generalize this into a feature registry pattern. The standalone plan (Option B) would extract the game entirely.</p>
+      <p>Work done under either option is not wasted &mdash; the delivery manager, caching logic, and background fetch handling are needed regardless of where they run. The OAuth provider built for Option B would have value beyond games. The feature registry built for Option A is straightforward to implement.</p>
+    </div>
+
+  </div>
+</body>
+</html>
