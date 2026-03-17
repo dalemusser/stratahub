@@ -8,9 +8,8 @@
 
 1. Open **Chrome** on the Chromebook and go to **mhs.adroit.games**
 2. Log in with your **Login ID** — on first login you will be asked to set your own password
-3. Tap **Mission HydroSci** in the sidebar menu
-4. Click the **Install** button in the blue banner at the top of the page
-5. Close the browser — you won't need it after this
+3. Click the **Install** button in the blue banner at the top of the Mission HydroSci page
+4. Close the browser — you won't need it after this
 
 After installation, launch the app from the **Launcher** (click the circle icon at the bottom-left of the screen and find Mission HydroSci). To keep it handy, **two-finger tap** the app icon in the Launcher and select **Pin to shelf** — the icon will stay in the bottom bar for quick access. You can launch the app by clicking the water drop icon anywhere it appears: Launcher, Shelf, or recents.
 
@@ -46,7 +45,7 @@ After installation, launch the app from the **Launcher** (click the circle icon 
 
 1. Open **Chrome** on the Chromebook and go to **mhs.adroit.games**
 2. Log in with your **Login ID** — on first login you will be asked to set your own password
-3. Tap **Mission HydroSci** in the sidebar menu
+3. In Mission HydroSci click the green **Launch** button to start playing.
 
 To make it easy to return, you can bookmark the page or type **mhs.adroit.games** in the address bar each time.
 
@@ -54,8 +53,7 @@ To make it easy to return, you can bookmark the page or type **mhs.adroit.games*
 
 1. Go to **mhs.adroit.games** in Chrome (or use your bookmark)
 2. Log in if prompted
-3. Tap **Mission HydroSci** in the sidebar menu
-4. Click the green **Launch** button
+3. Click the green **Launch** button
 
 ### During Gameplay
 
