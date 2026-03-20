@@ -1,0 +1,395 @@
+using System;
+using System.Runtime.InteropServices;
+using UnityEngine;
+
+/// <summary>
+/// Bridge between the Unity game and its hosting environment.
+/// Attach this script to a GameObject named "MHSBridge" in the first scene that loads.
+///
+/// Identity, service endpoints, and navigation configuration come from the host page
+/// via window.__mhsBridgeConfig. The host page sets this before Unity starts.
+///
+/// Two operating modes:
+///   PWA mode  - StrataHub manages unit transitions. The game signals completion
+///               and the host page handles navigation, progress tracking, and downloads.
+///   URL mode  - The game manages its own navigation using relative URLs or a unitMap.
+///
+/// Mode is determined automatically: if the host page calls
+/// SendMessage('MHSBridge', 'OnPWAReady', '...'), the game is in PWA mode.
+/// Otherwise it's in URL mode.
+///
+/// If window.__mhsBridgeConfig is absent (old host page), identity and service
+/// config are not available from the bridge. The game should use its existing mechanisms.
+/// </summary>
+public class MHSBridge : MonoBehaviour
+{
+    // --- JS function imports (from MHSBridge.jslib) ---
+
+    [DllImport("__Internal")]
+    private static extern IntPtr MHSBridge_GetConfig();
+
+    [DllImport("__Internal")]
+    private static extern void MHSBridge_Free(IntPtr ptr);
+
+    [DllImport("__Internal")]
+    private static extern void MHSBridge_NotifyUnitComplete(string unitId);
+
+    [DllImport("__Internal")]
+    private static extern void MHSBridge_NavigateToUnit(string url);
+
+    [DllImport("__Internal")]
+    private static extern IntPtr MHSBridge_GetUnitURL(string unitName);
+
+    // --- State ---
+
+    private bool _isPWA = false;
+    private bool _hasConfig = false;
+    private string _userId = null;
+    private string _userName = null;
+    private BridgeConfig _config = null;
+
+    /// <summary>True if the game is running inside the StrataHub PWA.</summary>
+    public bool IsPWA => _isPWA;
+
+    /// <summary>True if window.__mhsBridgeConfig was present and parsed.</summary>
+    public bool HasConfig => _hasConfig;
+
+    // --- Singleton ---
+
+    public static MHSBridge Instance { get; private set; }
+
+    private void Awake()
+    {
+        if (Instance != null && Instance != this) { Destroy(gameObject); return; }
+        Instance = this;
+        DontDestroyOnLoad(gameObject);
+
+        // Load config from host page on startup
+        LoadConfig();
+    }
+
+    // --- Config loading ---
+
+    /// <summary>
+    /// Loads the bridge configuration from window.__mhsBridgeConfig.
+    /// Called once during Awake(). In Editor, development defaults are used.
+    /// </summary>
+    private void LoadConfig()
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        IntPtr ptr = IntPtr.Zero;
+        try
+        {
+            ptr = MHSBridge_GetConfig();
+            if (ptr == IntPtr.Zero)
+                return;
+
+            string json = PtrToStringUTF8(ptr);
+            if (string.IsNullOrEmpty(json))
+                return;
+
+            _config = JsonUtility.FromJson<BridgeConfig>(json);
+            if (_config != null)
+            {
+                _hasConfig = true;
+                if (_config.identity != null)
+                {
+                    _userId = _config.identity.user_id;
+                    _userName = _config.identity.name;
+                }
+                Debug.Log("MHSBridge: Config loaded from host page");
+            }
+        }
+        catch (Exception e)
+        {
+            Debug.LogWarning("MHSBridge: Failed to parse config: " + e.Message);
+        }
+        finally
+        {
+            if (ptr != IntPtr.Zero)
+                MHSBridge_Free(ptr);
+        }
+#else
+        // Editor mode: use development defaults so devs can log and save during testing
+        _userId = "mhs_developer";
+        _userName = "MHS Developer";
+        _config = new BridgeConfig
+        {
+            identity = new BridgeIdentity { user_id = "mhs_developer", name = "MHS Developer" },
+            services = new BridgeServices
+            {
+                log = new ServiceConfig { url = "https://log.adroit.games", auth = "Bearer LEARN_FAST" },
+                save = new ServiceConfig { url = "https://save.adroit.games", auth = "Bearer LEARN_FAST" }
+            }
+        };
+        _hasConfig = true;
+        Debug.Log("MHSBridge: Editor mode — using development defaults (user_id=mhs_developer)");
+#endif
+    }
+
+    // --- Called by the PWA host page via SendMessage ---
+
+    /// <summary>
+    /// Called by the PWA host page after Unity finishes loading.
+    /// Signals that the game is running inside the managed PWA environment.
+    ///
+    /// Parameter is a JSON string with identity: { "user_id": "...", "name": "..." }
+    /// For backward compatibility, an empty string is also accepted (identity
+    /// comes from __mhsBridgeConfig instead).
+    /// </summary>
+    public void OnPWAReady(string identityJson)
+    {
+        _isPWA = true;
+
+        // Parse identity from the parameter if provided
+        if (!string.IsNullOrEmpty(identityJson))
+        {
+            try
+            {
+                var identity = JsonUtility.FromJson<BridgeIdentity>(identityJson);
+                if (identity != null)
+                {
+                    if (!string.IsNullOrEmpty(identity.user_id))
+                        _userId = identity.user_id;
+                    if (!string.IsNullOrEmpty(identity.name))
+                        _userName = identity.name;
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning("MHSBridge: Failed to parse OnPWAReady identity: " + e.Message);
+            }
+        }
+
+        Debug.Log("MHSBridge: PWA mode activated" +
+            (_userId != null ? ", user_id=" + _userId : ""));
+    }
+
+    // --- Called by game code: Identity ---
+
+    /// <summary>
+    /// Returns the player's user_id (currently carries login_id value).
+    ///
+    /// Identity is set during Awake (from __mhsBridgeConfig or editor defaults)
+    /// and can be overridden by OnPWAReady.
+    /// Returns empty string if no identity is available.
+    /// </summary>
+    public string GetPlayerID()
+    {
+        return _userId ?? string.Empty;
+    }
+
+    /// <summary>
+    /// Returns the player's display name, or empty string if not available.
+    /// </summary>
+    public string GetPlayerName()
+    {
+        return _userName ?? string.Empty;
+    }
+
+    // --- Called by game code: Service configuration ---
+
+    /// <summary>
+    /// Returns the log service configuration (URL and auth header), or null if not configured.
+    /// When null, the game should fall back to its hardcoded log service settings.
+    /// </summary>
+    public ServiceConfig GetLogServiceConfig()
+    {
+        if (_config?.services?.log != null &&
+            !string.IsNullOrEmpty(_config.services.log.url))
+        {
+            return _config.services.log;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the save service configuration (URL and auth header), or null if not configured.
+    /// When null, the game should fall back to its hardcoded save service settings.
+    /// </summary>
+    public ServiceConfig GetSaveServiceConfig()
+    {
+        if (_config?.services?.save != null &&
+            !string.IsNullOrEmpty(_config.services.save.url))
+        {
+            return _config.services.save;
+        }
+        return null;
+    }
+
+    // --- Called by game code: Navigation ---
+
+    /// <summary>
+    /// Returns the URL for a unit by name.
+    ///
+    /// If a unitMap is configured, looks up the unit there.
+    /// If no unitMap exists, returns a relative URL (e.g., "../unit2/index.html").
+    ///
+    /// Return values:
+    /// - URL string: unit is available, navigate to this URL
+    /// - null with isLocked=true: unit is explicitly locked (not yet accessible)
+    /// </summary>
+    public string GetUnitURL(string unitName, out bool isLocked)
+    {
+        isLocked = false;
+
+#if UNITY_WEBGL && !UNITY_EDITOR
+        IntPtr ptr = IntPtr.Zero;
+        try
+        {
+            ptr = MHSBridge_GetUnitURL(unitName);
+            if (ptr == IntPtr.Zero)
+                return null;
+
+            string result = PtrToStringUTF8(ptr);
+            if (result == "LOCKED")
+            {
+                isLocked = true;
+                return null;
+            }
+            if (string.IsNullOrEmpty(result))
+                return null;
+
+            return result;
+        }
+        finally
+        {
+            if (ptr != IntPtr.Zero)
+                MHSBridge_Free(ptr);
+        }
+#else
+        return null;
+#endif
+    }
+
+    /// <summary>
+    /// Call this when the current unit is complete.
+    /// In PWA mode: notifies the host page, which handles the transition.
+    /// In URL mode: navigates to the next unit using the provided relative URL.
+    ///              Passing empty or null for nextUnitRelativeUrl is a no-op
+    ///              (used for Unit 5, the final unit).
+    /// </summary>
+    /// <param name="currentUnitId">The unit that was just completed, e.g., "unit3"</param>
+    /// <param name="nextUnitRelativeUrl">
+    /// Relative URL to the next unit, e.g., "../unit4/index.html".
+    /// Ignored in PWA mode. Pass null or empty for the final unit in URL mode.
+    /// </param>
+    public void CompleteUnit(string currentUnitId, string nextUnitRelativeUrl)
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        if (_isPWA)
+        {
+            // PWA mode: notify the host page. It handles the transition.
+            MHSBridge_NotifyUnitComplete(currentUnitId);
+        }
+        else
+        {
+            // URL mode: navigate to the next unit directly.
+            if (!string.IsNullOrEmpty(nextUnitRelativeUrl))
+            {
+                MHSBridge_NavigateToUnit(nextUnitRelativeUrl);
+            }
+        }
+#else
+        Debug.Log($"MHSBridge: CompleteUnit(\"{currentUnitId}\") ignored in Editor");
+#endif
+    }
+
+    /// <summary>
+    /// Navigates to a unit by name (e.g., "unit1", "unit3").
+    /// Used by the loader to send the student to their current unit.
+    ///
+    /// Uses GetUnitURL to resolve the URL (unitMap if available, relative otherwise).
+    /// If the unit is locked, logs a warning and does nothing.
+    ///
+    /// No-ops in PWA mode — StrataHub handles navigation directly.
+    /// </summary>
+    public void NavigateToUnit(string unitName)
+    {
+#if UNITY_WEBGL && !UNITY_EDITOR
+        if (_isPWA)
+        {
+            Debug.LogWarning("MHSBridge: NavigateToUnit ignored in PWA mode");
+            return;
+        }
+        if (string.IsNullOrEmpty(unitName))
+        {
+            Debug.LogError("MHSBridge: NavigateToUnit called with null or empty unitName");
+            return;
+        }
+
+        bool isLocked;
+        string unitURL = GetUnitURL(unitName, out isLocked);
+
+        if (isLocked)
+        {
+            Debug.LogWarning("MHSBridge: Unit \"" + unitName + "\" is locked");
+            return;
+        }
+
+        if (unitURL != null)
+        {
+            MHSBridge_NavigateToUnit(unitURL);
+        }
+        else
+        {
+            Debug.LogWarning("MHSBridge: No URL found for unit \"" + unitName + "\"");
+        }
+#endif
+    }
+
+    // --- JSON data classes ---
+
+    [Serializable]
+    public class BridgeConfig
+    {
+        public BridgeIdentity identity;
+        public BridgeServices services;
+        public BridgeNavigation navigation;
+    }
+
+    [Serializable]
+    public class BridgeIdentity
+    {
+        public string user_id;
+        public string name;
+    }
+
+    [Serializable]
+    public class BridgeServices
+    {
+        public ServiceConfig log;
+        public ServiceConfig save;
+    }
+
+    [Serializable]
+    public class ServiceConfig
+    {
+        public string url;
+        public string auth;
+    }
+
+    [Serializable]
+    public class BridgeNavigation
+    {
+        // Note: JsonUtility cannot deserialize a Dictionary/Map.
+        // The unitMap is read via jslib (MHSBridge_GetUnitURL) instead.
+    }
+
+    // --- Helpers ---
+
+    /// <summary>
+    /// Reads a null-terminated UTF-8 string from an unmanaged pointer.
+    /// Compatible with all Unity .NET profiles (does not require .NET Standard 2.1).
+    /// </summary>
+    private static string PtrToStringUTF8(IntPtr ptr)
+    {
+        if (ptr == IntPtr.Zero) return string.Empty;
+        int len = 0;
+        while (Marshal.ReadByte(ptr, len) != 0) len++;
+        if (len == 0) return string.Empty;
+        byte[] bytes = new byte[len];
+        Marshal.Copy(ptr, bytes, 0, len);
+        return System.Text.Encoding.UTF8.GetString(bytes);
+    }
+}

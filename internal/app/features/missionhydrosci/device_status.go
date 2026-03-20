@@ -14,13 +14,14 @@ import (
 
 // deviceStatusRequest is the JSON body for POST /api/device-status.
 type deviceStatusRequest struct {
-	DeviceID     string            `json:"device_id"`
-	DeviceType   string            `json:"device_type"`
-	PWAInstalled bool              `json:"pwa_installed"`
-	SWRegistered bool              `json:"sw_registered"`
-	UnitStatus   map[string]string `json:"unit_status"`
-	StorageQuota int64             `json:"storage_quota"`
-	StorageUsage int64             `json:"storage_usage"`
+	DeviceID      string            `json:"device_id"`
+	DeviceType    string            `json:"device_type"`
+	DeviceDetails map[string]string `json:"device_details,omitempty"`
+	PWAInstalled  bool              `json:"pwa_installed"`
+	SWRegistered  bool              `json:"sw_registered"`
+	UnitStatus    map[string]string `json:"unit_status"`
+	StorageQuota  int64             `json:"storage_quota"`
+	StorageUsage  int64             `json:"storage_usage"`
 }
 
 // HandleDeviceStatus receives a device status report from the client.
@@ -55,16 +56,17 @@ func (h *Handler) HandleDeviceStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	status := models.MHSDeviceStatus{
-		WorkspaceID:  wsID,
-		UserID:       userID,
-		LoginID:      user.LoginID,
-		DeviceID:     req.DeviceID,
-		DeviceType:   req.DeviceType,
-		PWAInstalled: req.PWAInstalled,
-		SWRegistered: req.SWRegistered,
-		UnitStatus:   unitStatus,
-		StorageQuota: req.StorageQuota,
-		StorageUsage: req.StorageUsage,
+		WorkspaceID:   wsID,
+		UserID:        userID,
+		LoginID:       user.LoginID,
+		DeviceID:      req.DeviceID,
+		DeviceType:    req.DeviceType,
+		DeviceDetails: req.DeviceDetails,
+		PWAInstalled:  req.PWAInstalled,
+		SWRegistered:  req.SWRegistered,
+		UnitStatus:    unitStatus,
+		StorageQuota:  req.StorageQuota,
+		StorageUsage:  req.StorageUsage,
 	}
 
 	if err := h.DeviceStatusStore.Upsert(r.Context(), status); err != nil {

@@ -417,6 +417,69 @@
     background-color: rgba(0, 0, 0, 0.7);
   }
 
+  /* Device details modal */
+  .mhs-device-modal-panel {
+    background: #ffffff;
+  }
+  .mhs-device-modal-header {
+    border-bottom: 1px solid #e2e8f0;
+  }
+  #mhs-device-modal-title {
+    color: #1e293b;
+  }
+  .mhs-device-modal-close {
+    color: #94a3b8;
+  }
+  .mhs-device-detail-label {
+    padding: 0.35rem 0.5rem;
+    color: #64748b;
+    white-space: nowrap;
+    vertical-align: top;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .mhs-device-detail-value {
+    padding: 0.35rem 0.5rem;
+    color: #1e293b;
+    border-bottom: 1px solid #f1f5f9;
+  }
+  .mhs-device-detail-ua {
+    word-break: break-all;
+  }
+  .mhs-device-detail-empty {
+    color: #94a3b8;
+    text-align: center;
+    padding: 1rem;
+  }
+
+  /* Dark mode: device details modal */
+  .dark .mhs-device-modal-backdrop {
+    background: rgba(0, 0, 0, 0.6);
+  }
+  .dark .mhs-device-modal-panel {
+    background: #1e293b;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.5);
+  }
+  .dark .mhs-device-modal-header {
+    border-bottom-color: #334155;
+  }
+  .dark #mhs-device-modal-title {
+    color: #e2e8f0;
+  }
+  .dark .mhs-device-modal-close {
+    color: #64748b;
+  }
+  .dark .mhs-device-detail-label {
+    color: #94a3b8;
+    border-bottom-color: #334155;
+  }
+  .dark .mhs-device-detail-value {
+    color: #e2e8f0;
+    border-bottom-color: #334155;
+  }
+  .dark .mhs-device-detail-empty {
+    color: #64748b;
+  }
+
   /* Dark mode: theme info button */
   .dark #mhs-dashboard .mhs-theme-info-btn {
     background: #1e293b;
@@ -737,10 +800,23 @@
   </div>
 </div>
 
+<!-- Device Details Modal -->
+<div id="mhs-device-modal" class="hidden" style="position:fixed;inset:0;z-index:50;align-items:center;justify-content:center;">
+  <div class="mhs-device-modal-backdrop" style="position:absolute;inset:0;background:rgba(0,0,0,0.4);" onclick="closeDeviceModal()"></div>
+  <div class="mhs-device-modal-panel" style="position:relative;border-radius:8px;box-shadow:0 8px 32px rgba(0,0,0,0.2);max-width:520px;width:90%;max-height:80vh;display:flex;flex-direction:column;">
+    <div class="mhs-device-modal-header" style="display:flex;align-items:center;justify-content:space-between;padding:0.75rem 1rem;">
+      <h3 id="mhs-device-modal-title" style="font-size:0.9rem;font-weight:600;margin:0;"></h3>
+      <button onclick="closeDeviceModal()" style="background:none;border:none;cursor:pointer;font-size:1.1rem;padding:0 0.25rem;" class="mhs-device-modal-close" title="Close">&times;</button>
+    </div>
+    <div id="mhs-device-modal-body" style="padding:0.75rem 1rem;overflow-y:auto;font-size:0.8rem;"></div>
+  </div>
+</div>
+
 <script>
 (function() {
   var scrollPos = { x: 0, y: 0 };
   var activeTab = 'progress';
+  var deviceModalOpen = false;
   var countdown = 30;
   var countdownEl = document.getElementById('mhs-countdown');
   var refreshBtn = document.getElementById('mhs-refresh-btn');
@@ -808,6 +884,12 @@
   }
 
   function doRefresh() {
+    // Skip auto-refresh while the device details modal is open
+    if (deviceModalOpen) {
+      countdown = 30;
+      updateCountdown();
+      return;
+    }
     var groupSelect = document.getElementById('group-select');
     var group = groupSelect ? groupSelect.value : '';
     var gridEl = document.getElementById('mhs-grid');
@@ -1197,6 +1279,105 @@
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
       closeAllDropdowns();
+    }
+  });
+
+  // --- Device Details Modal ---
+  var deviceLabels = {
+    user_agent: 'User Agent', platform: 'Platform', language: 'Language',
+    screen_width: 'Screen Width', screen_height: 'Screen Height',
+    device_pixel_ratio: 'Pixel Ratio', max_touch_points: 'Touch Points',
+    cpu_cores: 'CPU Cores', device_memory_gb: 'Device Memory',
+    connection_type: 'Connection', connection_downlink_mbps: 'Downlink',
+    uad_platform: 'OS', uad_platform_version: 'OS Version',
+    uad_mobile: 'Mobile', uad_brands: 'Browser',
+    uad_full_versions: 'Browser (full)', uad_architecture: 'Architecture',
+    uad_bitness: 'Bitness', uad_model: 'Model'
+  };
+  var deviceOrder = [
+    'uad_platform', 'uad_platform_version', 'uad_architecture', 'uad_bitness', 'uad_model',
+    'uad_brands', 'uad_full_versions', 'uad_mobile',
+    'platform', 'language',
+    'screen_width', 'screen_height', 'device_pixel_ratio', 'max_touch_points',
+    'cpu_cores', 'device_memory_gb',
+    'connection_type', 'connection_downlink_mbps',
+    'user_agent'
+  ];
+  var deviceUnits = {
+    device_memory_gb: ' GB', connection_downlink_mbps: ' Mbps',
+    screen_width: ' px', screen_height: ' px'
+  };
+
+  function escDeviceHtml(s) {
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(s));
+    return d.innerHTML;
+  }
+
+  function formatBytes(bytes) {
+    if (bytes <= 0) return '0 MB';
+    var mb = bytes / (1024 * 1024);
+    if (mb >= 1024) return (mb / 1024).toFixed(1) + ' GB';
+    return mb.toFixed(0) + ' MB';
+  }
+
+  window.showDeviceDetails = function(details, deviceType, studentName, storageUsage, storageQuota) {
+    var modal = document.getElementById('mhs-device-modal');
+    var titleEl = document.getElementById('mhs-device-modal-title');
+    var bodyEl = document.getElementById('mhs-device-modal-body');
+
+    titleEl.textContent = studentName + ' \u2014 ' + deviceType;
+    var html = '<table style="width:100%;border-collapse:collapse;">';
+    var shown = {};
+
+    for (var i = 0; i < deviceOrder.length; i++) {
+      var key = deviceOrder[i];
+      if (details[key] !== undefined && details[key] !== '') {
+        shown[key] = true;
+        var val = details[key] + (deviceUnits[key] || '');
+        var label = deviceLabels[key] || key;
+        var cls = key === 'user_agent' ? ' mhs-device-detail-ua' : '';
+        html += '<tr><td class="mhs-device-detail-label">' + label + '</td>';
+        html += '<td class="mhs-device-detail-value' + cls + '">' + escDeviceHtml(val) + '</td></tr>';
+      }
+    }
+    for (var key in details) {
+      if (!shown[key] && details[key] !== undefined && details[key] !== '') {
+        html += '<tr><td class="mhs-device-detail-label">' + (deviceLabels[key] || key) + '</td>';
+        html += '<td class="mhs-device-detail-value">' + escDeviceHtml(details[key]) + '</td></tr>';
+      }
+    }
+
+    // Storage info
+    if (storageQuota && storageQuota > 0) {
+      var pct = Math.round(storageUsage * 100 / storageQuota);
+      var storageVal = formatBytes(storageUsage) + ' / ' + formatBytes(storageQuota) + ' (' + pct + '%)';
+      html += '<tr><td class="mhs-device-detail-label">Storage Used</td>';
+      html += '<td class="mhs-device-detail-value">' + escDeviceHtml(storageVal) + '</td></tr>';
+      html += '<tr><td class="mhs-device-detail-label">Storage Available</td>';
+      html += '<td class="mhs-device-detail-value">' + escDeviceHtml(formatBytes(storageQuota - storageUsage)) + '</td></tr>';
+    }
+
+    html += '</table>';
+    if (Object.keys(details).length === 0 && (!storageQuota || storageQuota <= 0)) {
+      html = '<p class="mhs-device-detail-empty">No detailed device information available.</p>';
+    }
+    bodyEl.innerHTML = html;
+    modal.classList.remove('hidden');
+    modal.style.display = 'flex';
+    deviceModalOpen = true;
+  };
+
+  window.closeDeviceModal = function() {
+    var modal = document.getElementById('mhs-device-modal');
+    modal.classList.add('hidden');
+    modal.style.display = '';
+    deviceModalOpen = false;
+  };
+
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Escape' && deviceModalOpen) {
+      closeDeviceModal();
     }
   });
 

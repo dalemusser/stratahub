@@ -82,6 +82,12 @@ var appConfigKeys = []config.AppKey{
 
 	// MHS Content Delivery
 	{Name: "mhs_cdn_base_url", Default: "", Desc: "CDN base URL for MHS game builds (e.g., https://cdn.adroit.games/mhs)"},
+
+	// Game service endpoints (for /api/game-config)
+	{Name: "game_mhs_log_url", Default: "", Desc: "Log service URL for MHS game"},
+	{Name: "game_mhs_log_auth", Default: "", Desc: "Log service auth header for MHS game (e.g., Bearer <api-key>)"},
+	{Name: "game_mhs_save_url", Default: "", Desc: "Save service URL for MHS game"},
+	{Name: "game_mhs_save_auth", Default: "", Desc: "Save service auth header for MHS game (e.g., Bearer <api-key>)"},
 }
 
 // LoadConfig loads WAFFLE core config and app-specific config.
@@ -170,6 +176,12 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 
 		// MHS Content Delivery
 		MHSCDNBaseURL: appValues.String("mhs_cdn_base_url"),
+
+		// Game service endpoints
+		GameMHSLogURL:   appValues.String("game_mhs_log_url"),
+		GameMHSLogAuth:  appValues.String("game_mhs_log_auth"),
+		GameMHSSaveURL:  appValues.String("game_mhs_save_url"),
+		GameMHSSaveAuth: appValues.String("game_mhs_save_auth"),
 	}
 
 	// Auto-derive session domain in multi-workspace mode if not explicitly set.

@@ -41,6 +41,12 @@ type PlayData struct {
 	DataFile        string // Build file name for data (e.g., "unit1.data" or "unit2.data.unityweb")
 	FrameworkFile   string // Build file name for framework
 	CodeFile        string // Build file name for wasm
+
+	// Game service config (injected into __mhsBridgeConfig for new builds)
+	LogServiceURL  string
+	LogServiceAuth string
+	SaveServiceURL  string
+	SaveServiceAuth string
 }
 
 // OfflineData is the view model for the offline fallback page.

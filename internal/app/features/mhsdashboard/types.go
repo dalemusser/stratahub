@@ -65,14 +65,17 @@ type CellData struct {
 
 // DeviceInfo represents a device's readiness status for display.
 type DeviceInfo struct {
-	DeviceType   string
-	PWAInstalled bool
-	UnitStatus   map[string]string // "unit1" → "cached" etc.
-	StorageUsage int64
-	StorageQuota int64
-	StoragePct   int // Pre-computed storage percentage (0-100)
-	LastSeen     time.Time
-	IsStale      bool // last_seen > 7 days ago
+	DeviceType    string
+	DeviceDetails map[string]string // Rich device info (browser, OS, screen, etc.)
+	PWAInstalled  bool
+	UnitStatus    map[string]string // "unit1" → "cached" etc.
+	StorageUsage  int64
+	StorageQuota  int64
+	StoragePct    int    // Pre-computed storage percentage (0-100)
+	StorageUsed   string // Human-readable used storage (e.g., "1.2 GB")
+	StorageTotal  string // Human-readable total storage (e.g., "4.8 GB")
+	LastSeen      time.Time
+	IsStale       bool // last_seen > 7 days ago
 }
 
 // MemberRow represents a single row of progress data for a member.

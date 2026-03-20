@@ -275,33 +275,89 @@
     if (navigator.maxTouchPoints > 0 && (/iPad/.test(ua) || /Macintosh/.test(ua))) return 'iPad';
     if (/Macintosh/.test(ua)) return 'macOS';
     if (/Windows/.test(ua)) return 'Windows';
+    if (/Android/.test(ua)) return 'Android';
+    if (/Linux/.test(ua)) return 'Linux';
     return 'Other';
   }
 
-  function reportDeviceStatus(unitStatuses) {
-    var report = {
-      device_id: getOrCreateDeviceId(),
-      device_type: detectDeviceType(),
-      pwa_installed: window.matchMedia('(display-mode: standalone)').matches,
-      sw_registered: !!(navigator.serviceWorker && navigator.serviceWorker.controller),
-      unit_status: unitStatuses || {},
-      storage_quota: 0,
-      storage_usage: 0
-    };
-    function send() {
-      fetch('/missionhydrosci/api/device-status', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify(report)
-      }).catch(function(e) { console.warn('Device status report failed:', e); });
+  function collectDeviceDetails() {
+    var details = {};
+    try { details.user_agent = navigator.userAgent; } catch(e) {}
+    try { details.platform = navigator.platform; } catch(e) {}
+    try { details.language = navigator.language; } catch(e) {}
+    try { details.screen_width = String(screen.width); } catch(e) {}
+    try { details.screen_height = String(screen.height); } catch(e) {}
+    try { details.device_pixel_ratio = String(window.devicePixelRatio); } catch(e) {}
+    try { details.max_touch_points = String(navigator.maxTouchPoints); } catch(e) {}
+    try { if (navigator.hardwareConcurrency) details.cpu_cores = String(navigator.hardwareConcurrency); } catch(e) {}
+    try { if (navigator.deviceMemory) details.device_memory_gb = String(navigator.deviceMemory); } catch(e) {}
+    try {
+      if (navigator.connection) {
+        var conn = navigator.connection;
+        if (conn.effectiveType) details.connection_type = conn.effectiveType;
+        if (conn.downlink) details.connection_downlink_mbps = String(conn.downlink);
+      }
+    } catch(e) {}
+    // Chromium userAgentData (structured, more reliable than UA parsing)
+    try {
+      if (navigator.userAgentData) {
+        var uad = navigator.userAgentData;
+        if (uad.platform) details.uad_platform = uad.platform;
+        details.uad_mobile = String(uad.mobile);
+        var brands = (uad.brands || []).map(function(b) { return b.brand + '/' + b.version; });
+        if (brands.length) details.uad_brands = brands.join(', ');
+      }
+    } catch(e) {}
+    return details;
+  }
+
+  // Request high-entropy values from userAgentData (async, Chromium only).
+  // Adds OS version, architecture, model, and bitness when available.
+  function enrichDeviceDetails(details) {
+    if (navigator.userAgentData && navigator.userAgentData.getHighEntropyValues) {
+      return navigator.userAgentData.getHighEntropyValues([
+        'architecture', 'bitness', 'model', 'platformVersion', 'fullVersionList'
+      ]).then(function(he) {
+        if (he.architecture) details.uad_architecture = he.architecture;
+        if (he.bitness) details.uad_bitness = he.bitness;
+        if (he.model) details.uad_model = he.model;
+        if (he.platformVersion) details.uad_platform_version = he.platformVersion;
+        var fvl = (he.fullVersionList || []).map(function(b) { return b.brand + '/' + b.version; });
+        if (fvl.length) details.uad_full_versions = fvl.join(', ');
+        return details;
+      }).catch(function() { return details; });
     }
-    if (navigator.storage && navigator.storage.estimate) {
-      navigator.storage.estimate().then(function(est) {
-        report.storage_quota = est.quota || 0;
-        report.storage_usage = est.usage || 0;
-        send();
-      }).catch(send);
-    } else { send(); }
+    return Promise.resolve(details);
+  }
+
+  function reportDeviceStatus(unitStatuses) {
+    var details = collectDeviceDetails();
+    enrichDeviceDetails(details).then(function(enrichedDetails) {
+      var report = {
+        device_id: getOrCreateDeviceId(),
+        device_type: detectDeviceType(),
+        device_details: enrichedDetails,
+        pwa_installed: window.matchMedia('(display-mode: standalone)').matches,
+        sw_registered: !!(navigator.serviceWorker && navigator.serviceWorker.controller),
+        unit_status: unitStatuses || {},
+        storage_quota: 0,
+        storage_usage: 0
+      };
+      function send() {
+        fetch('/missionhydrosci/api/device-status', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+          body: JSON.stringify(report)
+        }).catch(function(e) { console.warn('Device status report failed:', e); });
+      }
+      if (navigator.storage && navigator.storage.estimate) {
+        navigator.storage.estimate().then(function(est) {
+          report.storage_quota = est.quota || 0;
+          report.storage_usage = est.usage || 0;
+          send();
+        }).catch(send);
+      } else { send(); }
+    });
   }
 
   // Collect statuses from all units before reporting

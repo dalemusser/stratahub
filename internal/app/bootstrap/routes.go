@@ -13,6 +13,7 @@ import (
 	authgooglefeature "github.com/dalemusser/stratahub/internal/app/features/authgoogle"
 	dashboardfeature "github.com/dalemusser/stratahub/internal/app/features/dashboard"
 	errorsfeature "github.com/dalemusser/stratahub/internal/app/features/errors"
+	gameconfigfeature "github.com/dalemusser/stratahub/internal/app/features/gameconfig"
 	groupsfeature "github.com/dalemusser/stratahub/internal/app/features/groups"
 	healthfeature "github.com/dalemusser/stratahub/internal/app/features/health"
 	heartbeatfeature "github.com/dalemusser/stratahub/internal/app/features/heartbeat"
@@ -256,7 +257,12 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 
 	// Mission HydroSci: root-level PWA routes + content fallback.
 	// /sw.js and /manifest.json serve the Mission HydroSci PWA (used for the impact study).
-	missionHydroSciHandler := missionhydroscifeature.NewHandler(deps.StrataHubMongoDatabase, errLog, appCfg.MHSCDNBaseURL, logger)
+	missionHydroSciHandler := missionhydroscifeature.NewHandler(
+		deps.StrataHubMongoDatabase, errLog, appCfg.MHSCDNBaseURL,
+		missionhydroscifeature.GameServiceConfig{URL: appCfg.GameMHSLogURL, Auth: appCfg.GameMHSLogAuth},
+		missionhydroscifeature.GameServiceConfig{URL: appCfg.GameMHSSaveURL, Auth: appCfg.GameMHSSaveAuth},
+		logger,
+	)
 	r.Get("/sw.js", missionHydroSciHandler.ServeServiceWorker)
 	r.Get("/manifest.json", missionHydroSciHandler.ServeManifest)
 	r.Handle("/missionhydrosci/content/*", missionHydroSciHandler.ContentFallback())
@@ -440,6 +446,20 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	// User info API (for games to identify the current player - no workspace required for backward compat)
 	userInfoHandler := userinfofeature.NewHandler()
 	userinfofeature.MountRoutes(r, userInfoHandler)
+
+	// Game config API (provides service endpoints and credentials to games)
+	gameConfigs := map[string]gameconfigfeature.GameConfigResponse{}
+	if appCfg.GameMHSLogURL != "" || appCfg.GameMHSSaveURL != "" {
+		gameConfigs["mhs"] = gameconfigfeature.GameConfigResponse{
+			Game: "mhs",
+			Services: map[string]gameconfigfeature.ServiceEntry{
+				"log":  {URL: appCfg.GameMHSLogURL, Auth: appCfg.GameMHSLogAuth},
+				"save": {URL: appCfg.GameMHSSaveURL, Auth: appCfg.GameMHSSaveAuth},
+			},
+		}
+	}
+	gameConfigHandler := gameconfigfeature.NewHandler(gameConfigs)
+	gameconfigfeature.MountRoutes(r, gameConfigHandler)
 
 	// Activity store - used by multiple features
 	activityStore := activity.New(deps.StrataHubMongoDatabase)

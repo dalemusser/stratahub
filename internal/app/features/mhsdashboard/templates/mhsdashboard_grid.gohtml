@@ -137,7 +137,14 @@
             {{ if eq $di 0 }}
             <td class="px-3 py-1.5 font-medium text-slate-700 border-b border-slate-100 truncate" rowspan="{{ $devCount }}" title="{{ $name }}">{{ $name }}</td>
             {{ end }}
-            <td class="px-2 py-1.5 text-slate-600 border-b border-slate-100">{{ $dev.DeviceType }}</td>
+            <td class="px-2 py-1.5 border-b border-slate-100">
+              {{ if $dev.DeviceDetails }}
+              <button class="text-blue-600 dark:text-blue-400 underline decoration-blue-400 dark:decoration-blue-400 hover:text-blue-800 dark:hover:text-blue-300 cursor-pointer bg-transparent border-none p-0 text-xs font-medium"
+                      onclick="showDeviceDetails({{ $dev.DeviceDetails | toJSON }}, '{{ $dev.DeviceType }}', '{{ $name }}', {{ $dev.StorageUsage }}, {{ $dev.StorageQuota }})">{{ $dev.DeviceType }}</button>
+              {{ else }}
+              <span class="text-slate-600">{{ $dev.DeviceType }}</span>
+              {{ end }}
+            </td>
             <td class="text-center px-2 py-1.5 border-b border-slate-100">
               {{ if $dev.PWAInstalled }}
               <span class="text-green-600" title="PWA Installed">&#10003;</span>
@@ -164,11 +171,14 @@
             {{ end }}
             <td class="px-2 py-1.5 border-b border-slate-100">
               {{ if gt $dev.StorageQuota 0 }}
-              <div class="flex items-center gap-1.5">
-                <div class="mhs-storage-bar">
-                  <div class="mhs-storage-fill {{ if gt $dev.StoragePct 90 }}mhs-storage-danger{{ else if gt $dev.StoragePct 70 }}mhs-storage-warn{{ end }}" style="width: {{ $dev.StoragePct }}%"></div>
+              <div class="flex flex-col gap-0.5">
+                <div class="flex items-center gap-1.5">
+                  <div class="mhs-storage-bar">
+                    <div class="mhs-storage-fill {{ if gt $dev.StoragePct 90 }}mhs-storage-danger{{ else if gt $dev.StoragePct 70 }}mhs-storage-warn{{ end }}" style="width: {{ $dev.StoragePct }}%"></div>
+                  </div>
+                  <span class="text-slate-500 dark:text-slate-400">{{ $dev.StoragePct }}%</span>
                 </div>
-                <span class="text-slate-500">{{ $dev.StoragePct }}%</span>
+                <span class="text-[9px] text-slate-500 dark:text-slate-400">{{ $dev.StorageUsed }} / {{ $dev.StorageTotal }}</span>
               </div>
               {{ else }}
               <span class="text-slate-400">&mdash;</span>

@@ -266,12 +266,25 @@
       </div>
     </div>
 
-    <!-- Identity bridge: intercept Unity jslib calls to /api/user -->
+    <!-- MHSBridge config: identity, services, and navigation injected server-side -->
     <script>
     (function() {
-      // User identity injected server-side from StrataHub session.
-      // Unity's jslib calls /api/user (often cross-origin to adroit.games)
-      // which fails due to cookie scoping. We intercept and return this data directly.
+      // New MHSBridge config — provides identity, service endpoints, and navigation
+      // to new game builds via window.__mhsBridgeConfig.
+      window.__mhsBridgeConfig = {
+        identity: {
+          user_id: '{{ .UserLoginID }}',
+          name: '{{ .UserName }}'
+        },
+        services: {
+          log: { url: '{{ .LogServiceURL }}', auth: '{{ .LogServiceAuth }}' },
+          save: { url: '{{ .SaveServiceURL }}', auth: '{{ .SaveServiceAuth }}' }
+        },
+        navigation: {}
+      };
+
+      // Legacy identity bridge (backward compat with old builds that intercept /api/user).
+      // Remove this section once all deployed builds use the new MHSBridge.
       var __mhsUser = {
         isAuthenticated: {{ if .UserLoginID }}true{{ else }}false{{ end }},
         name: '{{ .UserName }}',
@@ -647,8 +660,12 @@
           loadingOverlay.classList.add('hidden');
           onResize();
 
-          // Tell MHSBridge this is PWA mode — game will use mhsUnitComplete callback
-          instance.SendMessage('MHSBridge', 'OnPWAReady', '');
+          // Tell MHSBridge this is PWA mode — game will use mhsUnitComplete callback.
+          // Pass identity JSON for new builds; old builds ignore the parameter.
+          instance.SendMessage('MHSBridge', 'OnPWAReady', JSON.stringify({
+            user_id: '{{ .UserLoginID }}',
+            name: '{{ .UserName }}'
+          }));
         }).catch(function(err) {
           loadingText.textContent = 'Error: ' + err.message;
           loadingBar.style.width = '100%';

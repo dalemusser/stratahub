@@ -20,6 +20,7 @@ type MHSDeviceStatus struct {
 	LoginID              string             `bson:"login_id" json:"login_id"`
 	DeviceID             string             `bson:"device_id" json:"device_id"`
 	DeviceType           string             `bson:"device_type" json:"device_type"`
+	DeviceDetails        map[string]string  `bson:"device_details,omitempty" json:"device_details,omitempty"`
 	PWAInstalled         bool               `bson:"pwa_installed" json:"pwa_installed"`
 	SWRegistered         bool               `bson:"sw_registered" json:"sw_registered"`
 	UnitStatus           map[string]string  `bson:"unit_status" json:"unit_status"`

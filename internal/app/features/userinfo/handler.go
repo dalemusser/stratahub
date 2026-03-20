@@ -24,10 +24,13 @@ func NewHandler() *Handler {
 //
 // Response format:
 //
-//	{ "isAuthenticated": bool, "name": "...", "email": "...", "login_id": "..." }
+//	{ "isAuthenticated": bool, "name": "...", "user_id": "...", "email": "...", "login_id": "..." }
 //
-// The "email" field is set to login_id for backwards compatibility with existing games.
-// New integrations should use "login_id" instead.
+// Three identity fields are provided for transition support:
+//   - "user_id"  — canonical identity field; currently carries login_id,
+//     will carry the user's MongoDB ObjectID in a future phase.
+//   - "login_id" — the human-readable login string.
+//   - "email"    — legacy alias for login_id (backwards compat with older games).
 func (h *Handler) ServeUserInfo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -36,6 +39,7 @@ func (h *Handler) ServeUserInfo(w http.ResponseWriter, r *http.Request) {
 		_ = json.NewEncoder(w).Encode(map[string]any{
 			"isAuthenticated": false,
 			"name":            "",
+			"user_id":         "",
 			"email":           "",
 			"login_id":        "",
 		})
@@ -45,7 +49,8 @@ func (h *Handler) ServeUserInfo(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"isAuthenticated": true,
 		"name":            user.Name,
-		"email":           user.LoginID, // For backwards compatibility with existing games
+		"user_id":         user.LoginID, // Phase 1: login_id; Phase 2: user.ID.Hex()
+		"email":           user.LoginID, // Legacy compat
 		"login_id":        user.LoginID,
 	})
 }

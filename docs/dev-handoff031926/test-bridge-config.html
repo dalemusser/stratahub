@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MHSBridge Config Test</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #0f172a; color: #e2e8f0;
+      padding: 24px; max-width: 800px; margin: 0 auto;
+    }
+    h1 { font-size: 1.4rem; margin-bottom: 8px; color: #f1f5f9; }
+    .subtitle { font-size: 0.85rem; color: #64748b; margin-bottom: 24px; }
+    h2 {
+      font-size: 1rem; color: #94a3b8; margin-top: 24px; margin-bottom: 8px;
+      border-bottom: 1px solid #1e293b; padding-bottom: 4px;
+    }
+    .card {
+      background: #1e293b; border-radius: 8px; padding: 16px;
+      margin-bottom: 16px; border: 1px solid #334155;
+    }
+    .status {
+      display: inline-block; padding: 2px 10px; border-radius: 4px;
+      font-size: 0.85rem; font-weight: 600;
+    }
+    .status-ok { background: #166534; color: #bbf7d0; }
+    .status-fail { background: #991b1b; color: #fecaca; }
+    .status-pending { background: #854d0e; color: #fef08a; }
+    .field { margin: 8px 0; }
+    .field-label { font-size: 0.8rem; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; }
+    .field-value {
+      font-family: 'SF Mono', 'Fira Code', 'Cascadia Code', monospace;
+      font-size: 0.9rem; color: #e2e8f0; word-break: break-all;
+    }
+    .field-value.masked { color: #94a3b8; }
+    pre {
+      background: #0f172a; border: 1px solid #334155; border-radius: 6px;
+      padding: 12px; font-size: 0.8rem; overflow-x: auto;
+      color: #a5f3fc; margin-top: 8px; line-height: 1.5;
+    }
+    .config-input {
+      margin-bottom: 16px;
+    }
+    .config-input label {
+      display: block; font-size: 0.85rem; color: #94a3b8; margin-bottom: 4px;
+    }
+    .config-input input {
+      width: 100%; padding: 8px 12px; background: #1e293b; border: 1px solid #334155;
+      border-radius: 6px; color: #e2e8f0; font-size: 0.9rem;
+      font-family: 'SF Mono', monospace;
+    }
+    .config-input input:focus { outline: none; border-color: #2563eb; }
+    button {
+      padding: 8px 20px; background: #2563eb; color: white; border: none;
+      border-radius: 6px; font-size: 0.9rem; cursor: pointer; margin-right: 8px;
+      margin-bottom: 8px;
+    }
+    button:hover { background: #1d4ed8; }
+    button:disabled { background: #334155; color: #64748b; cursor: not-allowed; }
+    button.secondary { background: #475569; }
+    button.secondary:hover { background: #64748b; }
+    .test-result {
+      margin-top: 8px; padding: 8px 12px; border-radius: 4px;
+      font-family: monospace; font-size: 0.8rem; line-height: 1.5;
+    }
+    .test-result.success { background: #052e16; border: 1px solid #166534; color: #bbf7d0; }
+    .test-result.error { background: #450a0a; border: 1px solid #991b1b; color: #fecaca; }
+  </style>
+</head>
+<body>
+
+  <h1>MHSBridge Config Test</h1>
+  <p class="subtitle">
+    Tests the /api/user and /api/game-config endpoints that MHSBridge uses.
+    Open this page while logged into a StrataHub workspace.
+  </p>
+
+  <div class="config-input">
+    <label for="stratahub-base">StrataHub Base URL</label>
+    <input type="text" id="stratahub-base" value="https://adroit.games" placeholder="https://adroit.games">
+  </div>
+
+  <div class="config-input">
+    <label for="game-id">Game ID</label>
+    <input type="text" id="game-id" value="mhs" placeholder="mhs">
+  </div>
+
+  <button onclick="runAllTests()">Run All Tests</button>
+  <button class="secondary" onclick="runIdentityTest()">Test Identity Only</button>
+  <button class="secondary" onclick="runGameConfigTest()">Test Game Config Only</button>
+
+  <!-- Identity Test -->
+  <h2>1. Identity (/api/user)</h2>
+  <div class="card" id="identity-card">
+    <span class="status status-pending" id="identity-status">Pending</span>
+    <div class="field" id="identity-fields" style="display:none;">
+      <div class="field">
+        <div class="field-label">Authenticated</div>
+        <div class="field-value" id="identity-auth">—</div>
+      </div>
+      <div class="field">
+        <div class="field-label">user_id</div>
+        <div class="field-value" id="identity-user-id">—</div>
+      </div>
+      <div class="field">
+        <div class="field-label">name</div>
+        <div class="field-value" id="identity-name">—</div>
+      </div>
+      <div class="field">
+        <div class="field-label">login_id</div>
+        <div class="field-value" id="identity-login-id">—</div>
+      </div>
+      <div class="field">
+        <div class="field-label">email (legacy)</div>
+        <div class="field-value" id="identity-email">—</div>
+      </div>
+    </div>
+    <pre id="identity-raw" style="display:none;"></pre>
+  </div>
+
+  <!-- Game Config Test -->
+  <h2>2. Game Config (/api/game-config)</h2>
+  <div class="card" id="gameconfig-card">
+    <span class="status status-pending" id="gameconfig-status">Pending</span>
+    <div id="gameconfig-fields" style="display:none;">
+      <div class="field">
+        <div class="field-label">Game</div>
+        <div class="field-value" id="gameconfig-game">—</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Log Service URL</div>
+        <div class="field-value" id="gameconfig-log-url">—</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Log Service Auth</div>
+        <div class="field-value masked" id="gameconfig-log-auth">—</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Save Service URL</div>
+        <div class="field-value" id="gameconfig-save-url">—</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Save Service Auth</div>
+        <div class="field-value masked" id="gameconfig-save-auth">—</div>
+      </div>
+    </div>
+    <pre id="gameconfig-raw" style="display:none;"></pre>
+  </div>
+
+  <!-- Assembled Config -->
+  <h2>3. Assembled __mhsBridgeConfig</h2>
+  <div class="card">
+    <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 8px;">
+      This is what would be set as <code>window.__mhsBridgeConfig</code> in the replacement index.html.
+    </p>
+    <pre id="assembled-config">Run tests to see assembled config.</pre>
+  </div>
+
+  <!-- Log Service Test -->
+  <h2>4. Service Connectivity (optional)</h2>
+  <div class="card">
+    <p style="font-size: 0.85rem; color: #94a3b8; margin-bottom: 12px;">
+      Send a test log event to verify credentials work. This writes a real log entry.
+    </p>
+    <button onclick="testLogService()" id="test-log-btn" disabled>Test Log Service</button>
+    <button onclick="testSaveService()" id="test-save-btn" disabled>Test Save Service</button>
+    <div id="service-test-result"></div>
+  </div>
+
+  <script>
+    var identityData = null;
+    var servicesData = null;
+
+    function getBase() { return document.getElementById('stratahub-base').value.replace(/\/$/, ''); }
+    function getGameId() { return document.getElementById('game-id').value.trim(); }
+
+    function maskAuth(auth) {
+      if (!auth) return '—';
+      if (auth.length <= 15) return auth.substring(0, 7) + '***';
+      return auth.substring(0, 12) + '***' + auth.substring(auth.length - 4);
+    }
+
+    function setStatus(id, ok, text) {
+      var el = document.getElementById(id);
+      el.textContent = text;
+      el.className = 'status ' + (ok ? 'status-ok' : 'status-fail');
+    }
+
+    // --- Identity Test ---
+    function runIdentityTest() {
+      var base = getBase();
+      setStatus('identity-status', false, 'Fetching...');
+      document.getElementById('identity-fields').style.display = 'none';
+      document.getElementById('identity-raw').style.display = 'none';
+
+      fetch(base + '/api/user', { credentials: 'include' })
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          identityData = data;
+          if (data.isAuthenticated) {
+            setStatus('identity-status', true, 'Authenticated');
+          } else {
+            setStatus('identity-status', false, 'Not Authenticated');
+          }
+
+          document.getElementById('identity-auth').textContent = data.isAuthenticated ? 'Yes' : 'No';
+          document.getElementById('identity-user-id').textContent = data.user_id || '(not present)';
+          document.getElementById('identity-name').textContent = data.name || '(empty)';
+          document.getElementById('identity-login-id').textContent = data.login_id || '(not present)';
+          document.getElementById('identity-email').textContent = data.email || '(not present)';
+          document.getElementById('identity-fields').style.display = 'block';
+          document.getElementById('identity-raw').textContent = JSON.stringify(data, null, 2);
+          document.getElementById('identity-raw').style.display = 'block';
+          updateAssembled();
+        })
+        .catch(function(err) {
+          identityData = null;
+          setStatus('identity-status', false, 'Failed: ' + err.message);
+          updateAssembled();
+        });
+    }
+
+    // --- Game Config Test ---
+    function runGameConfigTest() {
+      var base = getBase();
+      var gameId = getGameId();
+      setStatus('gameconfig-status', false, 'Fetching...');
+      document.getElementById('gameconfig-fields').style.display = 'none';
+      document.getElementById('gameconfig-raw').style.display = 'none';
+
+      fetch(base + '/api/game-config?game=' + encodeURIComponent(gameId), { credentials: 'include' })
+        .then(function(r) {
+          if (!r.ok) throw new Error('HTTP ' + r.status);
+          return r.json();
+        })
+        .then(function(data) {
+          if (data.error) throw new Error(data.error);
+          servicesData = data.services || {};
+          setStatus('gameconfig-status', true, 'OK');
+
+          document.getElementById('gameconfig-game').textContent = data.game || gameId;
+          document.getElementById('gameconfig-log-url').textContent = (servicesData.log && servicesData.log.url) || '(not configured)';
+          document.getElementById('gameconfig-log-auth').textContent = maskAuth(servicesData.log && servicesData.log.auth);
+          document.getElementById('gameconfig-save-url').textContent = (servicesData.save && servicesData.save.url) || '(not configured)';
+          document.getElementById('gameconfig-save-auth').textContent = maskAuth(servicesData.save && servicesData.save.auth);
+          document.getElementById('gameconfig-fields').style.display = 'block';
+          document.getElementById('gameconfig-raw').textContent = JSON.stringify(data, null, 2);
+          document.getElementById('gameconfig-raw').style.display = 'block';
+
+          // Enable service test buttons
+          document.getElementById('test-log-btn').disabled = !(servicesData.log && servicesData.log.url);
+          document.getElementById('test-save-btn').disabled = !(servicesData.save && servicesData.save.url);
+          updateAssembled();
+        })
+        .catch(function(err) {
+          servicesData = null;
+          setStatus('gameconfig-status', false, 'Failed: ' + err.message);
+          document.getElementById('test-log-btn').disabled = true;
+          document.getElementById('test-save-btn').disabled = true;
+          updateAssembled();
+        });
+    }
+
+    function runAllTests() {
+      runIdentityTest();
+      runGameConfigTest();
+    }
+
+    // --- Assembled Config ---
+    function updateAssembled() {
+      var config = { identity: null, services: null, navigation: {} };
+
+      if (identityData && identityData.isAuthenticated) {
+        config.identity = {
+          user_id: identityData.user_id || identityData.login_id || identityData.email,
+          name: identityData.name || ''
+        };
+      }
+
+      if (servicesData) {
+        config.services = servicesData;
+      }
+
+      var display = JSON.parse(JSON.stringify(config));
+      // Mask auth values in display
+      if (display.services) {
+        if (display.services.log && display.services.log.auth)
+          display.services.log.auth = maskAuth(display.services.log.auth);
+        if (display.services.save && display.services.save.auth)
+          display.services.save.auth = maskAuth(display.services.save.auth);
+      }
+
+      document.getElementById('assembled-config').textContent =
+        'window.__mhsBridgeConfig = ' + JSON.stringify(display, null, 2) + ';';
+    }
+
+    // --- Service Connectivity Tests ---
+    function testLogService() {
+      if (!servicesData || !servicesData.log) return;
+      var resultDiv = document.getElementById('service-test-result');
+      resultDiv.innerHTML = '';
+
+      var userId = (identityData && identityData.user_id) || 'test-user';
+
+      fetch(servicesData.log.url + '/api/log/submit', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': servicesData.log.auth
+        },
+        body: JSON.stringify({
+          game: getGameId(),
+          user_id: userId,
+          eventType: 'bridge_config_test',
+          source: 'test-bridge-config.html',
+          timestamp: new Date().toISOString()
+        })
+      })
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(data) {
+        resultDiv.innerHTML = '<div class="test-result success">Log service OK: ' +
+          JSON.stringify(data) + '</div>';
+      })
+      .catch(function(err) {
+        resultDiv.innerHTML = '<div class="test-result error">Log service failed: ' +
+          err.message + '</div>';
+      });
+    }
+
+    function testSaveService() {
+      if (!servicesData || !servicesData.save) return;
+      var resultDiv = document.getElementById('service-test-result');
+      resultDiv.innerHTML = '';
+
+      var userId = (identityData && identityData.user_id) || 'test-user';
+
+      // Test with a load request (non-destructive)
+      fetch(servicesData.save.url + '/api/state/load', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': servicesData.save.auth
+        },
+        body: JSON.stringify({
+          user_id: userId,
+          game: getGameId(),
+          limit: 1
+        })
+      })
+      .then(function(r) {
+        if (!r.ok) throw new Error('HTTP ' + r.status);
+        return r.json();
+      })
+      .then(function(data) {
+        var count = Array.isArray(data) ? data.length : 0;
+        resultDiv.innerHTML = '<div class="test-result success">Save service OK: ' +
+          count + ' save(s) found</div>';
+      })
+      .catch(function(err) {
+        resultDiv.innerHTML = '<div class="test-result error">Save service failed: ' +
+          err.message + '</div>';
+      });
+    }
+  </script>
+</body>
+</html>

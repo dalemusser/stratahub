@@ -3,6 +3,7 @@ package mhsdashboard
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"sort"
 	"time"
@@ -488,14 +489,17 @@ type ProgressGradeItem struct {
 
 // reasonCodeToMessage maps reason codes to human-readable messages.
 var reasonCodeToMessage = map[string]string{
-	"NO_TRIGGER":            "Student has not yet completed the trigger event for this activity.",
-	"TOO_MANY_TARGETS":      "Student used more targets than allowed for efficient problem-solving.",
-	"TOO_MANY_TESTS":        "Student ran more tests than expected, may need guidance on efficiency.",
-	"TOO_MANY_NEGATIVES":    "Student received too many negative responses during the activity.",
-	"MISSING_SUCCESS_NODE":  "Student did not reach the expected success outcome.",
-	"SCORE_BELOW_THRESHOLD": "Student's score was below the expected threshold.",
+	"NO_TRIGGER":                "Student has not yet completed the trigger event for this activity.",
+	"TOO_MANY_TARGETS":         "Student used more targets than allowed for efficient problem-solving.",
+	"TOO_MANY_TESTS":           "Student ran more tests than expected, may need guidance on efficiency.",
+	"TOO_MANY_NEGATIVES":       "Student received too many negative responses during the activity.",
+	"MISSING_SUCCESS_NODE":     "Student did not reach the expected success outcome.",
+	"SCORE_BELOW_THRESHOLD":    "Student's score was below the expected threshold.",
 	"HINT_OR_TOO_MANY_GUESSES": "Student needed hints or made too many incorrect attempts.",
-	"PUZZLE_TOO_SLOW":       "Student took longer than expected to complete the puzzle.",
+	"PUZZLE_TOO_SLOW":          "Student took longer than expected to complete the puzzle.",
+	"WRONG_ARG_SELECTED":       "Student needed multiple attempts to construct a correct scientific argument.",
+	"BAD_FEEDBACK":             "Student received repeated corrective feedback during the activity.",
+	"HIT_YELLOW_NODE":          "Student made an incorrect selection when evaluating evidence.",
 }
 
 // loadProgressGrades fetches progress grades from the mhsgrader database for the given player IDs.
@@ -569,14 +573,17 @@ func (h *Handler) loadDeviceMap(ctx context.Context, r *http.Request, members []
 			unitStatus = make(map[string]string)
 		}
 		deviceMap[uid] = append(deviceMap[uid], DeviceInfo{
-			DeviceType:   s.DeviceType,
-			PWAInstalled: s.PWAInstalled,
-			UnitStatus:   unitStatus,
-			StorageUsage: s.StorageUsage,
-			StorageQuota: s.StorageQuota,
-			StoragePct:   pct,
-			LastSeen:     s.LastSeen,
-			IsStale:      now.Sub(s.LastSeen) > staleDeviceThreshold,
+			DeviceType:    s.DeviceType,
+			DeviceDetails: s.DeviceDetails,
+			PWAInstalled:  s.PWAInstalled,
+			UnitStatus:    unitStatus,
+			StorageUsage:  s.StorageUsage,
+			StorageQuota:  s.StorageQuota,
+			StoragePct:    pct,
+			StorageUsed:   formatBytes(s.StorageUsage),
+			StorageTotal:  formatBytes(s.StorageQuota),
+			LastSeen:      s.LastSeen,
+			IsStale:       now.Sub(s.LastSeen) > staleDeviceThreshold,
 		})
 	}
 
@@ -851,4 +858,20 @@ func (h *Handler) formatTimeInOrgTimezone(ctx context.Context, orgID primitive.O
 	localTime := now.In(loc)
 	tzAbbr := localTime.Format("MST") // Gets the timezone abbreviation
 	return localTime.Format("Jan 2, 2006 3:04 PM"), tzAbbr
+}
+
+// formatBytes converts bytes to a human-readable string (MB or GB).
+func formatBytes(b int64) string {
+	const (
+		mb = 1024 * 1024
+		gb = 1024 * 1024 * 1024
+	)
+	switch {
+	case b >= gb:
+		return fmt.Sprintf("%.1f GB", float64(b)/float64(gb))
+	case b >= mb:
+		return fmt.Sprintf("%.0f MB", float64(b)/float64(mb))
+	default:
+		return fmt.Sprintf("%d B", b)
+	}
 }
