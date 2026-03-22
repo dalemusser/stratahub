@@ -139,8 +139,32 @@
     left: 0;
     right: 0;
     height: 4px;
-    background: #000000;
+    background: #dc2626;
     z-index: 0;
+  }
+
+  /* MHS progress "current unit" bar (top, green) */
+  .mhs-in-mhs-unit-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: #22c55e;
+    z-index: 0;
+  }
+
+  /* Fixed tooltip for bar indicators (created by JS) */
+  .mhs-bar-tip {
+    position: fixed;
+    padding: 2px 6px;
+    font-size: 10px;
+    white-space: nowrap;
+    background: #1e293b;
+    color: #f8fafc;
+    border-radius: 4px;
+    z-index: 9999;
+    pointer-events: none;
   }
 
   /* Legend samples use theme colors */
@@ -371,9 +395,12 @@
     background: #1e293b;
   }
 
-  /* Dark mode: in-unit bar */
+  /* Dark mode: in-unit bar — same red in both modes */
   .dark #mhs-dashboard .mhs-in-unit-bar {
-    background: #ffffff;
+    background: #dc2626;
+  }
+  .dark #mhs-dashboard .mhs-in-mhs-unit-bar {
+    background: #4ade80;
   }
 
   /* Dark mode: scrollbar */
@@ -658,8 +685,12 @@
         <span class="text-slate-600">Not Started</span>
       </div>
       <div class="flex items-center gap-1.5">
+        <span class="w-8 h-1 flex-shrink-0 rounded-full mhs-in-mhs-unit-bar" style="position:static;"></span>
+        <span class="text-slate-600">MHS Unit</span>
+      </div>
+      <div class="flex items-center gap-1.5">
         <span class="w-8 h-1 flex-shrink-0 rounded-full mhs-in-unit-bar" style="position:static;"></span>
-        <span class="text-slate-600">In Unit</span>
+        <span class="text-slate-600">Playing Unit</span>
       </div>
     </div>
     <!-- Right: Refresh controls -->
@@ -886,6 +917,12 @@
   function doRefresh() {
     // Skip auto-refresh while the device details modal is open
     if (deviceModalOpen) {
+      countdown = 30;
+      updateCountdown();
+      return;
+    }
+    // Skip auto-refresh while a set-progress menu is open
+    if (document.querySelector('.set-progress-menu:not(.hidden)')) {
       countdown = 30;
       updateCountdown();
       return;
@@ -1378,6 +1415,68 @@
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape' && deviceModalOpen) {
       closeDeviceModal();
+    }
+  });
+
+  // --- Set Progress Menu ---
+  window.toggleSetProgress = function(e, btn) {
+    e.stopPropagation();
+    var menu = btn.parentElement.querySelector('.set-progress-menu');
+    var wasHidden = menu.classList.contains('hidden');
+    closeSetProgressMenus();
+    if (wasHidden) {
+      // Use fixed positioning so the menu escapes the overflow-hidden container
+      var rect = btn.getBoundingClientRect();
+      menu.style.position = 'fixed';
+      menu.style.left = rect.left + 'px';
+      menu.style.top = (rect.bottom + 4) + 'px';
+      menu.classList.remove('hidden');
+    }
+  };
+
+  window.closeSetProgressMenus = function() {
+    document.querySelectorAll('.set-progress-menu').forEach(function(m) {
+      m.classList.add('hidden');
+    });
+  };
+
+  // Close set-progress menus on outside click
+  document.addEventListener('click', function(e) {
+    if (!e.target.closest('.set-progress-menu') && !e.target.closest('[onclick*="toggleSetProgress"]')) {
+      closeSetProgressMenus();
+    }
+  });
+
+  // Listen for refreshGrid trigger from set-progress POST
+  document.body.addEventListener('refreshGrid', function() {
+    closeSetProgressMenus();
+    doRefresh();
+  });
+
+  // --- Bar tooltip (fixed position, escapes overflow) ---
+  var barTip = document.createElement('div');
+  barTip.className = 'mhs-bar-tip';
+  barTip.style.display = 'none';
+  document.body.appendChild(barTip);
+
+  document.getElementById('mhs-dashboard').addEventListener('mouseover', function(e) {
+    var bar = e.target.closest('.mhs-bar-tooltip');
+    if (bar && bar.dataset.tip) {
+      var rect = bar.getBoundingClientRect();
+      barTip.textContent = bar.dataset.tip;
+      barTip.style.display = '';
+      barTip.style.left = (rect.left + rect.width / 2 - barTip.offsetWidth / 2) + 'px';
+      if (bar.classList.contains('mhs-in-mhs-unit-bar')) {
+        barTip.style.top = (rect.bottom + 4) + 'px';
+      } else {
+        barTip.style.top = (rect.top - barTip.offsetHeight - 4) + 'px';
+      }
+    }
+  });
+
+  document.getElementById('mhs-dashboard').addEventListener('mouseout', function(e) {
+    if (e.target.closest('.mhs-bar-tooltip')) {
+      barTip.style.display = 'none';
     }
   });
 

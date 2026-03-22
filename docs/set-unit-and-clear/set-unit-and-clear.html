@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Set Unit &amp; Clear Downloads</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1a1a2e;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --code-bg: #f1f5f9;
+    --heading: #0f172a;
+    --table-stripe: #f8fafc;
+    --green: #16a34a;
+    --green-bg: #f0fdf4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.7;
+    max-width: 860px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem 4rem;
+  }
+  h1 {
+    font-size: 1.75rem;
+    color: var(--heading);
+    border-bottom: 3px solid var(--accent);
+    padding-bottom: 0.5rem;
+    margin-bottom: 1.5rem;
+  }
+  h2 {
+    font-size: 1.35rem;
+    color: var(--heading);
+    margin-top: 2.5rem;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.3rem;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 1.05rem;
+    color: var(--heading);
+    margin-top: 1.5rem;
+    margin-bottom: 0.5rem;
+  }
+  p { margin-bottom: 0.75rem; }
+  ul, ol {
+    margin-bottom: 0.75rem;
+    padding-left: 1.5rem;
+  }
+  li { margin-bottom: 0.3rem; }
+  code {
+    font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+    font-size: 0.875em;
+    background: var(--code-bg);
+    padding: 0.15em 0.4em;
+    border-radius: 4px;
+  }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.5rem 0.75rem;
+    border: 1px solid var(--border);
+  }
+  th {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.85rem;
+  }
+  tr:nth-child(even) td { background: var(--table-stripe); }
+  .overview {
+    background: var(--accent-light);
+    border-left: 4px solid var(--accent);
+    padding: 1rem 1.25rem;
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 1.5rem;
+  }
+  .note {
+    background: var(--green-bg);
+    border-left: 4px solid var(--green);
+    padding: 0.75rem 1rem;
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+  .file-list {
+    list-style: none;
+    padding-left: 0;
+  }
+  .file-list li {
+    padding: 0.35rem 0;
+    border-bottom: 1px solid var(--border);
+    font-size: 0.9rem;
+  }
+  .file-list li:last-child { border-bottom: none; }
+  .file-list code { font-size: 0.8rem; }
+  .indicator {
+    display: inline-block;
+    width: 2.5rem;
+    height: 6px;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-right: 0.4rem;
+  }
+  .indicator-green { background: #22c55e; }
+  .indicator-dark { background: #dc2626; }
+  .flow-steps {
+    counter-reset: flow;
+    list-style: none;
+    padding-left: 0;
+  }
+  .flow-steps li {
+    counter-increment: flow;
+    padding: 0.4rem 0 0.4rem 2.5rem;
+    position: relative;
+    border-left: 2px solid var(--border);
+    margin-left: 0.75rem;
+  }
+  .flow-steps li::before {
+    content: counter(flow);
+    position: absolute;
+    left: -0.85rem;
+    top: 0.35rem;
+    width: 1.5rem;
+    height: 1.5rem;
+    background: var(--accent);
+    color: #fff;
+    border-radius: 50%;
+    font-size: 0.75rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .flow-steps li:last-child { border-left-color: transparent; }
+  .section-group { margin-left: 0.5rem; }
+</style>
+</head>
+<body>
+
+<h1>Set Unit &amp; Clear Downloads</h1>
+
+<div class="overview">
+  <p>This document describes the <strong>"Set to Unit"</strong> and <strong>"Clear All Downloads"</strong> features available in two places: the <strong>MHS Dashboard</strong> (for leaders/admins) and the <strong>Mission HydroSci units page</strong> (for any user with MHS access).</p>
+</div>
+
+<h2>Overview</h2>
+<p><strong>"Set to Unit"</strong> allows changing a student's current unit in Mission HydroSci. Setting to unit X means:</p>
+<ul>
+  <li><code>current_unit</code> becomes the selected unit</li>
+  <li><code>completed_units</code> becomes all units before it</li>
+  <li>Setting to Unit 1 is equivalent to a full progress reset (empty <code>completed_units</code>)</li>
+</ul>
+<p><strong>"Clear All Downloads"</strong> removes all cached unit files from the device without affecting progress.</p>
+<div class="note">These two actions were previously combined as "Reset All Progress" which both reset progress and cleared downloads. They are now separate concerns.</div>
+
+<h2>Data Model</h2>
+<p>Progress is tracked in two independent systems:</p>
+<table>
+  <thead>
+    <tr>
+      <th>System</th>
+      <th>Collection</th>
+      <th>Field</th>
+      <th>Meaning</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Mission HydroSci</strong> (stratahub)</td>
+      <td><code>mhs_user_progress</code></td>
+      <td><code>current_unit</code></td>
+      <td>The unit the student is authorized to play &mdash; set by Mission HydroSci and the Set to Unit feature</td>
+    </tr>
+    <tr>
+      <td><strong>MHS Grader</strong> (mhsgrader)</td>
+      <td><code>progress_point_grades</code></td>
+      <td><code>currentUnit</code></td>
+      <td>The unit the student last started playing in the game &mdash; set automatically when the grader sees a unit start event</td>
+    </tr>
+  </tbody>
+</table>
+<p>These values can diverge. For example, if a leader sets a student to Unit 4 via the dashboard, the grader's <code>currentUnit</code> will still reflect whatever unit the student last played until they launch Unit 4 in the game.</p>
+
+<!-- MHS Dashboard — Set Progress -->
+<h2>MHS Dashboard &mdash; Set Progress</h2>
+
+<div class="section-group">
+  <h3>Location</h3>
+  <p>Progress tab &rarr; hover over a member row &rarr; click the settings icon next to the member name.</p>
+
+  <h3>UI</h3>
+  <p>A dropdown menu appears (positioned with <code>position: fixed</code> to escape the overflow-hidden scroll container) showing "Set to Unit" with buttons for each unit (Unit 1 through Unit 5).</p>
+
+  <h3>Authorization</h3>
+  <p>Only leaders, admins, coordinators, and superadmins can access the dashboard. The set-progress handler enforces:</p>
+  <ul>
+    <li>Role must be leader, admin, coordinator, or superadmin</li>
+    <li>Requester must have access to the selected group</li>
+    <li>Target user must be a member of the selected group</li>
+  </ul>
+
+  <h3>Confirmation</h3>
+  <p>Clicking a unit shows a browser <code>confirm()</code> dialog: <em>"Set to Unit X for [Member Name]? All prior units will be marked completed."</em></p>
+
+  <h3>Flow</h3>
+  <ol class="flow-steps">
+    <li>User clicks unit button in dropdown</li>
+    <li><code>hx-confirm</code> shows confirmation dialog</li>
+    <li>On confirm, HTMX POSTs to <code>/mhsdashboard/set-progress</code> with <code>user_id</code>, <code>unit</code>, and <code>group</code></li>
+    <li>Server calls <code>ProgressStore.SetToUnit()</code> to update <code>mhs_user_progress</code></li>
+    <li>Server responds with <code>HX-Trigger: refreshGrid</code></li>
+    <li>Client receives trigger, closes any open menus, and refreshes the grid via HTMX</li>
+  </ol>
+
+  <h3>Auto-refresh behavior</h3>
+  <p>The dashboard grid auto-refreshes every 30 seconds. If a set-progress menu is open when the timer fires, the refresh is deferred (countdown resets to 30s) to prevent the menu from being destroyed mid-interaction. Server-triggered refreshes (after a set-progress action) close the menu first and then refresh immediately.</p>
+
+  <h3>Files</h3>
+  <ul class="file-list">
+    <li><strong>Handler:</strong> <code>internal/app/features/mhsdashboard/dashboard.go</code> &mdash; <code>HandleSetProgress</code></li>
+    <li><strong>Grid template:</strong> <code>internal/app/features/mhsdashboard/templates/mhsdashboard_grid.gohtml</code> &mdash; set-progress menu markup</li>
+    <li><strong>View template:</strong> <code>internal/app/features/mhsdashboard/templates/mhsdashboard_view.gohtml</code> &mdash; <code>toggleSetProgress</code> / <code>closeSetProgressMenus</code> JS, refresh-skip logic</li>
+  </ul>
+</div>
+
+<!-- MHS Dashboard — Current Unit Indicators -->
+<h2>MHS Dashboard &mdash; Current Unit Indicators</h2>
+
+<div class="section-group">
+  <p>The dashboard progress grid shows two bar indicators on each student's row:</p>
+
+  <h3><span class="indicator indicator-green"></span> Green bar (top of cell)</h3>
+  <ul>
+    <li><strong>Source:</strong> <code>mhs_user_progress.current_unit</code> (Mission HydroSci progress store)</li>
+    <li><strong>Meaning:</strong> The unit the student is currently assigned to in Mission HydroSci</li>
+    <li><strong>CSS class:</strong> <code>mhs-in-mhs-unit-bar</code></li>
+    <li><strong>Legend label:</strong> "MHS Unit"</li>
+  </ul>
+
+  <h3><span class="indicator indicator-dark"></span> Red bar (bottom of cell)</h3>
+  <ul>
+    <li><strong>Source:</strong> <code>progress_point_grades.currentUnit</code> (MHS Grader)</li>
+    <li><strong>Meaning:</strong> The unit the student last started playing in the game</li>
+    <li><strong>CSS class:</strong> <code>mhs-in-unit-bar</code></li>
+    <li><strong>Legend label:</strong> "Playing Unit"</li>
+  </ul>
+
+  <p>Both bars have hover tooltips (implemented via JS with <code>position: fixed</code> to avoid z-index clipping issues in the scrollable grid). The green bar tooltip reads "Current unit in Mission HydroSci" and the red bar tooltip reads "Unit last played in game".</p>
+
+  <h3>Data loading</h3>
+  <p><code>buildProgressRows</code> loads both data sources:</p>
+  <ul>
+    <li>Grader data via <code>loadProgressGrades()</code> from the mhsgrader database</li>
+    <li>MHS progress via <code>ProgressStore.ListByUserIDs()</code> from the stratahub database</li>
+  </ul>
+  <p>Each cell in the grid has both <code>IsInCurrentUnit</code> (grader) and <code>IsInMHSUnit</code> (progress store) boolean flags.</p>
+
+  <h3>Files</h3>
+  <ul class="file-list">
+    <li><strong>Data loading:</strong> <code>internal/app/features/mhsdashboard/dashboard.go</code> &mdash; <code>buildProgressRows</code></li>
+    <li><strong>Cell type:</strong> <code>internal/app/features/mhsdashboard/types.go</code> &mdash; <code>CellData.IsInMHSUnit</code></li>
+    <li><strong>Store method:</strong> <code>internal/app/store/mhsuserprogress/store.go</code> &mdash; <code>ListByUserIDs</code></li>
+    <li><strong>Bar CSS:</strong> <code>internal/app/features/mhsdashboard/templates/mhsdashboard_view.gohtml</code></li>
+    <li><strong>Bar HTML:</strong> <code>internal/app/features/mhsdashboard/templates/mhsdashboard_grid.gohtml</code></li>
+  </ul>
+</div>
+
+<!-- Mission HydroSci — Set to Unit -->
+<h2>Mission HydroSci &mdash; Set to Unit</h2>
+
+<div class="section-group">
+  <h3>Location</h3>
+  <p>Units page &rarr; expand "Manage downloads" &rarr; bordered box at the bottom with "Set to [select] Go".</p>
+
+  <h3>UI</h3>
+  <p>A <code>&lt;select&gt;</code> dropdown populated from the unit data (showing full titles like "Unit 2: Water Quality"), a "Set to" label, and a "Go" button. The select and button are centered in a bordered container.</p>
+
+  <h3>Authorization</h3>
+  <p>Any authenticated user with MHS access can set their own progress. The server does not restrict by role &mdash; the keyword gate provides the authorization check for members.</p>
+  <ul>
+    <li><strong>Members:</strong> Must enter the keyword <code>hydroreset</code> in a modal dialog before the action proceeds</li>
+    <li><strong>Leaders, admins, coordinators, superadmins:</strong> Shown a browser <code>confirm()</code> dialog</li>
+  </ul>
+
+  <h3>Flow</h3>
+  <ol class="flow-steps">
+    <li>User selects a unit and clicks "Go"</li>
+    <li><code>mhsSetToUnit()</code> checks <code>isMember</code>
+      <ul>
+        <li>If member: shows keyword modal (shared modal used by both Set to Unit and Clear All Downloads)</li>
+        <li>If non-member: shows <code>confirm()</code> dialog</li>
+      </ul>
+    </li>
+    <li>On confirmation, <code>doSetToUnit(unit)</code> POSTs JSON <code>{"unit": "unit3"}</code> to <code>/missionhydrosci/api/progress/set-unit</code></li>
+    <li>Server validates unit (must be unit1-unit5), calls <code>ProgressStore.SetToUnit()</code></li>
+    <li>Returns <code>{"ok": true, "unit": "unit3"}</code></li>
+    <li>Client reloads the page</li>
+  </ol>
+
+  <h3>Files</h3>
+  <ul class="file-list">
+    <li><strong>Handler:</strong> <code>internal/app/features/missionhydrosci/progress.go</code> &mdash; <code>HandleSetToUnit</code></li>
+    <li><strong>Route:</strong> <code>internal/app/features/missionhydrosci/routes.go</code> &mdash; <code>POST /api/progress/set-unit</code></li>
+    <li><strong>Template:</strong> <code>internal/app/features/missionhydrosci/templates/missionhydrosci_units.gohtml</code> &mdash; select/button UI, keyword modal, JS functions</li>
+  </ul>
+</div>
+
+<!-- Mission HydroSci — Clear All Downloads -->
+<h2>Mission HydroSci &mdash; Clear All Downloads</h2>
+
+<div class="section-group">
+  <h3>Location</h3>
+  <p>Units page &rarr; expand "Manage downloads" &rarr; bordered box at the bottom, below the Set to Unit controls.</p>
+
+  <h3>UI</h3>
+  <p>A full-width solid red button labeled "Clear All Downloads".</p>
+
+  <h3>Authorization</h3>
+  <p>Same keyword/confirmation pattern as Set to Unit:</p>
+  <ul>
+    <li><strong>Members:</strong> Must enter <code>hydroreset</code> keyword</li>
+    <li><strong>Non-members:</strong> Browser <code>confirm()</code> dialog</li>
+  </ul>
+
+  <h3>Flow</h3>
+  <ol class="flow-steps">
+    <li>User clicks "Clear All Downloads"</li>
+    <li><code>mhsClearAllDownloads()</code> checks <code>isMember</code> and requests confirmation</li>
+    <li>On confirmation, <code>doClearAllDownloads()</code>:
+      <ul>
+        <li>Calls <code>manager.deleteAllUnits()</code> to remove all cached unit files from the service worker cache</li>
+        <li>Removes <code>mhs-manual-downloads</code> from localStorage</li>
+        <li>Reloads the page</li>
+      </ul>
+    </li>
+  </ol>
+
+  <div class="note">This action does <strong>not</strong> affect progress &mdash; the student's current unit and completed units remain unchanged. Individual unit downloads can also be cleared using the per-unit "Clear" buttons on each unit card.</div>
+
+  <h3>Files</h3>
+  <ul class="file-list">
+    <li><strong>Template:</strong> <code>internal/app/features/missionhydrosci/templates/missionhydrosci_units.gohtml</code> &mdash; button markup, JS functions</li>
+  </ul>
+</div>
+
+<!-- Shared Keyword Modal -->
+<h2>Shared Keyword Modal</h2>
+
+<p>Both Set to Unit and Clear All Downloads on the Mission HydroSci units page share a single keyword confirmation modal (<code>#keyword-modal</code>). The modal is configured dynamically via <code>showKeywordModal(title, desc, callback)</code>:</p>
+<ul>
+  <li><code>title</code> &mdash; displayed as the modal heading</li>
+  <li><code>desc</code> &mdash; displayed as the description text</li>
+  <li><code>callback</code> &mdash; function called on successful keyword entry</li>
+</ul>
+<p>The keyword is <code>hydroreset</code> (case-insensitive). On incorrect entry, an "Incorrect keyword" error is shown. The modal can be dismissed with the Cancel button or the Escape key.</p>
+
+<!-- Store Methods -->
+<h2>Store Methods</h2>
+
+<div class="section-group">
+  <h3><code>SetToUnit(ctx, workspaceID, userID, targetUnit)</code></h3>
+  <p>Located in <code>internal/app/store/mhsuserprogress/store.go</code>. Updates <code>mhs_user_progress</code>:</p>
+  <ul>
+    <li>Validates unit format (unit1-unit5)</li>
+    <li>Sets <code>current_unit</code> to the target</li>
+    <li>Sets <code>completed_units</code> to all units before the target (e.g., unit3 gets <code>["unit1", "unit2"]</code>)</li>
+    <li>Updates <code>updated_at</code> timestamp</li>
+  </ul>
+  <p>Used by both the dashboard handler and the Mission HydroSci handler.</p>
+
+  <h3><code>ListByUserIDs(ctx, workspaceID, userIDs)</code></h3>
+  <p>Located in <code>internal/app/store/mhsuserprogress/store.go</code>. Batch query for the dashboard:</p>
+  <ul>
+    <li>Fetches all <code>mhs_user_progress</code> documents matching the workspace and user IDs</li>
+    <li>Returns a map keyed by user ID hex string</li>
+    <li>Used by <code>buildProgressRows</code> to populate the green "MHS Unit" bar</li>
+  </ul>
+</div>
+
+</body>
+</html>

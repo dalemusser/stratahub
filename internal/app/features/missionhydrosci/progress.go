@@ -97,6 +97,47 @@ func (h *Handler) HandleResetProgress(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(`{"ok":true}`))
 }
 
+// setToUnitRequest is the JSON body for POST /api/progress/set-unit.
+type setToUnitRequest struct {
+	Unit string `json:"unit"`
+}
+
+// HandleSetToUnit sets the user's progress to a specific unit.
+func (h *Handler) HandleSetToUnit(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.CurrentUser(r)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+
+	var req setToUnitRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	validUnits := map[string]bool{"unit1": true, "unit2": true, "unit3": true, "unit4": true, "unit5": true}
+	if !validUnits[req.Unit] {
+		http.Error(w, "invalid unit", http.StatusBadRequest)
+		return
+	}
+
+	wsID := workspace.IDFromRequest(r)
+	userID, err := primitive.ObjectIDFromHex(user.ID)
+	if err != nil {
+		http.Error(w, "invalid user", http.StatusBadRequest)
+		return
+	}
+
+	if err := h.ProgressStore.SetToUnit(r.Context(), wsID, userID, req.Unit); err != nil {
+		h.Log.Error("failed to set progress to unit", zap.Error(err))
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"ok": true, "unit": req.Unit})
+}
+
 // HandleCompleteUnit marks a unit as completed and advances to the next one.
 func (h *Handler) HandleCompleteUnit(w http.ResponseWriter, r *http.Request) {
 	user, ok := auth.CurrentUser(r)

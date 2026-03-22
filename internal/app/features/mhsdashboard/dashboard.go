@@ -165,7 +165,7 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 	deviceMap := h.loadDeviceMap(ctx, r, members)
 
 	// Build progress rows with real grade data
-	memberRows := h.buildProgressRows(ctx, members, cfg, deviceMap)
+	memberRows := h.buildProgressRows(ctx, r, members, cfg, deviceMap)
 
 	base := viewdata.LoadBase(r, h.DB)
 	data := DashboardData{
@@ -280,7 +280,7 @@ func (h *Handler) ServeGrid(w http.ResponseWriter, r *http.Request) {
 	// Load device status for all members
 	deviceMap := h.loadDeviceMap(ctx, r, members)
 
-	memberRows := h.buildProgressRows(ctx, members, cfg, deviceMap)
+	memberRows := h.buildProgressRows(ctx, r, members, cfg, deviceMap)
 
 	data := GridData{
 		SelectedGroup: selectedGroup,
@@ -296,6 +296,103 @@ func (h *Handler) ServeGrid(w http.ResponseWriter, r *http.Request) {
 	}
 
 	templates.Render(w, r, "mhsdashboard_grid", data)
+}
+
+// HandleSetProgress sets a student's progress to a specific unit.
+func (h *Handler) HandleSetProgress(w http.ResponseWriter, r *http.Request) {
+	role, _, userID, ok := authz.UserCtx(r)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	if role != "leader" && role != "admin" && role != "coordinator" && role != "superadmin" {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	targetUserHex := r.FormValue("user_id")
+	targetUnit := r.FormValue("unit")
+	group := r.FormValue("group")
+
+	if targetUserHex == "" || targetUnit == "" || group == "" {
+		http.Error(w, "missing required fields", http.StatusBadRequest)
+		return
+	}
+
+	targetUserID, err := primitive.ObjectIDFromHex(targetUserHex)
+	if err != nil {
+		http.Error(w, "invalid user_id", http.StatusBadRequest)
+		return
+	}
+
+	groupOID, err := primitive.ObjectIDFromHex(group)
+	if err != nil {
+		http.Error(w, "invalid group", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
+	defer cancel()
+
+	// Verify the requester has access to this group
+	groups, err := h.getGroupsForUser(ctx, r, userID, role)
+	if err != nil {
+		h.Log.Error("failed to verify group access", zap.Error(err))
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+
+	hasAccess := false
+	for _, g := range groups {
+		if g.ID == groupOID {
+			hasAccess = true
+			break
+		}
+	}
+	if !hasAccess {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	// Verify the target user is a member of the group
+	wsID := workspace.IDFromRequest(r)
+	membershipFilter := bson.M{
+		"group_id": groupOID,
+		"user_id":  targetUserID,
+		"role":     "member",
+	}
+	if wsID != primitive.NilObjectID {
+		membershipFilter["workspace_id"] = wsID
+	}
+
+	count, err := h.DB.Collection("group_memberships").CountDocuments(ctx, membershipFilter)
+	if err != nil {
+		h.Log.Error("failed to verify membership", zap.Error(err))
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	if count == 0 {
+		http.Error(w, "user is not a member of this group", http.StatusBadRequest)
+		return
+	}
+
+	// Set progress
+	if err := h.ProgressStore.SetToUnit(ctx, wsID, targetUserID, targetUnit); err != nil {
+		h.Log.Error("failed to set progress", zap.Error(err), zap.String("targetUnit", targetUnit))
+		http.Error(w, "failed to set progress", http.StatusInternalServerError)
+		return
+	}
+
+	h.Log.Info("progress set",
+		zap.String("targetUser", targetUserHex),
+		zap.String("targetUnit", targetUnit),
+		zap.String("group", group),
+		zap.String("setBy", userID.Hex()),
+	)
+
+	// Trigger grid refresh via HTMX
+	w.Header().Set("HX-Trigger", "refreshGrid")
+	w.WriteHeader(http.StatusOK)
 }
 
 // getGroupsForUser returns the groups accessible to the given user based on their role.
@@ -591,7 +688,7 @@ func (h *Handler) loadDeviceMap(ctx context.Context, r *http.Request, members []
 }
 
 // buildProgressRows builds the progress rows for the given members using real grade data.
-func (h *Handler) buildProgressRows(ctx context.Context, members []models.User, cfg *ProgressConfig, deviceMap map[string][]DeviceInfo) []MemberRow {
+func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, members []models.User, cfg *ProgressConfig, deviceMap map[string][]DeviceInfo) []MemberRow {
 	totalPoints := cfg.TotalProgressPoints()
 	result := make([]MemberRow, len(members))
 
@@ -612,6 +709,18 @@ func (h *Handler) buildProgressRows(ctx context.Context, members []models.User, 
 		grades = make(map[string]*ProgressGradeDoc)
 	}
 
+	// Load MHS user progress (current unit from Mission HydroSci)
+	wsID := workspace.IDFromRequest(r)
+	userIDs := make([]primitive.ObjectID, len(members))
+	for idx, m := range members {
+		userIDs[idx] = m.ID
+	}
+	mhsProgress, err := h.ProgressStore.ListByUserIDs(ctx, wsID, userIDs)
+	if err != nil {
+		h.Log.Error("failed to load MHS user progress", zap.Error(err))
+		mhsProgress = make(map[string]models.MHSUserProgress)
+	}
+
 	for i, member := range members {
 		cells := make([]CellData, totalPoints)
 		var gradeDoc *ProgressGradeDoc
@@ -623,6 +732,12 @@ func (h *Handler) buildProgressRows(ctx context.Context, members []models.User, 
 		var currentUnit string
 		if gradeDoc != nil {
 			currentUnit = gradeDoc.CurrentUnit
+		}
+
+		// Read current unit from MHS progress store
+		var mhsCurrentUnit string
+		if p, ok := mhsProgress[member.ID.Hex()]; ok {
+			mhsCurrentUnit = p.CurrentUnit
 		}
 
 		pointIdx := 0
@@ -670,6 +785,7 @@ func (h *Handler) buildProgressRows(ctx context.Context, members []models.User, 
 					Value:           value,
 					IsUnitStart:     j == 0,
 					IsInCurrentUnit: currentUnit != "" && currentUnit == unit.ID,
+					IsInMHSUnit:     mhsCurrentUnit != "" && mhsCurrentUnit == unit.ID,
 					CellClass:       cellClass,
 					BorderClass:     borderClass,
 					PointID:         point.ID,

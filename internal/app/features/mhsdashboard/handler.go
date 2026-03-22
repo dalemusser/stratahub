@@ -4,6 +4,7 @@ package mhsdashboard
 import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/store/mhsdevicestatus"
+	"github.com/dalemusser/stratahub/internal/app/store/mhsuserprogress"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )
@@ -15,6 +16,7 @@ type Handler struct {
 	Log               *zap.Logger
 	ErrLog            *uierrors.ErrorLogger
 	DeviceStatusStore *mhsdevicestatus.Store
+	ProgressStore     *mhsuserprogress.Store
 }
 
 // NewHandler constructs a new Handler.
@@ -25,5 +27,6 @@ func NewHandler(db, gradesDB *mongo.Database, errLog *uierrors.ErrorLogger, logg
 		Log:               logger,
 		ErrLog:            errLog,
 		DeviceStatusStore: mhsdevicestatus.New(db),
+		ProgressStore:     mhsuserprogress.New(db),
 	}
 }

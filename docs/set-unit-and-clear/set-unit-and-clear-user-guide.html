@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Set Unit &amp; Clear Downloads — User Guide</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1e293b;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --green: #16a34a;
+    --green-light: #f0fdf4;
+    --red: #dc2626;
+    --red-light: #fef2f2;
+    --amber: #d97706;
+    --amber-light: #fffbeb;
+    --heading: #0f172a;
+    --card-bg: #f8fafc;
+    --step-bg: #dbeafe;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.7;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 4rem;
+  }
+  h1 {
+    font-size: 1.75rem;
+    color: var(--heading);
+    margin-bottom: 0.5rem;
+  }
+  .subtitle {
+    font-size: 1rem;
+    color: var(--muted);
+    margin-bottom: 2rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    color: var(--heading);
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 2px solid var(--accent);
+  }
+  h3 {
+    font-size: 1.05rem;
+    color: var(--heading);
+    margin-top: 1.75rem;
+    margin-bottom: 0.6rem;
+  }
+  p { margin-bottom: 0.85rem; }
+  strong { color: var(--heading); }
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
+  }
+
+  /* Feature cards */
+  .feature-cards {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1rem;
+    margin-bottom: 1.5rem;
+  }
+  @media (max-width: 560px) {
+    .feature-cards { grid-template-columns: 1fr; }
+  }
+  .feature-card {
+    border-radius: 8px;
+    padding: 1.25rem;
+    border: 1px solid var(--border);
+  }
+  .feature-card h4 {
+    font-size: 0.95rem;
+    margin-bottom: 0.5rem;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .feature-card p {
+    font-size: 0.9rem;
+    color: var(--muted);
+    margin-bottom: 0;
+  }
+  .card-blue { background: var(--accent-light); border-color: #bfdbfe; }
+  .card-blue h4 { color: var(--accent); }
+  .card-red { background: var(--red-light); border-color: #fecaca; }
+  .card-red h4 { color: var(--red); }
+
+  /* Steps */
+  .steps {
+    counter-reset: step;
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 1rem;
+  }
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding: 0.5rem 0 0.5rem 3rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.95rem;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 0.45rem;
+    width: 1.75rem;
+    height: 1.75rem;
+    background: var(--step-bg);
+    color: var(--accent);
+    border-radius: 50%;
+    font-size: 0.8rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Indicator demo */
+  .indicator-row {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.65rem 1rem;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    margin-bottom: 0.5rem;
+    font-size: 0.9rem;
+  }
+  .indicator-bar {
+    width: 3rem;
+    height: 5px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+  .bar-green { background: #22c55e; }
+  .bar-dark { background: #dc2626; }
+
+  /* Callouts */
+  .callout {
+    border-radius: 6px;
+    padding: 0.85rem 1.1rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    border-left: 4px solid;
+  }
+  .callout-info {
+    background: var(--accent-light);
+    border-color: var(--accent);
+  }
+  .callout-warn {
+    background: var(--amber-light);
+    border-color: var(--amber);
+  }
+  .callout-green {
+    background: var(--green-light);
+    border-color: var(--green);
+  }
+  .callout strong { display: block; margin-bottom: 0.2rem; }
+
+  /* Role badges */
+  .role-badge {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.15em 0.55em;
+    border-radius: 4px;
+    vertical-align: middle;
+  }
+  .badge-leader { background: #dbeafe; color: #1e40af; }
+  .badge-member { background: #e0e7ff; color: #3730a3; }
+
+  /* FAQ */
+  .faq-item {
+    margin-bottom: 1.25rem;
+  }
+  .faq-q {
+    font-weight: 600;
+    color: var(--heading);
+    margin-bottom: 0.3rem;
+    font-size: 0.95rem;
+  }
+  .faq-a {
+    color: var(--muted);
+    font-size: 0.9rem;
+    padding-left: 0;
+  }
+
+  /* Section divider */
+  .section-label {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 0.2em 0.6em;
+    margin-bottom: 0.75rem;
+  }
+</style>
+</head>
+<body>
+
+<h1>Set Unit &amp; Clear Downloads</h1>
+<p class="subtitle">User guide for leaders, admins, and members</p>
+
+<!-- What do these features do? -->
+<div class="feature-cards">
+  <div class="feature-card card-blue">
+    <h4>Set to Unit</h4>
+    <p>Changes a student's current unit. All units before the selected unit are marked as completed. Setting to Unit 1 resets all progress.</p>
+  </div>
+  <div class="feature-card card-red">
+    <h4>Clear All Downloads</h4>
+    <p>Removes all cached unit files from the device to free up storage. Does not change progress — the student keeps their current unit and completed units.</p>
+  </div>
+</div>
+
+<div class="callout callout-green">
+  <strong>These are separate actions.</strong>
+  You can change a student's unit without affecting downloads, and you can clear downloads without changing progress.
+</div>
+
+<!-- Dashboard -->
+<h2>MHS Dashboard <span class="role-badge badge-leader">Leaders &amp; Admins</span></h2>
+
+<h3>Setting a student's unit</h3>
+<ol class="steps">
+  <li>Open the <strong>MHS Dashboard</strong> and select a group.</li>
+  <li>Go to the <strong>Progress</strong> tab.</li>
+  <li>Find the student's name in the left column and click the <strong>settings icon</strong> next to their name.</li>
+  <li>A menu will appear with <strong>Set to Unit</strong> options — Unit 1 through Unit 5.</li>
+  <li>Click the desired unit.</li>
+  <li>A confirmation dialog will appear: <em>"Set to Unit X for [Student Name]? All prior units will be marked completed."</em></li>
+  <li>Click <strong>OK</strong> to confirm. The grid will refresh to show the updated progress.</li>
+</ol>
+
+<h3>Understanding the progress indicators</h3>
+<p>The progress grid shows two colored bars on each student's row to indicate their current unit:</p>
+
+<div class="indicator-row">
+  <span class="indicator-bar bar-green"></span>
+  <span><strong>MHS Unit</strong> (green, top of cell) — The unit assigned in Mission HydroSci. Updates when you use Set to Unit.</span>
+</div>
+<div class="indicator-row">
+  <span class="indicator-bar bar-dark"></span>
+  <span><strong>Playing Unit</strong> (red, bottom of cell) — The unit last played in the game. Updates automatically when the student starts a unit.</span>
+</div>
+
+<div class="callout callout-info">
+  <strong>Why might these show different units?</strong>
+  If you set a student to Unit 4 but they haven't opened the game yet, the green bar will show Unit 4 while the other bar still shows the unit they last played. Once the student opens Unit 4 in the game, both bars will match.
+</div>
+
+<p>Hover over either bar to see a tooltip explaining what it represents.</p>
+
+<h3>Tips</h3>
+<ul>
+  <li>The grid auto-refreshes every 30 seconds. If you have the settings menu open, the refresh will wait until you close it.</li>
+  <li>After setting a unit, the grid refreshes immediately to show the change.</li>
+  <li>You can only set units for students who are members of the currently selected group.</li>
+</ul>
+
+<hr>
+
+<!-- Mission HydroSci Units Page -->
+<h2>Mission HydroSci Units Page <span class="role-badge badge-member">All Users</span></h2>
+
+<h3>Setting your unit</h3>
+<ol class="steps">
+  <li>Open <strong>Mission HydroSci</strong> and go to the units page.</li>
+  <li>Expand the <strong>Manage downloads</strong> section.</li>
+  <li>At the bottom, you'll see a bordered box with <strong>Set to</strong> followed by a dropdown and a <strong>Go</strong> button.</li>
+  <li>Select the unit you want from the dropdown. Units are listed with their full titles (e.g., "Unit 2: Water Quality").</li>
+  <li>Click <strong>Go</strong>.</li>
+  <li>Confirm the action:
+    <ul>
+      <li><span class="role-badge badge-member">Members</span> — Enter the keyword when prompted, then click Confirm.</li>
+      <li><span class="role-badge badge-leader">Leaders / Admins</span> — Click OK on the confirmation dialog.</li>
+    </ul>
+  </li>
+  <li>The page will reload showing your updated progress.</li>
+</ol>
+
+<h3>Clearing all downloads</h3>
+<ol class="steps">
+  <li>Open <strong>Mission HydroSci</strong> and go to the units page.</li>
+  <li>Expand the <strong>Manage downloads</strong> section.</li>
+  <li>At the bottom of the bordered box, click the red <strong>Clear All Downloads</strong> button.</li>
+  <li>Confirm the action:
+    <ul>
+      <li><span class="role-badge badge-member">Members</span> — Enter the keyword when prompted, then click Confirm.</li>
+      <li><span class="role-badge badge-leader">Leaders / Admins</span> — Click OK on the confirmation dialog.</li>
+    </ul>
+  </li>
+  <li>All cached unit files will be removed. The page will reload.</li>
+</ol>
+
+<div class="callout callout-warn">
+  <strong>Downloads only — not progress.</strong>
+  Clearing downloads does not change your current unit or completed units. You will need to re-download units before playing them offline. You can also clear individual units using the <strong>Clear</strong> button on each unit card.
+</div>
+
+<h3>Keyword confirmation for members</h3>
+<p>When a member uses Set to Unit or Clear All Downloads, a keyword dialog will appear. Enter the keyword provided by your leader or admin and click <strong>Confirm</strong>. If the keyword is incorrect, an error message will appear. You can click <strong>Cancel</strong> or press <strong>Escape</strong> to dismiss the dialog without making changes.</p>
+
+<hr>
+
+<!-- FAQ -->
+<h2>Frequently Asked Questions</h2>
+
+<div class="faq-item">
+  <div class="faq-q">Can I undo a Set to Unit action?</div>
+  <div class="faq-a">There is no undo button, but you can set to a different unit at any time. For example, if you accidentally set to Unit 1 (which resets all progress), you can set back to the unit the student was on.</div>
+</div>
+
+<div class="faq-item">
+  <div class="faq-q">Will setting a unit affect the student's grades or scores?</div>
+  <div class="faq-a">Setting a unit changes which unit the student is assigned to and which units are marked as completed. It does not erase any grades or scores that have already been recorded for progress points.</div>
+</div>
+
+<div class="faq-item">
+  <div class="faq-q">Why do the two progress bars on the dashboard show different units?</div>
+  <div class="faq-a">The green bar shows the unit assigned in Mission HydroSci (updated by Set to Unit), while the red bar shows the unit last played in the game (updated automatically). They will match once the student opens the assigned unit in the game.</div>
+</div>
+
+<div class="faq-item">
+  <div class="faq-q">Does Clear All Downloads affect my progress?</div>
+  <div class="faq-a">No. Clearing downloads only removes the cached files used for offline play. Your current unit and completed units are unchanged.</div>
+</div>
+
+<div class="faq-item">
+  <div class="faq-q">Can members set their own unit?</div>
+  <div class="faq-a">Yes, from the Mission HydroSci units page. Members must enter the correct keyword to confirm the action, which prevents accidental changes.</div>
+</div>
+
+</body>
+</html>

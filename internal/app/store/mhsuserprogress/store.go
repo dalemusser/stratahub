@@ -3,6 +3,7 @@ package mhsuserprogress
 
 import (
 	"context"
+	"fmt"
 	"strconv"
 	"time"
 
@@ -73,6 +74,59 @@ func (s *Store) Delete(ctx context.Context, workspaceID, userID primitive.Object
 	filter := bson.M{"workspace_id": workspaceID, "user_id": userID}
 	_, err := s.c.DeleteOne(ctx, filter)
 	return err
+}
+
+// SetToUnit sets the user's progress so that targetUnit is their current unit.
+// All units before targetUnit are marked completed. If targetUnit is "unit1",
+// completed_units is cleared (equivalent to a reset without deleting the record).
+func (s *Store) SetToUnit(ctx context.Context, workspaceID, userID primitive.ObjectID, targetUnit string) error {
+	num := unitNumber(targetUnit)
+	if num == 0 {
+		return fmt.Errorf("invalid unit: %s", targetUnit)
+	}
+
+	completed := unitOrder[:num-1] // units before targetUnit
+	now := time.Now().UTC()
+
+	filter := bson.M{"workspace_id": workspaceID, "user_id": userID}
+	update := bson.M{
+		"$set": bson.M{
+			"current_unit":    targetUnit,
+			"completed_units": completed,
+			"updated_at":      now,
+		},
+	}
+
+	_, err := s.c.UpdateOne(ctx, filter, update)
+	return err
+}
+
+// ListByUserIDs returns progress records for multiple users in a workspace, keyed by user ID hex.
+func (s *Store) ListByUserIDs(ctx context.Context, workspaceID primitive.ObjectID, userIDs []primitive.ObjectID) (map[string]models.MHSUserProgress, error) {
+	result := make(map[string]models.MHSUserProgress, len(userIDs))
+	if len(userIDs) == 0 {
+		return result, nil
+	}
+
+	filter := bson.M{
+		"workspace_id": workspaceID,
+		"user_id":      bson.M{"$in": userIDs},
+	}
+
+	cur, err := s.c.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+
+	for cur.Next(ctx) {
+		var p models.MHSUserProgress
+		if err := cur.Decode(&p); err != nil {
+			continue
+		}
+		result[p.UserID.Hex()] = p
+	}
+	return result, nil
 }
 
 // CompleteUnit marks a unit as completed and advances current_unit.

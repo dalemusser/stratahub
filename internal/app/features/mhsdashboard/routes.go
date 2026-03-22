@@ -19,6 +19,9 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 
 		// HTMX endpoint for grid refresh
 		pr.Get("/grid", h.ServeGrid)
+
+		// Set student progress to a specific unit
+		pr.Post("/set-progress", h.HandleSetProgress)
 	})
 
 	return r

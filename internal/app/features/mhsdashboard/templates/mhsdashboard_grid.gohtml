@@ -73,9 +73,36 @@
   <div id="mhs-names-scroll" class="mhs-name-width mhs-hide-scrollbar overflow-y-hidden bg-white shadow-[2px_0_8px_-2px_rgba(0,0,0,0.1)] z-10">
     <div>
       {{ range .Members }}
-      <div class="mhs-row-height flex items-center px-3 text-xs font-medium text-slate-700 border-b border-slate-200 {{ if .IsEven }}bg-slate-50{{ else }}bg-white{{ end }}"
-           title="{{ .Name }}">
-        <span class="truncate">{{ .Name }}</span>
+      <div class="mhs-row-height flex items-center px-3 text-xs font-medium text-slate-700 border-b border-slate-200 {{ if .IsEven }}bg-slate-50{{ else }}bg-white{{ end }} relative group/row"
+           title="{{ .Name }}"
+           data-member-id="{{ .ID }}">
+        <span class="truncate flex-1">{{ .Name }}</span>
+        <div class="relative">
+          <button type="button"
+                  class="ml-1 p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-300/40 dark:hover:bg-slate-400/20"
+                  onclick="toggleSetProgress(event, this)"
+                  title="Set progress for {{ .Name }}">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"/>
+            </svg>
+          </button>
+          <div class="set-progress-menu hidden bg-white dark:bg-gray-800 border border-slate-200 dark:border-gray-600 rounded-lg shadow-lg z-50 py-1 w-36">
+            <div class="px-2 py-1 text-[10px] text-slate-400 dark:text-gray-500 font-semibold uppercase tracking-wide">Set to Unit</div>
+            {{ $memberID := .ID }}
+            {{ $memberName := .Name }}
+            {{ range $u := $.UnitHeaders }}
+            <button type="button"
+                    class="w-full text-left px-3 py-1.5 text-xs text-slate-700 dark:text-gray-300 hover:bg-blue-50 dark:hover:bg-blue-500/20 hover:text-blue-700 dark:hover:text-blue-300 transition-colors"
+                    hx-post="/mhsdashboard/set-progress"
+                    hx-vals='{"user_id":"{{ $memberID }}", "unit":"{{ $u.ID }}", "group":"{{ $.SelectedGroup }}"}'
+                    hx-confirm="Set to {{ $u.Title }} for {{ $memberName }}? All prior units will be marked completed."
+                    hx-swap="none"
+                    onclick="closeSetProgressMenus()">
+              {{ $u.Title }}
+            </button>
+            {{ end }}
+          </div>
+        </div>
       </div>
       {{ end }}
     </div>
@@ -88,7 +115,8 @@
       <div class="flex mhs-row-height {{ if .IsEven }}bg-slate-50{{ else }}bg-white{{ end }}">
         {{ range .Cells }}
         <div class="mhs-cell-width p-0.5 border-b border-slate-200 {{ if .IsUnitStart }}border-l border-slate-300{{ end }}" style="position:relative;">
-          {{ if .IsInCurrentUnit }}<div class="mhs-in-unit-bar"></div>{{ end }}
+          {{ if .IsInMHSUnit }}<div class="mhs-in-mhs-unit-bar mhs-bar-tooltip" data-tip="Current unit in Mission HydroSci"></div>{{ end }}
+          {{ if .IsInCurrentUnit }}<div class="mhs-in-unit-bar mhs-bar-tooltip" data-tip="Unit last played in game"></div>{{ end }}
           {{ if eq .Value 1 }}
           <div class="{{ .CellClass }} w-full h-full rounded border {{ .BorderClass }} mhs-review-cell cursor-pointer hover:opacity-80 transition-opacity relative z-[1]"
                data-student-name="{{ .StudentName }}"

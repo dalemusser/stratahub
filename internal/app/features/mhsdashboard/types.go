@@ -54,7 +54,8 @@ type GroupOptionEx struct {
 type CellData struct {
 	Value           int    // 0 = pending, 1 = flagged, 2 = passed, 3 = active
 	IsUnitStart     bool   // True if this is the first cell in a unit
-	IsInCurrentUnit bool   // True if cell belongs to the unit the student is currently in
+	IsInCurrentUnit bool   // True if cell belongs to the unit the student is currently in (grader data)
+	IsInMHSUnit     bool   // True if cell belongs to the unit from Mission HydroSci progress
 	CellClass       string // CSS class for the cell background
 	BorderClass     string // CSS class for the border
 	PointID         string // Progress point ID (e.g., "u1p1")
