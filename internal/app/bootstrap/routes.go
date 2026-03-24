@@ -26,6 +26,8 @@ import (
 	membersfeature "github.com/dalemusser/stratahub/internal/app/features/members"
 	mhsdashboardfeature "github.com/dalemusser/stratahub/internal/app/features/mhsdashboard"
 	missionhydroscifeature "github.com/dalemusser/stratahub/internal/app/features/missionhydrosci"
+	"github.com/dalemusser/stratahub/internal/app/store/emailverify"
+	"github.com/dalemusser/stratahub/internal/app/system/staffauth"
 
 	organizationsfeature "github.com/dalemusser/stratahub/internal/app/features/organizations"
 	pagesfeature "github.com/dalemusser/stratahub/internal/app/features/pages"
@@ -255,6 +257,18 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		r.Handle(appCfg.StorageLocalURL+"/*", fileserver.Handler(appCfg.StorageLocalURL, appCfg.StorageLocalPath))
 	}
 
+	// Staff auth verifier (reusable supervisor override verification).
+	staffAuthStore := staffauth.NewStore(deps.StrataHubMongoDatabase, appCfg.EmailVerifyExpiry)
+	emailVerifyStore := emailverify.New(deps.StrataHubMongoDatabase, appCfg.EmailVerifyExpiry)
+	staffAuthVerifier := &staffauth.Verifier{
+		DB:          deps.StrataHubMongoDatabase,
+		Store:       staffAuthStore,
+		EmailVerify: emailVerifyStore,
+		Mailer:      deps.Mailer,
+		Log:         logger,
+		SiteName:    "StrataHub",
+	}
+
 	// Mission HydroSci: root-level PWA routes + content fallback.
 	// /sw.js and /manifest.json serve the Mission HydroSci PWA (used for the impact study).
 	missionHydroSciHandler := missionhydroscifeature.NewHandler(
@@ -263,6 +277,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		missionhydroscifeature.GameServiceConfig{URL: appCfg.GameMHSSaveURL, Auth: appCfg.GameMHSSaveAuth},
 		logger,
 	)
+	missionHydroSciHandler.StaffAuthVerifier = staffAuthVerifier
 	r.Get("/sw.js", missionHydroSciHandler.ServeServiceWorker)
 	r.Get("/manifest.json", missionHydroSciHandler.ServeManifest)
 	r.Handle("/missionhydrosci/content/*", missionHydroSciHandler.ContentFallback())
@@ -533,6 +548,8 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 
 		// MHS Leader Dashboard (Mission HydroSci progress tracking)
 		mhsDashboardHandler := mhsdashboardfeature.NewHandler(deps.StrataHubMongoDatabase, deps.MHSGraderDatabase, errLog, logger)
+		mhsDashboardHandler.ClaudeAPIKey = appCfg.ClaudeAPIKey
+		mhsDashboardHandler.ClaudeModel = appCfg.ClaudeModel
 		wsr.Mount("/mhsdashboard", mhsdashboardfeature.Routes(mhsDashboardHandler, sessionMgr))
 
 		// Mission HydroSci (experimental copy of MHS delivery for admin/coordinator development)

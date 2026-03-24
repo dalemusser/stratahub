@@ -9,6 +9,7 @@ import (
 	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	settingsstore "github.com/dalemusser/stratahub/internal/app/store/settings"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
@@ -49,6 +50,14 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Load site settings for AI summaries toggle
+	wsID := workspace.IDFromRequest(r)
+	siteSettings, err := settingsstore.New(h.DB).Get(ctx, wsID)
+	if err != nil {
+		h.Log.Warn("failed to load site settings for dashboard", zap.Error(err))
+	}
+	enableSummaries := siteSettings.EnableClaudeSummaries
+
 	// Get groups for this user
 	groups, err := h.getGroupsForUser(ctx, r, userID, role)
 	if err != nil {
@@ -63,11 +72,12 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 		// No groups - show empty state
 		base := viewdata.LoadBase(r, h.DB)
 		data := DashboardData{
-			BaseVM:       base,
-			Groups:       nil,
-			UnitHeaders:  unitHeaders,
-			PointHeaders: pointHeaders,
-			Members:      nil,
+			BaseVM:                base,
+			Groups:                nil,
+			UnitHeaders:           unitHeaders,
+			PointHeaders:          pointHeaders,
+			Members:               nil,
+			EnableClaudeSummaries: enableSummaries,
 		}
 		templates.Render(w, r, "mhsdashboard_view", data)
 		return
@@ -169,22 +179,23 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 
 	base := viewdata.LoadBase(r, h.DB)
 	data := DashboardData{
-		BaseVM:        base,
-		Groups:        groupOptions,
-		SelectedGroup: selectedGroup,
-		GroupName:     selectedGroupName,
-		MemberCount:   len(members),
-		LastUpdated:   lastUpdated,
-		TimezoneAbbr:  tzAbbr,
-		IsAdmin:       isAdmin,
-		Orgs:          orgs,
-		SelectedOrg:   selectedOrg,
-		GroupsEx:       groupsEx,
-		UnitHeaders:   unitHeaders,
-		PointHeaders:  pointHeaders,
-		Members:       memberRows,
-		SortBy:        sortBy,
-		SortDir:       sortDir,
+		BaseVM:                base,
+		Groups:                groupOptions,
+		SelectedGroup:         selectedGroup,
+		GroupName:             selectedGroupName,
+		MemberCount:           len(members),
+		LastUpdated:           lastUpdated,
+		TimezoneAbbr:          tzAbbr,
+		IsAdmin:               isAdmin,
+		Orgs:                  orgs,
+		SelectedOrg:           selectedOrg,
+		GroupsEx:               groupsEx,
+		UnitHeaders:           unitHeaders,
+		PointHeaders:          pointHeaders,
+		Members:               memberRows,
+		SortBy:                sortBy,
+		SortDir:               sortDir,
+		EnableClaudeSummaries: enableSummaries,
 	}
 
 	templates.Render(w, r, "mhsdashboard_view", data)
@@ -213,6 +224,14 @@ func (h *Handler) ServeGrid(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Load site settings for AI summaries toggle
+	gridWsID := workspace.IDFromRequest(r)
+	gridSettings, settingsErr := settingsstore.New(h.DB).Get(ctx, gridWsID)
+	if settingsErr != nil {
+		h.Log.Warn("failed to load site settings for grid", zap.Error(settingsErr))
+	}
+	gridEnableSummaries := gridSettings.EnableClaudeSummaries
+
 	// Get groups for this user
 	groups, err := h.getGroupsForUser(ctx, r, userID, role)
 	if err != nil {
@@ -226,10 +245,11 @@ func (h *Handler) ServeGrid(w http.ResponseWriter, r *http.Request) {
 
 	if len(groups) == 0 {
 		data := GridData{
-			UnitHeaders:  unitHeaders,
-			PointHeaders: pointHeaders,
-			Members:      nil,
-			CSRFToken:    csrf.Token(r),
+			UnitHeaders:           unitHeaders,
+			PointHeaders:          pointHeaders,
+			Members:               nil,
+			CSRFToken:             csrf.Token(r),
+			EnableClaudeSummaries: gridEnableSummaries,
 		}
 		templates.Render(w, r, "mhsdashboard_grid", data)
 		return
@@ -283,16 +303,17 @@ func (h *Handler) ServeGrid(w http.ResponseWriter, r *http.Request) {
 	memberRows := h.buildProgressRows(ctx, r, members, cfg, deviceMap)
 
 	data := GridData{
-		SelectedGroup: selectedGroup,
-		GroupName:     groupName,
-		MemberCount:   len(members),
-		LastUpdated:   lastUpdated,
-		UnitHeaders:   unitHeaders,
-		PointHeaders:  pointHeaders,
-		Members:       memberRows,
-		CSRFToken:     csrf.Token(r),
-		SortBy:        sortBy,
-		SortDir:       sortDir,
+		SelectedGroup:         selectedGroup,
+		GroupName:             groupName,
+		MemberCount:           len(members),
+		LastUpdated:           lastUpdated,
+		UnitHeaders:           unitHeaders,
+		PointHeaders:          pointHeaders,
+		Members:               memberRows,
+		CSRFToken:             csrf.Token(r),
+		SortBy:                sortBy,
+		SortDir:               sortDir,
+		EnableClaudeSummaries: gridEnableSummaries,
 	}
 
 	templates.Render(w, r, "mhsdashboard_grid", data)
@@ -547,10 +568,11 @@ func (h *Handler) buildHeaders(cfg *ProgressConfig) ([]UnitHeader, []PointHeader
 
 	for i, unit := range cfg.Units {
 		unitHeaders[i] = UnitHeader{
-			ID:         unit.ID,
-			Title:      unit.Title,
-			Width:      len(unit.ProgressPoints) * 28,
-			PointCount: len(unit.ProgressPoints),
+			ID:             unit.ID,
+			Title:          unit.Title,
+			Width:          len(unit.ProgressPoints) * 28,
+			AnalyticsWidth: len(unit.ProgressPoints) * 64,
+			PointCount:     len(unit.ProgressPoints),
 		}
 
 		for j, point := range unit.ProgressPoints {
@@ -568,20 +590,41 @@ func (h *Handler) buildHeaders(cfg *ProgressConfig) ([]UnitHeader, []PointHeader
 
 // ProgressGradeDoc represents a document from the progress_point_grades collection.
 type ProgressGradeDoc struct {
-	Game        string                       `bson:"game"`
-	PlayerID    string                       `bson:"playerId"`
-	Grades      map[string]ProgressGradeItem `bson:"grades"`
-	CurrentUnit string                       `bson:"currentUnit,omitempty"`
-	LastUpdated time.Time                    `bson:"lastUpdated"`
+	Game        string                         `bson:"game"`
+	PlayerID    string                         `bson:"playerId"`
+	Grades      map[string][]ProgressGradeItem `bson:"grades"`
+	CurrentUnit string                         `bson:"currentUnit,omitempty"`
+	LastUpdated time.Time                      `bson:"lastUpdated"`
 }
 
-// ProgressGradeItem represents a single grade within the grades map.
+// ProgressGradeItem represents a single grade within the grades array.
 type ProgressGradeItem struct {
-	Status     string         `bson:"status"`               // "active", "passed", or "flagged"
-	ComputedAt time.Time      `bson:"computedAt"`
-	RuleID     string         `bson:"ruleId"`
-	ReasonCode string         `bson:"reasonCode,omitempty"` // Only for flagged grades
-	Metrics    map[string]any `bson:"metrics,omitempty"`    // Only for flagged grades
+	Attempt            int            `bson:"attempt"`                      // 1-based attempt number
+	Status             string         `bson:"status"`                       // "active", "passed", or "flagged"
+	ComputedAt         time.Time      `bson:"computedAt"`
+	RuleID             string         `bson:"ruleId"`
+	ReasonCode         string         `bson:"reasonCode,omitempty"`         // Only for flagged grades
+	Metrics            map[string]any `bson:"metrics,omitempty"`            // Grade metrics (mistakeCount, etc.)
+	StartTime          *time.Time     `bson:"startTime,omitempty"`          // Activity start
+	EndTime            *time.Time     `bson:"endTime,omitempty"`            // Activity end
+	DurationSecs       *float64       `bson:"durationSecs,omitempty"`       // Wall-clock completion time in seconds
+	ActiveDurationSecs *float64       `bson:"activeDurationSecs,omitempty"` // Active time excluding gaps in seconds
+}
+
+// formatDuration formats seconds into a human-readable duration string.
+// Returns "m:ss" for durations under an hour, "h:mm:ss" for longer.
+func formatDuration(secs float64) string {
+	total := int(secs)
+	if total < 0 {
+		return ""
+	}
+	h := total / 3600
+	m := (total % 3600) / 60
+	s := total % 60
+	if h > 0 {
+		return fmt.Sprintf("%d:%02d:%02d", h, m, s)
+	}
+	return fmt.Sprintf("%d:%02d", m, s)
 }
 
 // reasonCodeToMessage maps reason codes to human-readable messages.
@@ -746,11 +789,14 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 				var value int
 				var cellClass, borderClass, reviewReason string
 
-				// Look up the grade for this progress point
+				// Look up the latest grade for this progress point
 				var gradeItem *ProgressGradeItem
+				var attemptCount int
 				if gradeDoc != nil {
-					if item, ok := gradeDoc.Grades[point.ID]; ok {
-						gradeItem = &item
+					if items, ok := gradeDoc.Grades[point.ID]; ok && len(items) > 0 {
+						latest := items[len(items)-1]
+						gradeItem = &latest
+						attemptCount = len(items)
 					}
 				}
 
@@ -781,19 +827,62 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 					}
 				}
 
+				// Format completion durations if available
+				var durationDisplay, activeDurationDisplay string
+				if gradeItem != nil && gradeItem.DurationSecs != nil {
+					durationDisplay = formatDuration(*gradeItem.DurationSecs)
+				}
+				if gradeItem != nil && gradeItem.ActiveDurationSecs != nil {
+					activeDurationDisplay = formatDuration(*gradeItem.ActiveDurationSecs)
+				}
+
+				// Extract mistake count from grade metrics (-1 means no data)
+				mistakeCount := -1
+				if gradeItem != nil && gradeItem.Metrics != nil {
+					if mc, ok := gradeItem.Metrics["mistakeCount"]; ok {
+						switch v := mc.(type) {
+						case int64:
+							mistakeCount = int(v)
+						case int32:
+							mistakeCount = int(v)
+						case float64:
+							mistakeCount = int(v)
+						}
+					}
+				}
+
 				cells[pointIdx] = CellData{
-					Value:           value,
-					IsUnitStart:     j == 0,
-					IsInCurrentUnit: currentUnit != "" && currentUnit == unit.ID,
-					IsInMHSUnit:     mhsCurrentUnit != "" && mhsCurrentUnit == unit.ID,
-					CellClass:       cellClass,
-					BorderClass:     borderClass,
-					PointID:         point.ID,
-					PointTitle:      point.ShortName,
-					StudentName:     member.FullName,
-					ReviewReason:    reviewReason,
+					Value:                 value,
+					IsUnitStart:           j == 0,
+					IsInCurrentUnit:       currentUnit != "" && currentUnit == unit.ID,
+					IsInMHSUnit:           mhsCurrentUnit != "" && mhsCurrentUnit == unit.ID,
+					CellClass:             cellClass,
+					BorderClass:           borderClass,
+					PointID:               point.ID,
+					PointTitle:            point.ShortName,
+					StudentName:           member.FullName,
+					ReviewReason:          reviewReason,
+					DurationDisplay:       durationDisplay,
+					ActiveDurationDisplay: activeDurationDisplay,
+					MistakeCount:          mistakeCount,
+					AttemptCount:          attemptCount,
 				}
 				pointIdx++
+			}
+		}
+
+		// Mark skipped points:
+		// - An "active" cell with passed cells after it (started but never completed)
+		// - A "passed" cell with no duration data (end event fired but no meaningful timing)
+		hasPassedAfter := false
+		for j := len(cells) - 1; j >= 0; j-- {
+			if cells[j].Value == 2 { // passed
+				if cells[j].DurationDisplay == "" && cells[j].ActiveDurationDisplay == "" {
+					cells[j].Skipped = true
+				}
+				hasPassedAfter = true
+			} else if cells[j].Value == 3 && hasPassedAfter { // active with passed after
+				cells[j].Skipped = true
 			}
 		}
 
@@ -805,8 +894,10 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 			for _, point := range unit.ProgressPoints {
 				var isPassed bool
 				if gradeDoc != nil {
-					if item, ok := gradeDoc.Grades[point.ID]; ok && item.Status == "passed" {
-						isPassed = true
+					if items, ok := gradeDoc.Grades[point.ID]; ok && len(items) > 0 {
+						if items[len(items)-1].Status == "passed" {
+							isPassed = true
+						}
 					}
 				}
 				if !isPassed {

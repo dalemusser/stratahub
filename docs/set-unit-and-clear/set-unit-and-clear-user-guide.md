@@ -8,6 +8,8 @@ This guide explains how to use the **Set to Unit** and **Clear All Downloads** f
 
 Setting to Unit 1 resets all progress — nothing is marked as completed.
 
+**No data is deleted.** Setting a unit only changes the pointer to which unit the student is playing. All save data, logging data, grades, and scores are preserved.
+
 **Clear All Downloads** removes all cached unit files from the device. This frees up storage space but does not change the student's progress. The student will need to re-download units before playing them offline.
 
 These are separate actions. You can change a student's unit without affecting their downloads, and you can clear downloads without changing their progress.
@@ -55,9 +57,7 @@ Hover over either bar to see a tooltip explaining what it represents.
 3. At the bottom, you'll see a bordered box with **Set to** followed by a dropdown and a **Go** button.
 4. Select the unit you want from the dropdown (units are listed with their full titles, e.g., "Unit 2: Water Quality").
 5. Click **Go**.
-6. Depending on your role:
-   - **Members** will be asked to enter a keyword to confirm the action.
-   - **Leaders, admins, and coordinators** will see a simple confirmation dialog.
+6. Confirm the action (see Authorization below).
 7. The page will reload showing your updated progress.
 
 ### Clearing all downloads
@@ -65,18 +65,47 @@ Hover over either bar to see a tooltip explaining what it represents.
 1. Open **Mission HydroSci** and go to the units page.
 2. Expand the **Manage downloads** section.
 3. At the bottom of the bordered box, click the red **Clear All Downloads** button.
-4. Depending on your role:
-   - **Members** will be asked to enter a keyword to confirm the action.
-   - **Leaders, admins, and coordinators** will see a simple confirmation dialog.
+4. Confirm the action (see Authorization below).
 5. All cached unit files will be removed from the device. The page will reload.
 
 This does **not** change your progress. Your current unit and completed units remain the same. You will need to re-download units before playing them offline.
 
 You can also clear individual unit downloads using the **Clear** button on each unit card, rather than clearing everything at once.
 
-### Keyword confirmation for members
+---
 
-When a member uses Set to Unit or Clear All Downloads, a keyword dialog will appear. Enter the keyword provided by your leader or admin and click **Confirm**. If the keyword is incorrect, an error message will appear. You can click **Cancel** or press **Escape** to dismiss the dialog without making any changes.
+## Authorization
+
+Setting a unit and clearing downloads are actions that require confirmation. The confirmation process depends on your role and how your StrataHub workspace is configured.
+
+### Leaders, admins, and coordinators
+
+You will see a simple confirmation dialog. Click **OK** to proceed.
+
+### Members (students)
+
+Your workspace administrator chooses what level of authorization is required for members. There are three options:
+
+#### Staff Auth (default)
+
+A leader, coordinator, admin, or superadmin must authenticate on your behalf:
+
+1. An authorization dialog will appear asking for the staff member's login ID.
+2. The staff member enters their login ID.
+3. Depending on their account setup, they may need to:
+   - Enter their password, or
+   - Enter a verification code sent to their email
+4. Once authenticated, the action proceeds.
+
+This is the default and most secure option. It ensures a staff member is present and approves the action.
+
+#### Keyword
+
+A keyword dialog will appear. Enter the keyword provided by your leader or admin and click **Confirm**. If the keyword is incorrect, an error message will appear. You can click **Cancel** or press **Escape** to dismiss the dialog without making changes.
+
+#### Trust
+
+No additional authorization is required. You will see a simple confirmation dialog, the same as leaders and admins.
 
 ---
 
@@ -86,7 +115,7 @@ When a member uses Set to Unit or Clear All Downloads, a keyword dialog will app
 There is no undo button, but you can set to a different unit at any time. For example, if you accidentally set to Unit 1 (which resets all progress), you can set back to the unit the student was on.
 
 **Will setting a unit affect the student's grades or scores?**
-Setting a unit changes which unit the student is assigned to and which units are marked as completed. It does not erase any grades or scores that have already been recorded for progress points.
+No. Setting a unit changes which unit the student is assigned to and which units are marked as completed. It does not erase any grades, scores, save data, or logging data that have already been recorded. All data is kept.
 
 **Why do the two progress bars on the dashboard show different units?**
 The green bar shows the unit assigned in Mission HydroSci (updated by Set to Unit), while the red bar shows the unit last played in the game (updated automatically when the student starts a unit). They will match once the student opens the assigned unit in the game.
@@ -95,4 +124,7 @@ The green bar shows the unit assigned in Mission HydroSci (updated by Set to Uni
 No. Clearing downloads only removes the cached files used for offline play. Your current unit and completed units are unchanged.
 
 **Can members set their own unit?**
-Yes, but they must enter the correct keyword to confirm the action. This prevents accidental changes.
+Yes, from the Mission HydroSci units page. The authorization required depends on the workspace setting — staff auth (default), keyword, or trust.
+
+**Who configures the authorization mode?**
+A workspace administrator sets the member authorization mode in the StrataHub workspace settings. The default is staff auth.

@@ -11,12 +11,15 @@ import (
 	"time"
 
 	"github.com/dalemusser/stratahub/internal/app/resources"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/app/store/activity"
 	"github.com/dalemusser/stratahub/internal/app/store/audit"
 	"github.com/dalemusser/stratahub/internal/app/store/emailverify"
 	"github.com/dalemusser/stratahub/internal/app/store/oauthstate"
 	"github.com/dalemusser/stratahub/internal/app/store/sessions"
 	workspacestore "github.com/dalemusser/stratahub/internal/app/store/workspaces"
+	"github.com/dalemusser/stratahub/internal/app/system/authutil"
+	"github.com/dalemusser/stratahub/internal/app/system/staffauth"
 	"github.com/dalemusser/stratahub/internal/app/system/tasks"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/config"
@@ -52,6 +55,7 @@ import (
 // StrataHub uses Startup to load shared templates (layouts, navigation, etc.)
 // that are used across all features.
 func Startup(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, logger *zap.Logger) error {
+	logger.Info("stratahub starting", zap.String("build", viewdata.GetBuildTime()))
 	resources.LoadSharedTemplates()
 
 	// Bootstrap default workspace if none exists
@@ -106,6 +110,13 @@ func Startup(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, 
 	activityStore := activity.New(deps.StrataHubMongoDatabase)
 	if err := activityStore.EnsureIndexes(ctx); err != nil {
 		logger.Error("failed to ensure activity indexes", zap.Error(err))
+		return err
+	}
+
+	// Ensure indexes for staff auth tokens store (TTL-indexed)
+	staffAuthStore := staffauth.NewStore(deps.StrataHubMongoDatabase, 0)
+	if err := staffAuthStore.EnsureIndexes(ctx); err != nil {
+		logger.Error("failed to ensure staff auth indexes", zap.Error(err))
 		return err
 	}
 
@@ -168,12 +179,16 @@ func ensureSuperAdmin(ctx context.Context, deps DBDeps, loginID string, logger *
 
 	// Create new superadmin user
 	now := time.Now().UTC()
+	var emailPtr *string
+	if authutil.EmailIsLogin("email") {
+		emailPtr = &loginID
+	}
 	newUser := models.User{
 		ID:           primitive.NewObjectID(),
 		WorkspaceID:  nil, // Superadmins have no workspace_id
 		FullName:     "SuperAdmin",
 		FullNameCI:   text.Fold("SuperAdmin"),
-		Email:        nil,
+		Email:        emailPtr,
 		LoginID:      &loginID,
 		LoginIDCI:    ptrString(text.Fold(loginID)),
 		AuthMethod:   "email", // Default to email auth for new superadmin

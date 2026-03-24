@@ -17,6 +17,8 @@ type Handler struct {
 	ErrLog            *uierrors.ErrorLogger
 	DeviceStatusStore *mhsdevicestatus.Store
 	ProgressStore     *mhsuserprogress.Store
+	ClaudeAPIKey      string // Anthropic API key for AI summaries
+	ClaudeModel       string // Claude model ID
 }
 
 // NewHandler constructs a new Handler.

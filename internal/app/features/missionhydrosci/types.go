@@ -25,6 +25,7 @@ type UnitsData struct {
 	UserLoginID    string   // For building the play URL with ?id=
 	IsComplete     bool     // True when all units are done
 	NextUnitID     string   // Unit after CurrentUnit, empty if last/complete
+	MHSMemberAuth  string   // "trust", "keyword", "staffauth" — controls member auth modal
 }
 
 // PlayData is the view model for the game launcher page.
@@ -43,8 +44,8 @@ type PlayData struct {
 	CodeFile        string // Build file name for wasm
 
 	// Game service config (injected into __mhsBridgeConfig for new builds)
-	LogServiceURL  string
-	LogServiceAuth string
+	LogServiceURL   string
+	LogServiceAuth  string
 	SaveServiceURL  string
 	SaveServiceAuth string
 }

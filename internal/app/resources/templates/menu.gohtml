@@ -41,9 +41,9 @@
     <div class="font-semibold truncate text-gray-700 dark:text-gray-300">{{ .UserName }}</div>
     <div class="text-gray-500 dark:text-gray-500">{{ .Role }}</div>
   </a>
-{{ template "menu_footer_no_border" }}
+{{ template "menu_footer_no_border" . }}
 {{ else }}
-{{ template "menu_footer" }}
+{{ template "menu_footer" . }}
 {{ end }}
 {{ end }}
 
@@ -84,9 +84,9 @@
     <div class="font-semibold truncate text-gray-700 dark:text-gray-300">{{ .UserName }}</div>
     <div class="text-gray-500 dark:text-gray-500">{{ .Role }}</div>
   </a>
-{{ template "menu_footer_no_border" }}
+{{ template "menu_footer_no_border" . }}
 {{ else }}
-{{ template "menu_footer" }}
+{{ template "menu_footer" . }}
 {{ end }}
 {{ end }}
 
@@ -112,9 +112,9 @@
     <div class="font-semibold truncate text-gray-700 dark:text-gray-300">{{ .UserName }}</div>
     <div class="text-gray-500 dark:text-gray-500">{{ .Role }}</div>
   </a>
-{{ template "menu_footer_no_border" }}
+{{ template "menu_footer_no_border" . }}
 {{ else }}
-{{ template "menu_footer" }}
+{{ template "menu_footer" . }}
 {{ end }}
 {{ end }}
 
@@ -151,9 +151,9 @@
     <div class="font-semibold truncate text-gray-700 dark:text-gray-300">{{ .UserName }}</div>
     <div class="text-gray-500 dark:text-gray-500">{{ .Role }}</div>
   </a>
-{{ template "menu_footer_no_border" }}
+{{ template "menu_footer_no_border" . }}
 {{ else }}
-{{ template "menu_footer" }}
+{{ template "menu_footer" . }}
 {{ end }}
 {{ end }}
 
@@ -191,9 +191,9 @@
     {{ if .UserOrg }}<div class="truncate text-gray-500 dark:text-gray-500" title="{{ .UserOrg }}">{{ .UserOrg }}</div>{{ end }}
     <div class="text-gray-500 dark:text-gray-500">{{ .Role }}</div>
   </a>
-{{ template "menu_footer_no_border" }}
+{{ template "menu_footer_no_border" . }}
 {{ else }}
-{{ template "menu_footer" }}
+{{ template "menu_footer" . }}
 {{ end }}
 {{ end }}
 
@@ -222,9 +222,9 @@
     {{ if .UserOrg }}<div class="truncate text-gray-500 dark:text-gray-500" title="{{ .UserOrg }}">{{ .UserOrg }}</div>{{ end }}
     <div class="text-gray-500 dark:text-gray-500">{{ .Role }}</div>
   </a>
-{{ template "menu_footer_no_border" }}
+{{ template "menu_footer_no_border" . }}
 {{ else }}
-{{ template "menu_footer" }}
+{{ template "menu_footer" . }}
 {{ end }}
 {{ end }}
 
@@ -244,7 +244,7 @@
   {{ template "menu_common" . }}
 </nav>
 
-{{ template "menu_footer" }}
+{{ template "menu_footer" . }}
 {{ end }}
 
 {{/* ───────────────────────────── Shared links  ───────────────────────*/}}
@@ -282,6 +282,9 @@
   <button id="menu-toggle" class="menu-link flex items-center text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 text-sm w-full" title="Toggle sidebar">
     <span class="menu-icon mr-2">◀</span><span class="menu-text">Collapse</span>
   </button>
+  <div class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+    <span class="menu-text text-xs text-gray-400 dark:text-gray-500">{{ .BuildTime }}</span>
+  </div>
 </div>
 {{ end }}
 
@@ -294,5 +297,8 @@
   <button id="menu-toggle" class="menu-link flex items-center text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 text-sm w-full" title="Toggle sidebar">
     <span class="menu-icon mr-2">◀</span><span class="menu-text">Collapse</span>
   </button>
+  <div class="mt-2 pt-2 border-t border-gray-200 dark:border-gray-700">
+    <span class="menu-text text-xs text-gray-400 dark:text-gray-500">{{ .BuildTime }}</span>
+  </div>
 </div>
 {{ end }}

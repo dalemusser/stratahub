@@ -28,8 +28,10 @@ func BuildVerificationEmail(data VerificationEmailData) Email {
 func buildVerificationText(data VerificationEmailData) string {
 	var buf bytes.Buffer
 	buf.WriteString(fmt.Sprintf("Your %s verification code is: %s\n\n", data.SiteName, data.Code))
-	buf.WriteString("Or click this link to sign in:\n")
-	buf.WriteString(data.MagicLink + "\n\n")
+	if data.MagicLink != "" {
+		buf.WriteString("Or click this link to sign in:\n")
+		buf.WriteString(data.MagicLink + "\n\n")
+	}
 	buf.WriteString(fmt.Sprintf("This code expires in %s.\n\n", data.ExpiresIn))
 	buf.WriteString("If you did not request this code, you can safely ignore this email.\n")
 	return buf.String()
@@ -73,6 +75,7 @@ const verificationHTMLTemplate = `<!DOCTYPE html>
                 <span style="font-size: 32px; font-weight: 700; letter-spacing: 8px; color: #1f2937; font-family: 'Courier New', monospace;">{{.Code}}</span>
               </div>
 
+              {{if .MagicLink}}
               <p style="margin: 0 0 24px; font-size: 14px; color: #6b7280; text-align: center;">
                 Or click the button below to sign in:
               </p>
@@ -87,6 +90,7 @@ const verificationHTMLTemplate = `<!DOCTYPE html>
                   </td>
                 </tr>
               </table>
+              {{end}}
 
               <p style="margin: 24px 0 0; font-size: 13px; color: #9ca3af; text-align: center;">
                 This code expires in {{.ExpiresIn}}.

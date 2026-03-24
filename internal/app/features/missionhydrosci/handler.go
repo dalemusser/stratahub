@@ -5,6 +5,8 @@ import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/store/mhsdevicestatus"
 	"github.com/dalemusser/stratahub/internal/app/store/mhsuserprogress"
+	settingsstore "github.com/dalemusser/stratahub/internal/app/store/settings"
+	"github.com/dalemusser/stratahub/internal/app/system/staffauth"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )
@@ -25,6 +27,8 @@ type Handler struct {
 	SaveService       GameServiceConfig
 	ProgressStore     *mhsuserprogress.Store
 	DeviceStatusStore *mhsdevicestatus.Store
+	SettingsStore     *settingsstore.Store
+	StaffAuthVerifier *staffauth.Verifier
 }
 
 // NewHandler constructs a new Handler.
@@ -38,5 +42,6 @@ func NewHandler(db *mongo.Database, errLog *uierrors.ErrorLogger, cdnBaseURL str
 		SaveService:       saveSvc,
 		ProgressStore:     mhsuserprogress.New(db),
 		DeviceStatusStore: mhsdevicestatus.New(db),
+		SettingsStore:     settingsstore.New(db),
 	}
 }

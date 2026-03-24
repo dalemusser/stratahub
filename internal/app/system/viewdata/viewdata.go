@@ -77,10 +77,27 @@ type BaseVM struct {
 	// LoginActionsJS contains one-shot JavaScript from login actions.
 	// Emitted once on the first page load after login, then cleared from session.
 	LoginActionsJS template.JS
+
+	// BuildTime is the compile-time build stamp (e.g., "20260323-184500" or "dev").
+	BuildTime string
 }
 
 // storageProvider is set by Init and used to generate logo URLs.
 var storageProvider storage.Store
+
+// buildTime is set once at startup via SetBuildTime.
+var buildTime = "dev"
+
+// SetBuildTime sets the build timestamp for display in the UI.
+// Call once at startup from main.
+func SetBuildTime(t string) {
+	buildTime = t
+}
+
+// GetBuildTime returns the current build timestamp.
+func GetBuildTime() string {
+	return buildTime
+}
 
 // AnnouncementLoader is a function that loads active announcements.
 // This is set by bootstrap to avoid circular dependencies.
@@ -141,6 +158,7 @@ func NewBaseVM(r *http.Request, db *mongo.Database, title, backDefault string) B
 		BackURL:      httpnav.ResolveBackURL(r, backDefault),
 		CurrentPath:  httpnav.CurrentPath(r),
 		CSRFToken:    csrf.Token(r),
+		BuildTime:    buildTime,
 	}
 
 	// Get LoginID, organization name, and enabled apps from session if logged in

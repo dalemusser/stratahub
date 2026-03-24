@@ -19,6 +19,7 @@ func Routes(h *Handler) chi.Router {
 	// Email verification flow
 	r.Get("/verify-email", h.ServeVerifyEmail)
 	r.Post("/verify-email", h.HandleVerifyEmailSubmit)
+	r.Post("/confirm-magic-link", h.HandleMagicLinkConfirm)
 	r.Post("/resend-code", h.HandleResendCode)
 
 	return r

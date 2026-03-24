@@ -34,6 +34,16 @@ type SiteSettings struct {
 	// If empty/nil, all methods from AllAuthMethods are enabled (default).
 	EnabledAuthMethods []string `bson:"enabled_auth_methods,omitempty" json:"enabled_auth_methods,omitempty"`
 
+	// MHS member action authorization
+	// Controls what is required when a member changes their unit or clears downloads.
+	// Values: "trust", "keyword", "staffauth". Default (empty) = "staffauth".
+	MHSMemberAuth        string `bson:"mhs_member_auth,omitempty" json:"mhs_member_auth,omitempty"`
+	MHSMemberAuthKeyword string `bson:"mhs_member_auth_keyword,omitempty" json:"mhs_member_auth_keyword,omitempty"`
+
+	// MHS AI summaries
+	EnableClaudeSummaries bool   `bson:"enable_claude_summaries,omitempty" json:"enable_claude_summaries,omitempty"`
+	ClaudeModel           string `bson:"claude_model,omitempty" json:"claude_model,omitempty"`
+
 	// Audit fields
 	UpdatedAt     *time.Time          `bson:"updated_at,omitempty" json:"updated_at,omitempty"`
 	UpdatedByID   *primitive.ObjectID `bson:"updated_by_id,omitempty" json:"updated_by_id,omitempty"`
@@ -77,6 +87,15 @@ func (s *SiteSettings) IsAuthMethodEnabled(method string) bool {
 		}
 	}
 	return false
+}
+
+// GetMHSMemberAuth returns the MHS member authorization mode for this workspace.
+// If not configured, defaults to "staffauth".
+func (s *SiteSettings) GetMHSMemberAuth() string {
+	if s.MHSMemberAuth == "" {
+		return "staffauth"
+	}
+	return s.MHSMemberAuth
 }
 
 // DefaultSiteName is the default site name used when settings don't exist.

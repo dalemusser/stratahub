@@ -107,4 +107,8 @@ type AppConfig struct {
 	GameMHSLogAuth string // Log service auth header for MHS (e.g., "Bearer <api-key>")
 	GameMHSSaveURL  string // Save service URL for MHS (e.g., "https://save.adroit.games")
 	GameMHSSaveAuth string // Save service auth header for MHS (e.g., "Bearer <api-key>")
+
+	// Claude API configuration (for AI-powered student performance summaries)
+	ClaudeAPIKey string // Anthropic API key (e.g., "sk-ant-...")
+	ClaudeModel  string // Claude model ID (e.g., "claude-sonnet-4-20250514")
 }

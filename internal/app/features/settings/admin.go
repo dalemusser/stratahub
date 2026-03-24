@@ -30,14 +30,18 @@ import (
 
 type settingsVM struct {
 	viewdata.BaseVM
-	HasLogo            bool
-	LogoName           string
-	LandingTitle       string // Title for landing page
-	LandingContent     string // HTML content for landing page
-	AllAuthMethods     []models.AuthMethod
-	EnabledAuthMethods map[string]bool
-	CurrentUserMethod  string // Current user's auth method (for protection)
-	Error              string
+	HasLogo               bool
+	LogoName              string
+	LandingTitle          string // Title for landing page
+	LandingContent        string // HTML content for landing page
+	AllAuthMethods        []models.AuthMethod
+	EnabledAuthMethods    map[string]bool
+	CurrentUserMethod     string // Current user's auth method (for protection)
+	MHSMemberAuth         string // trust, keyword, staffauth
+	MHSMemberAuthKeyword  string // keyword value (only when mode is "keyword")
+	EnableClaudeSummaries bool   // AI student summaries toggle
+	ClaudeModel           string // Selected Claude model ID
+	Error                 string
 }
 
 // ServeSettings displays the settings form.
@@ -95,14 +99,18 @@ func (h *Handler) ServeSettings(w http.ResponseWriter, r *http.Request) {
 	}
 
 	vm := settingsVM{
-		BaseVM:             viewdata.NewBaseVM(r, h.DB, "Settings", "/dashboard"),
-		HasLogo:            settings.HasLogo(),
-		LogoName:           settings.LogoName,
-		LandingTitle:       landingTitle,
-		LandingContent:     settings.LandingContent,
-		AllAuthMethods:     models.AllAuthMethods,
-		EnabledAuthMethods: enabledMap,
-		CurrentUserMethod:  currentUserMethod,
+		BaseVM:                viewdata.NewBaseVM(r, h.DB, "Settings", "/dashboard"),
+		HasLogo:               settings.HasLogo(),
+		LogoName:              settings.LogoName,
+		LandingTitle:          landingTitle,
+		LandingContent:        settings.LandingContent,
+		AllAuthMethods:        models.AllAuthMethods,
+		EnabledAuthMethods:    enabledMap,
+		CurrentUserMethod:     currentUserMethod,
+		MHSMemberAuth:         settings.GetMHSMemberAuth(),
+		MHSMemberAuthKeyword:  settings.MHSMemberAuthKeyword,
+		EnableClaudeSummaries: settings.EnableClaudeSummaries,
+		ClaudeModel:           settings.ClaudeModel,
 	}
 
 	h.render(w, r, vm)
@@ -138,6 +146,10 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	footerHTML := htmlsanitize.Sanitize(strings.TrimSpace(r.FormValue("footer_html")))
 	removeLogo := r.FormValue("remove_logo") != ""
 	authMethods := r.Form["auth_methods"]
+	mhsMemberAuth := strings.TrimSpace(r.FormValue("mhs_member_auth"))
+	mhsMemberAuthKeyword := strings.TrimSpace(r.FormValue("mhs_member_auth_keyword"))
+	enableClaudeSummaries := r.FormValue("enable_claude_summaries") != ""
+	claudeModel := strings.TrimSpace(r.FormValue("claude_model"))
 
 	// Validation
 	if siteName == "" {
@@ -146,6 +158,29 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(authMethods) == 0 {
 		h.renderWithError(w, r, wsID, "At least one authentication method must be selected.")
+		return
+	}
+
+	// Validate Claude model selection
+	switch claudeModel {
+	case "", "claude-haiku-4-5-20251001", "claude-sonnet-4-20250514", "claude-opus-4-20250514":
+		// valid
+	default:
+		h.renderWithError(w, r, wsID, "Invalid AI model selection.")
+		return
+	}
+
+	// Validate MHS member auth setting
+	switch mhsMemberAuth {
+	case "trust", "staffauth", "":
+		// valid
+	case "keyword":
+		if mhsMemberAuthKeyword == "" {
+			h.renderWithError(w, r, wsID, "A keyword is required when Keyword mode is selected.")
+			return
+		}
+	default:
+		h.renderWithError(w, r, wsID, "Invalid MHS member authorization mode.")
 		return
 	}
 
@@ -235,15 +270,19 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 
 	// Save settings
 	settings := models.SiteSettings{
-		SiteName:           siteName,
-		LogoPath:           logoPath,
-		LogoName:           logoName,
-		LandingTitle:       landingTitle,
-		LandingContent:     landingContent,
-		FooterHTML:         footerHTML,
-		EnabledAuthMethods: authMethods,
-		UpdatedByID:        &memberID,
-		UpdatedByName:      uname,
+		SiteName:              siteName,
+		LogoPath:              logoPath,
+		LogoName:              logoName,
+		LandingTitle:          landingTitle,
+		LandingContent:        landingContent,
+		FooterHTML:            footerHTML,
+		EnabledAuthMethods:    authMethods,
+		MHSMemberAuth:         mhsMemberAuth,
+		MHSMemberAuthKeyword:  mhsMemberAuthKeyword,
+		EnableClaudeSummaries: enableClaudeSummaries,
+		ClaudeModel:           claudeModel,
+		UpdatedByID:           &memberID,
+		UpdatedByName:         uname,
 	}
 
 	if err := store.Save(ctx, wsID, settings); err != nil {
@@ -297,15 +336,19 @@ func (h *Handler) renderWithError(w http.ResponseWriter, r *http.Request, wsID p
 	}
 
 	vm := settingsVM{
-		BaseVM:             viewdata.NewBaseVM(r, h.DB, "Settings", "/dashboard"),
-		HasLogo:            settings.HasLogo(),
-		LogoName:           settings.LogoName,
-		LandingTitle:       landingTitle,
-		LandingContent:     settings.LandingContent,
-		AllAuthMethods:     models.AllAuthMethods,
-		EnabledAuthMethods: enabledMap,
-		CurrentUserMethod:  currentUserMethod,
-		Error:              errMsg,
+		BaseVM:                viewdata.NewBaseVM(r, h.DB, "Settings", "/dashboard"),
+		HasLogo:               settings.HasLogo(),
+		LogoName:              settings.LogoName,
+		LandingTitle:          landingTitle,
+		LandingContent:        settings.LandingContent,
+		AllAuthMethods:        models.AllAuthMethods,
+		EnabledAuthMethods:    enabledMap,
+		CurrentUserMethod:     currentUserMethod,
+		MHSMemberAuth:         settings.GetMHSMemberAuth(),
+		MHSMemberAuthKeyword:  settings.MHSMemberAuthKeyword,
+		EnableClaudeSummaries: settings.EnableClaudeSummaries,
+		ClaudeModel:           settings.ClaudeModel,
+		Error:                 errMsg,
 	}
 
 	h.render(w, r, vm)

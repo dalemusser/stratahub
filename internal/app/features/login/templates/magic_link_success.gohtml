@@ -91,11 +91,15 @@
       var returnURL = "{{ .ReturnURL }}";
       var dest = returnURL || '/dashboard';
 
-      // Broadcast to other tabs/windows that login succeeded
+      // Notify other tabs/windows that login succeeded
       if (typeof BroadcastChannel !== 'undefined') {
         var channel = new BroadcastChannel('stratahub_auth');
         channel.postMessage({ type: 'login_success', returnURL: dest });
       }
+      // localStorage fallback — storage events fire in other tabs
+      try {
+        localStorage.setItem('stratahub_auth_success', JSON.stringify({ returnURL: dest, t: Date.now() }));
+      } catch(e) {}
     })();
   </script>
 </body>

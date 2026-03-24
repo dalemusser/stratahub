@@ -88,6 +88,10 @@ var appConfigKeys = []config.AppKey{
 	{Name: "game_mhs_log_auth", Default: "", Desc: "Log service auth header for MHS game (e.g., Bearer <api-key>)"},
 	{Name: "game_mhs_save_url", Default: "", Desc: "Save service URL for MHS game"},
 	{Name: "game_mhs_save_auth", Default: "", Desc: "Save service auth header for MHS game (e.g., Bearer <api-key>)"},
+
+	// Claude API configuration
+	{Name: "claude_api_key", Default: "", Desc: "Anthropic API key for AI summaries (sk-ant-...)"},
+	{Name: "claude_model", Default: "claude-sonnet-4-20250514", Desc: "Claude model ID for AI summaries"},
 }
 
 // LoadConfig loads WAFFLE core config and app-specific config.
@@ -182,6 +186,10 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 		GameMHSLogAuth:  appValues.String("game_mhs_log_auth"),
 		GameMHSSaveURL:  appValues.String("game_mhs_save_url"),
 		GameMHSSaveAuth: appValues.String("game_mhs_save_auth"),
+
+		// Claude API
+		ClaudeAPIKey: appValues.String("claude_api_key"),
+		ClaudeModel:  appValues.String("claude_model"),
 	}
 
 	// Auto-derive session domain in multi-workspace mode if not explicitly set.

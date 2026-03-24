@@ -1,0 +1,269 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Authorization for Unit Changes and Download Clearing</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1e293b;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --green: #16a34a;
+    --green-light: #f0fdf4;
+    --heading: #0f172a;
+    --card-bg: #f8fafc;
+    --step-bg: #dbeafe;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.7;
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 4rem;
+  }
+  h1 {
+    font-size: 1.75rem;
+    color: var(--heading);
+    margin-bottom: 0.5rem;
+  }
+  .subtitle {
+    font-size: 1rem;
+    color: var(--muted);
+    margin-bottom: 2rem;
+  }
+  h2 {
+    font-size: 1.3rem;
+    color: var(--heading);
+    margin-top: 2.5rem;
+    margin-bottom: 1rem;
+    padding-bottom: 0.35rem;
+    border-bottom: 2px solid var(--accent);
+  }
+  h3 {
+    font-size: 1.05rem;
+    color: var(--heading);
+    margin-top: 1.75rem;
+    margin-bottom: 0.6rem;
+  }
+  p { margin-bottom: 0.85rem; }
+  strong { color: var(--heading); }
+  ul, ol {
+    margin-bottom: 0.85rem;
+    padding-left: 1.5rem;
+  }
+  li { margin-bottom: 0.3rem; }
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 2rem 0;
+  }
+
+  /* Callouts */
+  .callout {
+    border-radius: 8px;
+    padding: 1rem 1.25rem;
+    margin-bottom: 1.25rem;
+    font-size: 0.95rem;
+    border-left: 4px solid;
+  }
+  .callout-green {
+    background: var(--green-light);
+    border-color: var(--green);
+  }
+  .callout-blue {
+    background: var(--accent-light);
+    border-color: var(--accent);
+  }
+  .callout strong { display: block; margin-bottom: 0.25rem; }
+
+  /* Auth mode cards */
+  .mode-cards {
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    margin-bottom: 1.25rem;
+  }
+  .mode-card {
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.1rem 1.25rem;
+  }
+  .mode-card h3 {
+    margin-top: 0;
+    margin-bottom: 0.4rem;
+  }
+  .mode-card p, .mode-card ol {
+    font-size: 0.9rem;
+    color: var(--muted);
+    margin-bottom: 0;
+  }
+  .mode-card ol { padding-left: 1.25rem; }
+  .mode-card li { margin-bottom: 0.2rem; }
+  .mode-label {
+    display: inline-block;
+    font-size: 0.65rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.1em 0.45em;
+    border-radius: 3px;
+    vertical-align: middle;
+    margin-left: 0.4rem;
+  }
+  .mode-default { background: #dbeafe; color: #1e40af; }
+
+  /* Steps */
+  .steps {
+    counter-reset: step;
+    list-style: none;
+    padding-left: 0;
+    margin-bottom: 1.25rem;
+  }
+  .steps li {
+    counter-increment: step;
+    position: relative;
+    padding: 0.5rem 0 0.5rem 3rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.95rem;
+  }
+  .steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 0;
+    top: 0.45rem;
+    width: 1.75rem;
+    height: 1.75rem;
+    background: var(--step-bg);
+    color: var(--accent);
+    border-radius: 50%;
+    font-size: 0.8rem;
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Summary table */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+  th, td {
+    text-align: left;
+    padding: 0.6rem 0.85rem;
+    border: 1px solid var(--border);
+  }
+  th {
+    background: var(--accent);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.85rem;
+    width: 35%;
+  }
+  tr:nth-child(even) td { background: var(--card-bg); }
+</style>
+</head>
+<body>
+
+<h1>Authorization for Unit Changes and Download Clearing</h1>
+<p class="subtitle">How StrataHub protects student progress in Mission HydroSci</p>
+
+<!-- Why -->
+<h2>Why authorization is required</h2>
+
+<p>Changing a student's unit or clearing their downloads in Mission HydroSci are actions that affect the student's experience. To prevent accidental or unauthorized changes, these actions require a staff member &mdash; a superadmin, admin, coordinator, or leader &mdash; to authorize them.</p>
+
+<p>This applies when a <strong>member</strong> (student) initiates the action from the Mission HydroSci units page. Staff members using the MHS Dashboard or the units page are not subject to additional authorization beyond their standard login.</p>
+
+<!-- Data -->
+<h2>What happens to data</h2>
+
+<div class="callout callout-green">
+  <strong>No save data or logging data is deleted.</strong>
+  Setting a unit or clearing downloads does not remove any grades, scores, save data, or logging data. All data is kept.
+</div>
+
+<ul>
+  <li><strong>Set to Unit</strong> changes the pointer to which unit the student is currently playing. All prior units are marked as completed. The student's save data, progress point grades, logging data, and scores remain intact. You are simply telling the system which unit the student should be on.</li>
+  <li><strong>Clear All Downloads</strong> removes cached unit files from the student's device to free up storage. It has no effect on the student's progress, grades, or any server-side data.</li>
+</ul>
+
+<!-- Per-workspace -->
+<h2>Per-workspace configuration</h2>
+
+<p>The authorization mode is configured on a <strong>per-workspace basis</strong> in StrataHub. Each workspace can independently choose what is required when a member performs a unit change or clears downloads. This is set in the workspace's site settings by an administrator.</p>
+
+<p>Three options are available:</p>
+
+<div class="mode-cards">
+  <div class="mode-card">
+    <h3>Staff Auth <span class="mode-label mode-default">Default</span></h3>
+    <p>A leader, coordinator, admin, or superadmin must authenticate directly in the Mission HydroSci interface on the student's behalf. When a member initiates a unit change or download clearing, an authorization dialog appears. The staff member enters their login ID, then verifies their identity using their configured authentication method &mdash; password, email verification code, or trust (depending on how their account is set up). Once authenticated, the action proceeds.</p>
+    <p style="margin-top: 0.5rem;">This is the default and most secure option. It ensures a staff member is physically present and explicitly approves each action.</p>
+  </div>
+
+  <div class="mode-card">
+    <h3>Keyword</h3>
+    <p>A shared keyword is configured for the workspace. When a member initiates an action, they are prompted to enter the keyword. This is a simpler approach that does not require a staff member to be present, but provides a basic gate to prevent accidental changes.</p>
+  </div>
+
+  <div class="mode-card">
+    <h3>Trust</h3>
+    <p>No additional authorization is required for members. The action proceeds with a simple confirmation dialog. This option is appropriate for environments where members are trusted to manage their own unit changes.</p>
+  </div>
+</div>
+
+<!-- How staff auth works -->
+<h2>How staff authentication works</h2>
+
+<p>When the workspace uses staff auth (the default), the authorization flow works as follows:</p>
+
+<ol class="steps">
+  <li>The member clicks "Set to Unit" or "Clear All Downloads" on the Mission HydroSci units page.</li>
+  <li>An authorization dialog appears asking for a staff member's login ID.</li>
+  <li>The system looks up the staff member and determines their authentication method:
+    <ul>
+      <li><strong>Trust:</strong> The staff member is immediately authorized.</li>
+      <li><strong>Password:</strong> The staff member enters their password in the dialog.</li>
+      <li><strong>Email:</strong> A verification code is sent to the staff member's email. They enter the code in the dialog.</li>
+    </ul>
+  </li>
+  <li>On successful authentication, the system issues a one-time authorization token.</li>
+  <li>The token is included with the unit change or download clearing request.</li>
+  <li>The server validates and consumes the token, then performs the action.</li>
+</ol>
+
+<div class="callout callout-blue">
+  <strong>Who can authorize?</strong>
+  The staff member must be a leader, coordinator, admin, or superadmin. They must belong to the same workspace as the student. Superadmins, who have no workspace restriction, are also accepted.
+</div>
+
+<hr>
+
+<!-- Summary -->
+<h2>Summary</h2>
+
+<table>
+  <tbody>
+    <tr><th>Who needs authorization</th><td>Members (students) only</td></tr>
+    <tr><th>Staff roles that can authorize</th><td>Superadmin, admin, coordinator, leader</td></tr>
+    <tr><th>Authorization modes</th><td>Staff auth (default), keyword, trust</td></tr>
+    <tr><th>Configured where</th><td>Per workspace, in StrataHub site settings</td></tr>
+    <tr><th>Data deleted</th><td>None &mdash; all save data, logging data, grades, and scores are preserved</td></tr>
+    <tr><th>What "Set to Unit" does</th><td>Moves the pointer to which unit the student is playing</td></tr>
+    <tr><th>What "Clear Downloads" does</th><td>Removes cached files from the device; no server-side data is affected</td></tr>
+  </tbody>
+</table>
+
+</body>
+</html>

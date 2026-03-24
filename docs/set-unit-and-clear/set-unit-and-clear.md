@@ -9,6 +9,8 @@ This document describes the "Set to Unit" and "Clear All Downloads" features ava
 - `completed_units` becomes all units before it
 - Setting to Unit 1 is equivalent to a full progress reset (empty completed_units)
 
+**No data is deleted.** Setting a unit only changes the pointer to which unit the student is playing. All save data, logging data, grades, and scores are preserved.
+
 "Clear All Downloads" removes all cached unit files from the device without affecting progress.
 
 These two actions were previously combined as "Reset All Progress" which both reset progress and cleared downloads. They are now separate concerns.
@@ -23,6 +25,37 @@ Progress is tracked in two independent systems:
 | **MHS Grader** (mhsgrader) | `progress_point_grades` | `currentUnit` | The unit the student last started playing in the game — set automatically when the grader sees a unit start event |
 
 These values can diverge. For example, if a leader sets a student to Unit 4 via the dashboard, the grader's `currentUnit` will still reflect whatever unit the student last played until they launch Unit 4 in the game.
+
+## Member Authorization
+
+When a **member** (student) uses Set to Unit or Clear All Downloads on the Mission HydroSci units page, they must pass an authorization check. The authorization mode is configured per workspace via the `MHSMemberAuth` site setting. Three modes are supported:
+
+### Staff Auth (default)
+
+When `MHSMemberAuth` is `"staffauth"` (or empty/unset), a member must have a leader, coordinator, admin, or superadmin authenticate on their behalf. The flow:
+
+1. Member clicks Set to Unit or Clear All Downloads
+2. An authorization modal appears asking for the staff member's login ID
+3. The staff member's authentication method determines the next step:
+   - **Trust:** Immediate authorization (token returned directly)
+   - **Password:** Staff member enters their password
+   - **Email:** A verification code is sent to the staff member's email; they enter it in the modal
+4. On success, the modal returns an `auth_token` which is included with the action request
+5. The server validates and consumes the token before allowing the action
+
+The staff auth verifier enforces that the authenticating user is a leader, coordinator, admin, or superadmin, and that they belong to the same workspace (or are a superadmin with no workspace restriction).
+
+### Keyword
+
+When `MHSMemberAuth` is `"keyword"`, a member must enter the workspace's configured keyword (`MHSMemberAuthKeyword`). The comparison is case-insensitive.
+
+### Trust
+
+When `MHSMemberAuth` is `"trust"`, no additional authorization is required for members. The action proceeds with a simple confirmation.
+
+### Non-member roles
+
+Leaders, admins, coordinators, and superadmins are **not** subject to member authorization. They see a standard browser `confirm()` dialog and proceed directly.
 
 ## MHS Dashboard — Set Progress
 
@@ -40,6 +73,8 @@ Only leaders, admins, coordinators, and superadmins can access the dashboard. Th
 - Role must be leader, admin, coordinator, or superadmin
 - Requester must have access to the selected group
 - Target user must be a member of the selected group
+
+No additional member authorization is needed — the dashboard is a staff-only interface.
 
 ### Confirmation
 
@@ -110,19 +145,20 @@ A `<select>` dropdown populated from the unit data (showing full titles like "Un
 
 ### Authorization
 
-Any authenticated user with MHS access can set their own progress. The server does not restrict by role — the keyword gate provides the authorization check for members.
+Any authenticated user with MHS access can set their own progress. The authorization check depends on role:
 
-- **Members:** Must enter the keyword `hydroreset` in a modal dialog before the action proceeds
-- **Leaders, admins, coordinators, superadmins:** Shown a browser `confirm()` dialog
+- **Members:** Must pass the workspace's configured authorization check (staff auth, keyword, or trust — see Member Authorization above)
+- **Leaders, admins, coordinators, superadmins:** Shown a browser `confirm()` dialog — no additional authorization needed
 
 ### Flow
 
 1. User selects a unit and clicks "Go"
-2. `mhsSetToUnit()` checks `isMember`
-   - If member: shows keyword modal (shared modal used by both Set to Unit and Clear All Downloads)
-   - If non-member: shows `confirm()` dialog
-3. On confirmation, `doSetToUnit(unit)` POSTs JSON `{"unit": "unit3"}` to `/missionhydrosci/api/progress/set-unit`
-4. Server validates unit (must be unit1-unit5), calls `ProgressStore.SetToUnit()`
+2. `mhsSetToUnit()` checks `isMember` and `memberAuthMode`
+   - If member and mode is not "trust": shows authorization modal (staff auth or keyword depending on mode)
+   - If non-member or trust mode: shows `confirm()` dialog
+3. On confirmation, `doSetToUnit(unit, authData)` POSTs JSON to `/missionhydrosci/api/progress/set-unit`
+   - Includes `auth_token` (staff auth mode) or `keyword` (keyword mode) if applicable
+4. Server validates authorization, then calls `ProgressStore.SetToUnit()`
 5. Returns `{"ok": true, "unit": "unit3"}`
 6. Client reloads the page
 
@@ -130,7 +166,7 @@ Any authenticated user with MHS access can set their own progress. The server do
 
 - **Handler:** `internal/app/features/missionhydrosci/progress.go` — `HandleSetToUnit`
 - **Route:** `internal/app/features/missionhydrosci/routes.go` — `POST /api/progress/set-unit`
-- **Template:** `internal/app/features/missionhydrosci/templates/missionhydrosci_units.gohtml` — select/button UI, keyword modal, JS functions
+- **Template:** `internal/app/features/missionhydrosci/templates/missionhydrosci_units.gohtml` — select/button UI, authorization modal, JS functions
 
 ## Mission HydroSci — Clear All Downloads
 
@@ -144,14 +180,14 @@ A full-width solid red button labeled "Clear All Downloads".
 
 ### Authorization
 
-Same keyword/confirmation pattern as Set to Unit:
-- **Members:** Must enter `hydroreset` keyword
+Same authorization pattern as Set to Unit:
+- **Members:** Must pass the workspace's configured authorization check
 - **Non-members:** Browser `confirm()` dialog
 
 ### Flow
 
 1. User clicks "Clear All Downloads"
-2. `mhsClearAllDownloads()` checks `isMember` and requests confirmation
+2. `mhsClearAllDownloads()` checks `isMember` and `memberAuthMode`, requests authorization
 3. On confirmation, `doClearAllDownloads()`:
    - Calls `manager.deleteAllUnits()` to remove all cached unit files from the service worker cache
    - Removes `mhs-manual-downloads` from localStorage
@@ -163,15 +199,41 @@ This action does **not** affect progress — the student's current unit and comp
 
 - **Template:** `internal/app/features/missionhydrosci/templates/missionhydrosci_units.gohtml` — button markup, JS functions
 
-## Shared Keyword Modal
+## Authorization Modal
 
-Both Set to Unit and Clear All Downloads on the Mission HydroSci units page share a single keyword confirmation modal (`#keyword-modal`). The modal is configured dynamically via `showKeywordModal(title, desc, callback)`:
+Both Set to Unit and Clear All Downloads on the Mission HydroSci units page share a single authorization modal. The modal adapts its UI based on the workspace's `MHSMemberAuth` setting:
 
-- `title` — displayed as the modal heading
-- `desc` — displayed as the description text
-- `callback` — function called on successful keyword entry
+### Staff Auth mode
+The modal presents a multi-step flow:
+1. **Login ID entry:** Member enters the staff member's login ID
+2. **Challenge step:** Based on the staff member's auth method:
+   - Password: shows a password field
+   - Email: shows a verification code field with a "Resend code" option
+   - Trust: skips directly to success
+3. **Success:** Returns an `auth_token` used to authorize the action
 
-The keyword is `hydroreset` (case-insensitive). On incorrect entry, an "Incorrect keyword" error is shown. The modal can be dismissed with the Cancel button or the Escape key.
+### Keyword mode
+The modal shows a single keyword input field. The keyword is validated against the workspace setting (case-insensitive).
+
+### Staff Auth API endpoints
+
+| Endpoint | Handler | Purpose |
+|----------|---------|---------|
+| `POST /api/auth/start` | `HandleStaffAuthStart` | Initiates auth challenge |
+| `POST /api/auth/verify` | `HandleStaffAuthVerify` | Validates credential |
+| `POST /api/auth/resend` | `HandleStaffAuthResend` | Resends email code |
+| `POST /api/auth/keyword` | `HandleKeywordVerify` | Validates keyword |
+
+## Workspace Settings
+
+Member authorization is configured per workspace in `site_settings`:
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `mhs_member_auth` | string | `"staffauth"` | Authorization mode: `"staffauth"`, `"keyword"`, or `"trust"` |
+| `mhs_member_auth_keyword` | string | (empty) | The keyword for keyword mode |
+
+The `GetMHSMemberAuth()` method on `SiteSettings` returns the configured mode, defaulting to `"staffauth"` when empty.
 
 ## Store Methods
 

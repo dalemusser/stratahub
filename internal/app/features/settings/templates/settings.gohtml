@@ -83,6 +83,76 @@
   </div>
 
   <div class="border-t dark:border-gray-700 pt-4">
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Mission HydroSci &mdash; Member Authorization</label>
+    <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+      Choose what is required when a member changes their unit or clears downloads in Mission HydroSci.
+      This setting does not affect leaders, admins, or coordinators.
+    </p>
+    <div class="space-y-2 bg-gray-50 dark:bg-gray-700 p-3 rounded border dark:border-gray-600">
+      <label class="flex items-center">
+        <input type="radio" name="mhs_member_auth" value="staffauth"
+               {{ if eq .MHSMemberAuth "staffauth" }}checked{{ end }}
+               class="mr-2 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+               onchange="document.getElementById('mhs-keyword-field').classList.add('hidden')">
+        <span class="text-sm text-gray-700 dark:text-gray-300">Staff Auth</span>
+        <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(a leader/admin must authenticate on the device)</span>
+      </label>
+      <label class="flex items-center">
+        <input type="radio" name="mhs_member_auth" value="keyword"
+               {{ if eq .MHSMemberAuth "keyword" }}checked{{ end }}
+               class="mr-2 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+               onchange="document.getElementById('mhs-keyword-field').classList.remove('hidden')">
+        <span class="text-sm text-gray-700 dark:text-gray-300">Keyword</span>
+        <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(member must enter a keyword)</span>
+      </label>
+      <div id="mhs-keyword-field" class="ml-6 {{ if ne .MHSMemberAuth "keyword" }}hidden{{ end }}">
+        <input name="mhs_member_auth_keyword" type="text" value="{{ .MHSMemberAuthKeyword }}"
+               placeholder="Enter keyword"
+               class="w-full max-w-xs border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm">
+      </div>
+      <label class="flex items-center">
+        <input type="radio" name="mhs_member_auth" value="trust"
+               {{ if eq .MHSMemberAuth "trust" }}checked{{ end }}
+               class="mr-2 border-gray-300 text-indigo-600 focus:ring-indigo-500"
+               onchange="document.getElementById('mhs-keyword-field').classList.add('hidden')">
+        <span class="text-sm text-gray-700 dark:text-gray-300">Trust</span>
+        <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(member only confirms via dialog)</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="border-t dark:border-gray-700 pt-4">
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Mission HydroSci &mdash; AI Student Summaries</label>
+    <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+      When enabled, leaders and admins can generate AI-powered performance summaries for individual students from the dashboard.
+    </p>
+    <div class="space-y-3 bg-gray-50 dark:bg-gray-700 p-3 rounded border dark:border-gray-600">
+      <label class="flex items-center gap-2">
+        <input type="checkbox" name="enable_claude_summaries" value="1"
+               {{ if .EnableClaudeSummaries }}checked{{ end }}
+               class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+        <span class="text-sm text-gray-700 dark:text-gray-300">Enable AI Student Summaries</span>
+      </label>
+      <div>
+        <label class="block text-sm text-gray-700 dark:text-gray-300 mb-1">AI Model</label>
+        <select name="claude_model"
+                class="w-full max-w-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm">
+          <option value="claude-haiku-4-5-20251001" {{ if eq .ClaudeModel "claude-haiku-4-5-20251001" }}selected{{ end }}>
+            Haiku 4.5 &mdash; Fast, basic analysis (~$0.007/summary)
+          </option>
+          <option value="claude-sonnet-4-20250514" {{ if or (eq .ClaudeModel "claude-sonnet-4-20250514") (eq .ClaudeModel "") }}selected{{ end }}>
+            Sonnet 4 &mdash; Recommended, strong analysis (~$0.04/summary)
+          </option>
+          <option value="claude-opus-4-20250514" {{ if eq .ClaudeModel "claude-opus-4-20250514" }}selected{{ end }}>
+            Opus 4 &mdash; Highest quality, highest cost (~$0.40/summary)
+          </option>
+        </select>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Higher-tier models produce more insightful summaries but cost more per request.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="border-t dark:border-gray-700 pt-4">
     <div class="flex items-center justify-between mb-2">
       <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Landing Page</label>
       <a href="/" target="_blank" class="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">View Landing Page</a>

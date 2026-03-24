@@ -1,0 +1,115 @@
+{{ define "login_magic_link_confirm" }}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sign In - {{ .SiteName }}</title>
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+      margin: 0;
+      background-color: #f3f4f6;
+      color: #1f2937;
+    }
+    .card {
+      text-align: center;
+      background: white;
+      padding: 2.5rem 3rem;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+      max-width: 400px;
+    }
+    .site-name {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: #4f46e5;
+      margin: 0 0 1.5rem 0;
+      letter-spacing: 0.025em;
+    }
+    .lock-circle {
+      width: 64px;
+      height: 64px;
+      background-color: #4f46e5;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0 auto 1.25rem auto;
+    }
+    .lock-circle svg {
+      width: 32px;
+      height: 32px;
+      stroke: white;
+      stroke-width: 2;
+      fill: none;
+    }
+    .title {
+      font-size: 1.5rem;
+      font-weight: 600;
+      color: #111827;
+      margin: 0 0 0.75rem 0;
+    }
+    .message {
+      color: #4b5563;
+      margin: 0 0 1.5rem 0;
+      line-height: 1.5;
+    }
+    .btn {
+      display: inline-block;
+      padding: 14px 48px;
+      background-color: #4f46e5;
+      color: #ffffff;
+      border: none;
+      font-size: 16px;
+      font-weight: 500;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: background-color 0.15s;
+    }
+    .btn:hover { background-color: #4338ca; }
+    .error {
+      color: #dc2626;
+      margin: 0 0 1rem 0;
+      font-size: 0.9rem;
+    }
+    /* Dark mode */
+    @media (prefers-color-scheme: dark) {
+      body { background-color: #111827; color: #f3f4f6; }
+      .card { background-color: #1f2937; box-shadow: 0 4px 20px rgba(0,0,0,0.3); }
+      .site-name { color: #818cf8; }
+      .title { color: #f9fafb; }
+      .message { color: #d1d5db; }
+      .btn { background-color: #6366f1; }
+      .btn:hover { background-color: #4f46e5; }
+      .error { color: #f87171; }
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <p class="site-name">{{ .SiteName }}</p>
+    <div class="lock-circle">
+      <svg viewBox="0 0 24 24" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+      </svg>
+    </div>
+    {{ if .Error }}
+    <p class="error">{{ .Error }}</p>
+    {{ end }}
+    <p class="title">Confirm Sign In</p>
+    <p class="message">Click the button below to complete your sign in.</p>
+    <form method="POST" action="/login/confirm-magic-link">
+      <input type="hidden" name="token" value="{{ .Token }}">
+      <button type="submit" class="btn">Sign In</button>
+    </form>
+  </div>
+</body>
+</html>
+{{ end }}

@@ -50,17 +50,46 @@
     </div>
   </div>
 
-  <!-- Keyword confirmation modal (members only) -->
-  <div id="keyword-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center">
-    <div class="absolute inset-0 bg-black/40" onclick="mhsCloseKeywordModal()"></div>
+  <!-- Member authorization modal (multi-mode: keyword, staff auth) -->
+  <div id="auth-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center">
+    <div class="absolute inset-0 bg-black/40" onclick="mhsCloseAuthModal()"></div>
     <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-300 dark:border-gray-600 max-w-sm w-full p-4 space-y-3 mx-4">
-      <h2 id="keyword-modal-title" class="text-sm font-semibold text-gray-900 dark:text-gray-100"></h2>
-      <p id="keyword-modal-desc" class="text-xs text-gray-500 dark:text-gray-400"></p>
-      <input id="keyword-modal-input" type="password" autocomplete="off" class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-      <div id="keyword-modal-error" class="text-xs text-red-600 dark:text-red-400 hidden">Incorrect keyword</div>
+      <h2 id="auth-modal-title" class="text-sm font-semibold text-gray-900 dark:text-gray-100"></h2>
+      <p id="auth-modal-desc" class="text-xs text-gray-500 dark:text-gray-400"></p>
+
+      <!-- Keyword step -->
+      <div id="auth-step-keyword" class="hidden">
+        <input id="auth-keyword-input" type="password" autocomplete="off" placeholder="Enter keyword"
+               class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+
+      <!-- Staff auth step 1: login ID -->
+      <div id="auth-step-login" class="hidden">
+        <input id="auth-login-input" type="text" autocomplete="off" placeholder="Staff login ID"
+               class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+
+      <!-- Staff auth step 2: password -->
+      <div id="auth-step-password" class="hidden">
+        <p id="auth-staff-name" class="text-xs text-gray-600 dark:text-gray-400 mb-2"></p>
+        <input id="auth-password-input" type="password" autocomplete="off" placeholder="Enter password"
+               class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      </div>
+
+      <!-- Staff auth step 2: email code -->
+      <div id="auth-step-email" class="hidden">
+        <p id="auth-email-name" class="text-xs text-gray-600 dark:text-gray-400 mb-2"></p>
+        <input id="auth-code-input" type="text" autocomplete="off" placeholder="Enter verification code" maxlength="6" inputmode="numeric"
+               class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+        <button type="button" id="auth-resend-btn" class="mt-1 text-xs text-blue-600 dark:text-blue-400 hover:underline hidden" onclick="mhsResendCode()">Resend code</button>
+      </div>
+
+      <div id="auth-modal-error" class="text-xs text-red-600 dark:text-red-400 hidden"></div>
+      <div id="auth-modal-loading" class="text-xs text-gray-500 dark:text-gray-400 hidden">Verifying...</div>
+
       <div class="flex justify-end gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-        <button type="button" class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" onclick="mhsCloseKeywordModal()">Cancel</button>
-        <button type="button" class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700" onclick="mhsConfirmKeywordModal()">Confirm</button>
+        <button type="button" class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" onclick="mhsCloseAuthModal()">Cancel</button>
+        <button type="button" id="auth-modal-submit" class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700" onclick="mhsSubmitAuthModal()">Next</button>
       </div>
     </div>
   </div>
@@ -690,45 +719,227 @@
   };
 
   var isMember = {{ if eq .Role "member" }}true{{ else }}false{{ end }};
+  var memberAuthMode = '{{ .MHSMemberAuth }}';
 
-  // --- Keyword modal (shared by set-to-unit and clear-all) ---
-  var keywordModalCallback = null;
+  // --- Authorization modal (multi-mode: keyword, staff auth) ---
+  var authModalCallback = null;  // Function to call on success, receives {auth_token, keyword}
+  var authModalStep = '';        // 'keyword', 'login', 'password', 'email'
+  var authChallengeID = '';
+  var authActionTitle = '';
 
-  function showKeywordModal(title, desc, callback) {
-    keywordModalCallback = callback;
-    document.getElementById('keyword-modal-title').textContent = title;
-    document.getElementById('keyword-modal-desc').textContent = desc;
-    document.getElementById('keyword-modal-input').value = '';
-    document.getElementById('keyword-modal-error').classList.add('hidden');
-    document.getElementById('keyword-modal').classList.remove('hidden');
-    document.getElementById('keyword-modal-input').focus();
+  function showAuthModal(title, desc, callback) {
+    authModalCallback = callback;
+    authActionTitle = title;
+    document.getElementById('auth-modal-title').textContent = title;
+    document.getElementById('auth-modal-desc').textContent = desc;
+    document.getElementById('auth-modal-error').classList.add('hidden');
+    document.getElementById('auth-modal-loading').classList.add('hidden');
+
+    // Hide all steps
+    document.getElementById('auth-step-keyword').classList.add('hidden');
+    document.getElementById('auth-step-login').classList.add('hidden');
+    document.getElementById('auth-step-password').classList.add('hidden');
+    document.getElementById('auth-step-email').classList.add('hidden');
+    document.getElementById('auth-resend-btn').classList.add('hidden');
+
+    // Clear inputs
+    document.getElementById('auth-keyword-input').value = '';
+    document.getElementById('auth-login-input').value = '';
+    document.getElementById('auth-password-input').value = '';
+    document.getElementById('auth-code-input').value = '';
+    authChallengeID = '';
+
+    if (memberAuthMode === 'keyword') {
+      authModalStep = 'keyword';
+      document.getElementById('auth-step-keyword').classList.remove('hidden');
+      document.getElementById('auth-modal-submit').textContent = 'Confirm';
+    } else {
+      // staffauth
+      authModalStep = 'login';
+      document.getElementById('auth-step-login').classList.remove('hidden');
+      document.getElementById('auth-modal-submit').textContent = 'Next';
+    }
+
+    document.getElementById('auth-modal').classList.remove('hidden');
+
+    // Focus the visible input
+    setTimeout(function() {
+      if (authModalStep === 'keyword') {
+        document.getElementById('auth-keyword-input').focus();
+      } else {
+        document.getElementById('auth-login-input').focus();
+      }
+    }, 50);
   }
 
-  window.mhsCloseKeywordModal = function() {
-    document.getElementById('keyword-modal').classList.add('hidden');
-    keywordModalCallback = null;
+  function showAuthError(msg) {
+    var el = document.getElementById('auth-modal-error');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    document.getElementById('auth-modal-loading').classList.add('hidden');
+  }
+
+  function showAuthLoading(show) {
+    if (show) {
+      document.getElementById('auth-modal-loading').classList.remove('hidden');
+      document.getElementById('auth-modal-error').classList.add('hidden');
+    } else {
+      document.getElementById('auth-modal-loading').classList.add('hidden');
+    }
+  }
+
+  window.mhsCloseAuthModal = function() {
+    document.getElementById('auth-modal').classList.add('hidden');
+    authModalCallback = null;
+    authChallengeID = '';
   };
 
-  window.mhsConfirmKeywordModal = function() {
-    var input = document.getElementById('keyword-modal-input').value;
-    if (input.toLowerCase() !== 'hydroreset') {
-      document.getElementById('keyword-modal-error').classList.remove('hidden');
-      return;
+  window.mhsSubmitAuthModal = function() {
+    document.getElementById('auth-modal-error').classList.add('hidden');
+
+    if (authModalStep === 'keyword') {
+      var keyword = document.getElementById('auth-keyword-input').value;
+      if (!keyword) { showAuthError('Please enter the keyword.'); return; }
+      showAuthLoading(true);
+      // Validate keyword server-side
+      fetch('/missionhydrosci/api/auth/keyword', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({ keyword: keyword })
+      }).then(function(resp) {
+        return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
+      }).then(function(result) {
+        showAuthLoading(false);
+        if (!result.ok) { showAuthError(result.data.error || 'Incorrect keyword.'); return; }
+        document.getElementById('auth-modal').classList.add('hidden');
+        if (authModalCallback) authModalCallback({ keyword: keyword });
+        authModalCallback = null;
+      }).catch(function() {
+        showAuthLoading(false);
+        showAuthError('Verification failed. Please try again.');
+      });
+
+    } else if (authModalStep === 'login') {
+      var loginID = document.getElementById('auth-login-input').value.trim();
+      if (!loginID) { showAuthError('Please enter a staff login ID.'); return; }
+      showAuthLoading(true);
+      fetch('/missionhydrosci/api/auth/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({ login_id: loginID })
+      }).then(function(resp) {
+        return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
+      }).then(function(result) {
+        showAuthLoading(false);
+        if (!result.ok) { showAuthError(result.data.error || 'Authentication failed.'); return; }
+        var data = result.data;
+        if (data.method === 'trust') {
+          // Immediate success
+          document.getElementById('auth-modal').classList.add('hidden');
+          if (authModalCallback) authModalCallback({ auth_token: data.token });
+          authModalCallback = null;
+        } else if (data.method === 'password') {
+          authChallengeID = data.challenge_id;
+          authModalStep = 'password';
+          document.getElementById('auth-step-login').classList.add('hidden');
+          document.getElementById('auth-step-password').classList.remove('hidden');
+          document.getElementById('auth-staff-name').textContent = 'Enter password for ' + data.staff_name;
+          document.getElementById('auth-modal-submit').textContent = 'Verify';
+          document.getElementById('auth-password-input').focus();
+        } else if (data.method === 'email') {
+          authChallengeID = data.challenge_id;
+          authModalStep = 'email';
+          document.getElementById('auth-step-login').classList.add('hidden');
+          document.getElementById('auth-step-email').classList.remove('hidden');
+          document.getElementById('auth-email-name').textContent = 'A verification code was sent to ' + data.staff_name + '\'s email.';
+          document.getElementById('auth-resend-btn').classList.remove('hidden');
+          document.getElementById('auth-modal-submit').textContent = 'Verify';
+          document.getElementById('auth-code-input').focus();
+        }
+      }).catch(function() {
+        showAuthLoading(false);
+        showAuthError('Authentication failed. Please try again.');
+      });
+
+    } else if (authModalStep === 'password') {
+      var password = document.getElementById('auth-password-input').value;
+      if (!password) { showAuthError('Please enter the password.'); return; }
+      showAuthLoading(true);
+      fetch('/missionhydrosci/api/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({ challenge_id: authChallengeID, credential: password })
+      }).then(function(resp) {
+        return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
+      }).then(function(result) {
+        showAuthLoading(false);
+        if (!result.ok) { showAuthError(result.data.error || 'Incorrect password.'); return; }
+        document.getElementById('auth-modal').classList.add('hidden');
+        if (authModalCallback) authModalCallback({ auth_token: result.data.token });
+        authModalCallback = null;
+      }).catch(function() {
+        showAuthLoading(false);
+        showAuthError('Verification failed. Please try again.');
+      });
+
+    } else if (authModalStep === 'email') {
+      var code = document.getElementById('auth-code-input').value.trim();
+      if (!code) { showAuthError('Please enter the verification code.'); return; }
+      showAuthLoading(true);
+      fetch('/missionhydrosci/api/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({ challenge_id: authChallengeID, credential: code })
+      }).then(function(resp) {
+        return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
+      }).then(function(result) {
+        showAuthLoading(false);
+        if (!result.ok) { showAuthError(result.data.error || 'Incorrect code.'); return; }
+        document.getElementById('auth-modal').classList.add('hidden');
+        if (authModalCallback) authModalCallback({ auth_token: result.data.token });
+        authModalCallback = null;
+      }).catch(function() {
+        showAuthLoading(false);
+        showAuthError('Verification failed. Please try again.');
+      });
     }
-    document.getElementById('keyword-modal').classList.add('hidden');
-    if (keywordModalCallback) keywordModalCallback();
-    keywordModalCallback = null;
+  };
+
+  window.mhsResendCode = function() {
+    if (!authChallengeID) return;
+    var btn = document.getElementById('auth-resend-btn');
+    btn.textContent = 'Sending...';
+    btn.disabled = true;
+    fetch('/missionhydrosci/api/auth/resend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      body: JSON.stringify({ challenge_id: authChallengeID })
+    }).then(function(resp) {
+      if (resp.ok) {
+        btn.textContent = 'Code resent';
+      } else {
+        btn.textContent = 'Resend failed';
+      }
+      setTimeout(function() { btn.textContent = 'Resend code'; btn.disabled = false; }, 3000);
+    }).catch(function() {
+      btn.textContent = 'Resend code';
+      btn.disabled = false;
+    });
   };
 
   // --- Set to Unit ---
-  function doSetToUnit(unit) {
+  function doSetToUnit(unit, authData) {
+    var body = { unit: unit };
+    if (authData && authData.auth_token) body.auth_token = authData.auth_token;
+    if (authData && authData.keyword) body.keyword = authData.keyword;
+
     fetch('/missionhydrosci/api/progress/set-unit', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'X-CSRF-Token': csrfToken
       },
-      body: JSON.stringify({ unit: unit })
+      body: JSON.stringify(body)
     })
     .then(function(resp) {
       if (!resp.ok) throw new Error('set unit failed');
@@ -747,15 +958,15 @@
     var unit = select.value;
     var unitTitle = select.options[select.selectedIndex].text;
 
-    if (isMember) {
-      showKeywordModal(
+    if (isMember && memberAuthMode !== 'trust') {
+      showAuthModal(
         'Set progress to ' + unitTitle,
-        'Enter keyword to confirm. This will update your current unit and mark all prior units as completed.',
-        function() { doSetToUnit(unit); }
+        'This will update your current unit and mark all prior units as completed.',
+        function(authData) { doSetToUnit(unit, authData); }
       );
     } else {
       if (!confirm('Set progress to ' + unitTitle + '? This will mark all prior units as completed.')) return;
-      doSetToUnit(unit);
+      doSetToUnit(unit, {});
     }
   };
 
@@ -771,11 +982,11 @@
   }
 
   window.mhsClearAllDownloads = function() {
-    if (isMember) {
-      showKeywordModal(
+    if (isMember && memberAuthMode !== 'trust') {
+      showAuthModal(
         'Clear all downloads',
-        'Enter keyword to confirm. This will remove all downloaded unit files from this device.',
-        doClearAllDownloads
+        'This will remove all downloaded unit files from this device.',
+        function() { doClearAllDownloads(); }
       );
     } else {
       if (!confirm('Remove all downloaded unit files from this device?')) return;
@@ -984,10 +1195,10 @@
 
   document.addEventListener('keydown', function(e) {
     if (e.key === 'Escape') {
-      var keywordModal = document.getElementById('keyword-modal');
+      var authModal = document.getElementById('auth-modal');
       var helpModal = document.getElementById('help-modal');
-      if (!keywordModal.classList.contains('hidden')) {
-        mhsCloseKeywordModal();
+      if (!authModal.classList.contains('hidden')) {
+        mhsCloseAuthModal();
       } else if (!helpModal.classList.contains('hidden')) {
         mhsCloseHelp();
       }

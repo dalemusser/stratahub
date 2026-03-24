@@ -77,6 +77,16 @@
            title="{{ .Name }}"
            data-member-id="{{ .ID }}">
         <span class="truncate flex-1">{{ .Name }}</span>
+        {{ if $.EnableClaudeSummaries }}
+        <button type="button"
+                class="ml-1 p-0.5 rounded text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-indigo-100/50 dark:hover:bg-indigo-400/20"
+                onclick="requestSummary('{{ .ID }}', '{{ .Name }}')"
+                title="AI Summary for {{ .Name }}">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/>
+          </svg>
+        </button>
+        {{ end }}
         <div class="relative">
           <button type="button"
                   class="ml-1 p-0.5 rounded text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-300/40 dark:hover:bg-slate-400/20"
@@ -230,6 +240,93 @@
       {{ end }}
     </tbody>
   </table>
+</div>
+{{ end }}
+
+<!-- Analytics Tab Panel -->
+{{ if .Members }}
+<div id="mhs-tab-analytics" class="hidden flex flex-col h-full">
+
+  <div class="mhs-analytics-grid-container flex-1 min-h-0">
+
+  <!-- Top-Left Corner (frozen both ways) -->
+  <div class="mhs-name-width mhs-header-height bg-[#0c2d48] z-20 shadow-[2px_2px_8px_-2px_rgba(0,0,0,0.2)]">
+    <div class="mhs-h1 flex items-center px-3 border-b border-[#145374]">
+      <div>
+        <div class="font-bold text-white text-sm">Name</div>
+        <div class="text-[10px] text-[#b1d4e0]">Student</div>
+      </div>
+    </div>
+    <div class="mhs-h3 bg-[#2e8bc0] flex flex-col justify-between px-3 py-2 border-b border-[#b1d4e0]">
+      <span id="mhs-analytics-corner-label" class="text-[#e8f4f8] text-[9px] opacity-80">Active Time</span>
+      <span class="text-[#e8f4f8] font-medium text-[10px]">Progress Points &rarr;</span>
+    </div>
+  </div>
+
+  <!-- Top Header (frozen vertically, scrolls horizontally) -->
+  <div id="mhs-analytics-header-scroll" class="mhs-header-height mhs-hide-scrollbar overflow-x-hidden">
+    <div class="inline-flex flex-col min-w-full">
+      <!-- Row 1: Unit headers (40px) -->
+      <div class="flex mhs-h1 bg-[#0c2d48]">
+        {{ range .UnitHeaders }}
+        <div class="flex flex-col justify-center items-center border-l border-[#145374] px-1"
+             style="min-width: {{ .AnalyticsWidth }}px; width: {{ .AnalyticsWidth }}px;"
+             title="{{ .Title }}">
+          <div class="font-bold text-white text-xs">{{ .Title | upper }}</div>
+        </div>
+        {{ end }}
+      </div>
+      <!-- Row 2: Point names with vertical text (120px) -->
+      <div class="flex mhs-h3 bg-[#2e8bc0]">
+        {{ range .PointHeaders }}
+        <div class="mhs-analytics-cell-width mhs-vertical-cell {{ if .IsUnitStart }}border-l border-[#b1d4e0]{{ end }}"
+             title="{{ .ShortName }}: {{ .Description }}">
+          <div class="mhs-vertical-text text-[9px] text-white font-medium">{{ .ShortName }}</div>
+        </div>
+        {{ end }}
+      </div>
+    </div>
+  </div>
+
+  <!-- Left Column (frozen horizontally, scrolls vertically) -->
+  <div id="mhs-analytics-names-scroll" class="mhs-name-width mhs-hide-scrollbar overflow-y-hidden bg-white shadow-[2px_0_8px_-2px_rgba(0,0,0,0.1)] z-10">
+    <div>
+      {{ range .Members }}
+      <div class="mhs-analytics-row-height flex items-center px-3 text-xs font-medium text-slate-700 border-b border-slate-200 {{ if .IsEven }}bg-slate-50{{ else }}bg-white{{ end }}"
+           title="{{ .Name }}">
+        <span class="truncate">{{ .Name }}</span>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+
+  <!-- Main Data Area (scrolls both ways) -->
+  <div id="mhs-analytics-data-scroll" class="mhs-styled-scrollbar overflow-auto bg-white">
+    <div>
+      {{ range .Members }}
+      <div class="flex {{ if .IsEven }}bg-slate-50{{ else }}bg-white{{ end }}">
+        {{ range .Cells }}
+          {{ if .Skipped }}
+          <div class="mhs-analytics-cell-width mhs-analytics-row-height mhs-analytics-cell mhs-analytics-skipped {{ .CellClass }}{{ if .IsUnitStart }} border-l border-slate-300{{ end }}" title="Skipped">
+            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+          </div>
+          {{ else if or .DurationDisplay .ActiveDurationDisplay (ge .MistakeCount 0) }}
+          <div class="mhs-analytics-cell-width mhs-analytics-row-height mhs-analytics-cell mhs-metric-cell {{ .CellClass }}{{ if .IsUnitStart }} border-l border-slate-300{{ end }}"
+               data-active-time="{{ .ActiveDurationDisplay }}"
+               data-elapsed-time="{{ .DurationDisplay }}"
+               data-mistakes="{{ if ge .MistakeCount 0 }}{{ .MistakeCount }}{{ end }}">{{ if .ActiveDurationDisplay }}{{ .ActiveDurationDisplay }}{{ else }}{{ .DurationDisplay }}{{ end }}</div>
+          {{ else if eq .Value 3 }}
+          <div class="mhs-analytics-cell-width mhs-analytics-row-height mhs-analytics-cell {{ .CellClass }}{{ if .IsUnitStart }} border-l border-slate-300{{ end }}"></div>
+          {{ else }}
+          <div class="mhs-analytics-cell-width mhs-analytics-row-height mhs-analytics-cell{{ if .IsUnitStart }} border-l border-slate-300{{ end }}"></div>
+          {{ end }}
+        {{ end }}
+      </div>
+      {{ end }}
+    </div>
+  </div>
+
+  </div>
 </div>
 {{ end }}
 

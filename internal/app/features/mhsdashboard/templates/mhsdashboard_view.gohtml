@@ -5,6 +5,11 @@
 {{ define "content" }}
 <div id="mhs-dashboard" data-theme="blue-yellow" style="height: calc(100% - 8px);" class="flex flex-col">
 <style>
+  /* Left column width: wider when AI summaries are enabled to accommodate the icon */
+  :root {
+    --mhs-left-col-width: 140px; /* updated dynamically by JS after render */
+  }
+
   /* Theme CSS Variables */
   #mhs-dashboard {
     /* Default theme colors */
@@ -269,14 +274,43 @@
   /* Grid dimensions */
   .mhs-grid-container {
     display: grid;
-    grid-template-columns: 140px 1fr;
+    grid-template-columns: var(--mhs-left-col-width) 1fr;
     grid-template-rows: 160px 1fr;
     min-height: 400px;
   }
   .mhs-header-height { height: 160px; }
-  .mhs-name-width { width: 140px; min-width: 140px; }
+  .mhs-name-width { width: var(--mhs-left-col-width); min-width: var(--mhs-left-col-width); }
   .mhs-row-height { height: 28px; }
   .mhs-cell-width { width: 28px; min-width: 28px; max-width: 28px; }
+
+  /* Analytics grid dimensions */
+  .mhs-analytics-grid-container {
+    display: grid;
+    grid-template-columns: var(--mhs-left-col-width) 1fr;
+    grid-template-rows: 160px 1fr;
+    min-height: 400px;
+  }
+  .mhs-analytics-cell-width { width: 64px; min-width: 64px; max-width: 64px; }
+  .mhs-analytics-row-height { height: 28px; }
+  .mhs-analytics-cell {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    font-size: 11.5px;
+    font-weight: 600;
+    color: rgba(0, 0, 0, 0.85);
+    line-height: 1.1;
+  }
+  .mhs-analytics-elapsed-line {
+    opacity: 0.55;
+  }
+  .mhs-analytics-skipped {
+    color: rgba(100, 116, 139, 0.5);
+  }
+  .mhs-analytics-cell-empty {
+    color: transparent;
+  }
   .mhs-h1 { height: 40px; }
   .mhs-h3 { height: 120px; }
   /* Vertical text cell - align to bottom, clip at top */
@@ -666,33 +700,6 @@
         <button id="theme-info-btn" type="button" class="mhs-theme-info-btn" title="Theme information">?</button>
       </div>
     </div>
-    <!-- Center: Legend -->
-    <div class="flex items-center gap-5 text-xs">
-      <div class="flex items-center gap-1.5">
-        <span class="w-4 h-4 flex-shrink-0 rounded mhs-legend-success border"></span>
-        <span class="text-slate-600">Passed</span>
-      </div>
-      <div class="flex items-center gap-1.5">
-        <span class="w-4 h-4 flex-shrink-0 rounded mhs-legend-warning border"></span>
-        <span class="text-slate-600">Flagged</span>
-      </div>
-      <div class="flex items-center gap-1.5">
-        <span class="w-4 h-4 flex-shrink-0 rounded border border-indigo-300 mhs-cell-active" style="position:relative;"></span>
-        <span class="text-slate-600">In Progress</span>
-      </div>
-      <div class="flex items-center gap-1.5">
-        <span class="w-4 h-4 flex-shrink-0 rounded border border-slate-300 bg-white"></span>
-        <span class="text-slate-600">Not Started</span>
-      </div>
-      <div class="flex items-center gap-1.5">
-        <span class="w-8 h-1 flex-shrink-0 rounded-full mhs-in-mhs-unit-bar" style="position:static;"></span>
-        <span class="text-slate-600">MHS Unit</span>
-      </div>
-      <div class="flex items-center gap-1.5">
-        <span class="w-8 h-1 flex-shrink-0 rounded-full mhs-in-unit-bar" style="position:static;"></span>
-        <span class="text-slate-600">Playing Unit</span>
-      </div>
-    </div>
     <!-- Right: Refresh controls -->
     <div class="flex items-center gap-2">
       <button id="mhs-refresh-btn"
@@ -717,6 +724,94 @@
             onclick="switchTab('devices')">
       Devices
     </button>
+    <button id="mhs-tab-btn-analytics" type="button"
+            class="px-4 py-2 text-sm font-medium mhs-tab-inactive"
+            onclick="switchTab('analytics')">
+      Analytics
+    </button>
+  </div>
+
+  <!-- Tab-Specific Legend Row -->
+  <div class="flex items-center px-3 py-1 bg-slate-50 border-b border-slate-200 flex-shrink-0 min-h-[28px]">
+    <!-- Progress Legend -->
+    <div id="mhs-legend-progress" class="flex items-center gap-4 text-xs">
+      <div class="flex items-center gap-1.5">
+        <span class="w-3.5 h-3.5 flex-shrink-0 rounded mhs-legend-success border"></span>
+        <span class="text-slate-600">Passed</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-3.5 h-3.5 flex-shrink-0 rounded mhs-legend-warning border"></span>
+        <span class="text-slate-600">Flagged</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-3.5 h-3.5 flex-shrink-0 rounded border border-indigo-300 mhs-cell-active" style="position:relative;"></span>
+        <span class="text-slate-600">In Progress</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-3.5 h-3.5 flex-shrink-0 rounded border border-slate-300 bg-white"></span>
+        <span class="text-slate-600">Not Started</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-6 h-1 flex-shrink-0 rounded-full mhs-in-mhs-unit-bar" style="position:static;"></span>
+        <span class="text-slate-600">MHS Unit</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-6 h-1 flex-shrink-0 rounded-full mhs-in-unit-bar" style="position:static;"></span>
+        <span class="text-slate-600">Playing Unit</span>
+      </div>
+    </div>
+    <!-- Devices Legend -->
+    <div id="mhs-legend-devices" class="hidden items-center gap-4 text-xs">
+      <div class="flex items-center gap-1.5">
+        <span class="mhs-device-dot mhs-device-dot-completed" style="position:static;"></span>
+        <span class="text-slate-600">Completed</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="mhs-device-dot mhs-device-dot-current" style="position:static;"></span>
+        <span class="text-slate-600">Current</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="mhs-device-dot mhs-device-dot-cached" style="position:static;"></span>
+        <span class="text-slate-600">Downloaded</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="mhs-device-dot mhs-device-dot-downloading" style="position:static;"></span>
+        <span class="text-slate-600">Downloading</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="mhs-device-dot mhs-device-dot-none" style="position:static;"></span>
+        <span class="text-slate-600">Not Downloaded</span>
+      </div>
+    </div>
+    <!-- Analytics Legend -->
+    <div id="mhs-legend-analytics" class="hidden items-center gap-4 text-xs">
+      <div class="flex items-center gap-1.5">
+        <label for="mhs-analytics-metric" class="font-medium text-slate-600">Measure:</label>
+        <select id="mhs-analytics-metric" class="text-xs border border-slate-300 rounded px-2 py-0.5 bg-white text-slate-700"
+                onchange="switchAnalyticsMetric(this.value)">
+          <option value="active_time" selected>Active Time</option>
+          <option value="elapsed_time">Elapsed Time</option>
+          <option value="both">Active / Elapsed</option>
+          <option value="mistakes">Mistakes</option>
+        </select>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-3.5 h-3.5 flex-shrink-0 rounded mhs-legend-success border"></span>
+        <span class="text-slate-600">Passed</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-3.5 h-3.5 flex-shrink-0 rounded mhs-legend-warning border"></span>
+        <span class="text-slate-600">Flagged</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-3.5 h-3.5 flex-shrink-0 rounded border border-indigo-300 mhs-cell-active" style="position:relative;"></span>
+        <span class="text-slate-600">In Progress</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <svg class="w-3.5 h-3.5 flex-shrink-0" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" style="color: rgba(100,116,139,0.5);"><path stroke-linecap="round" stroke-linejoin="round" d="M13 5l7 7-7 7M5 5l7 7-7 7"/></svg>
+        <span class="text-slate-600">Skipped</span>
+      </div>
+    </div>
   </div>
 
   <!-- Grid Container -->
@@ -843,11 +938,35 @@
   </div>
 </div>
 
+<!-- AI Summary Modal -->
+{{ if .EnableClaudeSummaries }}
+<div id="mhs-summary-modal" style="display:none;position:fixed;inset:0;z-index:50;align-items:center;justify-content:center;">
+  <div style="position:absolute;inset:0;background:rgba(0,0,0,0.4);" onclick="closeSummaryModal()"></div>
+  <div class="bg-white dark:bg-gray-800" style="position:relative;border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,0.2);max-width:600px;width:90%;max-height:80vh;display:flex;flex-direction:column;">
+    <div class="border-b border-slate-200 dark:border-gray-700 flex items-center justify-between" style="padding:1rem 1.25rem;">
+      <div>
+        <div class="text-xs text-indigo-500 dark:text-indigo-400 uppercase tracking-wide font-semibold">AI Student Summary</div>
+        <h3 id="mhs-summary-modal-title" class="text-lg font-semibold text-slate-800 dark:text-gray-200 mt-0.5"></h3>
+      </div>
+      <button onclick="closeSummaryModal()" class="text-slate-400 hover:text-slate-600 dark:hover:text-gray-300 p-1" title="Close">
+        <svg width="16" height="16" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2">
+          <path d="M1 1l12 12M13 1L1 13"/>
+        </svg>
+      </button>
+    </div>
+    <div id="mhs-summary-modal-body" class="text-sm text-slate-700 dark:text-gray-300 leading-relaxed" style="padding:1.25rem;overflow-y:auto;flex:1;">
+    </div>
+  </div>
+</div>
+{{ end }}
+
 <script>
 (function() {
   var scrollPos = { x: 0, y: 0 };
   var activeTab = 'progress';
+  var activeMetric = 'active_time';
   var deviceModalOpen = false;
+  var summaryModalOpen = false;
   var countdown = 30;
   var countdownEl = document.getElementById('mhs-countdown');
   var refreshBtn = document.getElementById('mhs-refresh-btn');
@@ -915,8 +1034,8 @@
   }
 
   function doRefresh() {
-    // Skip auto-refresh while the device details modal is open
-    if (deviceModalOpen) {
+    // Skip auto-refresh while a modal is open
+    if (deviceModalOpen || summaryModalOpen) {
       countdown = 30;
       updateCountdown();
       return;
@@ -940,25 +1059,78 @@
   // Tab switching
   window.switchTab = function(tab) {
     activeTab = tab;
-    var progressPanel = document.getElementById('mhs-tab-progress');
-    var devicesPanel = document.getElementById('mhs-tab-devices');
-    var progressBtn = document.getElementById('mhs-tab-btn-progress');
-    var devicesBtn = document.getElementById('mhs-tab-btn-devices');
+    var panels = {
+      progress: document.getElementById('mhs-tab-progress'),
+      devices: document.getElementById('mhs-tab-devices'),
+      analytics: document.getElementById('mhs-tab-analytics')
+    };
+    var buttons = {
+      progress: document.getElementById('mhs-tab-btn-progress'),
+      devices: document.getElementById('mhs-tab-btn-devices'),
+      analytics: document.getElementById('mhs-tab-btn-analytics')
+    };
+    var legends = {
+      progress: document.getElementById('mhs-legend-progress'),
+      devices: document.getElementById('mhs-legend-devices'),
+      analytics: document.getElementById('mhs-legend-analytics')
+    };
 
-    if (!progressPanel || !devicesPanel) return;
-
-    if (tab === 'progress') {
-      progressPanel.classList.remove('hidden');
-      devicesPanel.classList.add('hidden');
-      progressBtn.className = 'px-4 py-2 text-sm font-medium mhs-tab-active';
-      devicesBtn.className = 'px-4 py-2 text-sm font-medium mhs-tab-inactive';
-    } else {
-      progressPanel.classList.add('hidden');
-      devicesPanel.classList.remove('hidden');
-      devicesBtn.className = 'px-4 py-2 text-sm font-medium mhs-tab-active';
-      progressBtn.className = 'px-4 py-2 text-sm font-medium mhs-tab-inactive';
+    for (var key in panels) {
+      if (!panels[key]) continue;
+      if (key === tab) {
+        panels[key].classList.remove('hidden');
+        if (buttons[key]) buttons[key].className = 'px-4 py-2 text-sm font-medium mhs-tab-active';
+        if (legends[key]) { legends[key].classList.remove('hidden'); legends[key].classList.add('flex'); }
+      } else {
+        panels[key].classList.add('hidden');
+        if (buttons[key]) buttons[key].className = 'px-4 py-2 text-sm font-medium mhs-tab-inactive';
+        if (legends[key]) { legends[key].classList.add('hidden'); legends[key].classList.remove('flex'); }
+      }
     }
   };
+
+  // Analytics metric switching
+  window.switchAnalyticsMetric = function(metric) {
+    activeMetric = metric;
+    applyAnalyticsMetric();
+  };
+
+  function applyAnalyticsMetric() {
+    var cells = document.querySelectorAll('.mhs-metric-cell');
+    var label = document.getElementById('mhs-analytics-corner-label');
+    var select = document.getElementById('mhs-analytics-metric');
+    var labels = { active_time: 'Active Time', elapsed_time: 'Elapsed Time', both: 'Active / Elapsed', mistakes: 'Mistakes' };
+    if (label) label.textContent = labels[activeMetric] || '';
+    if (select) select.value = activeMetric;
+
+    // Toggle row heights for both mode
+    var isBoth = activeMetric === 'both';
+    document.querySelectorAll('.mhs-analytics-row-height').forEach(function(el) {
+      el.style.height = isBoth ? '38px' : '';
+    });
+    // Also adjust the name column rows
+    var namesScroll = document.getElementById('mhs-analytics-names-scroll');
+    if (namesScroll) {
+      namesScroll.querySelectorAll('.mhs-analytics-row-height').forEach(function(el) {
+        el.style.height = isBoth ? '38px' : '';
+      });
+    }
+
+    cells.forEach(function(cell) {
+      var active = cell.getAttribute('data-active-time') || '';
+      var elapsed = cell.getAttribute('data-elapsed-time') || '';
+      if (activeMetric === 'both') {
+        cell.innerHTML = (active ? '<div>' + active + '</div>' : '') +
+                         (elapsed ? '<div class="mhs-analytics-elapsed-line">' + elapsed + '</div>' : '');
+      } else if (activeMetric === 'mistakes') {
+        var mc = cell.getAttribute('data-mistakes') || '';
+        cell.textContent = mc;
+      } else {
+        var value = cell.getAttribute('data-' + activeMetric.replace('_', '-'));
+        cell.textContent = value || '';
+      }
+    });
+  }
 
   if (refreshBtn) {
     refreshBtn.addEventListener('click', doRefresh);
@@ -1026,6 +1198,7 @@
         dataScroll.scrollTop = scrollPos.y;
       }
       setupScrollSync();
+      autoSizeNameColumn();
       countdown = 30;
       updateCountdown();
 
@@ -1049,8 +1222,31 @@
       if (activeTab !== 'progress') {
         switchTab(activeTab);
       }
+      // Restore selected analytics metric after grid refresh
+      if (activeMetric !== 'active_time') {
+        applyAnalyticsMetric();
+      }
     }
   });
+
+  // Measure the widest name and adjust the left column width to fit.
+  function autoSizeNameColumn() {
+    var namesScroll = document.getElementById('mhs-names-scroll');
+    if (!namesScroll) return;
+    var spans = namesScroll.querySelectorAll('span.truncate');
+    if (spans.length === 0) return;
+
+    // scrollWidth on a truncated element gives its full un-truncated content width
+    var maxW = 0;
+    spans.forEach(function(s) {
+      if (s.scrollWidth > maxW) maxW = s.scrollWidth;
+    });
+
+    // Add space for padding (px-3 = 24px) + icon buttons (~40px with summaries, ~24px without)
+    var iconSpace = {{ if .EnableClaudeSummaries }}40{{ else }}24{{ end }};
+    var totalWidth = Math.max(140, Math.ceil(maxW + 24 + iconSpace + 8));
+    document.documentElement.style.setProperty('--mhs-left-col-width', totalWidth + 'px');
+  }
 
   function setupScrollSync() {
     var headerScroll = document.getElementById('mhs-header-scroll');
@@ -1061,6 +1257,18 @@
       dataScroll.addEventListener('scroll', function() {
         headerScroll.scrollLeft = dataScroll.scrollLeft;
         namesScroll.scrollTop = dataScroll.scrollTop;
+      });
+    }
+
+    // Analytics grid scroll sync
+    var analyticsHeaderScroll = document.getElementById('mhs-analytics-header-scroll');
+    var analyticsNamesScroll = document.getElementById('mhs-analytics-names-scroll');
+    var analyticsDataScroll = document.getElementById('mhs-analytics-data-scroll');
+
+    if (analyticsDataScroll && analyticsHeaderScroll && analyticsNamesScroll) {
+      analyticsDataScroll.addEventListener('scroll', function() {
+        analyticsHeaderScroll.scrollLeft = analyticsDataScroll.scrollLeft;
+        analyticsNamesScroll.scrollTop = analyticsDataScroll.scrollTop;
       });
     }
   }
@@ -1351,6 +1559,52 @@
     return d.innerHTML;
   }
 
+  // Convert basic markdown to HTML (headings, bold, italic, paragraphs)
+  function markdownToHtml(md) {
+    var lines = md.split('\n');
+    var html = '';
+    var inParagraph = false;
+
+    for (var i = 0; i < lines.length; i++) {
+      var line = lines[i];
+
+      // Headings
+      var headingMatch = line.match(/^(#{1,4})\s+(.*)/);
+      if (headingMatch) {
+        if (inParagraph) { html += '</p>'; inParagraph = false; }
+        var level = headingMatch[1].length;
+        var text = inlineMarkdown(escDeviceHtml(headingMatch[2]));
+        var cls = level <= 2 ? 'text-lg font-semibold mb-2 mt-3' : 'text-base font-semibold mb-1 mt-2';
+        html += '<h' + level + ' class="' + cls + '">' + text + '</h' + level + '>';
+        continue;
+      }
+
+      // Blank line = end paragraph
+      if (line.trim() === '') {
+        if (inParagraph) { html += '</p>'; inParagraph = false; }
+        continue;
+      }
+
+      // Regular text line
+      if (!inParagraph) {
+        html += '<p class="mb-3">';
+        inParagraph = true;
+      } else {
+        html += ' ';
+      }
+      html += inlineMarkdown(escDeviceHtml(line.trim()));
+    }
+    if (inParagraph) html += '</p>';
+    return html;
+  }
+
+  // Convert inline markdown: **bold** and *italic*
+  function inlineMarkdown(s) {
+    s = s.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+    s = s.replace(/\*(.+?)\*/g, '<em>$1</em>');
+    return s;
+  }
+
   function formatBytes(bytes) {
     if (bytes <= 0) return '0 MB';
     var mb = bytes / (1024 * 1024);
@@ -1416,7 +1670,44 @@
     if (e.key === 'Escape' && deviceModalOpen) {
       closeDeviceModal();
     }
+    if (e.key === 'Escape' && summaryModalOpen) {
+      closeSummaryModal();
+    }
   });
+
+  // --- AI Summary Modal ---
+  window.requestSummary = function(userID, memberName) {
+    var modal = document.getElementById('mhs-summary-modal');
+    var titleEl = document.getElementById('mhs-summary-modal-title');
+    var bodyEl = document.getElementById('mhs-summary-modal-body');
+    if (!modal || !titleEl || !bodyEl) return;
+
+    titleEl.textContent = memberName;
+    bodyEl.innerHTML = '<div class="flex items-center gap-2 text-slate-500 dark:text-gray-400"><svg class="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"></path></svg><span>Generating summary...</span></div>';
+    modal.style.display = 'flex';
+    summaryModalOpen = true;
+
+    fetch('/mhsdashboard/summary?user_id=' + encodeURIComponent(userID))
+      .then(function(resp) { return resp.json(); })
+      .then(function(data) {
+        if (data.error) {
+          bodyEl.innerHTML = '<div class="text-red-600 dark:text-red-400">' + escDeviceHtml(data.error) + '</div>';
+        } else {
+          bodyEl.innerHTML = markdownToHtml(data.summary || '');
+        }
+      })
+      .catch(function(err) {
+        bodyEl.innerHTML = '<div class="text-red-600 dark:text-red-400">Failed to load summary. Please try again.</div>';
+      });
+  };
+
+  window.closeSummaryModal = function() {
+    var modal = document.getElementById('mhs-summary-modal');
+    if (modal) {
+      modal.style.display = 'none';
+    }
+    summaryModalOpen = false;
+  };
 
   // --- Set Progress Menu ---
   window.toggleSetProgress = function(e, btn) {
@@ -1483,6 +1774,7 @@
   // Initial setup
   startCountdown();
   setupScrollSync();
+  autoSizeNameColumn();
   setupClickHandlers();
 })();
 </script>

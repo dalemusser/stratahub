@@ -14,7 +14,7 @@ build:
 
 # Build for Linux 386 (production server)
 build-linux:
-	GOOS=linux GOARCH=386 go build -o $(BUILD_DIR)/$(BINARY_NAME)-linux-386 $(CMD_PATH)
+	GOOS=linux GOARCH=386 go build -ldflags "-X main.BuildTime=$$(date -u +%Y%m%d-%H%M%S)" -o $(BUILD_DIR)/$(BINARY_NAME)-linux-386 $(CMD_PATH)
 
 # Run the application
 run:

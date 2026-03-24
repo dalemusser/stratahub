@@ -164,7 +164,9 @@ func (s *Store) Create(ctx context.Context, userID primitive.ObjectID, email str
 	}
 
 	// Delete any existing verifications for this user
-	_, _ = s.c.DeleteMany(ctx, bson.M{"user_id": userID})
+	if _, err := s.c.DeleteMany(ctx, bson.M{"user_id": userID}); err != nil {
+		return nil, fmt.Errorf("delete existing verifications: %w", err)
+	}
 
 	v := Verification{
 		ID:          primitive.NewObjectID(),
@@ -209,8 +211,11 @@ func (s *Store) VerifyCode(ctx context.Context, userID primitive.ObjectID, code 
 	}
 
 	// Check if the record has expired
-	if time.Now().After(v.ExpiresAt) {
-		return nil, ErrExpired
+	now := time.Now().UTC()
+	if now.After(v.ExpiresAt) {
+		return nil, fmt.Errorf("%w (created=%s expires=%s now=%s elapsed=%s)",
+			ErrExpired, v.CreatedAt.UTC().Format(time.RFC3339), v.ExpiresAt.UTC().Format(time.RFC3339),
+			now.Format(time.RFC3339), now.Sub(v.CreatedAt.UTC()).Round(time.Second))
 	}
 
 	// Check if too many attempts have been made
@@ -226,20 +231,30 @@ func (s *Store) VerifyCode(ctx context.Context, userID primitive.ObjectID, code 
 		return nil, ErrInvalidCode
 	}
 
-	// Delete the verification record (single use)
-	_, _ = s.c.DeleteOne(ctx, bson.M{"_id": v.ID})
+	// Atomically delete the verification record (single use).
+	// FindOneAndDelete ensures that if two concurrent requests both pass the
+	// bcrypt check, only one will successfully delete (and consume) the record.
+	var deleted Verification
+	err = s.c.FindOneAndDelete(ctx, bson.M{"_id": v.ID}).Decode(&deleted)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			// Another request already consumed this verification
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("delete verification: %w", err)
+	}
 
-	return &v, nil
+	return &deleted, nil
 }
 
 // VerifyToken verifies a magic link token and returns the verification record if valid.
-// The record is deleted after successful verification.
+// The record is atomically deleted on successful verification (FindOneAndDelete)
+// so that concurrent requests with the same token cannot both succeed.
+// Returns ErrExpired if the token exists but has expired, ErrNotFound if no record exists.
 func (s *Store) VerifyToken(ctx context.Context, token string) (*Verification, error) {
+	// Two-step lookup: first find by token only so we can distinguish expired from not-found.
 	var v Verification
-	err := s.c.FindOne(ctx, bson.M{
-		"token":      token,
-		"expires_at": bson.M{"$gt": time.Now()},
-	}).Decode(&v)
+	err := s.c.FindOne(ctx, bson.M{"token": token}).Decode(&v)
 	if err != nil {
 		if err == mongo.ErrNoDocuments {
 			return nil, ErrNotFound
@@ -247,10 +262,28 @@ func (s *Store) VerifyToken(ctx context.Context, token string) (*Verification, e
 		return nil, err
 	}
 
-	// Delete the verification record (single use)
-	_, _ = s.c.DeleteOne(ctx, bson.M{"_id": v.ID})
+	// Check expiry
+	now := time.Now().UTC()
+	if now.After(v.ExpiresAt) {
+		// Clean up the expired record
+		_, _ = s.c.DeleteOne(ctx, bson.M{"_id": v.ID})
+		return nil, fmt.Errorf("%w (created=%s expires=%s now=%s elapsed=%s)",
+			ErrExpired, v.CreatedAt.UTC().Format(time.RFC3339), v.ExpiresAt.UTC().Format(time.RFC3339),
+			now.Format(time.RFC3339), now.Sub(v.CreatedAt.UTC()).Round(time.Second))
+	}
 
-	return &v, nil
+	// Atomically delete the valid record
+	var deleted Verification
+	err = s.c.FindOneAndDelete(ctx, bson.M{"_id": v.ID}).Decode(&deleted)
+	if err != nil {
+		if err == mongo.ErrNoDocuments {
+			// Another request already consumed this token
+			return nil, ErrNotFound
+		}
+		return nil, fmt.Errorf("delete verification: %w", err)
+	}
+
+	return &deleted, nil
 }
 
 // DeleteByUser deletes all verification records for a user.

@@ -22,6 +22,9 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 
 		// Set student progress to a specific unit
 		pr.Post("/set-progress", h.HandleSetProgress)
+
+		// AI-powered student performance summary
+		pr.Get("/summary", h.ServeSummary)
 	})
 
 	return r

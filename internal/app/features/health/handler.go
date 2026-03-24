@@ -7,6 +7,7 @@ import (
 
 	"github.com/dalemusser/stratahub/internal/app/system/certcheck"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/readpref"
 	"go.uber.org/zap"
@@ -31,6 +32,7 @@ func NewHandler(client *mongo.Client, baseURL string, logger *zap.Logger) *Handl
 // healthResponse is the JSON structure for the health check response.
 type healthResponse struct {
 	Status   string       `json:"status"`
+	Build    string       `json:"build"`
 	Database string       `json:"database"`
 	Message  string       `json:"message,omitempty"`
 	Error    string       `json:"error,omitempty"`
@@ -60,6 +62,7 @@ func (h *Handler) Serve(w http.ResponseWriter, r *http.Request) {
 
 	resp := healthResponse{
 		Status:   "ok",
+		Build:    viewdata.GetBuildTime(),
 		Database: "connected",
 	}
 

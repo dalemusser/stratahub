@@ -100,6 +100,12 @@ type emailVerifyFormData struct {
 	Resent    bool // True if code was just resent (for success message)
 }
 
+type magicLinkConfirmData struct {
+	SiteName string
+	Token    string
+	Error    string
+}
+
 type magicLinkSuccessData struct {
 	SiteName  string
 	ReturnURL string
@@ -1021,19 +1027,50 @@ func (h *Handler) ServeVerifyEmail(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// handleMagicLink verifies a magic link token and completes login.
+// handleMagicLink shows a confirmation page for the magic link.
+// The actual token verification happens on POST via HandleMagicLinkConfirm.
+// This two-step approach prevents email security scanners (e.g., Microsoft
+// Exchange Safe Links) from consuming the token via automated GET requests.
 func (h *Handler) handleMagicLink(w http.ResponseWriter, r *http.Request, token string) {
+	// Get site name for branding
+	siteName := "StrataHub"
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
+	wsID := workspace.IDFromRequest(r)
+	if wsID != primitive.NilObjectID {
+		settings, err := settingsstore.New(h.DB).Get(ctx, wsID)
+		if err == nil && settings.SiteName != "" {
+			siteName = settings.SiteName
+		}
+	}
+	cancel()
+
+	templates.Render(w, r, "login_magic_link_confirm", magicLinkConfirmData{
+		SiteName: siteName,
+		Token:    token,
+	})
+}
+
+// HandleMagicLinkConfirm verifies the magic link token and completes login.
+// This is the POST handler that actually consumes the token.
+func (h *Handler) HandleMagicLinkConfirm(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
+	token := strings.TrimSpace(r.FormValue("token"))
+	if token == "" {
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
+		return
+	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
 	defer cancel()
 
 	v, err := h.EmailVerify.VerifyToken(ctx, token)
 	if err != nil {
 		h.Log.Warn("invalid magic link token", zap.Error(err))
-		// Render the verify form with an error
-		templates.Render(w, r, "login_verify_email", emailVerifyFormData{
-			BaseVM: viewdata.NewBaseVM(r, h.DB, "Verify Email", "/login"),
-			Error:  "This verification link is invalid or has expired. Please request a new one.",
-		})
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
 
@@ -1042,10 +1079,7 @@ func (h *Handler) handleMagicLink(w http.ResponseWriter, r *http.Request, token 
 	err = h.DB.Collection("users").FindOne(ctx, bson.M{"_id": v.UserID}).Decode(&u)
 	if err != nil {
 		h.Log.Error("failed to load user after magic link verification", zap.Error(err), zap.String("user_id", v.UserID.Hex()))
-		templates.Render(w, r, "login_verify_email", emailVerifyFormData{
-			BaseVM: viewdata.NewBaseVM(r, h.DB, "Verify Email", "/login"),
-			Error:  "Failed to complete login. Please try again.",
-		})
+		http.Redirect(w, r, "/login", http.StatusSeeOther)
 		return
 	}
 
@@ -1112,20 +1146,24 @@ func (h *Handler) HandleVerifyEmailSubmit(w http.ResponseWriter, r *http.Request
 	if err != nil {
 		if errors.Is(err, emailverify.ErrTooManyAttempts) {
 			h.Log.Warn("too many verification attempts", zap.String("user_id", pendingUserID))
-			// Audit log: verification code failed - too many attempts
 			h.AuditLog.VerificationCodeFailed(ctx, r, oid, nil, "too many attempts")
 			h.renderVerifyEmailFormWithError(w, r, "Too many incorrect attempts. Please request a new verification code.", pendingLoginID, pendingEmail, returnURL)
 			return
 		}
 		if errors.Is(err, emailverify.ErrExpired) {
-			h.Log.Warn("expired verification code", zap.String("user_id", pendingUserID))
-			// Audit log: verification code failed - expired
+			h.Log.Warn("expired verification code", zap.Error(err), zap.String("user_id", pendingUserID))
 			h.AuditLog.VerificationCodeFailed(ctx, r, oid, nil, "expired code")
 			h.renderVerifyEmailFormWithError(w, r, "Your verification code has expired. Please request a new one.", pendingLoginID, pendingEmail, returnURL)
 			return
 		}
+		if errors.Is(err, emailverify.ErrNotFound) {
+			h.Log.Warn("verification record not found (may have been consumed by email security scanner)",
+				zap.String("user_id", pendingUserID), zap.String("email", pendingEmail))
+			h.AuditLog.VerificationCodeFailed(ctx, r, oid, nil, "record not found")
+			h.renderVerifyEmailFormWithError(w, r, "No pending verification found. Your email system may have used the sign-in link automatically. Please click Resend to get a new code.", pendingLoginID, pendingEmail, returnURL)
+			return
+		}
 		h.Log.Warn("invalid verification code", zap.Error(err), zap.String("user_id", pendingUserID))
-		// Audit log: verification code failed - invalid
 		h.AuditLog.VerificationCodeFailed(ctx, r, oid, nil, "invalid code")
 		h.renderVerifyEmailFormWithError(w, r, "Invalid verification code. Please try again.", pendingLoginID, pendingEmail, returnURL)
 		return

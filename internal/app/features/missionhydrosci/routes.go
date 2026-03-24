@@ -26,6 +26,10 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 		pr.Post("/api/progress/reset", h.HandleResetProgress)
 		pr.Post("/api/progress/set-unit", h.HandleSetToUnit)
 		pr.Post("/api/device-status", h.HandleDeviceStatus)
+		pr.Post("/api/auth/start", h.HandleStaffAuthStart)
+		pr.Post("/api/auth/verify", h.HandleStaffAuthVerify)
+		pr.Post("/api/auth/resend", h.HandleStaffAuthResend)
+		pr.Post("/api/auth/keyword", h.HandleKeywordVerify)
 	})
 
 	return r

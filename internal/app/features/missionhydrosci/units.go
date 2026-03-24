@@ -20,10 +20,10 @@ func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
 	var currentUnit, userLoginID string
 	var completedUnits []string
 	var isComplete bool
+	wsID := workspace.IDFromRequest(r)
 
 	if user, ok := auth.CurrentUser(r); ok {
 		userLoginID = user.LoginID
-		wsID := workspace.IDFromRequest(r)
 		if userID, err := primitive.ObjectIDFromHex(user.ID); err == nil {
 			progress, err := h.ProgressStore.GetOrCreate(r.Context(), wsID, userID, user.LoginID)
 			if err == nil {
@@ -80,6 +80,12 @@ func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Load workspace MHS member auth setting
+	mhsMemberAuth := "staffauth"
+	if settings, err := h.SettingsStore.Get(r.Context(), wsID); err == nil {
+		mhsMemberAuth = settings.GetMHSMemberAuth()
+	}
+
 	data := UnitsData{
 		BaseVM:         viewdata.LoadBase(r, h.DB),
 		Units:          units,
@@ -89,6 +95,7 @@ func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
 		UserLoginID:    userLoginID,
 		IsComplete:     isComplete,
 		NextUnitID:     nextUnitID,
+		MHSMemberAuth:  mhsMemberAuth,
 	}
 	data.Title = "Mission HydroSci"
 

@@ -85,13 +85,24 @@
 <!-- Listen for magic link success from another tab -->
 <script>
 (function() {
-  if (typeof BroadcastChannel === 'undefined') return;
-  var channel = new BroadcastChannel('stratahub_auth');
-  channel.onmessage = function(event) {
-    if (event.data && event.data.type === 'login_success') {
-      window.location.href = event.data.returnURL || '/dashboard';
+  // BroadcastChannel listener
+  if (typeof BroadcastChannel !== 'undefined') {
+    var channel = new BroadcastChannel('stratahub_auth');
+    channel.onmessage = function(event) {
+      if (event.data && event.data.type === 'login_success') {
+        window.location.href = event.data.returnURL || '/dashboard';
+      }
+    };
+  }
+  // localStorage fallback — storage events fire when another tab writes
+  window.addEventListener('storage', function(e) {
+    if (e.key === 'stratahub_auth_success' && e.newValue) {
+      try {
+        var data = JSON.parse(e.newValue);
+        window.location.href = data.returnURL || '/dashboard';
+      } catch(err) {}
     }
-  };
+  });
 })();
 </script>
 {{ end }}

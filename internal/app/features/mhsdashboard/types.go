@@ -62,6 +62,11 @@ type CellData struct {
 	PointTitle      string // Progress point title
 	StudentName     string // Student name for this row
 	ReviewReason    string // Reason for flagged cells
+	DurationDisplay       string // Formatted wall-clock completion time (e.g., "12:34" or "1:23:45")
+	ActiveDurationDisplay string // Formatted active time excluding gaps
+	MistakeCount          int    // Number of mistakes/negative events (-1 = no data)
+	AttemptCount          int    // Number of attempts for this point (0 = no data)
+	Skipped               bool   // True if this active point was skipped (later points are passed)
 }
 
 // DeviceInfo represents a device's readiness status for display.
@@ -92,10 +97,11 @@ type MemberRow struct {
 
 // UnitHeader represents header info for a unit.
 type UnitHeader struct {
-	ID         string
-	Title      string
-	Width      int // Width in pixels (28px per progress point)
-	PointCount int
+	ID             string
+	Title          string
+	Width          int // Width in pixels (28px per progress point)
+	AnalyticsWidth int // Width in pixels (64px per progress point)
+	PointCount     int
 }
 
 // PointHeader represents header info for a progress point.
@@ -129,6 +135,8 @@ type DashboardData struct {
 
 	SortBy  string // Sort field (currently only "name")
 	SortDir string // Sort direction: "asc" or "desc"
+
+	EnableClaudeSummaries bool // Whether AI summaries feature is enabled
 }
 
 // GridData is the view model for the HTMX-refreshed grid content.
@@ -147,4 +155,6 @@ type GridData struct {
 
 	SortBy  string // Sort field (currently only "name")
 	SortDir string // Sort direction: "asc" or "desc"
+
+	EnableClaudeSummaries bool // Whether AI summaries feature is enabled
 }

@@ -17,6 +17,8 @@
     --table-stripe: #f8fafc;
     --green: #16a34a;
     --green-bg: #f0fdf4;
+    --amber: #d97706;
+    --amber-bg: #fffbeb;
   }
   * { box-sizing: border-box; margin: 0; padding: 0; }
   body {
@@ -48,6 +50,12 @@
     color: var(--heading);
     margin-top: 1.5rem;
     margin-bottom: 0.5rem;
+  }
+  h4 {
+    font-size: 0.95rem;
+    color: var(--heading);
+    margin-top: 1.25rem;
+    margin-bottom: 0.4rem;
   }
   p { margin-bottom: 0.75rem; }
   ul, ol {
@@ -90,6 +98,14 @@
   .note {
     background: var(--green-bg);
     border-left: 4px solid var(--green);
+    padding: 0.75rem 1rem;
+    border-radius: 0 6px 6px 0;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+  }
+  .note-amber {
+    background: var(--amber-bg);
+    border-left: 4px solid var(--amber);
     padding: 0.75rem 1rem;
     border-radius: 0 6px 6px 0;
     margin-bottom: 1rem;
@@ -146,6 +162,17 @@
   }
   .flow-steps li:last-child { border-left-color: transparent; }
   .section-group { margin-left: 0.5rem; }
+  .mode-label {
+    display: inline-block;
+    font-size: 0.7rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    padding: 0.15em 0.55em;
+    border-radius: 4px;
+    vertical-align: middle;
+  }
+  .mode-default { background: #dbeafe; color: #1e40af; }
 </style>
 </head>
 <body>
@@ -163,8 +190,11 @@
   <li><code>completed_units</code> becomes all units before it</li>
   <li>Setting to Unit 1 is equivalent to a full progress reset (empty <code>completed_units</code>)</li>
 </ul>
+
+<div class="note"><strong>No data is deleted.</strong> Setting a unit only changes the pointer to which unit the student is playing. All save data, logging data, grades, and scores are preserved.</div>
+
 <p><strong>"Clear All Downloads"</strong> removes all cached unit files from the device without affecting progress.</p>
-<div class="note">These two actions were previously combined as "Reset All Progress" which both reset progress and cleared downloads. They are now separate concerns.</div>
+<div class="note-amber">These two actions were previously combined as "Reset All Progress" which both reset progress and cleared downloads. They are now separate concerns.</div>
 
 <h2>Data Model</h2>
 <p>Progress is tracked in two independent systems:</p>
@@ -194,6 +224,39 @@
 </table>
 <p>These values can diverge. For example, if a leader sets a student to Unit 4 via the dashboard, the grader's <code>currentUnit</code> will still reflect whatever unit the student last played until they launch Unit 4 in the game.</p>
 
+<!-- Member Authorization -->
+<h2>Member Authorization</h2>
+
+<p>When a <strong>member</strong> (student) uses Set to Unit or Clear All Downloads on the Mission HydroSci units page, they must pass an authorization check. The mode is configured per workspace via the <code>MHSMemberAuth</code> site setting.</p>
+
+<div class="section-group">
+  <h3>Staff Auth <span class="mode-label mode-default">Default</span></h3>
+  <p>When <code>MHSMemberAuth</code> is <code>"staffauth"</code> (or empty/unset), a member must have a leader, coordinator, admin, or superadmin authenticate on their behalf:</p>
+  <ol class="flow-steps">
+    <li>Member clicks Set to Unit or Clear All Downloads</li>
+    <li>Authorization modal appears asking for the staff member's login ID</li>
+    <li>Staff member's auth method determines the next step:
+      <ul>
+        <li><strong>Trust:</strong> Immediate authorization (token returned directly)</li>
+        <li><strong>Password:</strong> Staff member enters their password</li>
+        <li><strong>Email:</strong> Verification code sent to staff member's email; they enter it in the modal</li>
+      </ul>
+    </li>
+    <li>On success, an <code>auth_token</code> is included with the action request</li>
+    <li>Server validates and consumes the token before allowing the action</li>
+  </ol>
+  <p>The staff auth verifier enforces that the authenticating user is a leader, coordinator, admin, or superadmin belonging to the same workspace (or a superadmin with no workspace restriction).</p>
+
+  <h3>Keyword</h3>
+  <p>When <code>MHSMemberAuth</code> is <code>"keyword"</code>, a member must enter the workspace's configured keyword (<code>MHSMemberAuthKeyword</code>). The comparison is case-insensitive.</p>
+
+  <h3>Trust</h3>
+  <p>When <code>MHSMemberAuth</code> is <code>"trust"</code>, no additional authorization is required. The action proceeds with a simple confirmation.</p>
+
+  <h3>Non-member roles</h3>
+  <p>Leaders, admins, coordinators, and superadmins are <strong>not</strong> subject to member authorization. They see a standard browser <code>confirm()</code> dialog and proceed directly.</p>
+</div>
+
 <!-- MHS Dashboard — Set Progress -->
 <h2>MHS Dashboard &mdash; Set Progress</h2>
 
@@ -211,6 +274,7 @@
     <li>Requester must have access to the selected group</li>
     <li>Target user must be a member of the selected group</li>
   </ul>
+  <p>No additional member authorization is needed &mdash; the dashboard is a staff-only interface.</p>
 
   <h3>Confirmation</h3>
   <p>Clicking a unit shows a browser <code>confirm()</code> dialog: <em>"Set to Unit X for [Member Name]? All prior units will be marked completed."</em></p>
@@ -289,23 +353,23 @@
   <p>A <code>&lt;select&gt;</code> dropdown populated from the unit data (showing full titles like "Unit 2: Water Quality"), a "Set to" label, and a "Go" button. The select and button are centered in a bordered container.</p>
 
   <h3>Authorization</h3>
-  <p>Any authenticated user with MHS access can set their own progress. The server does not restrict by role &mdash; the keyword gate provides the authorization check for members.</p>
+  <p>Any authenticated user with MHS access can set their own progress. The authorization check depends on role:</p>
   <ul>
-    <li><strong>Members:</strong> Must enter the keyword <code>hydroreset</code> in a modal dialog before the action proceeds</li>
-    <li><strong>Leaders, admins, coordinators, superadmins:</strong> Shown a browser <code>confirm()</code> dialog</li>
+    <li><strong>Members:</strong> Must pass the workspace's configured authorization check (staff auth, keyword, or trust &mdash; see Member Authorization above)</li>
+    <li><strong>Leaders, admins, coordinators, superadmins:</strong> Shown a browser <code>confirm()</code> dialog &mdash; no additional authorization needed</li>
   </ul>
 
   <h3>Flow</h3>
   <ol class="flow-steps">
     <li>User selects a unit and clicks "Go"</li>
-    <li><code>mhsSetToUnit()</code> checks <code>isMember</code>
+    <li><code>mhsSetToUnit()</code> checks <code>isMember</code> and <code>memberAuthMode</code>
       <ul>
-        <li>If member: shows keyword modal (shared modal used by both Set to Unit and Clear All Downloads)</li>
-        <li>If non-member: shows <code>confirm()</code> dialog</li>
+        <li>If member and mode is not "trust": shows authorization modal (staff auth or keyword depending on mode)</li>
+        <li>If non-member or trust mode: shows <code>confirm()</code> dialog</li>
       </ul>
     </li>
-    <li>On confirmation, <code>doSetToUnit(unit)</code> POSTs JSON <code>{"unit": "unit3"}</code> to <code>/missionhydrosci/api/progress/set-unit</code></li>
-    <li>Server validates unit (must be unit1-unit5), calls <code>ProgressStore.SetToUnit()</code></li>
+    <li>On confirmation, <code>doSetToUnit(unit, authData)</code> POSTs JSON to <code>/missionhydrosci/api/progress/set-unit</code> with <code>auth_token</code> or <code>keyword</code> if applicable</li>
+    <li>Server validates authorization, then calls <code>ProgressStore.SetToUnit()</code></li>
     <li>Returns <code>{"ok": true, "unit": "unit3"}</code></li>
     <li>Client reloads the page</li>
   </ol>
@@ -314,7 +378,7 @@
   <ul class="file-list">
     <li><strong>Handler:</strong> <code>internal/app/features/missionhydrosci/progress.go</code> &mdash; <code>HandleSetToUnit</code></li>
     <li><strong>Route:</strong> <code>internal/app/features/missionhydrosci/routes.go</code> &mdash; <code>POST /api/progress/set-unit</code></li>
-    <li><strong>Template:</strong> <code>internal/app/features/missionhydrosci/templates/missionhydrosci_units.gohtml</code> &mdash; select/button UI, keyword modal, JS functions</li>
+    <li><strong>Template:</strong> <code>internal/app/features/missionhydrosci/templates/missionhydrosci_units.gohtml</code> &mdash; select/button UI, authorization modal, JS functions</li>
   </ul>
 </div>
 
@@ -329,16 +393,16 @@
   <p>A full-width solid red button labeled "Clear All Downloads".</p>
 
   <h3>Authorization</h3>
-  <p>Same keyword/confirmation pattern as Set to Unit:</p>
+  <p>Same authorization pattern as Set to Unit:</p>
   <ul>
-    <li><strong>Members:</strong> Must enter <code>hydroreset</code> keyword</li>
+    <li><strong>Members:</strong> Must pass the workspace's configured authorization check</li>
     <li><strong>Non-members:</strong> Browser <code>confirm()</code> dialog</li>
   </ul>
 
   <h3>Flow</h3>
   <ol class="flow-steps">
     <li>User clicks "Clear All Downloads"</li>
-    <li><code>mhsClearAllDownloads()</code> checks <code>isMember</code> and requests confirmation</li>
+    <li><code>mhsClearAllDownloads()</code> checks <code>isMember</code> and <code>memberAuthMode</code>, requests authorization</li>
     <li>On confirmation, <code>doClearAllDownloads()</code>:
       <ul>
         <li>Calls <code>manager.deleteAllUnits()</code> to remove all cached unit files from the service worker cache</li>
@@ -356,16 +420,57 @@
   </ul>
 </div>
 
-<!-- Shared Keyword Modal -->
-<h2>Shared Keyword Modal</h2>
+<!-- Authorization Modal -->
+<h2>Authorization Modal</h2>
 
-<p>Both Set to Unit and Clear All Downloads on the Mission HydroSci units page share a single keyword confirmation modal (<code>#keyword-modal</code>). The modal is configured dynamically via <code>showKeywordModal(title, desc, callback)</code>:</p>
-<ul>
-  <li><code>title</code> &mdash; displayed as the modal heading</li>
-  <li><code>desc</code> &mdash; displayed as the description text</li>
-  <li><code>callback</code> &mdash; function called on successful keyword entry</li>
-</ul>
-<p>The keyword is <code>hydroreset</code> (case-insensitive). On incorrect entry, an "Incorrect keyword" error is shown. The modal can be dismissed with the Cancel button or the Escape key.</p>
+<p>Both Set to Unit and Clear All Downloads share a single authorization modal that adapts based on the workspace's <code>MHSMemberAuth</code> setting:</p>
+
+<div class="section-group">
+  <h3>Staff Auth mode</h3>
+  <p>The modal presents a multi-step flow:</p>
+  <ol>
+    <li><strong>Login ID entry:</strong> Member enters the staff member's login ID</li>
+    <li><strong>Challenge step:</strong> Based on the staff member's auth method:
+      <ul>
+        <li>Password: shows a password field</li>
+        <li>Email: shows a verification code field with a "Resend code" option</li>
+        <li>Trust: skips directly to success</li>
+      </ul>
+    </li>
+    <li><strong>Success:</strong> Returns an <code>auth_token</code> used to authorize the action</li>
+  </ol>
+
+  <h3>Keyword mode</h3>
+  <p>The modal shows a single keyword input field. The keyword is validated against the workspace setting (case-insensitive).</p>
+</div>
+
+<h3>Staff Auth API endpoints</h3>
+<table>
+  <thead>
+    <tr><th>Endpoint</th><th>Handler</th><th>Purpose</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>POST /api/auth/start</code></td><td><code>HandleStaffAuthStart</code></td><td>Initiates auth challenge</td></tr>
+    <tr><td><code>POST /api/auth/verify</code></td><td><code>HandleStaffAuthVerify</code></td><td>Validates credential</td></tr>
+    <tr><td><code>POST /api/auth/resend</code></td><td><code>HandleStaffAuthResend</code></td><td>Resends email code</td></tr>
+    <tr><td><code>POST /api/auth/keyword</code></td><td><code>HandleKeywordVerify</code></td><td>Validates keyword</td></tr>
+  </tbody>
+</table>
+
+<!-- Workspace Settings -->
+<h2>Workspace Settings</h2>
+
+<p>Member authorization is configured per workspace in <code>site_settings</code>:</p>
+<table>
+  <thead>
+    <tr><th>Field</th><th>Type</th><th>Default</th><th>Description</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>mhs_member_auth</code></td><td>string</td><td><code>"staffauth"</code></td><td>Authorization mode: <code>"staffauth"</code>, <code>"keyword"</code>, or <code>"trust"</code></td></tr>
+    <tr><td><code>mhs_member_auth_keyword</code></td><td>string</td><td>(empty)</td><td>The keyword for keyword mode</td></tr>
+  </tbody>
+</table>
+<p>The <code>GetMHSMemberAuth()</code> method on <code>SiteSettings</code> returns the configured mode, defaulting to <code>"staffauth"</code> when empty.</p>
 
 <!-- Store Methods -->
 <h2>Store Methods</h2>
