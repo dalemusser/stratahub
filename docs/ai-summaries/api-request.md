@@ -167,7 +167,7 @@ No personally identifiable information (name, login ID, or user ID) is sent to t
 | **Total input** | **~5,500–7,000** |
 | Output (max_tokens=1024) | ~400–800 typical |
 
-See `docs/costs/claude-api-cost-estimate.md` for detailed cost analysis by model and usage scenario.
+See [Claude API Cost Estimate](claude-api-cost-estimate.html) for detailed cost analysis by model and usage scenario.
 
 ---
 
