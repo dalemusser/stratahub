@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mission HydroSci &mdash; Curriculum Context and Learning Objectives</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #1a1a2e;
+      --muted: #555;
+      --accent: #2563eb;
+      --border: #e5e7eb;
+      --code-bg: #f3f4f6;
+      --callout-bg: #eff6ff;
+      --callout-border: #bfdbfe;
+      --callout-text: #1e40af;
+      --card-bg: #f8fafc;
+      --card-border: #e2e8f0;
+      --flag-bg: #fef3c7;
+      --flag-border: #f59e0b;
+      --flag-text: #92400e;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1a2e;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #60a5fa;
+        --border: #334155;
+        --code-bg: #1e293b;
+        --callout-bg: #1e293b;
+        --callout-border: #334155;
+        --callout-text: #93c5fd;
+        --card-bg: #1e293b;
+        --card-border: #334155;
+        --flag-bg: #422006;
+        --flag-border: #b45309;
+        --flag-text: #fcd34d;
+      }
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--bg);
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+    h1 {
+      font-size: 1.75rem;
+      margin-bottom: 0.5rem;
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 0.5rem;
+    }
+    h2 {
+      font-size: 1.35rem;
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+      color: var(--accent);
+    }
+    h3 {
+      font-size: 1.1rem;
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    p { margin-bottom: 0.75rem; }
+    .subtitle {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+    }
+    .callout {
+      background: var(--callout-bg);
+      border-left: 4px solid var(--callout-border);
+      color: var(--callout-text);
+      padding: 0.75rem 1rem;
+      margin-bottom: 1.5rem;
+      border-radius: 0 6px 6px 0;
+      font-size: 0.9rem;
+    }
+    .theme {
+      font-style: italic;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .progress-point {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .progress-point h3 {
+      margin-top: 0;
+      margin-bottom: 0.5rem;
+    }
+    .progress-point .field {
+      margin-bottom: 0.4rem;
+      font-size: 0.92rem;
+    }
+    .progress-point .field-label {
+      font-weight: 600;
+      display: inline;
+    }
+    .flag-box {
+      background: var(--flag-bg);
+      border-left: 3px solid var(--flag-border);
+      color: var(--flag-text);
+      padding: 0.5rem 0.75rem;
+      margin-top: 0.5rem;
+      margin-bottom: 0.4rem;
+      border-radius: 0 4px 4px 0;
+      font-size: 0.88rem;
+    }
+    .flag-box code {
+      font-weight: 600;
+      background: none;
+      padding: 0;
+      font-size: 0.85rem;
+    }
+    code {
+      background: var(--code-bg);
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+      font-size: 0.88em;
+      font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+    }
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 2rem 0;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+    }
+    th {
+      background: var(--card-bg);
+      font-weight: 600;
+    }
+    td code {
+      font-size: 0.82em;
+    }
+    ol, ul {
+      margin: 0.5rem 0 0.75rem 1.5rem;
+      font-size: 0.92rem;
+    }
+    li { margin-bottom: 0.3rem; }
+    .skill-list {
+      list-style: none;
+      margin-left: 0;
+      padding-left: 0;
+    }
+    .skill-list li {
+      padding-left: 1.5rem;
+      position: relative;
+      margin-bottom: 0.4rem;
+    }
+    .skill-list li::before {
+      content: "→";
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Mission HydroSci: Curriculum Context and Learning Objectives</h1>
+
+<div class="callout">
+  <strong>Status:</strong> Draft &mdash; extrapolated from game mechanics and grading rules. Send to curriculum team for validation and corrections.
+</div>
+
+<p>This document maps each progress point to its learning objectives, assessed skills, and what flagged results indicate about student understanding. It is used as context when generating AI-powered student performance summaries.</p>
+
+<hr>
+
+<h2>Game Overview</h2>
+
+<p>Mission HydroSci is a science adventure game where students play as cadets on an alien planet. Through narrative-driven missions, students learn hydrology and Earth science concepts while developing scientific argumentation skills. The game spans 5 units with 26 progress points, progressing from basic orientation through watersheds, water flow, soil infiltration, and the water cycle.</p>
+
+<hr>
+
+<h2>Unit 1: Orientation and Scientific Argumentation Basics</h2>
+
+<p class="theme">Theme: Introduction to the game world, controls, and the fundamentals of scientific argumentation.</p>
+
+<div class="progress-point">
+  <h3>U1P1 &mdash; Getting Your Space Legs</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Familiarize with game navigation and controls.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> None (completion-based). This is an onboarding activity.</div>
+  <div class="field"><span class="field-label">What Flagged Means:</span> N/A &mdash; always passes on completion.</div>
+  <div class="field"><span class="field-label">Duration Insight:</span> Very long durations may indicate difficulty with game controls or navigation.</div>
+</div>
+
+<div class="progress-point">
+  <h3>U1P2 &mdash; Info and Intros</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Meet crew members and begin understanding what constitutes a scientific argument (claim, evidence, reasoning).</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> None (completion-based). Students collect argument components through dialogue.</div>
+  <div class="field"><span class="field-label">What Flagged Means:</span> N/A &mdash; always passes on completion.</div>
+  <div class="field"><span class="field-label">Duration Insight:</span> Extended time may indicate the student is carefully reading dialogue or having difficulty following the narrative.</div>
+</div>
+
+<div class="progress-point">
+  <h3>U1P3 &mdash; Defend the Expedition</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Use the argumentation engine to identify the correct claim in a scientific argument.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Distinguishing valid claims from invalid ones; basic argumentation structure.</div>
+  <div class="flag-box"><code>WRONG_ARG_SELECTED</code> &mdash; The student selected an incorrect argument component. This suggests difficulty distinguishing between claims, evidence, and reasoning, or trouble identifying which claim is supported by the available evidence.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>mistakeCount</code> &mdash; number of incorrect argument selections.</div>
+</div>
+
+<div class="progress-point">
+  <h3>U1P4 &mdash; What Was That?</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Complete a narrative transition involving first contact with ancient aliens.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> None (completion-based). This is a story-driven transition.</div>
+  <div class="field"><span class="field-label">What Flagged Means:</span> N/A &mdash; always passes on completion.</div>
+</div>
+
+<hr>
+
+<h2>Unit 2: Topographic Maps and Watersheds</h2>
+
+<p class="theme">Theme: Reading topographic maps, understanding elevation, watersheds, and constructing scientific arguments about watershed characteristics.</p>
+
+<div class="progress-point">
+  <h3>U2P1 &mdash; Escape the Ruin</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Match topographic maps to elevation profiles; understand how contour lines represent terrain.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Reading topographic maps; translating 2D contour maps into 3D elevation understanding; spatial reasoning.</div>
+  <div class="flag-box"><code>MISSING_SUCCESS_NODE</code> &mdash; The student did not successfully match the maps, indicating fundamental difficulty reading topographic contour lines.</div>
+  <div class="flag-box"><code>TOO_MANY_NEGATIVES</code> &mdash; The student made errors during the matching process, suggesting partial but inconsistent understanding of contour line interpretation.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>mistakeCount</code> &mdash; number of incorrect map-matching attempts.</div>
+</div>
+
+<div class="progress-point">
+  <h3>U2P2 &mdash; Foraged Forging</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Read a topographic map to locate a specific position (Toppo&rsquo;s location).</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Interpreting contour lines to identify specific terrain features; applying topographic map reading to navigation.</div>
+  <div class="flag-box"><code>BAD_FEEDBACK</code> &mdash; The student made multiple incorrect location identifications, suggesting difficulty translating contour patterns into real terrain understanding.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>mistakeCount</code> &mdash; number of incorrect location attempts.</div>
+</div>
+
+<div class="progress-point">
+  <h3>U2P3 &mdash; Getting the Band Back Together Part II</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Read topographic maps to locate two characters (Tera and Aryn) by interpreting terrain features.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Applying topographic map skills independently; identifying multiple locations from contour patterns; understanding directional movement on a map.</div>
+  <div class="flag-box"><code>BAD_FEEDBACK</code> &mdash; More than 6 wrong-direction choices, indicating the student struggles to determine correct paths on a topographic map. This may reflect difficulty with elevation interpretation or spatial orientation.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>mistakeCount</code> &mdash; number of wrong-direction prompts (threshold: 6).</div>
+</div>
+
+<div class="progress-point">
+  <h3>U2P4 &mdash; Investigate the Temple</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Understand the relationship between watershed size and flow rate through its main river.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Connecting watershed area to water flow volume; understanding that larger watersheds collect more precipitation and produce higher flow rates.</div>
+  <div class="flag-box"><code>MISSING_SUCCESS_NODE</code> &mdash; The student did not demonstrate understanding of the watershed-flow relationship.</div>
+  <div class="flag-box"><code>TOO_MANY_NEGATIVES</code> &mdash; Incorrect responses suggest confusion about how watershed characteristics affect river flow.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>mistakeCount</code> &mdash; number of incorrect responses.</div>
+</div>
+
+<div class="progress-point">
+  <h3>U2P5 &mdash; Classified Information</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Identify the parts of a scientific argument (claim, evidence, reasoning) and correctly classify them.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Scientific argumentation literacy; distinguishing between argument components; understanding how each part functions in supporting a conclusion.</div>
+  <div class="flag-box"><code>TOO_MANY_NEGATIVES</code> &mdash; The weighted score fell below threshold, indicating the student frequently misclassified argument components. This suggests a need for more practice distinguishing claims from evidence and reasoning.</div>
+  <div class="field"><span class="field-label">Scoring:</span> <code>score = positiveSelections - (negativeSelections / 3)</code>. Threshold: 4.0.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>posCount</code>, <code>mistakeCount</code>, <code>score</code>.</div>
+</div>
+
+<div class="progress-point">
+  <h3>U2P6 &mdash; Which Watershed? Part I</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Collect and identify relevant evidence for constructing an argument about watershed size.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Evidence identification; understanding what constitutes relevant data for a watershed comparison; distinguishing useful evidence from irrelevant information.</div>
+  <div class="flag-box"><code>MISSING_SUCCESS_NODE</code> &mdash; The student did not collect the necessary evidence, suggesting difficulty identifying what data is relevant to a watershed size argument.</div>
+  <div class="flag-box"><code>HIT_YELLOW_NODE</code> &mdash; The student selected incorrect or irrelevant evidence, indicating confusion about what supports a watershed comparison claim.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>mistakeCount</code> &mdash; number of incorrect evidence selections.</div>
+</div>
+
+<div class="progress-point">
+  <h3>U2P7 &mdash; Which Watershed? Part II</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Construct a complete argument about which watershed is bigger by linking a claim with supporting evidence.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Argument construction; claim-evidence alignment; synthesizing collected data into a coherent scientific argument.</div>
+  <div class="flag-box"><code>WRONG_ARG_SELECTED</code> &mdash; The student made too many incorrect argument component selections (&gt;3), indicating difficulty connecting claims with appropriate evidence or constructing a logically consistent argument.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>mistakeCount</code> &mdash; number of incorrect argument selections (threshold: 3).</div>
+</div>
+
+<hr>
+
+<h2>Unit 3: Water Flow Direction and Dissolved Materials</h2>
+
+<p class="theme">Theme: Understanding water flow direction in watersheds, how dissolved materials (pollutants and nutrients) spread through waterways, and constructing evidence-based arguments.</p>
+
+<div class="progress-point">
+  <h3>U3P1 &mdash; Supply Run</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Identify the direction of water flow based on a map of the watershed.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Reading watershed maps to determine flow direction; understanding that water flows from higher to lower elevation; applying this knowledge to predict where objects carried by water will go.</div>
+  <div class="flag-box"><code>TOO_MANY_NEGATIVES</code> &mdash; The student had difficulty sending crates in the correct direction, suggesting they cannot reliably determine water flow direction from a watershed map.</div>
+  <div class="field"><span class="field-label">Scoring:</span> Pass if count &gt; 1 (student needs at least 2 successful sends).</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>count</code> (successful sends), <code>mistakeCount</code>.</div>
+</div>
+
+<div class="progress-point">
+  <h3>U3P2 &mdash; Pollution Solution Part I</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Predict the spread of dissolved materials (pollutants) through a watershed to trace a pollutant back to its source.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Understanding how dissolved substances move with water flow; tracing contaminant paths upstream; predicting which waterways could carry a pollutant to a given location.</div>
+  <div class="flag-box"><code>BAD_FEEDBACK</code> &mdash; The capped-penalty score fell below 3, indicating the student made significant errors predicting pollutant movement.</div>
+  <div class="field"><span class="field-label">Scoring:</span> Capped penalty system across 3 event types. Each category: 0 penalty if &le;1 error, 1 if &le;3, 2 if &ge;4. Score = 5 - penalties. Threshold: 3.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>c27</code>, <code>c29</code>, <code>c230</code>, <code>score</code>, <code>mistakeCount</code>.</div>
+</div>
+
+<div class="progress-point">
+  <h3>U3P3 &mdash; Pollution Solution Part II</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Construct a scientific argument about the location of a pollutant source, including reasoning that links claim with evidence.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Full scientific argumentation (claim + evidence + reasoning); using watershed knowledge as reasoning to connect evidence to a claim; using backing information to strengthen arguments.</div>
+  <div class="flag-box"><code>MISSING_SUCCESS_NODE</code> &mdash; Did not use backing information. The student may have constructed an argument but failed to support it with additional evidence.</div>
+  <div class="flag-box"><code>WRONG_ARG_SELECTED</code> &mdash; Despite using backing info, the score was too low. The student made too many incorrect argument selections.</div>
+  <div class="field"><span class="field-label">Scoring:</span> Base score (3&rarr;0 based on mistakes) + 1 bonus for using backing info. Threshold: 3.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>baseScore</code>, <code>usedBackingInfo</code>, <code>totalScore</code>, <code>mistakeCount</code>.</div>
+</div>
+
+<div class="progress-point">
+  <h3>U3P4 &mdash; Forsaken Facility</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Demonstrate understanding of how materials move through waterways by solving puzzles in alien ruins.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Applying knowledge of water flow and material transport in practical problem-solving contexts; predicting outcomes of material movement through connected water systems.</div>
+  <div class="flag-box"><code>MISSING_SUCCESS_NODE</code> &mdash; The student did not reach the required gate checkpoint, indicating they could not solve the fundamental puzzle about material movement.</div>
+  <div class="flag-box"><code>TOO_MANY_NEGATIVES</code> &mdash; Too many incorrect attempts (&gt;2), suggesting trial-and-error rather than applying understanding.</div>
+  <div class="field"><span class="field-label">Scoring:</span> Gate requirement + score based on mistakes (2 if 0, 1 if &le;2, 0 if &ge;3). Threshold: pass if &le;2 mistakes.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>score</code>, <code>mistakeCount</code>.</div>
+</div>
+
+<div class="progress-point">
+  <h3>U3P5 &mdash; Part of a Balanced Ecosystem</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Predict the spread of a dissolved nutrient through a watershed to plant seeds in ideal locations.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Understanding nutrient transport in water systems; predicting where dissolved substances will concentrate; applying watershed knowledge to ecological/agricultural decisions.</div>
+  <div class="flag-box"><code>TOO_MANY_NEGATIVES</code> &mdash; The weighted score fell below 3.0, indicating the student placed seeds in incorrect locations.</div>
+  <div class="field"><span class="field-label">Scoring:</span> <code>score = positiveCount - (negativeCount * 0.5)</code>. Threshold: 3.0.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>posCount</code>, <code>score</code>, <code>mistakeCount</code>.</div>
+</div>
+
+<hr>
+
+<h2>Unit 4: Groundwater, Soil Infiltration, and the Water Table</h2>
+
+<p class="theme">Theme: Understanding groundwater, the water table, soil types and their infiltration rates, and how these properties affect water availability. Continued development of scientific argumentation skills.</p>
+
+<div class="progress-point">
+  <h3>U4P1 &mdash; Well What Have We Here?</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Understand the concept of the water table and how to locate groundwater in a desert environment.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Understanding that water exists underground (water table); knowing that wells access groundwater; understanding the relationship between soil type and water accessibility.</div>
+  <div class="flag-box"><code>SCORE_BELOW_THRESHOLD</code> &mdash; The combined score from correct answer choice and puzzle speed was below 1.0.</div>
+  <div class="field"><span class="field-label">Scoring:</span> +0.5 for correct dialogue choice, +1.0 if puzzle &le;30s, +0.5 if 30&ndash;90s. Threshold: 1.0.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>hasCorrectAnswer</code>, <code>puzzleDurationSecs</code>, <code>durationBonus</code>, <code>score</code>, <code>mistakeCount</code>.</div>
+  <div class="field"><span class="field-label">Duration Insight:</span> Fast completion (&lt;30s) suggests strong understanding; slow completion (&gt;90s) suggests the student is still developing this knowledge.</div>
+</div>
+
+<div class="progress-point">
+  <h3>U4P2 &mdash; Power Play: Floors 1 &amp; 2</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Understand the relationship between infiltration rate and soil type.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Knowing that different soil types (sand, gravel, clay) have different infiltration rates; predicting how water moves through different soils.</div>
+  <div class="flag-box"><code>MISSING_SUCCESS_NODE</code> &mdash; The student did not demonstrate understanding of infiltration-soil relationships.</div>
+  <div class="flag-box"><code>TOO_MANY_NEGATIVES</code> &mdash; Incorrect responses suggest confusion about which soil types allow faster or slower water movement.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>mistakeCount</code> &mdash; number of incorrect responses.</div>
+</div>
+
+<div class="progress-point">
+  <h3>U4P3 &mdash; Power Play: Floors 3 &amp; 4</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Manipulate soil type variables to achieve target infiltration rates, demonstrating deeper understanding of the infiltration-soil relationship.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Applying infiltration rate knowledge in a hands-on context; selecting appropriate soil types to achieve desired water flow outcomes; problem-solving with soil/water variables.</div>
+  <div class="flag-box"><code>SCORE_BELOW_THRESHOLD</code> &mdash; Multiple attempts on the soil machines indicate the student needed trial-and-error rather than applying understanding.</div>
+  <div class="field"><span class="field-label">Scoring:</span> +1 if floor 3 solved in 1 attempt, +2 if floor 4 solved in 1 attempt, +1 if floor 4 solved in 2 attempts. Threshold: &gt;1.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>floor3Attempts</code>, <code>floor4Attempts</code>, <code>score</code>, <code>mistakeCount</code>.</div>
+</div>
+
+<div class="progress-point">
+  <h3>U4P4 &mdash; Power Play: Floor 5 + You Know the Drill</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Synthesize soil infiltration knowledge across multiple machine configurations and drill a well to access the water table.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Advanced soil machine manipulation; understanding multiple soil layer configurations; connecting soil infiltration knowledge to practical well-drilling decisions.</div>
+  <div class="flag-box"><code>SCORE_BELOW_THRESHOLD</code> &mdash; The student needed multiple attempts across the floor 5 machines and/or made errors in the well-drilling activity.</div>
+  <div class="field"><span class="field-label">Scoring:</span> Multi-component: +1 for top row machine (1 attempt + no bottom row errors), +1 for machine 2 (1 attempt), +2 for dialogue success with 0 negatives or +1 with 1 negative. Threshold: &gt;2.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>topRowAttempts</code>, <code>bottomRowAttempts</code>, <code>machine2Attempts</code>, <code>successCount</code>, <code>score</code>, <code>mistakeCount</code>.</div>
+</div>
+
+<div class="progress-point">
+  <h3>U4P5 &mdash; Saving Cadet Anderson</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Construct a complete scientific argument using evidence and reasoning to convince a character to take action.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Persuasive scientific argumentation; selecting appropriate evidence and reasoning; constructing a complete argument (claim + evidence + reasoning) under narrative pressure.</div>
+  <div class="flag-box"><code>MISSING_SUCCESS_NODE</code> &mdash; The student could not construct a convincing argument, indicating significant difficulty with argument structure.</div>
+  <div class="flag-box"><code>TOO_MANY_NEGATIVES</code> &mdash; More than 3 incorrect selections suggest the student struggles to identify which components make a persuasive scientific argument.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>mistakeCount</code> &mdash; number of incorrect argument selections (threshold: 3).</div>
+</div>
+
+<div class="progress-point">
+  <h3>U4P6 &mdash; Desert Delicacies</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Demonstrate understanding of soil infiltration rates and water holding capacity by selecting the ideal soil type for different plants.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Matching plant water needs to soil properties; understanding that gravel drains quickly (low holding capacity), sand has moderate drainage, and clay retains water (high holding capacity).</div>
+  <div class="flag-box"><code>SCORE_BELOW_THRESHOLD</code> &mdash; The student placed fewer than 2 of 3 boxes on the correct soil type.</div>
+  <div class="field"><span class="field-label">Scoring:</span> 3 boxes (Box 0=Gravel, Box 1=Sand, Box 2=Clay). +1 per correct placement. Threshold: &ge;2.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>score</code>, <code>mistakeCount</code>, <code>box0SoilType</code>, <code>box0Correct</code>, <code>box1SoilType</code>, <code>box1Correct</code>, <code>box2SoilType</code>, <code>box2Correct</code>.</div>
+</div>
+
+<hr>
+
+<h2>Unit 5: The Water Cycle &mdash; Evaporation and Condensation</h2>
+
+<p class="theme">Theme: Understanding evaporation, condensation, and the water cycle. Constructing counter-arguments and applying water cycle knowledge to practical problems.</p>
+
+<div class="progress-point">
+  <h3>U5P1 &mdash; If I Had a Nickel: Floors 1 &amp; 2</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Apply knowledge of evaporation rate and the water cycle to solve puzzles.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Understanding factors that affect evaporation rate (temperature, surface area, humidity); basic water cycle knowledge; applying these concepts to predict outcomes.</div>
+  <div class="flag-box"><code>MISSING_SUCCESS_NODE</code> &mdash; The student could not solve the puzzle, suggesting fundamental gaps in understanding evaporation and the water cycle.</div>
+  <div class="flag-box"><code>TOO_MANY_NEGATIVES</code> &mdash; More than 2 errors indicate the student is guessing rather than applying water cycle knowledge.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>mistakeCount</code> &mdash; number of incorrect attempts (threshold: 2).</div>
+</div>
+
+<div class="progress-point">
+  <h3>U5P2 &mdash; If I Had a Nickel: Floors 3 &amp; 4</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Demonstrate understanding of evaporation and condensation through hands-on puzzle solving with water chamber machines.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Manipulating evaporation and condensation variables; understanding the relationship between temperature and phase changes; predicting how changes to one part of a water system affect other parts.</div>
+  <div class="flag-box"><code>SCORE_BELOW_THRESHOLD</code> &mdash; High attempt counts on the water chamber machines indicate the student is not yet able to predict how manipulating evaporation/condensation variables will affect outcomes.</div>
+  <div class="field"><span class="field-label">Scoring:</span> Floor 3: +2 if &le;6 attempts, +1 if &lt;11. Floor 4: +2 if &le;5 attempts, +1 if &lt;10. Threshold: &ge;3.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>floor3Attempts</code>, <code>floor4Attempts</code>, <code>score</code>, <code>mistakeCount</code>.</div>
+</div>
+
+<div class="progress-point">
+  <h3>U5P3 &mdash; What Happened Here?</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Evaluate and counter a faulty scientific claim using knowledge about the water cycle.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Critical evaluation of scientific claims; constructing counter-arguments; identifying flaws in reasoning about the water cycle; distinguishing between correlation and causation.</div>
+  <div class="flag-box"><code>TOO_MANY_NEGATIVES</code> &mdash; 4 or more incorrect responses when trying to counter Aryn&rsquo;s claim. This suggests difficulty identifying what makes a scientific claim faulty.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>mistakeCount</code> &mdash; number of incorrect counter-argument attempts (threshold: 3).</div>
+</div>
+
+<div class="progress-point">
+  <h3>U5P4 &mdash; Water Problems Require Water Solutions</h3>
+  <div class="field"><span class="field-label">Learning Objective:</span> Apply knowledge of evaporation and condensation to fix a solar still &mdash; a practical water purification device.</div>
+  <div class="field"><span class="field-label">Assessed Skills:</span> Understanding how solar stills work (evaporation of contaminated water, condensation of pure water); applying water cycle knowledge to real-world technology; troubleshooting a physical system using scientific principles.</div>
+  <div class="flag-box"><code>MISSING_SUCCESS_NODE</code> &mdash; The student could not fix the solar still, indicating they do not understand how evaporation and condensation work together in a practical device.</div>
+  <div class="flag-box"><code>TOO_MANY_NEGATIVES</code> &mdash; Zero tolerance for errors. Any incorrect attempt indicates incomplete understanding of the solar still&rsquo;s components.</div>
+  <div class="field"><span class="field-label">Metrics:</span> <code>mistakeCount</code> &mdash; number of incorrect attempts (threshold: 0 &mdash; strictest rule in the game).</div>
+  <div class="field"><em>Note: This is the strictest rule, requiring zero mistakes. It serves as a capstone assessment for water cycle understanding.</em></div>
+</div>
+
+<hr>
+
+<h2>Cross-Cutting Skills</h2>
+
+<h3>Scientific Argumentation</h3>
+<p>Assessed in U1P3, U2P5, U2P6, U2P7, U3P3, U4P5, U5P3. Students develop argumentation skills progressively:</p>
+<ol>
+  <li><strong>U1P3:</strong> Identify a claim (basic recognition)</li>
+  <li><strong>U2P5:</strong> Classify argument parts (claim, evidence, reasoning)</li>
+  <li><strong>U2P6&ndash;U2P7:</strong> Collect evidence and construct a complete argument</li>
+  <li><strong>U3P3:</strong> Include reasoning and backing information in arguments</li>
+  <li><strong>U4P5:</strong> Construct a persuasive argument under pressure</li>
+  <li><strong>U5P3:</strong> Evaluate and counter a faulty claim (critical thinking)</li>
+</ol>
+
+<h3>Hydrology Concepts</h3>
+<p>Assessed across Units 2&ndash;5:</p>
+<ol>
+  <li><strong>Topographic maps</strong> (U2P1&ndash;U2P3): Reading contour lines, spatial orientation</li>
+  <li><strong>Watersheds</strong> (U2P4, U2P6&ndash;U2P7): Watershed size and flow rate relationship</li>
+  <li><strong>Water flow direction</strong> (U3P1, U3P4): Predicting flow from elevation data</li>
+  <li><strong>Dissolved material transport</strong> (U3P2, U3P5): Pollutant tracing, nutrient prediction</li>
+  <li><strong>Groundwater and water table</strong> (U4P1, U4P4): Underground water, well drilling</li>
+  <li><strong>Soil infiltration</strong> (U4P2&ndash;U4P4, U4P6): Soil type &rarr; infiltration rate &rarr; holding capacity</li>
+  <li><strong>Water cycle</strong> (U5P1&ndash;U5P4): Evaporation, condensation, and practical applications</li>
+</ol>
+
+<hr>
+
+<h2>Interpreting Student Performance Data</h2>
+
+<h3>Attempt Count</h3>
+<ul>
+  <li><strong>1 attempt:</strong> Student demonstrated understanding on first try.</li>
+  <li><strong>2 attempts:</strong> Student needed one retry &mdash; may have had a minor misconception that self-corrected.</li>
+  <li><strong>3+ attempts:</strong> Student is struggling with the concept and may benefit from targeted instruction.</li>
+</ul>
+
+<h3>Duration and Active Duration</h3>
+<ul>
+  <li><strong>Duration:</strong> Wall-clock time from activity start to completion. Includes all pauses, distractions, and idle time.</li>
+  <li><strong>Active Duration:</strong> Time spent actively engaged (gaps &gt;5 minutes excluded). Better reflects actual time-on-task.</li>
+  <li><strong>Very short active durations</strong> with passing grades may indicate the student understood the concept quickly.</li>
+  <li><strong>Long active durations</strong> with flagged results suggest the student spent significant effort but could not overcome their misconception.</li>
+  <li><strong>Large gap between duration and active duration</strong> suggests the student took breaks, was multitasking, or left the game idle.</li>
+</ul>
+
+<h3>Mistake Count</h3>
+<ul>
+  <li>Normalized differently per rule. Compare within a progress point, not across them.</li>
+  <li>A mistake count of 0 with a pass indicates mastery.</li>
+  <li>A high mistake count even with a pass (e.g., U2P3 allows up to 6 mistakes) indicates the student eventually succeeded but needed many attempts.</li>
+</ul>
+
+<h3>Reason Codes</h3>
+
+<table>
+  <thead>
+    <tr><th>Code</th><th>Meaning</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><code>TOO_MANY_NEGATIVES</code></td><td>Student made too many errors during the activity</td></tr>
+    <tr><td><code>MISSING_SUCCESS_NODE</code></td><td>Student did not reach the required success checkpoint</td></tr>
+    <tr><td><code>WRONG_ARG_SELECTED</code></td><td>Student chose incorrect argument components</td></tr>
+    <tr><td><code>BAD_FEEDBACK</code></td><td>Student received negative feedback for incorrect choices</td></tr>
+    <tr><td><code>SCORE_BELOW_THRESHOLD</code></td><td>Student&rsquo;s computed score did not meet the minimum</td></tr>
+    <tr><td><code>HIT_YELLOW_NODE</code></td><td>Student triggered a specific incorrect choice marker</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>Notes for Curriculum Team</h2>
+
+<p>This document was generated by analyzing the game&rsquo;s automated grading rules. The learning objectives and skill descriptions are <em>inferred</em> from the game mechanics and may not precisely match the intended curriculum goals. Please review and correct:</p>
+
+<ol>
+  <li><strong>Learning objectives:</strong> Are these accurate descriptions of what each activity is designed to teach?</li>
+  <li><strong>Assessed skills:</strong> Do these capture the key competencies being evaluated?</li>
+  <li><strong>Flagged interpretations:</strong> Are these fair descriptions of what mistakes indicate about student understanding?</li>
+  <li><strong>Cross-cutting progressions:</strong> Does the argumentation progression accurately reflect the curriculum design?</li>
+  <li><strong>Missing context:</strong> Are there pedagogical goals not captured by the grading rules (e.g., collaboration, reflection, real-world connections)?</li>
+</ol>
+
+</body>
+</html>

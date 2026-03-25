@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Claude API Request &mdash; Student Summary Feature</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #1a1a2e;
+      --muted: #555;
+      --accent: #2563eb;
+      --border: #e5e7eb;
+      --code-bg: #f3f4f6;
+      --callout-bg: #eff6ff;
+      --callout-border: #bfdbfe;
+      --callout-text: #1e40af;
+      --card-bg: #f8fafc;
+      --card-border: #e2e8f0;
+      --privacy-bg: #ecfdf5;
+      --privacy-border: #6ee7b7;
+      --privacy-text: #065f46;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1a2e;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #60a5fa;
+        --border: #334155;
+        --code-bg: #1e293b;
+        --callout-bg: #1e293b;
+        --callout-border: #334155;
+        --callout-text: #93c5fd;
+        --card-bg: #1e293b;
+        --card-border: #334155;
+        --privacy-bg: #064e3b;
+        --privacy-border: #059669;
+        --privacy-text: #a7f3d0;
+      }
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--bg);
+      max-width: 760px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+    h1 {
+      font-size: 1.75rem;
+      margin-bottom: 0.5rem;
+      border-bottom: 2px solid var(--accent);
+      padding-bottom: 0.5rem;
+    }
+    .subtitle {
+      color: var(--muted);
+      font-size: 0.95rem;
+      margin-bottom: 1.5rem;
+    }
+    h2 {
+      font-size: 1.35rem;
+      margin-top: 2rem;
+      margin-bottom: 0.75rem;
+      color: var(--accent);
+    }
+    h3 {
+      font-size: 1.1rem;
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    p { margin-bottom: 0.75rem; }
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+    hr {
+      border: none;
+      border-top: 1px solid var(--border);
+      margin: 2rem 0;
+    }
+    code {
+      background: var(--code-bg);
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+      font-size: 0.88em;
+      font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 1rem;
+      overflow-x: auto;
+      font-size: 0.85rem;
+      line-height: 1.5;
+      margin: 0.75rem 0 1rem;
+      font-family: "SF Mono", "Fira Code", "Fira Mono", Menlo, Consolas, monospace;
+    }
+    pre code {
+      background: none;
+      padding: 0;
+      font-size: inherit;
+    }
+    table {
+      border-collapse: collapse;
+      width: 100%;
+      margin: 1rem 0;
+      font-size: 0.9rem;
+    }
+    th, td {
+      border: 1px solid var(--border);
+      padding: 0.5rem 0.75rem;
+      text-align: left;
+    }
+    th {
+      background: var(--card-bg);
+      font-weight: 600;
+    }
+    ul {
+      margin: 0.5rem 0 0.75rem 1.5rem;
+      font-size: 0.92rem;
+    }
+    li { margin-bottom: 0.3rem; }
+    ol {
+      margin: 0.5rem 0 0.75rem 1.5rem;
+      font-size: 0.92rem;
+    }
+    .callout {
+      background: var(--callout-bg);
+      border-left: 4px solid var(--callout-border);
+      color: var(--callout-text);
+      padding: 0.75rem 1rem;
+      margin: 1rem 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 0.9rem;
+    }
+    .privacy-box {
+      background: var(--privacy-bg);
+      border-left: 4px solid var(--privacy-border);
+      color: var(--privacy-text);
+      padding: 0.75rem 1rem;
+      margin: 1rem 0;
+      border-radius: 0 6px 6px 0;
+      font-size: 0.9rem;
+    }
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin: 1rem 0;
+    }
+  </style>
+</head>
+<body>
+
+<h1>Claude API Request: Student Summary Feature</h1>
+
+<p class="subtitle">This document describes what is sent to the Anthropic Claude API when a leader, coordinator, or admin clicks the summary icon for a student on the MHS Dashboard.</p>
+
+<hr>
+
+<h2>1. System Prompt (context + instructions)</h2>
+
+<p>The system prompt has two parts: the instructions for how to write the summary, and the full curriculum context document embedded within it.</p>
+
+<h3>Instructions</h3>
+
+<pre><code>You are an educational assessment specialist analyzing student performance data
+from Mission HydroSci, a science adventure game that teaches hydrology and
+scientific argumentation.
+
+Below is the curriculum context document that explains each progress point's
+learning objectives, what is assessed, and what flagged results indicate:
+
+&lt;curriculum_context&gt;
+[... full curriculum context — see below ...]
+&lt;/curriculum_context&gt;
+
+Your task is to write a clear, professional performance summary for a teacher
+or instructional leader. The summary should:
+
+1. Describe the student's overall progress through the game
+2. Highlight areas of strength (passed with low mistake counts, fast completion)
+3. Identify areas of concern (flagged results, high mistake counts, many attempts)
+4. Connect flagged results to specific learning gaps using the curriculum context
+5. Suggest instructional focus areas based on patterns in the data
+6. Refer to the student as "this student" or "the student" (no name is provided
+   for privacy)
+
+Write in 2-4 paragraphs. Be specific about which concepts the student
+understands or struggles with. Avoid generic statements. Reference specific
+progress points by their descriptive name (not IDs like "u2p3"). Do not include
+raw metrics numbers unless they help illustrate a point.</code></pre>
+
+<h3>Curriculum Context</h3>
+
+<p>The curriculum context is the full contents of <code>curriculum_context.md</code> (~294 lines, ~3,400 words, ~4,500 tokens). It is embedded into the Go binary at compile time and included in every request. It covers:</p>
+
+<ul>
+  <li>Game overview</li>
+  <li>All 5 units and 26 progress points</li>
+  <li>For each progress point: learning objectives, assessed skills, what flagged results mean, scoring rules, and relevant metrics</li>
+  <li>Cross-cutting skills progression (scientific argumentation and hydrology concepts)</li>
+  <li>How to interpret attempt counts, durations, mistake counts, and reason codes</li>
+</ul>
+
+<p>View the full document: <a href="curriculum_context.html">Curriculum Context and Learning Objectives</a></p>
+
+<hr>
+
+<h2>2. Student Data (user message)</h2>
+
+<p>The user message contains the student&rsquo;s grade data formatted as structured text. No student name or other personally identifiable information is sent to the API.</p>
+
+<h3>Format</h3>
+
+<pre><code>Please write a performance summary based on the following grade data:
+
+Current Unit: [unit ID]
+
+## [Unit ID]: [Unit Title]
+- [Point ID] ([Short Name]): [status] [reason] [duration] [active duration] [metrics] [attempts] [history]
+- [Point ID] ([Short Name]): Not started
+...</code></pre>
+
+<h3>Example</h3>
+
+<pre><code>Please write a performance summary based on the following grade data:
+
+Current Unit: unit3
+
+## unit1: Orientation and Scientific Argumentation Basics
+- u1p1 (Space Legs): passed [duration: 245s] [active: 230s] [metrics: mistakeCount=0]
+- u1p2 (Info &amp; Intros): passed [duration: 180s] [active: 170s] [metrics: mistakeCount=0]
+- u1p3 (Defend Expedition): passed [duration: 120s] [active: 115s] [metrics: mistakeCount=0]
+- u1p4 (What Was That?): passed [duration: 95s] [active: 90s]
+
+## unit2: Topographic Maps and Watersheds
+- u2p1 (Escape the Ruin): passed [duration: 310s] [active: 290s] [metrics: mistakeCount=0]
+- u2p2 (Foraged Forging): flagged [reason: BAD_FEEDBACK] [duration: 420s] [active: 400s] [metrics: mistakeCount=6]
+- u2p3 (Band Together II): passed [duration: 350s] [active: 330s] [metrics: mistakeCount=2]
+- u2p4 (Investigate Temple): passed [duration: 280s] [active: 260s] [metrics: mistakeCount=1]
+- u2p5 (Classified Info): passed [duration: 200s] [active: 190s] [metrics: posCount=5, mistakeCount=1, score=4.67]
+- u2p6 (Which Watershed? I): flagged [reason: MISSING_SUCCESS_NODE] [duration: 150s] [active: 140s] [metrics: mistakeCount=3]
+- u2p7 (Which Watershed? II): passed [duration: 180s] [active: 170s] [metrics: mistakeCount=2]
+
+## unit3: Water Flow Direction and Dissolved Materials
+- u3p1 (Supply Run): flagged [reason: TOO_MANY_NEGATIVES] [duration: 195s] [active: 185s] [metrics: count=0, mistakeCount=3]
+- u3p2 (Pollution Solution I): Not started
+- u3p3 (Pollution Solution II): Not started
+- u3p4 (Forsaken Facility): Not started
+- u3p5 (Balanced Ecosystem): Not started
+
+## unit4: Groundwater, Soil Infiltration, and the Water Table
+- u4p1 (Well What Have We Here?): Not started
+- u4p2 (Power Play 1&amp;2): Not started
+- u4p3 (Power Play 3&amp;4): Not started
+- u4p4 (Power Play 5 + Drill): Not started
+- u4p5 (Saving Anderson): Not started
+- u4p6 (Desert Delicacies): Not started
+
+## unit5: The Water Cycle
+- u5p1 (Nickel 1&amp;2): Not started
+- u5p2 (Nickel 3&amp;4): Not started
+- u5p3 (What Happened Here?): Not started
+- u5p4 (Water Solutions): Not started</code></pre>
+
+<p>Each progress point includes (when available):</p>
+
+<ul>
+  <li><strong>Status:</strong> <code>passed</code>, <code>flagged</code>, <code>active</code>, or <code>Not started</code></li>
+  <li><strong>Reason code:</strong> Only present for flagged items (e.g., <code>BAD_FEEDBACK</code>, <code>TOO_MANY_NEGATIVES</code>)</li>
+  <li><strong>Duration:</strong> Wall-clock time in seconds</li>
+  <li><strong>Active duration:</strong> Engaged time in seconds (excludes idle gaps &gt;5 min)</li>
+  <li><strong>Metrics:</strong> Key-value pairs specific to each progress point&rsquo;s grading rule</li>
+  <li><strong>Attempt count:</strong> Shown when the student has attempted a point more than once</li>
+  <li><strong>History:</strong> Previous attempt statuses when multiple attempts exist (e.g., <code>flagged(BAD_FEEDBACK) &rarr; passed</code>)</li>
+</ul>
+
+<hr>
+
+<h2>3. API Configuration</h2>
+
+<table>
+  <thead>
+    <tr><th>Parameter</th><th>Value</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>API endpoint</strong></td><td><code>POST https://api.anthropic.com/v1/messages</code></td></tr>
+    <tr><td><strong>API version header</strong></td><td><code>anthropic-version: 2023-06-01</code></td></tr>
+    <tr><td><strong>Model</strong></td><td>Configurable per workspace in Settings. Default: <code>claude-sonnet-4-20250514</code>. Options: Haiku 4.5 (<code>claude-haiku-4-5-20251001</code>), Sonnet 4 (<code>claude-sonnet-4-20250514</code>), Opus 4 (<code>claude-opus-4-20250514</code>)</td></tr>
+    <tr><td><strong>max_tokens</strong></td><td><code>1024</code></td></tr>
+    <tr><td><strong>Request timeout</strong></td><td>90 seconds (context timeout and HTTP client timeout)</td></tr>
+    <tr><td><strong>Authentication</strong></td><td><code>x-api-key</code> header with the Anthropic API key from <code>STRATAHUB_CLAUDE_API_KEY</code> env var</td></tr>
+  </tbody>
+</table>
+
+<hr>
+
+<h2>4. Response Handling</h2>
+
+<p>The API returns a JSON response with a <code>content</code> array of text blocks. The text from all blocks is joined and returned to the browser as:</p>
+
+<pre><code>{
+  "summary": "This student has made strong progress through the initial units...",
+  "user_id": "6612a3f1c2e4b5d6e7f89012",
+  "name": "Chase Creason"
+}</code></pre>
+
+<p>The <code>name</code> field is used by the modal header to display the student&rsquo;s name above the summary. The summary text itself does not contain the student&rsquo;s name. The summary is in Markdown format and the browser converts it to HTML for display, handling headings (<code>##</code>, <code>###</code>), bold (<code>**text**</code>), italic (<code>*text*</code>), and paragraph breaks.</p>
+
+<div class="privacy-box">
+  <strong>Privacy:</strong> No personally identifiable information (name, login ID, or user ID) is sent to the Anthropic API. The request contains only the anonymous grade data and curriculum context. The student&rsquo;s name is displayed only in the browser-side modal header.
+</div>
+
+<hr>
+
+<h2>5. Token Estimates</h2>
+
+<table>
+  <thead>
+    <tr><th>Component</th><th>Estimated Tokens</th></tr>
+  </thead>
+  <tbody>
+    <tr><td>System prompt instructions</td><td>~500</td></tr>
+    <tr><td>Curriculum context</td><td>~4,500</td></tr>
+    <tr><td>Student grade data</td><td>~500&ndash;2,000 (varies by progress)</td></tr>
+    <tr><td><strong>Total input</strong></td><td><strong>~5,500&ndash;7,000</strong></td></tr>
+    <tr><td>Output (max_tokens=1024)</td><td>~400&ndash;800 typical</td></tr>
+  </tbody>
+</table>
+
+<p>See <a href="../costs/claude-api-cost-estimate.html">Claude API Cost Estimate</a> for detailed cost analysis by model and usage scenario.</p>
+
+<hr>
+
+<h2>6. Source Code</h2>
+
+<div class="card">
+  <ul style="list-style: none; margin: 0; padding: 0;">
+    <li style="margin-bottom: 0.4rem;"><strong>API call and prompt construction:</strong> <code>internal/app/features/mhsdashboard/summary.go</code></li>
+    <li style="margin-bottom: 0.4rem;"><strong>Curriculum context:</strong> <code>internal/app/features/mhsdashboard/curriculum_context.md</code></li>
+    <li style="margin-bottom: 0.4rem;"><strong>Progress point config:</strong> <code>internal/app/resources/mhs_progress_points.json</code></li>
+    <li><strong>Dashboard UI (modal + JS):</strong> <code>internal/app/features/mhsdashboard/templates/mhsdashboard_view.gohtml</code></li>
+  </ul>
+</div>
+
+</body>
+</html>

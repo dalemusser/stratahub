@@ -102,7 +102,7 @@ func (h *Handler) ServeSummary(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Build and send the Claude API request
-	summary, err := h.callClaudeAPI(ctx, studentName, studentData, model)
+	summary, err := h.callClaudeAPI(ctx, studentData, model)
 	if err != nil {
 		h.Log.Error("Claude API call failed", zap.String("userID", userIDHex), zap.String("model", model), zap.Error(err))
 		writeJSONError(w, http.StatusBadGateway, "AI summary generation failed. Please try again.")
@@ -248,7 +248,8 @@ type claudeResponse struct {
 }
 
 // callClaudeAPI sends the student data to Claude and returns the summary text.
-func (h *Handler) callClaudeAPI(ctx context.Context, studentName, studentData, model string) (string, error) {
+// The student's name is intentionally excluded — no PII is sent to the API.
+func (h *Handler) callClaudeAPI(ctx context.Context, studentData, model string) (string, error) {
 	systemPrompt := fmt.Sprintf(`You are an educational assessment specialist analyzing student performance data from Mission HydroSci, a science adventure game that teaches hydrology and scientific argumentation.
 
 Below is the curriculum context document that explains each progress point's learning objectives, what is assessed, and what flagged results indicate:
@@ -264,11 +265,11 @@ Your task is to write a clear, professional performance summary for a teacher or
 3. Identify areas of concern (flagged results, high mistake counts, many attempts)
 4. Connect flagged results to specific learning gaps using the curriculum context
 5. Suggest instructional focus areas based on patterns in the data
-6. Use the student's name naturally (not "the student")
+6. Refer to the student as "this student" or "the student" (no name is provided for privacy)
 
 Write in 2-4 paragraphs. Be specific about which concepts the student understands or struggles with. Avoid generic statements. Reference specific progress points by their descriptive name (not IDs like "u2p3"). Do not include raw metrics numbers unless they help illustrate a point.`, curriculumContext)
 
-	userPrompt := fmt.Sprintf("Please write a performance summary for %s based on the following grade data:\n\n%s", studentName, studentData)
+	userPrompt := fmt.Sprintf("Please write a performance summary based on the following grade data:\n\n%s", studentData)
 
 	if model == "" {
 		model = "claude-sonnet-4-20250514"
