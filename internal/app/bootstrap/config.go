@@ -84,9 +84,13 @@ var appConfigKeys = []config.AppKey{
 	{Name: "mhs_cdn_base_url", Default: "", Desc: "CDN base URL for MHS game builds (e.g., https://cdn.adroit.games/mhs)"},
 
 	// Game service endpoints (for /api/game-config)
-	{Name: "game_mhs_log_url", Default: "", Desc: "Log service URL for MHS game"},
+	// Full endpoint URLs so games can POST directly without constructing paths.
+	{Name: "game_mhs_log_submit_url", Default: "", Desc: "Log submit endpoint (e.g., https://log.adroit.games/api/log/submit)"},
 	{Name: "game_mhs_log_auth", Default: "", Desc: "Log service auth header for MHS game (e.g., Bearer <api-key>)"},
-	{Name: "game_mhs_save_url", Default: "", Desc: "Save service URL for MHS game"},
+	{Name: "game_mhs_state_save_url", Default: "", Desc: "State save endpoint (e.g., https://save.adroit.games/api/state/save)"},
+	{Name: "game_mhs_state_load_url", Default: "", Desc: "State load endpoint (e.g., https://save.adroit.games/api/state/load)"},
+	{Name: "game_mhs_settings_save_url", Default: "", Desc: "Settings save endpoint (e.g., https://save.adroit.games/api/settings/save)"},
+	{Name: "game_mhs_settings_load_url", Default: "", Desc: "Settings load endpoint (e.g., https://save.adroit.games/api/settings/load)"},
 	{Name: "game_mhs_save_auth", Default: "", Desc: "Save service auth header for MHS game (e.g., Bearer <api-key>)"},
 
 	// Claude API configuration
@@ -182,10 +186,13 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 		MHSCDNBaseURL: appValues.String("mhs_cdn_base_url"),
 
 		// Game service endpoints
-		GameMHSLogURL:   appValues.String("game_mhs_log_url"),
-		GameMHSLogAuth:  appValues.String("game_mhs_log_auth"),
-		GameMHSSaveURL:  appValues.String("game_mhs_save_url"),
-		GameMHSSaveAuth: appValues.String("game_mhs_save_auth"),
+		GameMHSLogSubmitURL:    appValues.String("game_mhs_log_submit_url"),
+		GameMHSLogAuth:         appValues.String("game_mhs_log_auth"),
+		GameMHSStateSaveURL:    appValues.String("game_mhs_state_save_url"),
+		GameMHSStateLoadURL:    appValues.String("game_mhs_state_load_url"),
+		GameMHSSettingsSaveURL: appValues.String("game_mhs_settings_save_url"),
+		GameMHSSettingsLoadURL: appValues.String("game_mhs_settings_load_url"),
+		GameMHSSaveAuth:        appValues.String("game_mhs_save_auth"),
 
 		// Claude API
 		ClaudeAPIKey: appValues.String("claude_api_key"),

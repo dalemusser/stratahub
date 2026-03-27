@@ -130,19 +130,31 @@
         <div class="field-value" id="gameconfig-game">—</div>
       </div>
       <div class="field">
-        <div class="field-label">Log Service URL</div>
-        <div class="field-value" id="gameconfig-log-url">—</div>
+        <div class="field-label">Log Submit URL</div>
+        <div class="field-value" id="gameconfig-log-submit-url">—</div>
       </div>
       <div class="field">
-        <div class="field-label">Log Service Auth</div>
+        <div class="field-label">Log Auth</div>
         <div class="field-value masked" id="gameconfig-log-auth">—</div>
       </div>
       <div class="field">
-        <div class="field-label">Save Service URL</div>
-        <div class="field-value" id="gameconfig-save-url">—</div>
+        <div class="field-label">State Save URL</div>
+        <div class="field-value" id="gameconfig-state-save-url">—</div>
       </div>
       <div class="field">
-        <div class="field-label">Save Service Auth</div>
+        <div class="field-label">State Load URL</div>
+        <div class="field-value" id="gameconfig-state-load-url">—</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Settings Save URL</div>
+        <div class="field-value" id="gameconfig-settings-save-url">—</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Settings Load URL</div>
+        <div class="field-value" id="gameconfig-settings-load-url">—</div>
+      </div>
+      <div class="field">
+        <div class="field-label">Save Auth</div>
         <div class="field-value masked" id="gameconfig-save-auth">—</div>
       </div>
     </div>
@@ -244,17 +256,20 @@
           setStatus('gameconfig-status', true, 'OK');
 
           document.getElementById('gameconfig-game').textContent = data.game || gameId;
-          document.getElementById('gameconfig-log-url').textContent = (servicesData.log && servicesData.log.url) || '(not configured)';
-          document.getElementById('gameconfig-log-auth').textContent = maskAuth(servicesData.log && servicesData.log.auth);
-          document.getElementById('gameconfig-save-url').textContent = (servicesData.save && servicesData.save.url) || '(not configured)';
-          document.getElementById('gameconfig-save-auth').textContent = maskAuth(servicesData.save && servicesData.save.auth);
+          document.getElementById('gameconfig-log-submit-url').textContent = (servicesData.log_submit && servicesData.log_submit.url) || '(not configured)';
+          document.getElementById('gameconfig-log-auth').textContent = maskAuth(servicesData.log_submit && servicesData.log_submit.auth);
+          document.getElementById('gameconfig-state-save-url').textContent = (servicesData.state_save && servicesData.state_save.url) || '(not configured)';
+          document.getElementById('gameconfig-state-load-url').textContent = (servicesData.state_load && servicesData.state_load.url) || '(not configured)';
+          document.getElementById('gameconfig-settings-save-url').textContent = (servicesData.settings_save && servicesData.settings_save.url) || '(not configured)';
+          document.getElementById('gameconfig-settings-load-url').textContent = (servicesData.settings_load && servicesData.settings_load.url) || '(not configured)';
+          document.getElementById('gameconfig-save-auth').textContent = maskAuth(servicesData.state_save && servicesData.state_save.auth);
           document.getElementById('gameconfig-fields').style.display = 'block';
           document.getElementById('gameconfig-raw').textContent = JSON.stringify(data, null, 2);
           document.getElementById('gameconfig-raw').style.display = 'block';
 
           // Enable service test buttons
-          document.getElementById('test-log-btn').disabled = !(servicesData.log && servicesData.log.url);
-          document.getElementById('test-save-btn').disabled = !(servicesData.save && servicesData.save.url);
+          document.getElementById('test-log-btn').disabled = !(servicesData.log_submit && servicesData.log_submit.url);
+          document.getElementById('test-save-btn').disabled = !(servicesData.state_load && servicesData.state_load.url);
           updateAssembled();
         })
         .catch(function(err) {
@@ -289,10 +304,10 @@
       var display = JSON.parse(JSON.stringify(config));
       // Mask auth values in display
       if (display.services) {
-        if (display.services.log && display.services.log.auth)
-          display.services.log.auth = maskAuth(display.services.log.auth);
-        if (display.services.save && display.services.save.auth)
-          display.services.save.auth = maskAuth(display.services.save.auth);
+        ['log_submit', 'state_save', 'state_load', 'settings_save', 'settings_load'].forEach(function(key) {
+          if (display.services[key] && display.services[key].auth)
+            display.services[key].auth = maskAuth(display.services[key].auth);
+        });
       }
 
       document.getElementById('assembled-config').textContent =
@@ -301,17 +316,17 @@
 
     // --- Service Connectivity Tests ---
     function testLogService() {
-      if (!servicesData || !servicesData.log) return;
+      if (!servicesData || !servicesData.log_submit) return;
       var resultDiv = document.getElementById('service-test-result');
       resultDiv.innerHTML = '';
 
       var userId = (identityData && identityData.user_id) || 'test-user';
 
-      fetch(servicesData.log.url + '/api/log/submit', {
+      fetch(servicesData.log_submit.url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': servicesData.log.auth
+          'Authorization': servicesData.log_submit.auth
         },
         body: JSON.stringify({
           game: getGameId(),
@@ -336,18 +351,18 @@
     }
 
     function testSaveService() {
-      if (!servicesData || !servicesData.save) return;
+      if (!servicesData || !servicesData.state_load) return;
       var resultDiv = document.getElementById('service-test-result');
       resultDiv.innerHTML = '';
 
       var userId = (identityData && identityData.user_id) || 'test-user';
 
-      // Test with a load request (non-destructive)
-      fetch(servicesData.save.url + '/api/state/load', {
+      // Test with a state load request (non-destructive)
+      fetch(servicesData.state_load.url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': servicesData.save.auth
+          'Authorization': servicesData.state_load.auth
         },
         body: JSON.stringify({
           user_id: userId,

@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IRB Amendment &mdash; AI-Generated Teacher Feedback from De-Identified Gameplay Logs</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #1a1a2e;
+      --muted: #555;
+      --accent: #2563eb;
+      --border: #e5e7eb;
+      --code-bg: #f3f4f6;
+      --callout-bg: #eff6ff;
+      --callout-border: #bfdbfe;
+      --callout-text: #1e40af;
+      --card-bg: #f8fafc;
+      --card-border: #e2e8f0;
+      --success-bg: #f0fdf4;
+      --success-border: #86efac;
+      --success-text: #166534;
+      --warn-bg: #fffbeb;
+      --warn-border: #fcd34d;
+      --warn-text: #92400e;
+      --section-divider: #e5e7eb;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1a2e;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #60a5fa;
+        --border: #334155;
+        --code-bg: #1e293b;
+        --callout-bg: #1e293b;
+        --callout-border: #334155;
+        --callout-text: #93c5fd;
+        --card-bg: #1e293b;
+        --card-border: #334155;
+        --success-bg: #052e16;
+        --success-border: #166534;
+        --success-text: #86efac;
+        --warn-bg: #451a03;
+        --warn-border: #92400e;
+        --warn-text: #fcd34d;
+        --section-divider: #334155;
+      }
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--bg);
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+    h1 {
+      font-size: 1.75rem;
+      margin-bottom: 0.5rem;
+      border-bottom: 3px solid var(--accent);
+      padding-bottom: 0.5rem;
+    }
+    h2 {
+      font-size: 1.35rem;
+      margin-top: 2.5rem;
+      margin-bottom: 0.75rem;
+      color: var(--accent);
+      border-bottom: 1px solid var(--section-divider);
+      padding-bottom: 0.35rem;
+    }
+    h3 {
+      font-size: 1.1rem;
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    p { margin-bottom: 1rem; }
+    strong { font-weight: 600; }
+    ul, ol {
+      margin-bottom: 1rem;
+      padding-left: 1.5rem;
+    }
+    li { margin-bottom: 0.35rem; }
+    a { color: var(--accent); }
+    .subtitle {
+      font-size: 1.05rem;
+      color: var(--muted);
+      margin-bottom: 2rem;
+    }
+    .callout {
+      background: var(--callout-bg);
+      border-left: 4px solid var(--callout-border);
+      color: var(--callout-text);
+      padding: 0.75rem 1rem;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 1.25rem;
+      font-size: 0.95rem;
+    }
+    .callout-success {
+      background: var(--success-bg);
+      border-left: 4px solid var(--success-border);
+      color: var(--success-text);
+      padding: 0.75rem 1rem;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 1.25rem;
+      font-size: 0.95rem;
+    }
+    .callout-warn {
+      background: var(--warn-bg);
+      border-left: 4px solid var(--warn-border);
+      color: var(--warn-text);
+      padding: 0.75rem 1rem;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 1.25rem;
+      font-size: 0.95rem;
+    }
+    .exec-summary {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .exec-summary h2 {
+      margin-top: 0;
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+    .exec-summary ul {
+      list-style: none;
+      padding-left: 0;
+    }
+    .exec-summary li {
+      padding: 0.3rem 0;
+      padding-left: 1.5rem;
+      position: relative;
+    }
+    .exec-summary li::before {
+      content: "\2713";
+      color: var(--accent);
+      font-weight: 700;
+      position: absolute;
+      left: 0;
+    }
+    .section-group {
+      border-left: 3px solid var(--border);
+      padding-left: 1.25rem;
+      margin-bottom: 2rem;
+    }
+    .checklist-item {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 0.75rem;
+    }
+    .checklist-item h3 {
+      margin-top: 0;
+      font-size: 1rem;
+    }
+    .checklist-item .answer {
+      font-weight: 700;
+      font-size: 1.05rem;
+    }
+    .checklist-item .answer.yes { color: var(--success-text); }
+    .checklist-item .answer.no { color: var(--muted); }
+    .badge {
+      display: inline-block;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.2em 0.6em;
+      border-radius: 4px;
+      margin-left: 0.5rem;
+      vertical-align: middle;
+    }
+    .badge-minimal {
+      background: var(--success-bg);
+      color: var(--success-text);
+      border: 1px solid var(--success-border);
+    }
+    .badge-expedited {
+      background: var(--callout-bg);
+      color: var(--callout-text);
+      border: 1px solid var(--callout-border);
+    }
+    .mitigation-card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+      margin-bottom: 1rem;
+    }
+    .mitigation-card h3 {
+      margin-top: 0;
+    }
+    .mitigation-label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      margin-top: 0.75rem;
+      margin-bottom: 0.25rem;
+    }
+    .kill-shot {
+      text-align: center;
+      font-size: 1.1rem;
+      font-weight: 600;
+      font-style: italic;
+      color: var(--accent);
+      padding: 1.5rem 1rem;
+      margin: 2rem 0;
+      border-top: 2px solid var(--accent);
+      border-bottom: 2px solid var(--accent);
+    }
+    .doc-divider {
+      border: none;
+      border-top: 3px double var(--border);
+      margin: 3rem 0;
+    }
+    .toc {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1rem 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .toc h3 {
+      margin-top: 0;
+      font-size: 0.95rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .toc ol {
+      margin-bottom: 0;
+      padding-left: 1.25rem;
+    }
+    .toc li { margin-bottom: 0.2rem; }
+    .toc a {
+      text-decoration: none;
+      font-size: 0.95rem;
+    }
+    .toc a:hover { text-decoration: underline; }
+    @media print {
+      body { max-width: 100%; padding: 1rem; }
+      .doc-divider { page-break-before: always; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>IRB Amendment</h1>
+<p class="subtitle">Modification to Data Analysis Procedures: AI-Generated Teacher Feedback from De-Identified Gameplay Logs</p>
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#exec-summary">Executive Summary</a></li>
+    <li><a href="#amendment">Amendment Application</a></li>
+    <li><a href="#ai-justification">AI Use Justification</a></li>
+    <li><a href="#checklist">IRB Reviewer Checklist</a></li>
+    <li><a href="#risk-clarification">AI Risk Clarification &amp; Mitigation</a></li>
+  </ol>
+</nav>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- EXECUTIVE SUMMARY                                           -->
+<!-- ════════════════════════════════════════════════════════════ -->
+
+<div class="exec-summary" id="exec-summary">
+  <h2>Executive Summary</h2>
+  <ul>
+    <li><strong>No new data collection:</strong> Uses only existing gameplay log data already approved under the protocol</li>
+    <li><strong>No identifiable information:</strong> Data is fully de-identified (e.g., attempts, choices, progression only)</li>
+    <li><strong>No change to participants:</strong> No changes to interaction, consent, or study procedures</li>
+    <li><strong>Minimal risk unchanged:</strong> No increase in data sensitivity, exposure, or privacy risk</li>
+    <li><strong>AI = analytic tool only:</strong> Replaces/augments existing summary methods; no automated decisions or evaluations</li>
+    <li><strong>Secure environment maintained:</strong> All processing remains within controlled, access-restricted systems</li>
+  </ul>
+  <div class="callout" style="margin-top:1rem;margin-bottom:0;">
+    This represents a change in analytic methodology only, with no change to human subjects involvement or risk profile.
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- AMENDMENT APPLICATION                                       -->
+<!-- ════════════════════════════════════════════════════════════ -->
+
+<h2 id="amendment">Amendment Application</h2>
+
+<h3>Summary of Proposed Change</h3>
+<p>This amendment proposes a modification to data analysis procedures only. The study will incorporate an AI-based analytic method to process existing gameplay log data and generate teacher-facing narrative summaries of student performance.</p>
+
+<p>There are <strong>no changes</strong> to:</p>
+<ul>
+  <li>Study population</li>
+  <li>Recruitment procedures</li>
+  <li>Consent process or consent documents</li>
+  <li>Participant interaction or intervention</li>
+  <li>Data collection methods or instruments</li>
+</ul>
+
+<h3>Description of the Modification</h3>
+<p>The current study collects gameplay log data reflecting student interactions within the MHS game. These logs include behavioral and performance events such as:</p>
+<ul>
+  <li>Number of attempts to complete tasks</li>
+  <li>Choices made within the game</li>
+  <li>Progression through levels or activities</li>
+</ul>
+
+<p>Under this amendment, these existing, de-identified data will be processed using an AI-based analytic system to generate short summaries for teachers. These summaries may include:</p>
+<ul>
+  <li>Indicators of student progress</li>
+  <li>Identification of common errors or challenges</li>
+  <li>General instructional suggestions</li>
+</ul>
+
+<p>The AI system functions as an analytic tool, replacing or augmenting traditional rule-based or statistical summaries.</p>
+
+<h3>Data Description</h3>
+<ul>
+  <li><strong>Data type:</strong> Gameplay interaction/performance logs</li>
+  <li><strong>Examples:</strong> Attempts, choices, progression events</li>
+  <li><strong>Identifiability:</strong> Fully de-identified; no PII collected or transmitted</li>
+  <li><strong>Source:</strong> Existing data already approved under the current protocol</li>
+  <li><strong>No new variables</strong> or sensitive data elements are introduced</li>
+</ul>
+
+<h3>Data Use and Flow</h3>
+<ul>
+  <li>Data is transmitted to a controlled AI processing environment</li>
+  <li>Processing generates teacher-facing summaries only</li>
+  <li>No raw data is shared outside authorized MHS systems</li>
+  <li>No external/public data sharing occurs</li>
+  <li>Outputs are limited to instructional support summaries</li>
+</ul>
+
+<h3>Privacy and Confidentiality</h3>
+<ul>
+  <li>No personally identifiable information (PII) is used</li>
+  <li>Data remains de-identified throughout processing</li>
+  <li>Access restricted to authorized project personnel</li>
+  <li>Security and storage practices remain unchanged from the approved protocol</li>
+</ul>
+
+<h3>Risk Assessment <span class="badge badge-minimal">Minimal Risk</span></h3>
+<p>This modification does not increase risk to participants.</p>
+<ul>
+  <li>No change in participant experience</li>
+  <li>No new data collection</li>
+  <li>No introduction of identifiable or sensitive data</li>
+  <li>No change in data exposure or sharing</li>
+</ul>
+<p>The activity remains minimal risk, consistent with the currently approved study.</p>
+
+<h3>Impact on Participants</h3>
+<p><strong>None.</strong> Participants will not be aware of or affected by this change, as it only alters internal data analysis and reporting methods.</p>
+
+<h3>Consent Process</h3>
+<p><strong>No changes.</strong> Existing consent materials remain accurate, as:</p>
+<ul>
+  <li>No new data is collected</li>
+  <li>No new uses of identifiable data are introduced</li>
+  <li>The nature of participation is unchanged</li>
+</ul>
+
+<h3>Justification / Purpose of Change</h3>
+<p>The purpose of this modification is to improve the usefulness and clarity of teacher-facing feedback by leveraging AI to generate more flexible and informative summaries of student gameplay performance.</p>
+<p>This is an exploratory enhancement to:</p>
+<ul>
+  <li>Evaluate the quality and usefulness of AI-generated feedback</li>
+  <li>Gather teacher input on instructional value</li>
+  <li>Assess feasibility in terms of time and cost</li>
+</ul>
+
+<h3>Review Category Requested <span class="badge badge-expedited">Expedited</span></h3>
+<p>We believe this modification qualifies for expedited review as it:</p>
+<ul>
+  <li>Involves no more than minimal risk</li>
+  <li>Does not alter participant involvement</li>
+  <li>Constitutes a change in data analysis methodology only</li>
+</ul>
+
+<h3>Supplemental Materials (if requested)</h3>
+<p>Available upon request:</p>
+<ul>
+  <li>Sample anonymized input data</li>
+  <li>Example AI-generated teacher summaries</li>
+  <li>Data flow diagram</li>
+  <li>Description of AI processing environment and safeguards</li>
+</ul>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- AI USE JUSTIFICATION                                        -->
+<!-- ════════════════════════════════════════════════════════════ -->
+
+<hr class="doc-divider">
+
+<h2 id="ai-justification">AI Use Justification for MHS Project</h2>
+
+<h3>Overview</h3>
+<p>This project proposes the use of an AI-based analytic tool to process existing, de-identified gameplay performance data in order to generate teacher-facing summaries that support instructional decision-making.</p>
+<p>The AI system does not introduce new data collection, new participant interaction, or changes to the study design. It functions solely as an enhancement to existing data analysis methods.</p>
+
+<h3>Nature of the Data</h3>
+<p>The data used by the AI system consists exclusively of de-identified gameplay logs, including:</p>
+<ul>
+  <li>Task attempts (e.g., number of tries)</li>
+  <li>In-game choices (e.g., selection paths)</li>
+  <li>Progression through activities or levels</li>
+</ul>
+<p>No personally identifiable information (PII) is included in the dataset. The data represents student interaction with the game system, not student identity.</p>
+
+<h3>Purpose of AI Use</h3>
+<p>The AI system is used to:</p>
+<ul>
+  <li>Summarize patterns in student performance</li>
+  <li>Identify common errors or challenges</li>
+  <li>Provide general instructional suggestions to teachers</li>
+</ul>
+<p>This replaces or augments traditional rule-based or statistical summaries currently used in the system.</p>
+
+<h3>Role of AI in the Study</h3>
+<p>The AI system:</p>
+<ul>
+  <li>Does <strong>not</strong> make decisions about participants</li>
+  <li>Does <strong>not</strong> alter gameplay or student experience</li>
+  <li>Does <strong>not</strong> impact grading or evaluation directly</li>
+</ul>
+<p>It generates advisory, teacher-facing summaries only, which educators may use at their discretion.</p>
+
+<h3>Data Handling and Security</h3>
+<ul>
+  <li>All data remains within a secure, access-controlled MHS environment</li>
+  <li>No data is shared publicly or with unauthorized third parties</li>
+  <li>No identifiable data is introduced at any stage</li>
+  <li>Data storage and security practices remain unchanged from the approved protocol</li>
+</ul>
+
+<h3>Risk Assessment <span class="badge badge-minimal">Minimal Risk</span></h3>
+<p>This use of AI presents no greater than minimal risk because:</p>
+<ul>
+  <li>No new data is collected</li>
+  <li>No identifiable or sensitive data is used</li>
+  <li>No change occurs in participant interaction</li>
+  <li>Data exposure and handling remain unchanged</li>
+</ul>
+<p>The AI system functions as a data processing tool, not a new research intervention.</p>
+
+<h3>Human Oversight</h3>
+<ul>
+  <li>Teachers receive training on appropriate interpretation of AI-generated feedback</li>
+  <li>AI outputs are not treated as authoritative or automated decisions</li>
+  <li>Human judgment remains central to instructional use</li>
+</ul>
+
+<h3>Exploratory Nature</h3>
+<p>This work is exploratory and intended to:</p>
+<ul>
+  <li>Evaluate the usefulness of AI-generated feedback</li>
+  <li>Understand how teachers interpret and apply summaries</li>
+  <li>Assess feasibility in terms of time, cost, and instructional value</li>
+</ul>
+
+<div class="callout-success">
+  <strong>Conclusion:</strong> The proposed use of AI represents a change in analytic methodology only, without altering the scope of human subjects involvement, data sensitivity, or risk profile of the study.
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- IRB REVIEWER CHECKLIST                                      -->
+<!-- ════════════════════════════════════════════════════════════ -->
+
+<hr class="doc-divider">
+
+<h2 id="checklist">IRB Reviewer Alignment Checklist</h2>
+
+<div class="checklist-item">
+  <h3>1. Does this involve human subjects interaction?</h3>
+  <p class="answer no">No.</p>
+  <ul>
+    <li>No changes to participant interaction, intervention, or experience</li>
+    <li>Activity is limited to internal data processing</li>
+  </ul>
+</div>
+
+<div class="checklist-item">
+  <h3>2. Is new data being collected?</h3>
+  <p class="answer no">No.</p>
+  <ul>
+    <li>Uses existing gameplay log data already approved under the protocol</li>
+    <li>No additional variables or instruments introduced</li>
+  </ul>
+</div>
+
+<div class="checklist-item">
+  <h3>3. Does the data include identifiable information?</h3>
+  <p class="answer no">No.</p>
+  <ul>
+    <li>Data is fully de-identified</li>
+    <li>No names, IDs, emails, device identifiers, or indirect identifiers</li>
+    <li>Data consists only of in-game behavioral/performance events</li>
+  </ul>
+</div>
+
+<div class="checklist-item">
+  <h3>4. Does this increase risk to participants?</h3>
+  <p class="answer no">No.</p>
+  <ul>
+    <li>No change in exposure, data sensitivity, or handling</li>
+    <li>No external data sharing</li>
+    <li>No impact on participants</li>
+  </ul>
+  <div class="callout-success" style="margin-top:0.75rem;margin-bottom:0;"><strong>Remains minimal risk</strong></div>
+</div>
+
+<div class="checklist-item">
+  <h3>5. Does this change the study design or scope?</h3>
+  <p class="answer no">No.</p>
+  <ul>
+    <li>No change to research questions</li>
+    <li>No change to procedures</li>
+    <li>No change to population</li>
+  </ul>
+  <div class="callout" style="margin-top:0.75rem;margin-bottom:0;">This is a methodological change in data analysis only</div>
+</div>
+
+<div class="checklist-item">
+  <h3>6. Is AI being used to make decisions about participants?</h3>
+  <p class="answer no">No.</p>
+  <ul>
+    <li>AI outputs are advisory only</li>
+    <li>Used by teachers as optional instructional support</li>
+    <li>No automated decision-making or evaluation</li>
+  </ul>
+</div>
+
+<div class="checklist-item">
+  <h3>7. Is there appropriate human oversight?</h3>
+  <p class="answer yes">Yes.</p>
+  <ul>
+    <li>Teachers interpret and apply feedback</li>
+    <li>Training provided on limitations of AI output</li>
+    <li>No reliance on AI as an authoritative source</li>
+  </ul>
+</div>
+
+<div class="checklist-item">
+  <h3>8. Are privacy and security protections adequate?</h3>
+  <p class="answer yes">Yes.</p>
+  <ul>
+    <li>Data remains within secure, access-controlled environment</li>
+    <li>No third-party sharing of identifiable data</li>
+    <li>Same safeguards as current approved protocol</li>
+  </ul>
+</div>
+
+<div class="checklist-item">
+  <h3>9. Does this qualify for expedited review?</h3>
+  <p class="answer yes">Yes.</p>
+  <ul>
+    <li>No more than minimal risk</li>
+    <li>No change in participant involvement</li>
+    <li>Limited to data analysis procedures</li>
+  </ul>
+</div>
+
+<div class="checklist-item" style="border: 2px solid var(--accent);">
+  <h3>10. Bottom-Line Determination</h3>
+  <p><strong>This modification represents a change in analytic methodology only, with no change in risk, data scope, or human subjects involvement.</strong></p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- AI RISK CLARIFICATION                                       -->
+<!-- ════════════════════════════════════════════════════════════ -->
+
+<hr class="doc-divider">
+
+<h2 id="risk-clarification">AI Risk Clarification &amp; Mitigation Statement</h2>
+
+<div class="mitigation-card">
+  <h3>AI Output Reliability</h3>
+  <p>AI-generated summaries are non-deterministic and advisory in nature, not treated as ground truth or formal assessment.</p>
+  <p class="mitigation-label">Mitigation</p>
+  <ul>
+    <li>Outputs are presented as suggestive insights, not conclusions</li>
+    <li>Teachers are explicitly instructed to apply professional judgment</li>
+  </ul>
+</div>
+
+<div class="mitigation-card">
+  <h3>Bias and Interpretation</h3>
+  <p>The AI system may reflect patterns in the input data but does not profile students, assign labels or categories to individuals, or make evaluative judgments about student ability.</p>
+  <p class="mitigation-label">Mitigation</p>
+  <ul>
+    <li>Outputs are limited to task-level and interaction-level observations</li>
+    <li>No demographic or personal attributes are included or inferred</li>
+  </ul>
+</div>
+
+<div class="mitigation-card">
+  <h3>Hallucination / Incorrect Output</h3>
+  <p>AI systems may generate incorrect or imprecise summaries.</p>
+  <p class="mitigation-label">Mitigation</p>
+  <ul>
+    <li>Outputs are constrained to provided gameplay logs and defined game context</li>
+    <li>Teachers are trained to treat outputs as supporting information only</li>
+  </ul>
+</div>
+
+<div class="mitigation-card">
+  <h3>Data Leakage / Privacy Concerns</h3>
+  <p><strong>Risk:</strong> AI systems exposing sensitive data.</p>
+  <p class="mitigation-label">Mitigation</p>
+  <ul>
+    <li>Only de-identified data is used</li>
+    <li>Processing occurs in a controlled environment</li>
+    <li>No prompts include identifiable or sensitive content</li>
+    <li>No external/public model training on this data</li>
+  </ul>
+</div>
+
+<div class="mitigation-card">
+  <h3>Automation Risk</h3>
+  <p><strong>Risk:</strong> AI replacing human decision-making.</p>
+  <p class="mitigation-label">Mitigation</p>
+  <ul>
+    <li>AI does not automate decisions</li>
+    <li>No grading, placement, or evaluation actions are taken by AI</li>
+    <li>Human educators remain fully in control</li>
+  </ul>
+</div>
+
+<div class="mitigation-card">
+  <h3>Scope Limitation</h3>
+  <p>The AI system is strictly limited to processing gameplay logs and generating teacher-facing summaries. It does not interact with students, modify gameplay, or influence participant behavior.</p>
+</div>
+
+<div class="callout">
+  <strong>Regulatory Positioning:</strong> This use of AI is best understood as an advanced analytic tool applied to de-identified data, equivalent in risk profile to existing statistical or rule-based methods.
+</div>
+
+<div class="kill-shot">
+  "The AI does not introduce new data, new risk, or new interaction &mdash; it changes only how already-approved data is summarized."
+</div>
+
+</body>
+</html>

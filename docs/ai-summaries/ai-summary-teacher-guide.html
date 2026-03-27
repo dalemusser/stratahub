@@ -1,0 +1,606 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AI Summary Teacher Guide &mdash; Mission HydroSci</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #1a1a2e;
+      --muted: #555;
+      --accent: #2563eb;
+      --border: #e5e7eb;
+      --code-bg: #f3f4f6;
+      --callout-bg: #eff6ff;
+      --callout-border: #bfdbfe;
+      --callout-text: #1e40af;
+      --card-bg: #f8fafc;
+      --card-border: #e2e8f0;
+      --success-bg: #f0fdf4;
+      --success-border: #86efac;
+      --success-text: #166534;
+      --warn-bg: #fffbeb;
+      --warn-border: #fcd34d;
+      --warn-text: #92400e;
+      --danger-bg: #fef2f2;
+      --danger-border: #fca5a5;
+      --danger-text: #991b1b;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1a2e;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #60a5fa;
+        --border: #334155;
+        --code-bg: #1e293b;
+        --callout-bg: #1e293b;
+        --callout-border: #334155;
+        --callout-text: #93c5fd;
+        --card-bg: #1e293b;
+        --card-border: #334155;
+        --success-bg: #052e16;
+        --success-border: #166534;
+        --success-text: #86efac;
+        --warn-bg: #451a03;
+        --warn-border: #92400e;
+        --warn-text: #fcd34d;
+        --danger-bg: #450a0a;
+        --danger-border: #991b1b;
+        --danger-text: #fca5a5;
+      }
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--bg);
+      max-width: 800px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+    h1 {
+      font-size: 1.75rem;
+      margin-bottom: 0.25rem;
+      border-bottom: 3px solid var(--accent);
+      padding-bottom: 0.5rem;
+    }
+    h2 {
+      font-size: 1.35rem;
+      margin-top: 2.5rem;
+      margin-bottom: 0.75rem;
+      color: var(--accent);
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 0.35rem;
+    }
+    h3 {
+      font-size: 1.1rem;
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    p { margin-bottom: 1rem; }
+    strong { font-weight: 600; }
+    ul, ol { margin-bottom: 1rem; padding-left: 1.5rem; }
+    li { margin-bottom: 0.35rem; }
+    a { color: var(--accent); }
+    .subtitle {
+      font-size: 1.05rem;
+      color: var(--muted);
+      margin-bottom: 2rem;
+    }
+
+    /* Table of Contents */
+    .toc {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1rem 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .toc h3 {
+      margin-top: 0;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+    }
+    .toc ol { margin-bottom: 0; padding-left: 1.25rem; }
+    .toc li { margin-bottom: 0.2rem; }
+    .toc a { text-decoration: none; font-size: 0.95rem; }
+    .toc a:hover { text-decoration: underline; }
+
+    /* Callouts */
+    .callout {
+      background: var(--callout-bg);
+      border-left: 4px solid var(--callout-border);
+      color: var(--callout-text);
+      padding: 0.75rem 1rem;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 1.25rem;
+      font-size: 0.95rem;
+    }
+    .callout-success {
+      background: var(--success-bg);
+      border-left: 4px solid var(--success-border);
+      color: var(--success-text);
+      padding: 0.75rem 1rem;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 1.25rem;
+      font-size: 0.95rem;
+    }
+    .callout-warn {
+      background: var(--warn-bg);
+      border-left: 4px solid var(--warn-border);
+      color: var(--warn-text);
+      padding: 0.75rem 1rem;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 1.25rem;
+      font-size: 0.95rem;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1rem;
+    }
+    .card h3 { margin-top: 0; }
+
+    /* Steps */
+    .steps {
+      counter-reset: step-counter;
+      list-style: none;
+      padding-left: 0;
+    }
+    .steps li {
+      counter-increment: step-counter;
+      position: relative;
+      padding-left: 2.75rem;
+      margin-bottom: 0.75rem;
+    }
+    .steps li::before {
+      content: counter(step-counter);
+      position: absolute;
+      left: 0;
+      top: 0.05rem;
+      width: 2rem;
+      height: 2rem;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      font-weight: 700;
+    }
+
+    /* Do / Don't columns */
+    .do-dont {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+      margin-bottom: 1.5rem;
+    }
+    @media (max-width: 600px) {
+      .do-dont { grid-template-columns: 1fr; }
+    }
+    .do-box, .dont-box {
+      border-radius: 8px;
+      padding: 1rem 1.25rem;
+    }
+    .do-box {
+      background: var(--success-bg);
+      border: 1px solid var(--success-border);
+    }
+    .do-box h3 { color: var(--success-text); margin-top: 0; }
+    .do-box li { color: var(--text); }
+    .dont-box {
+      background: var(--danger-bg);
+      border: 1px solid var(--danger-border);
+    }
+    .dont-box h3 { color: var(--danger-text); margin-top: 0; }
+    .dont-box li { color: var(--text); }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1.5rem;
+      font-size: 0.95rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.6rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      font-weight: 600;
+      font-size: 0.85rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--muted);
+      border-bottom: 2px solid var(--border);
+    }
+
+    /* Privacy shield */
+    .privacy-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 1.5rem;
+    }
+    @media (max-width: 600px) {
+      .privacy-grid { grid-template-columns: 1fr; }
+    }
+    .privacy-item {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      display: flex;
+      gap: 0.65rem;
+      align-items: flex-start;
+    }
+    .privacy-icon {
+      flex-shrink: 0;
+      width: 1.75rem;
+      height: 1.75rem;
+      border-radius: 50%;
+      background: var(--success-bg);
+      border: 1px solid var(--success-border);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.85rem;
+      color: var(--success-text);
+      font-weight: 700;
+    }
+    .privacy-text { font-size: 0.93rem; }
+    .privacy-text strong { display: block; margin-bottom: 0.15rem; }
+
+    /* FAQ */
+    .faq-item {
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 0;
+    }
+    .faq-item:last-child { border-bottom: none; }
+    .faq-q {
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+      color: var(--accent);
+    }
+    .faq-a { margin-bottom: 0; color: var(--text); }
+
+    /* Limitations */
+    .limitation-list {
+      list-style: none;
+      padding-left: 0;
+    }
+    .limitation-list li {
+      padding: 0.5rem 0 0.5rem 1.75rem;
+      position: relative;
+      border-bottom: 1px solid var(--border);
+    }
+    .limitation-list li:last-child { border-bottom: none; }
+    .limitation-list li::before {
+      content: "\26A0";
+      position: absolute;
+      left: 0;
+      top: 0.5rem;
+      font-size: 1rem;
+    }
+
+    /* Footer */
+    .closing {
+      background: var(--callout-bg);
+      border: 1px solid var(--callout-border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      margin-top: 2rem;
+      text-align: center;
+      font-size: 0.95rem;
+      color: var(--callout-text);
+    }
+    .closing p { margin-bottom: 0.5rem; }
+    .closing p:last-child { margin-bottom: 0; }
+
+    @media print {
+      body { max-width: 100%; padding: 1rem; }
+      .do-dont, .privacy-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>AI Summary Teacher Guide</h1>
+<p class="subtitle">Mission HydroSci &mdash; Understanding and Using AI-Generated Student Summaries</p>
+
+<div style="background: linear-gradient(135deg, var(--callout-bg), var(--card-bg)); border: 2px solid var(--accent); border-radius: 10px; padding: 1.5rem 1.75rem; margin-bottom: 2rem;">
+  <h2 style="margin-top: 0; border-bottom: none; padding-bottom: 0; font-size: 1.25rem; color: var(--accent);">Key Points for Teachers</h2>
+  <ul style="list-style: none; padding-left: 0; margin-bottom: 0;">
+    <li style="padding: 0.45rem 0; padding-left: 1.75rem; position: relative; border-bottom: 1px solid var(--border);">
+      <span style="position: absolute; left: 0; color: var(--accent); font-weight: 700;">&#x25B6;</span>
+      <strong>AI summaries are a tool, not a verdict.</strong> They surface patterns in gameplay data to save you time &mdash; they do not assess, grade, or evaluate your students.
+    </li>
+    <li style="padding: 0.45rem 0; padding-left: 1.75rem; position: relative; border-bottom: 1px solid var(--border);">
+      <span style="position: absolute; left: 0; color: var(--accent); font-weight: 700;">&#x25B6;</span>
+      <strong>Your professional judgment comes first.</strong> You know your students in ways the AI cannot. If a summary conflicts with what you observe in the classroom, trust yourself.
+    </li>
+    <li style="padding: 0.45rem 0; padding-left: 1.75rem; position: relative; border-bottom: 1px solid var(--border);">
+      <span style="position: absolute; left: 0; color: var(--accent); font-weight: 700;">&#x25B6;</span>
+      <strong>Summaries are advisory and suggestive.</strong> Treat them as a starting point for reflection, not a conclusion. They highlight where a student may need support &mdash; what you do with that is up to you.
+    </li>
+    <li style="padding: 0.45rem 0; padding-left: 1.75rem; position: relative; border-bottom: 1px solid var(--border);">
+      <span style="position: absolute; left: 0; color: var(--accent); font-weight: 700;">&#x25B6;</span>
+      <strong>The AI only sees gameplay data.</strong> It does not know about absences, accommodations, classroom context, or anything outside the game. Always interpret summaries with that in mind.
+    </li>
+    <li style="padding: 0.45rem 0; padding-left: 1.75rem; position: relative; border-bottom: 1px solid var(--border);">
+      <span style="position: absolute; left: 0; color: var(--accent); font-weight: 700;">&#x25B6;</span>
+      <strong>No student names or personal information are sent to the AI.</strong> Privacy protections are built into the system &mdash; the AI analyzes anonymous gameplay logs only.
+    </li>
+    <li style="padding: 0.45rem 0; padding-left: 1.75rem; position: relative; border-bottom: 1px solid var(--border);">
+      <span style="position: absolute; left: 0; color: var(--accent); font-weight: 700;">&#x25B6;</span>
+      <strong>AI can be imprecise.</strong> Like any tool, it can occasionally get things wrong. Use summaries alongside your other sources of information, not in place of them.
+    </li>
+    <li style="padding: 0.45rem 0; padding-left: 1.75rem; position: relative;">
+      <span style="position: absolute; left: 0; color: var(--accent); font-weight: 700;">&#x25B6;</span>
+      <strong>You are always in control.</strong> The AI does not make decisions, assign grades, or take action. Every instructional decision remains yours.
+    </li>
+  </ul>
+</div>
+
+<nav class="toc">
+  <h3>Contents</h3>
+  <ol>
+    <li><a href="#what">What Are AI Summaries?</a></li>
+    <li><a href="#access">How to Access AI Summaries</a></li>
+    <li><a href="#include">What the Summaries Include</a></li>
+    <li><a href="#effective">How to Use Them Effectively</a></li>
+    <li><a href="#game">Understanding the Game Structure</a></li>
+    <li><a href="#terms">Common Terms in Summaries</a></li>
+    <li><a href="#privacy">Privacy and Data</a></li>
+    <li><a href="#limitations">Limitations to Be Aware Of</a></li>
+    <li><a href="#faq">Frequently Asked Questions</a></li>
+  </ol>
+</nav>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- WHAT ARE AI SUMMARIES?                                      -->
+<!-- ════════════════════════════════════════════════════════════ -->
+
+<h2 id="what">What Are AI Summaries?</h2>
+
+<p>AI Summaries are on-demand, AI-generated performance narratives for individual students playing Mission HydroSci. When you click the summary icon on a student's row in the MHS Dashboard, the system analyzes that student's complete gameplay history and produces a 2&ndash;4 paragraph written summary of their progress.</p>
+
+<p>These summaries are designed to help you quickly understand:</p>
+<ul>
+  <li>How far a student has progressed through the game</li>
+  <li>Where they are demonstrating strength</li>
+  <li>Where they may be struggling or have learning gaps</li>
+  <li>What instructional focus areas might help them move forward</li>
+</ul>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- HOW TO ACCESS                                               -->
+<!-- ════════════════════════════════════════════════════════════ -->
+
+<h2 id="access">How to Access AI Summaries</h2>
+
+<ol class="steps">
+  <li>Log in to the MHS Dashboard</li>
+  <li>Navigate to your student roster</li>
+  <li>Click the <strong>summary icon</strong> next to any student's name</li>
+  <li>A modal window will appear with a loading indicator while the summary is being generated</li>
+  <li>The summary will display within a few seconds</li>
+  <li>Close the modal by clicking the close button or pressing <strong>Escape</strong></li>
+</ol>
+
+<div class="callout">
+  Each summary is generated fresh at the time you request it, so it always reflects the student's most current gameplay data.
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- WHAT THE SUMMARIES INCLUDE                                  -->
+<!-- ════════════════════════════════════════════════════════════ -->
+
+<h2 id="include">What the Summaries Include</h2>
+
+<p>A typical AI summary will cover:</p>
+
+<div class="card">
+  <h3>Overall Progress</h3>
+  <p style="margin-bottom:0;">Where the student currently is in the game &mdash; which unit they are working through and how many progress points they have completed.</p>
+</div>
+
+<div class="card">
+  <h3>Areas of Strength</h3>
+  <p style="margin-bottom:0;">Activities where the student performed well &mdash; passing quickly, with few mistakes, or on the first attempt. For example, a student who completed the topographic map activities in Unit 2 with low mistake counts likely has a solid grasp of elevation and map reading.</p>
+</div>
+
+<div class="card">
+  <h3>Areas of Concern</h3>
+  <p style="margin-bottom:0;">Activities where the student was flagged, required many attempts, or showed patterns of repeated errors. The summary connects these results to specific learning concepts. For example, if a student was flagged on a water flow activity, the summary may note that they are having difficulty applying their understanding of elevation to predict how water moves across a landscape.</p>
+</div>
+
+<div class="card">
+  <h3>Instructional Suggestions</h3>
+  <p style="margin-bottom:0;">Based on the patterns identified, the summary may suggest areas where targeted instruction could help. These are general recommendations &mdash; you know your students best and should use your professional judgment about what support to provide.</p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- HOW TO USE EFFECTIVELY                                      -->
+<!-- ════════════════════════════════════════════════════════════ -->
+
+<h2 id="effective">How to Use AI Summaries Effectively</h2>
+
+<div class="do-dont">
+  <div class="do-box">
+    <h3>Do</h3>
+    <ul>
+      <li><strong>Use summaries as a starting point.</strong> Let them point you toward students or concepts that need attention.</li>
+      <li><strong>Combine with your own observations.</strong> You know context that the AI does not &mdash; absences, accommodations, classroom dynamics.</li>
+      <li><strong>Look for patterns across students.</strong> If multiple students are flagged on the same progress point, consider whole-class instruction.</li>
+      <li><strong>Use them for parent/guardian conversations.</strong> Summaries provide a clear narrative about a student's progress.</li>
+      <li><strong>Revisit over time.</strong> Check back after providing targeted instruction to see if progress has improved.</li>
+    </ul>
+  </div>
+  <div class="dont-box">
+    <h3>Don't</h3>
+    <ul>
+      <li><strong>Don't treat summaries as a grade or formal assessment.</strong> These are advisory insights, not evaluative judgments.</li>
+      <li><strong>Don't rely on them as the sole source of information.</strong> They should complement &mdash; not replace &mdash; your direct knowledge.</li>
+      <li><strong>Don't assume the AI is always right.</strong> If something doesn't match what you know, trust your professional judgment.</li>
+    </ul>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- GAME STRUCTURE                                              -->
+<!-- ════════════════════════════════════════════════════════════ -->
+
+<h2 id="game">Understanding the Game Structure</h2>
+
+<p>Mission HydroSci teaches hydrology and scientific argumentation across 5 units. The AI summary references specific activities by name, so here is a general overview of what each unit covers:</p>
+
+<table>
+  <thead>
+    <tr><th>Unit</th><th>Focus Area</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>Unit 1</strong></td><td>Introduction to Mission HydroSci and the argumentation engine</td></tr>
+    <tr><td><strong>Unit 2</strong></td><td>Topographic maps, elevation profiles, and watershed boundaries</td></tr>
+    <tr><td><strong>Unit 3</strong></td><td>Water flow direction, flow accumulation, and runoff</td></tr>
+    <tr><td><strong>Unit 4</strong></td><td>Soil properties, infiltration, and groundwater</td></tr>
+    <tr><td><strong>Unit 5</strong></td><td>Water cycle connections and engineering solutions</td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  A key skill that develops across the entire game is <strong>scientific argumentation</strong> &mdash; students progress from identifying claims and evidence in early units to constructing and defending their own arguments in later units.
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- COMMON TERMS                                                -->
+<!-- ════════════════════════════════════════════════════════════ -->
+
+<h2 id="terms">Common Terms in Summaries</h2>
+
+<table>
+  <thead>
+    <tr><th>Term</th><th>What It Means</th></tr>
+  </thead>
+  <tbody>
+    <tr><td><strong>Progress point</strong></td><td>A specific activity or assessment checkpoint within the game</td></tr>
+    <tr><td><strong>Flagged</strong></td><td>The student did not meet the passing criteria for an activity and may have a learning gap in that area</td></tr>
+    <tr><td><strong>Passed</strong></td><td>The student successfully completed the activity</td></tr>
+    <tr><td><strong>Attempt</strong></td><td>Each time a student tries a progress point; multiple attempts may indicate extra practice was needed</td></tr>
+    <tr><td><strong>Mistake count</strong></td><td>The number of errors made within a single attempt</td></tr>
+    <tr><td><strong>Reason code</strong></td><td>The specific type of error that caused a flag (the summary translates these into plain language)</td></tr>
+  </tbody>
+</table>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- PRIVACY AND DATA                                            -->
+<!-- ════════════════════════════════════════════════════════════ -->
+
+<h2 id="privacy">Privacy and Data</h2>
+
+<p>AI Summaries are designed with student privacy as a priority:</p>
+
+<div class="privacy-grid">
+  <div class="privacy-item">
+    <div class="privacy-icon">&check;</div>
+    <div class="privacy-text">
+      <strong>No PII sent to AI</strong>
+      The system strips out all personally identifiable information before analysis. The AI only sees anonymous gameplay data.
+    </div>
+  </div>
+  <div class="privacy-item">
+    <div class="privacy-icon">&check;</div>
+    <div class="privacy-text">
+      <strong>Names added locally</strong>
+      Student names are added back after the AI generates its response &mdash; they were never part of the AI analysis.
+    </div>
+  </div>
+  <div class="privacy-item">
+    <div class="privacy-icon">&check;</div>
+    <div class="privacy-text">
+      <strong>No data stored by AI</strong>
+      Summaries are generated in real time and are not retained or used for AI training purposes.
+    </div>
+  </div>
+  <div class="privacy-item">
+    <div class="privacy-icon">&check;</div>
+    <div class="privacy-text">
+      <strong>Role-restricted access</strong>
+      Only authorized leaders, administrators, and coordinators can generate summaries for students in their organization.
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- LIMITATIONS                                                 -->
+<!-- ════════════════════════════════════════════════════════════ -->
+
+<h2 id="limitations">Limitations to Be Aware Of</h2>
+
+<ul class="limitation-list">
+  <li><strong>Summaries reflect gameplay data only.</strong> The AI does not know about classroom instruction, student absences, accommodations, or other factors that influence performance.</li>
+  <li><strong>Summaries are generated by AI and are advisory.</strong> Like any AI system, outputs may occasionally be imprecise. They are designed to surface patterns, not serve as a definitive assessment.</li>
+  <li><strong>Each summary is a snapshot.</strong> It reflects the student's data at the moment you requested it. Progress may change as they continue playing.</li>
+  <li><strong>The AI does not compare students to each other.</strong> Each summary is about one student's individual journey through the game.</li>
+</ul>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- FAQ                                                         -->
+<!-- ════════════════════════════════════════════════════════════ -->
+
+<h2 id="faq">Frequently Asked Questions</h2>
+
+<div class="faq-item">
+  <p class="faq-q">How long does it take to generate a summary?</p>
+  <p class="faq-a">Typically a few seconds. You will see a loading indicator while the summary is being prepared.</p>
+</div>
+
+<div class="faq-item">
+  <p class="faq-q">Can I generate a summary for any student?</p>
+  <p class="faq-a">You can generate summaries for students within your organization. Access is based on your role and permissions in the system.</p>
+</div>
+
+<div class="faq-item">
+  <p class="faq-q">Will the summary be different if I request it again?</p>
+  <p class="faq-a">It may vary slightly in wording since AI generates fresh text each time, but the substance will be consistent as long as the underlying data has not changed. If the student has continued playing between requests, the new summary will reflect their updated progress.</p>
+</div>
+
+<div class="faq-item">
+  <p class="faq-q">Can I save or print a summary?</p>
+  <p class="faq-a">You can copy the text from the summary modal for your records. Each summary is generated on demand and is not automatically saved.</p>
+</div>
+
+<div class="faq-item">
+  <p class="faq-q">What if a summary seems inaccurate?</p>
+  <p class="faq-a">Trust your professional judgment. The AI is working from gameplay data alone and may miss context that you have. If you notice a pattern of inaccurate summaries, please let your administrator know so the team can investigate.</p>
+</div>
+
+<div class="faq-item">
+  <p class="faq-q">Does the AI make decisions about my students?</p>
+  <p class="faq-a">No. The AI generates informational summaries only. It does not assign grades, make placement decisions, or take any action. All instructional decisions remain entirely with you.</p>
+</div>
+
+<!-- ════════════════════════════════════════════════════════════ -->
+<!-- CLOSING                                                     -->
+<!-- ════════════════════════════════════════════════════════════ -->
+
+<div class="closing">
+  <p><strong>AI Summaries translate raw gameplay data into professional, curriculum-aware narratives that highlight strengths, flag concerns, and suggest focus areas.</strong></p>
+  <p>They work best when combined with your own knowledge of your students and your professional expertise. Think of them as a knowledgeable assistant that has read through all the data for you &mdash; helpful, but not the final word.</p>
+  <p>If you have questions or feedback, please reach out to your administrator or project coordinator.</p>
+</div>
+
+</body>
+</html>

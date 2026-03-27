@@ -39,7 +39,7 @@ func NewHandler(configs map[string]GameConfigResponse) *Handler {
 //
 // Response format:
 //
-//	{ "game": "mhs", "services": { "log": { "url": "...", "auth": "..." }, "save": { "url": "...", "auth": "..." } } }
+//	{ "game": "mhs", "services": { "log_submit": { "url": "...", "auth": "..." }, "state_save": { ... }, "state_load": { ... }, "settings_save": { ... }, "settings_load": { ... } } }
 func (h *Handler) ServeGameConfig(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 

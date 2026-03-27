@@ -98,10 +98,13 @@ func (h *Handler) ServePlay(w http.ResponseWriter, r *http.Request) {
 		DataFile:        dataFile,
 		FrameworkFile:   frameworkFile,
 		CodeFile:        codeFile,
-		LogServiceURL:   h.LogService.URL,
-		LogServiceAuth:  h.LogService.Auth,
-		SaveServiceURL:  h.SaveService.URL,
-		SaveServiceAuth: h.SaveService.Auth,
+		LogSubmitURL:    h.Services.LogSubmitURL,
+		LogAuth:         h.Services.LogAuth,
+		StateSaveURL:    h.Services.StateSaveURL,
+		StateLoadURL:    h.Services.StateLoadURL,
+		SettingsSaveURL: h.Services.SettingsSaveURL,
+		SettingsLoadURL: h.Services.SettingsLoadURL,
+		SaveAuth:        h.Services.SaveAuth,
 	}
 	data.Title = unitTitle
 

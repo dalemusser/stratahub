@@ -277,8 +277,11 @@
           name: '{{ .UserName }}'
         },
         services: {
-          log: { url: '{{ .LogServiceURL }}', auth: '{{ .LogServiceAuth }}' },
-          save: { url: '{{ .SaveServiceURL }}', auth: '{{ .SaveServiceAuth }}' }
+          log_submit:    { url: '{{ .LogSubmitURL }}',    auth: '{{ .LogAuth }}' },
+          state_save:    { url: '{{ .StateSaveURL }}',    auth: '{{ .SaveAuth }}' },
+          state_load:    { url: '{{ .StateLoadURL }}',    auth: '{{ .SaveAuth }}' },
+          settings_save: { url: '{{ .SettingsSaveURL }}', auth: '{{ .SaveAuth }}' },
+          settings_load: { url: '{{ .SettingsLoadURL }}', auth: '{{ .SaveAuth }}' }
         },
         navigation: {}
       };

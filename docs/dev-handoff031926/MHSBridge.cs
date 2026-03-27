@@ -118,8 +118,11 @@ public class MHSBridge : MonoBehaviour
             identity = new BridgeIdentity { user_id = "mhs_developer", name = "MHS Developer" },
             services = new BridgeServices
             {
-                log = new ServiceConfig { url = "https://log.adroit.games", auth = "Bearer LEARN_FAST" },
-                save = new ServiceConfig { url = "https://save.adroit.games", auth = "Bearer LEARN_FAST" }
+                log_submit    = new ServiceConfig { url = "https://log.adroit.games/api/log/submit",       auth = "Bearer LEARN_FAST" },
+                state_save    = new ServiceConfig { url = "https://save.adroit.games/api/state/save",      auth = "Bearer LEARN_FAST" },
+                state_load    = new ServiceConfig { url = "https://save.adroit.games/api/state/load",      auth = "Bearer LEARN_FAST" },
+                settings_save = new ServiceConfig { url = "https://save.adroit.games/api/settings/save",   auth = "Bearer LEARN_FAST" },
+                settings_load = new ServiceConfig { url = "https://save.adroit.games/api/settings/load",   auth = "Bearer LEARN_FAST" }
             }
         };
         _hasConfig = true;
@@ -190,29 +193,76 @@ public class MHSBridge : MonoBehaviour
     // --- Called by game code: Service configuration ---
 
     /// <summary>
-    /// Returns the log service configuration (URL and auth header), or null if not configured.
+    /// Returns the log submit endpoint config (URL and auth header), or null if not configured.
+    /// URL is a full endpoint (e.g., "https://log.adroit.games/api/log/submit").
     /// When null, the game should fall back to its hardcoded log service settings.
     /// </summary>
-    public ServiceConfig GetLogServiceConfig()
+    public ServiceConfig GetLogSubmitConfig()
     {
-        if (_config?.services?.log != null &&
-            !string.IsNullOrEmpty(_config.services.log.url))
+        if (_config?.services?.log_submit != null &&
+            !string.IsNullOrEmpty(_config.services.log_submit.url))
         {
-            return _config.services.log;
+            return _config.services.log_submit;
         }
         return null;
     }
 
     /// <summary>
-    /// Returns the save service configuration (URL and auth header), or null if not configured.
+    /// Returns the state save endpoint config (URL and auth header), or null if not configured.
+    /// URL is a full endpoint (e.g., "https://save.adroit.games/api/state/save").
     /// When null, the game should fall back to its hardcoded save service settings.
     /// </summary>
-    public ServiceConfig GetSaveServiceConfig()
+    public ServiceConfig GetStateSaveConfig()
     {
-        if (_config?.services?.save != null &&
-            !string.IsNullOrEmpty(_config.services.save.url))
+        if (_config?.services?.state_save != null &&
+            !string.IsNullOrEmpty(_config.services.state_save.url))
         {
-            return _config.services.save;
+            return _config.services.state_save;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the state load endpoint config (URL and auth header), or null if not configured.
+    /// URL is a full endpoint (e.g., "https://save.adroit.games/api/state/load").
+    /// When null, the game should fall back to its hardcoded save service settings.
+    /// </summary>
+    public ServiceConfig GetStateLoadConfig()
+    {
+        if (_config?.services?.state_load != null &&
+            !string.IsNullOrEmpty(_config.services.state_load.url))
+        {
+            return _config.services.state_load;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the settings save endpoint config (URL and auth header), or null if not configured.
+    /// URL is a full endpoint (e.g., "https://save.adroit.games/api/settings/save").
+    /// When null, the game should fall back to its hardcoded settings service settings.
+    /// </summary>
+    public ServiceConfig GetSettingsSaveConfig()
+    {
+        if (_config?.services?.settings_save != null &&
+            !string.IsNullOrEmpty(_config.services.settings_save.url))
+        {
+            return _config.services.settings_save;
+        }
+        return null;
+    }
+
+    /// <summary>
+    /// Returns the settings load endpoint config (URL and auth header), or null if not configured.
+    /// URL is a full endpoint (e.g., "https://save.adroit.games/api/settings/load").
+    /// When null, the game should fall back to its hardcoded settings service settings.
+    /// </summary>
+    public ServiceConfig GetSettingsLoadConfig()
+    {
+        if (_config?.services?.settings_load != null &&
+            !string.IsNullOrEmpty(_config.services.settings_load.url))
+        {
+            return _config.services.settings_load;
         }
         return null;
     }
@@ -358,8 +408,11 @@ public class MHSBridge : MonoBehaviour
     [Serializable]
     public class BridgeServices
     {
-        public ServiceConfig log;
-        public ServiceConfig save;
+        public ServiceConfig log_submit;
+        public ServiceConfig state_save;
+        public ServiceConfig state_load;
+        public ServiceConfig settings_save;
+        public ServiceConfig settings_load;
     }
 
     [Serializable]

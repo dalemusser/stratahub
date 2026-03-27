@@ -101,12 +101,17 @@ type AppConfig struct {
 	// MHS Content Delivery
 	MHSCDNBaseURL string // CDN base URL for MHS game builds (e.g., "https://cdn.adroit.games/mhs")
 
-	// Game service endpoints (per-game log/save URLs and auth)
+	// Game service endpoints (per-game full endpoint URLs and auth)
 	// Used by /api/game-config to provide service credentials to games.
-	GameMHSLogURL  string // Log service URL for MHS (e.g., "https://log.adroit.games")
-	GameMHSLogAuth string // Log service auth header for MHS (e.g., "Bearer <api-key>")
-	GameMHSSaveURL  string // Save service URL for MHS (e.g., "https://save.adroit.games")
-	GameMHSSaveAuth string // Save service auth header for MHS (e.g., "Bearer <api-key>")
+	// URLs include the full path (e.g., "https://log.adroit.games/api/log/submit")
+	// so games can POST directly without constructing paths.
+	GameMHSLogSubmitURL  string // Log submit endpoint for MHS
+	GameMHSLogAuth       string // Log service auth header for MHS (e.g., "Bearer <api-key>")
+	GameMHSStateSaveURL  string // State save endpoint for MHS
+	GameMHSStateLoadURL  string // State load endpoint for MHS
+	GameMHSSettingsSaveURL string // Settings save endpoint for MHS
+	GameMHSSettingsLoadURL string // Settings load endpoint for MHS
+	GameMHSSaveAuth      string // Save service auth header for MHS (e.g., "Bearer <api-key>")
 
 	// Claude API configuration (for AI-powered student performance summaries)
 	ClaudeAPIKey string // Anthropic API key (e.g., "sk-ant-...")

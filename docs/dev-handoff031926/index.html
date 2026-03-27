@@ -117,8 +117,11 @@
       window.__mhsBridgeConfig = {
         identity: { user_id: 'mhs_developer', name: 'MHS Developer' },
         services: {
-          log:  { url: 'https://log.adroit.games',  auth: 'Bearer LEARN_FAST' },
-          save: { url: 'https://save.adroit.games', auth: 'Bearer LEARN_FAST' }
+          log_submit:    { url: 'https://log.adroit.games/api/log/submit',       auth: 'Bearer LEARN_FAST' },
+          state_save:    { url: 'https://save.adroit.games/api/state/save',      auth: 'Bearer LEARN_FAST' },
+          state_load:    { url: 'https://save.adroit.games/api/state/load',      auth: 'Bearer LEARN_FAST' },
+          settings_save: { url: 'https://save.adroit.games/api/settings/save',   auth: 'Bearer LEARN_FAST' },
+          settings_load: { url: 'https://save.adroit.games/api/settings/load',   auth: 'Bearer LEARN_FAST' }
         },
         navigation: {}
       };

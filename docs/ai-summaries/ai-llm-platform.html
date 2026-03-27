@@ -1,0 +1,1214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Running Open-Weight LLMs for Student Performance Summaries</title>
+  <style>
+    :root {
+      --bg: #ffffff;
+      --text: #1a1a2e;
+      --muted: #555;
+      --accent: #2563eb;
+      --border: #e5e7eb;
+      --code-bg: #f3f4f6;
+      --callout-bg: #eff6ff;
+      --callout-border: #bfdbfe;
+      --callout-text: #1e40af;
+      --card-bg: #f8fafc;
+      --card-border: #e2e8f0;
+      --success-bg: #f0fdf4;
+      --success-border: #86efac;
+      --success-text: #166534;
+      --warn-bg: #fffbeb;
+      --warn-border: #fcd34d;
+      --warn-text: #92400e;
+      --danger-bg: #fef2f2;
+      --danger-border: #fca5a5;
+      --danger-text: #991b1b;
+      --section-divider: #e5e7eb;
+      --purple-bg: #faf5ff;
+      --purple-border: #d8b4fe;
+      --purple-text: #6b21a8;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #1a1a2e;
+        --text: #e2e8f0;
+        --muted: #94a3b8;
+        --accent: #60a5fa;
+        --border: #334155;
+        --code-bg: #1e293b;
+        --callout-bg: #1e293b;
+        --callout-border: #334155;
+        --callout-text: #93c5fd;
+        --card-bg: #1e293b;
+        --card-border: #334155;
+        --success-bg: #052e16;
+        --success-border: #166534;
+        --success-text: #86efac;
+        --warn-bg: #451a03;
+        --warn-border: #92400e;
+        --warn-text: #fcd34d;
+        --danger-bg: #450a0a;
+        --danger-border: #991b1b;
+        --danger-text: #fca5a5;
+        --section-divider: #334155;
+        --purple-bg: #2e1065;
+        --purple-border: #6b21a8;
+        --purple-text: #d8b4fe;
+      }
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+      line-height: 1.7;
+      color: var(--text);
+      background: var(--bg);
+      max-width: 840px;
+      margin: 0 auto;
+      padding: 2rem 1.5rem;
+    }
+    h1 {
+      font-size: 1.75rem;
+      margin-bottom: 0.25rem;
+      border-bottom: 3px solid var(--accent);
+      padding-bottom: 0.5rem;
+    }
+    h2 {
+      font-size: 1.35rem;
+      margin-top: 2.5rem;
+      margin-bottom: 0.75rem;
+      color: var(--accent);
+      border-bottom: 1px solid var(--section-divider);
+      padding-bottom: 0.35rem;
+    }
+    h3 {
+      font-size: 1.1rem;
+      margin-top: 1.5rem;
+      margin-bottom: 0.5rem;
+    }
+    h4 {
+      font-size: 1rem;
+      margin-top: 1.25rem;
+      margin-bottom: 0.4rem;
+    }
+    p { margin-bottom: 1rem; }
+    strong { font-weight: 600; }
+    ul, ol { margin-bottom: 1rem; padding-left: 1.5rem; }
+    li { margin-bottom: 0.35rem; }
+    a { color: var(--accent); }
+    code {
+      font-family: "SF Mono", "Fira Code", Menlo, monospace;
+      font-size: 0.9em;
+      background: var(--code-bg);
+      padding: 0.15em 0.4em;
+      border-radius: 4px;
+    }
+    .subtitle {
+      font-size: 1.05rem;
+      color: var(--muted);
+      margin-bottom: 2rem;
+    }
+
+    /* TOC */
+    .toc {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1rem 1.5rem;
+      margin-bottom: 2rem;
+    }
+    .toc-title {
+      margin-top: 0;
+      font-size: 0.9rem;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      color: var(--muted);
+      margin-bottom: 0.5rem;
+    }
+    .toc ol { margin-bottom: 0; padding-left: 1.25rem; }
+    .toc li { margin-bottom: 0.2rem; }
+    .toc a { text-decoration: none; font-size: 0.95rem; }
+    .toc a:hover { text-decoration: underline; }
+
+    /* Callouts */
+    .callout {
+      background: var(--callout-bg);
+      border-left: 4px solid var(--callout-border);
+      color: var(--callout-text);
+      padding: 0.75rem 1rem;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 1.25rem;
+      font-size: 0.95rem;
+    }
+    .callout-success {
+      background: var(--success-bg);
+      border-left: 4px solid var(--success-border);
+      color: var(--success-text);
+      padding: 0.75rem 1rem;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 1.25rem;
+      font-size: 0.95rem;
+    }
+    .callout-warn {
+      background: var(--warn-bg);
+      border-left: 4px solid var(--warn-border);
+      color: var(--warn-text);
+      padding: 0.75rem 1rem;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 1.25rem;
+      font-size: 0.95rem;
+    }
+    .callout-purple {
+      background: var(--purple-bg);
+      border-left: 4px solid var(--purple-border);
+      color: var(--purple-text);
+      padding: 0.75rem 1rem;
+      border-radius: 0 6px 6px 0;
+      margin-bottom: 1.25rem;
+      font-size: 0.95rem;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 8px;
+      padding: 1.15rem 1.35rem;
+      margin-bottom: 1rem;
+    }
+    .card h3, .card h4 { margin-top: 0; }
+    .card p:last-child, .card ul:last-child, .card ol:last-child { margin-bottom: 0; }
+
+    /* Exec summary box */
+    .exec-summary {
+      background: linear-gradient(135deg, var(--callout-bg), var(--card-bg));
+      border: 2px solid var(--accent);
+      border-radius: 10px;
+      padding: 1.5rem 1.75rem;
+      margin-bottom: 2rem;
+    }
+    .exec-summary h2 {
+      margin-top: 0;
+      border-bottom: none;
+      padding-bottom: 0;
+    }
+
+    /* Recommendation banner */
+    .rec-banner {
+      background: var(--success-bg);
+      border: 2px solid var(--success-border);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+      text-align: center;
+    }
+    .rec-banner p {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--success-text);
+      margin-bottom: 0;
+    }
+
+    /* Tables */
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-bottom: 1.5rem;
+      font-size: 0.93rem;
+    }
+    th, td {
+      text-align: left;
+      padding: 0.55rem 0.75rem;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      font-weight: 600;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.03em;
+      color: var(--muted);
+      border-bottom: 2px solid var(--border);
+    }
+
+    /* Pros/Cons side by side */
+    .pros-cons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0.75rem;
+      margin-bottom: 1.25rem;
+    }
+    @media (max-width: 600px) {
+      .pros-cons { grid-template-columns: 1fr; }
+    }
+    .pro-box {
+      background: var(--success-bg);
+      border: 1px solid var(--success-border);
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+    }
+    .pro-box h4 { margin-top: 0; color: var(--success-text); }
+    .con-box {
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+    }
+    .con-box h4 { margin-top: 0; color: var(--warn-text); }
+    .pro-box ul, .con-box ul { margin-bottom: 0; }
+
+    /* Strengths/Weaknesses */
+    .str-box {
+      background: var(--success-bg);
+      border: 1px solid var(--success-border);
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      margin-bottom: 0.75rem;
+    }
+    .str-box h4 { margin-top: 0; color: var(--success-text); }
+    .str-box ul { margin-bottom: 0; }
+    .weak-box {
+      background: var(--warn-bg);
+      border: 1px solid var(--warn-border);
+      border-radius: 8px;
+      padding: 0.85rem 1rem;
+      margin-bottom: 1rem;
+    }
+    .weak-box h4 { margin-top: 0; color: var(--warn-text); }
+    .weak-box ul { margin-bottom: 0; }
+
+    /* Numbered steps */
+    .steps {
+      counter-reset: step-counter;
+      list-style: none;
+      padding-left: 0;
+    }
+    .steps li {
+      counter-increment: step-counter;
+      position: relative;
+      padding-left: 2.75rem;
+      margin-bottom: 0.65rem;
+    }
+    .steps li::before {
+      content: counter(step-counter);
+      position: absolute;
+      left: 0;
+      top: 0.1rem;
+      width: 1.85rem;
+      height: 1.85rem;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.82rem;
+      font-weight: 700;
+    }
+
+    /* Dividers */
+    .doc-divider {
+      border: none;
+      border-top: 3px double var(--border);
+      margin: 3rem 0;
+    }
+
+    /* Footnotes */
+    .footnotes {
+      margin-top: 2.5rem;
+      padding-top: 1.5rem;
+      border-top: 2px solid var(--border);
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+    .footnotes h2 {
+      font-size: 1.1rem;
+      margin-top: 0;
+    }
+    .footnotes ol { padding-left: 1.5rem; }
+    .footnotes li { margin-bottom: 0.4rem; word-break: break-all; }
+    .footnotes a { font-size: 0.85rem; }
+
+    /* Architecture diagram-style card */
+    .arch-card {
+      background: var(--card-bg);
+      border: 2px solid var(--accent);
+      border-radius: 10px;
+      padding: 1.25rem 1.5rem;
+      margin-bottom: 1.5rem;
+    }
+    .arch-card h3 { margin-top: 0; color: var(--accent); }
+    .arch-row {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      margin-bottom: 0.5rem;
+      flex-wrap: wrap;
+    }
+    .arch-label {
+      font-size: 0.75rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 0.25em 0.65em;
+      border-radius: 4px;
+      flex-shrink: 0;
+    }
+    .arch-primary { background: var(--success-bg); color: var(--success-text); border: 1px solid var(--success-border); }
+    .arch-secondary { background: var(--callout-bg); color: var(--callout-text); border: 1px solid var(--callout-border); }
+    .arch-tertiary { background: var(--warn-bg); color: var(--warn-text); border: 1px solid var(--warn-border); }
+
+    @media print {
+      body { max-width: 100%; padding: 1rem; }
+      .pros-cons { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<h1>Running Open-Weight LLMs for Student Performance Summaries</h1>
+<p class="subtitle">Infrastructure evaluation &mdash; cloud GPU providers, on-site hardware, and the recommended hybrid architecture</p>
+
+<!-- TOC -->
+<nav class="toc">
+  <h3 class="toc-title">Contents</h3>
+  <ol>
+    <li><a href="#exec-summary">Executive Summary</a></li>
+    <li><a href="#why">Why We Are Evaluating This</a></li>
+    <li><a href="#recommendation">Recommendation</a></li>
+    <li><a href="#modes">The Main Ways These Systems Can Be Used</a></li>
+    <li><a href="#consistency">Why Standardizing on One Primary Model Environment Matters</a></li>
+    <li><a href="#cloud-landscape">Cloud GPU Provider Landscape</a></li>
+    <li><a href="#runpod">Runpod Deep Dive</a></li>
+    <li><a href="#lambda">Lambda Deep Dive</a></li>
+    <li><a href="#comparison">Runpod vs Lambda</a></li>
+    <li><a href="#running-llm">What Is Involved in Actually Running an LLM on Cloud GPUs</a></li>
+    <li><a href="#model-sources">Open-Weight Model Sources</a></li>
+    <li><a href="#model-size">Model Size, GPU Requirements, and Quantization</a></li>
+    <li><a href="#on-site">Can Purchased On-Site Hardware Actually Do the Job?</a></li>
+    <li><a href="#cost">Approximate Cost Thinking</a></li>
+    <li><a href="#privacy">Data Privacy, IRB, and Student Data</a></li>
+    <li><a href="#hybrid">Why the Hybrid Architecture Is Best</a></li>
+    <li><a href="#proposed-arch">Proposed Architecture for the Team</a></li>
+    <li><a href="#concrete-rec">Concrete Recommendation</a></li>
+    <li><a href="#sources">Sources</a></li>
+  </ol>
+</nav>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- EXECUTIVE SUMMARY                                      -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<div class="exec-summary" id="exec-summary">
+  <h2>Executive Summary</h2>
+  <p>This document explains how the team can run large language models (LLMs) for student-performance summaries on either:</p>
+  <ol>
+    <li><strong>Cloud-hosted GPUs</strong> using providers such as <strong>Runpod</strong> or <strong>Lambda</strong>, or</li>
+    <li><strong>On-site purchased hardware</strong> such as <strong>NVIDIA DGX Spark</strong>.</li>
+  </ol>
+  <p>The best long-term architecture for our project is:</p>
+  <ul>
+    <li><strong>Primary inference on hardware we control on site</strong>, using open-weight models we choose and tune,</li>
+    <li><strong>Cloud GPU as backup and burst capacity</strong>, with Runpod and Lambda as the primary options to evaluate.</li>
+  </ul>
+  <p>That approach gives us the best balance of:</p>
+  <ul>
+    <li>Predictable cost</li>
+    <li>Data control</li>
+    <li>Repeatability of outputs</li>
+    <li>Owned hardware provides full use 24x7 at no additional cost</li>
+    <li>Resilience when local hardware is unavailable or demand spikes</li>
+  </ul>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- WHY WE ARE EVALUATING THIS                             -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<h2 id="why">Why We Are Evaluating This</h2>
+
+<p>We are currently using LLM APIs to generate summaries of student performance in Mission HydroSci. That works, but API cost can rise quickly because summaries are generated repeatedly across students, activities, and reporting cycles.</p>
+
+<p>The question is not just whether an API can do the work. It is whether we can run our own model stack in a way that is:</p>
+<ul>
+  <li>affordable,</li>
+  <li>privacy-conscious,</li>
+  <li>IRB-friendly,</li>
+  <li>stable enough to tune once and use repeatedly,</li>
+  <li>and operationally realistic for a university research project.</li>
+</ul>
+
+<div class="callout-warn">
+  <strong>Key lesson:</strong> Different models can produce different summaries even with the same prompt, context, and data. Our real goal should be to <strong>standardize on a primary model environment</strong>, tune that environment carefully, and avoid constant model-switching so the results remain predictable.
+</div>
+
+<p>This is one of the strongest arguments for owning the primary inference path rather than relying entirely on shifting external APIs.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- RECOMMENDATION                                         -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<h2 id="recommendation">Recommendation</h2>
+
+<div class="arch-card">
+  <h3>Recommended Architecture</h3>
+  <div class="arch-row">
+    <span class="arch-label arch-primary">Primary</span>
+    <span>On-site hardware we control (e.g., NVIDIA DGX Spark)</span>
+  </div>
+  <div class="arch-row">
+    <span class="arch-label arch-secondary">Backup / Burst</span>
+    <span>Cloud GPUs &mdash; <strong>Runpod</strong> and <strong>Lambda</strong> as the two most relevant providers</span>
+  </div>
+</div>
+
+<h3>Why this is the best fit</h3>
+<ol>
+  <li><strong>Data control is strongest on-site.</strong> Student data stays inside infrastructure we manage directly.</li>
+  <li><strong>Output consistency is better.</strong> We can pick one model, one quantization strategy, one prompt template, and tune for that environment.</li>
+  <li><strong>Costs become more predictable.</strong> Hardware is a capital purchase rather than ongoing per-token spend.</li>
+  <li><strong>Cloud still covers risk.</strong> If local hardware is down, overloaded, or temporarily insufficient, we can fail over to Runpod or Lambda.</li>
+  <li><strong>The project keeps the asset.</strong> Unlike service spend, purchased hardware remains available after the initial budget period.</li>
+</ol>
+
+<div class="rec-banner">
+  <p>Own the primary inference path. Rent backup compute when needed.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- OPERATING MODES                                        -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<h2 id="modes">The Main Ways These Systems Can Be Used</h2>
+
+<p>There are several distinct operating modes. These are often conflated, but they are materially different.</p>
+
+<div class="card">
+  <h3>1. API Model</h3>
+  <p>The current pattern with hosted LLM APIs. We send prompt + context + student data to a vendor-managed model endpoint and get back a summary.</p>
+  <div class="pros-cons">
+    <div class="pro-box">
+      <h4>Pros</h4>
+      <ul>
+        <li>Easiest to start</li>
+        <li>Strongest frontier models</li>
+        <li>No infrastructure to manage</li>
+      </ul>
+    </div>
+    <div class="con-box">
+      <h4>Cons</h4>
+      <ul>
+        <li>Recurring usage cost</li>
+        <li>Changing model behavior over time</li>
+        <li>Lower control over inference stack</li>
+        <li>More concern about student data leaving project-controlled infrastructure</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>2. Cloud GPU Instance Running Our Own Model</h3>
+  <p>We rent a GPU machine from a cloud provider, install or launch an inference server such as <strong>vLLM</strong>, and serve an open-weight model ourselves.</p>
+  <div class="pros-cons">
+    <div class="pro-box">
+      <h4>Pros</h4>
+      <ul>
+        <li>Much more control than API use</li>
+        <li>Can use open-weight models from Hugging Face</li>
+        <li>Can expose an OpenAI-compatible API</li>
+        <li>Often dramatically cheaper per summary</li>
+      </ul>
+    </div>
+    <div class="con-box">
+      <h4>Cons</h4>
+      <ul>
+        <li>Still rely on third-party infrastructure</li>
+        <li>Must manage model serving, storage, access control, monitoring</li>
+        <li>Some providers have capacity variation</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <h3>3. On-Site Hardware Running Our Own Model</h3>
+  <p>Same architecture as the cloud-GPU case, except the hardware is in our own environment.</p>
+  <div class="pros-cons">
+    <div class="pro-box">
+      <h4>Pros</h4>
+      <ul>
+        <li>Strongest privacy/control position</li>
+        <li>Stable model environment</li>
+        <li>Retained institutional asset</li>
+        <li>No per-request inference bill</li>
+        <li>Best fit for long-lived model stack</li>
+      </ul>
+    </div>
+    <div class="con-box">
+      <h4>Cons</h4>
+      <ul>
+        <li>Upfront hardware purchase</li>
+        <li>Maintenance responsibility</li>
+        <li>Limited local redundancy</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="card" style="border: 2px solid var(--accent);">
+  <h3>4. Hybrid Architecture <span style="font-size:0.8rem;font-weight:600;text-transform:uppercase;letter-spacing:0.04em;color:var(--accent);margin-left:0.5rem;">Recommended</span></h3>
+  <div class="arch-row">
+    <span class="arch-label arch-primary">Primary</span>
+    <span>On-site inference</span>
+  </div>
+  <div class="arch-row">
+    <span class="arch-label arch-secondary">Secondary</span>
+    <span>Cloud failover or cloud burst capacity</span>
+  </div>
+  <div class="arch-row">
+    <span class="arch-label arch-tertiary">Optional Tertiary</span>
+    <span>Premium API only for exceptional cases</span>
+  </div>
+  <p style="margin-top:0.75rem;">This gives us privacy and control by default, resilience when hardware is unavailable, and flexibility if demand grows unexpectedly.</p>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- CONSISTENCY                                            -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<h2 id="consistency">Why Standardizing on One Primary Model Environment Matters</h2>
+
+<div class="callout-warn">
+  <strong>The same prompt, context, and data do not produce the same style or quality of summary across different models.</strong>
+</div>
+
+<p>We have already observed this with different hosted models. The same will also be true when switching among API models, cloud-hosted open models, and local/open models on owned hardware.</p>
+
+<p>This means the real product is not just &ldquo;the model.&rdquo; It is a <strong>summary engine</strong>, consisting of:</p>
+<ul>
+  <li>the model family,</li>
+  <li>quantization level,</li>
+  <li>inference runtime,</li>
+  <li>prompt template,</li>
+  <li>context construction,</li>
+  <li>output schema,</li>
+  <li>and validation/evaluation rules.</li>
+</ul>
+
+<p>The more we switch model backends, the more tuning and evaluation noise we introduce. That is one of the strongest reasons to propose <strong>one primary local/on-site environment</strong> and <strong>cloud as backup</strong>, not as a constantly changing primary.</p>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- CLOUD LANDSCAPE                                        -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<h2 id="cloud-landscape">Cloud GPU Provider Landscape</h2>
+
+<p>The full GPU-cloud landscape is broad. Major options in 2026 include hyperscalers such as <strong>AWS, Azure, Google Cloud, Oracle Cloud, and IBM Cloud</strong>, plus AI-native providers such as <strong>Runpod, Lambda, CoreWeave, Crusoe, DigitalOcean/Paperspace, Replicate, Vast.ai</strong>, and others.<sup><a href="#fn1">1</a></sup></p>
+
+<p>For our purposes, the most relevant providers for serious evaluation are:</p>
+<ul>
+  <li><strong>Runpod</strong></li>
+  <li><strong>Lambda</strong></li>
+</ul>
+<p>Those map well to our needs: open-weight model serving, cost-sensitive inference, relatively straightforward deployment, and realistic use for research workloads.</p>
+
+<hr class="doc-divider">
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- RUNPOD                                                 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<h2 id="runpod">Runpod Deep Dive</h2>
+
+<p>Runpod is an AI-focused GPU platform offering both <strong>Pods</strong> and <strong>Serverless</strong> products.<sup><a href="#fn2">2</a></sup></p>
+
+<h3>Main Operating Modes</h3>
+
+<div class="card">
+  <h4>A. Pods</h4>
+  <p>The closest thing to renting a GPU machine. You choose a GPU, create a pod, and run your own software stack on it. Ideal when we want a stable inference target, SSH access, explicit control over the runtime, and the ability to install or launch <strong>vLLM</strong> ourselves.</p>
+</div>
+
+<div class="card">
+  <h4>B. Serverless</h4>
+  <p>Runpod supports <strong>serverless vLLM</strong> deployments for open-source models.<sup><a href="#fn8">8</a></sup> Ideal for lower idle cost, scale-to-zero behavior, and event-driven or batch workflows. The tradeoff is <strong>cold starts</strong> and more operational abstraction.</p>
+</div>
+
+<div class="card">
+  <h4>C. Flex vs Active Workers</h4>
+  <ul>
+    <li><strong>Flex:</strong> Scale up only when traffic arrives; best for bursty workloads</li>
+    <li><strong>Active:</strong> Always-on warm workers; avoids cold starts but costs more<sup><a href="#fn2">2</a></sup></li>
+  </ul>
+</div>
+
+<h3>Typical GPUs Relevant to Us</h3>
+
+<table>
+  <thead><tr><th>GPU</th><th>VRAM</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td><strong>A100</strong></td><td>80 GB</td><td>Safest general choice for LLM inference</td></tr>
+    <tr><td><strong>L40S</strong></td><td>48 GB</td><td>Potentially attractive lower-cost option</td></tr>
+    <tr><td><strong>H100</strong></td><td>80 GB</td><td>Usually more than we need unless throughput is very high</td></tr>
+    <tr><td><strong>4090</strong></td><td>24 GB</td><td>Budget option for smaller models</td></tr>
+  </tbody>
+</table>
+
+<h3>Pricing</h3>
+
+<table>
+  <thead><tr><th>Configuration</th><th>Price</th><th>Source</th></tr></thead>
+  <tbody>
+    <tr><td>Serverless A100 80GB (Flex)</td><td>$0.00076/sec</td><td><sup><a href="#fn4">4</a></sup></td></tr>
+    <tr><td>Serverless A100 80GB (Active)</td><td>$0.00060/sec</td><td><sup><a href="#fn4">4</a></sup></td></tr>
+    <tr><td>Serverless H100 80GB (Flex)</td><td>$0.00116/sec</td><td><sup><a href="#fn4">4</a></sup></td></tr>
+    <tr><td>Serverless H100 80GB (Active)</td><td>$0.00093/sec</td><td><sup><a href="#fn4">4</a></sup></td></tr>
+    <tr><td>On-demand A100 PCIe 80GB</td><td>$1.19/hr</td><td><sup><a href="#fn3">3</a></sup></td></tr>
+    <tr><td>On-demand H100 PCIe 80GB</td><td>$1.99/hr</td><td><sup><a href="#fn3">3</a></sup></td></tr>
+  </tbody>
+</table>
+
+<h3>Storage Pricing</h3>
+
+<table>
+  <thead><tr><th>Type</th><th>Price</th><th>Notes</th></tr></thead>
+  <tbody>
+    <tr><td>Network volume (&lt;1TB)</td><td>$0.07/GB/month</td><td>Model weights persist independently of pod</td></tr>
+    <tr><td>Network volume (&gt;1TB)</td><td>$0.05/GB/month</td><td></td></tr>
+    <tr><td>Volume disk (running)</td><td>$0.10/GB/month</td><td></td></tr>
+    <tr><td>Volume disk (stopped)</td><td>$0.20/GB/month</td><td></td></tr>
+    <tr><td>Container disk</td><td>Temporary</td><td>Erased when a Pod stops</td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  For our work, the right choice is usually <strong>network volume</strong>, because model weights persist independently of the pod and do not need to be downloaded every time.
+</div>
+
+<h3>Capacity Behavior</h3>
+
+<p>Runpod is flexible and cost-effective, but it is not guaranteed reserved enterprise capacity. When a stopped Pod is restarted, it may show <strong>&ldquo;Zero GPU Pods&rdquo;</strong> if the original GPU is no longer available.<sup><a href="#fn10">10</a>, <a href="#fn11">11</a></sup></p>
+
+<div class="callout-warn">
+  <strong>Practical takeaway:</strong> As long as a Pod is running, the reserved GPU is stable. Once stopped, that exact GPU may no longer be available. This is manageable for our batchable workload, but is still a reason not to rely on Runpod as the only production path.
+</div>
+
+<h3>Security and Privacy</h3>
+<ul>
+  <li>Pods and workers run with <strong>containerized isolation</strong> in a multi-tenant environment</li>
+  <li><strong>Secure Cloud</strong> operates in enterprise-grade data centers</li>
+  <li>Host policies prohibit hosts from inspecting Pod/worker data</li>
+  <li>Can use vetted infrastructure partners meeting <strong>SOC 2, ISO 27001, and PCI DSS</strong><sup><a href="#fn9">9</a></sup></li>
+  <li><strong>SOC 2 Type II certification</strong> announced October 2025<sup><a href="#fn7">7</a></sup></li>
+</ul>
+
+<h3>Runpod Summary</h3>
+<div class="str-box">
+  <h4>Strengths</h4>
+  <ul>
+    <li>Flexible, cost-efficient</li>
+    <li>Supports pods and serverless</li>
+    <li>Straightforward for open-source inference</li>
+    <li>Good fit for bursty workloads</li>
+  </ul>
+</div>
+<div class="weak-box">
+  <h4>Weaknesses</h4>
+  <ul>
+    <li>Capacity can vary</li>
+    <li>Secure Cloud and storage choices require deliberate configuration</li>
+    <li>Multi-tenant by default unless we choose the right deployment pattern</li>
+  </ul>
+</div>
+
+<hr class="doc-divider">
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- LAMBDA                                                 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<h2 id="lambda">Lambda Deep Dive</h2>
+
+<p>Lambda is an AI-focused cloud company with roots in deep-learning workstations and servers. Today it provides cloud GPUs, on-demand instances, clusters, private cloud, and an enterprise trust/security program.<sup><a href="#fn12">12</a>, <a href="#fn13">13</a></sup></p>
+
+<h3>Main Operating Modes</h3>
+
+<div class="card">
+  <h4>A. On-Demand Cloud Instances</h4>
+  <p>Individual Linux-based GPU-backed virtual machines.<sup><a href="#fn15">15</a></sup> The closest counterpart to Runpod Pods. Ideal for stable inference servers, SSH-based administration, running vLLM or Ollama, and predictable hands-on control.</p>
+</div>
+
+<div class="card">
+  <h4>B. 1-Click Clusters</h4>
+  <p>Production-ready clusters of <strong>16 to 512 H100 GPUs</strong>.<sup><a href="#fn15">15</a>, <a href="#fn13">13</a></sup> Far more than we need for student-summary generation, but shows the platform can scale.</p>
+</div>
+
+<div class="card">
+  <h4>C. Private Cloud / Enterprise</h4>
+  <p>Emphasizes <strong>single-tenant, shared-nothing architecture</strong>, <strong>SOC 2 Type II certification</strong>, and isolated/caged clusters.<sup><a href="#fn12">12</a></sup> Relevant because our team is concerned about student data, IRB, and institutional review.</p>
+</div>
+
+<h3>Pricing</h3>
+
+<table>
+  <thead><tr><th>Configuration</th><th>Price</th><th>Source</th></tr></thead>
+  <tbody>
+    <tr><td>H100 (cluster pricing)</td><td>$2.76/hr</td><td><sup><a href="#fn13">13</a></sup></td></tr>
+    <tr><td>A100 PCIe 40GB</td><td>$1.99/hr</td><td><sup><a href="#fn14">14</a></sup></td></tr>
+    <tr><td>A6000 48GB</td><td>$1.09/hr</td><td><sup><a href="#fn14">14</a></sup></td></tr>
+    <tr><td>H100 SXM 80GB (8-GPU)</td><td>$3.99/hr</td><td><sup><a href="#fn14">14</a></sup></td></tr>
+  </tbody>
+</table>
+
+<div class="callout">
+  Lambda is generally positioned as a more stable, more enterprise-oriented AI cloud than Runpod, but usually not the cheapest option.
+</div>
+
+<h3>Security and Privacy</h3>
+<ul>
+  <li><strong>Single-tenant, shared-nothing architecture</strong></li>
+  <li><strong>SOC 2 Type II certification</strong></li>
+  <li>Hardware-level isolation options</li>
+  <li><strong>Trust Portal</strong> for security posture and compliance documentation<sup><a href="#fn16">16</a></sup></li>
+</ul>
+
+<h3>Lambda Summary</h3>
+<div class="str-box">
+  <h4>Strengths</h4>
+  <ul>
+    <li>Strong research/enterprise positioning</li>
+    <li>Stable instance-based model</li>
+    <li>Clear security/trust posture</li>
+    <li>Good for conventional GPU cloud needs</li>
+  </ul>
+</div>
+<div class="weak-box">
+  <h4>Weaknesses</h4>
+  <ul>
+    <li>Usually higher cost than Runpod for comparable flexible usage</li>
+    <li>Less oriented toward scale-to-zero burst economics</li>
+    <li>May be more infrastructure than we need for routine inference</li>
+  </ul>
+</div>
+
+<hr class="doc-divider">
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- COMPARISON                                             -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<h2 id="comparison">Runpod vs Lambda</h2>
+
+<h3>In One Sentence</h3>
+<ul>
+  <li><strong>Runpod</strong> is generally better when we want <strong>lower-cost bursty inference and flexibility</strong>.</li>
+  <li><strong>Lambda</strong> is generally better when we want <strong>stable AI-cloud instances and a stronger enterprise/security story</strong>.</li>
+</ul>
+
+<h3>Practical Comparison</h3>
+<table>
+  <thead><tr><th>Dimension</th><th>Runpod</th><th>Lambda</th></tr></thead>
+  <tbody>
+    <tr><td>Best mental model</td><td>Flexible GPU utility</td><td>Stable AI cloud</td></tr>
+    <tr><td>Primary modes</td><td>Pods, Serverless, Flex/Active</td><td>On-Demand instances, clusters, private cloud</td></tr>
+    <tr><td>Cost profile</td><td>Often lower, especially bursty</td><td>Often higher, more &ldquo;traditional cloud&rdquo;</td></tr>
+    <tr><td>Capacity behavior</td><td>Can vary; stopped pods can lose GPUs</td><td>More instance-oriented and stable</td></tr>
+    <tr><td>Security posture</td><td>Multi-tenant by default; stronger with Secure Cloud</td><td>Strong trust/security, single-tenant messaging</td></tr>
+    <tr><td>Best fit for us</td><td>Burst, backup, experiments</td><td>Backup, stable cloud serving, enterprise discussions</td></tr>
+  </tbody>
+</table>
+
+<h3>Which Is Better for Our Project?</h3>
+<div class="callout">
+  Choose <strong>Runpod</strong> for lower cost and flexibility. Choose <strong>Lambda</strong> if institutional comfort with security messaging matters more than raw cost. It is reasonable to test both.
+</div>
+
+<hr class="doc-divider">
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- RUNNING AN LLM                                         -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<h2 id="running-llm">What Is Involved in Actually Running an LLM on Cloud GPUs</h2>
+
+<p>This is the mechanics stakeholders often do not understand.</p>
+
+<h3>The Pieces</h3>
+<p>To run an open-weight LLM on cloud GPUs, we typically need:</p>
+<ol class="steps">
+  <li>A GPU machine (Pod, instance, or cluster)</li>
+  <li>A model source</li>
+  <li>An inference engine</li>
+  <li>Persistent storage for model caching</li>
+  <li>An HTTP API surface our application can call</li>
+</ol>
+
+<h3>Inference Engine</h3>
+<p>The most important serving engine for our purposes is <strong>vLLM</strong>, which is designed for high-throughput LLM serving and exposes an <strong>OpenAI-compatible API</strong>. vLLM supports a large range of open-source models and explicitly supports deployment on Runpod.<sup><a href="#fn17">17</a>, <a href="#fn18">18</a></sup></p>
+
+<h3>Deployment Pattern</h3>
+<ol class="steps">
+  <li>Launch pod/instance</li>
+  <li>Mount or attach persistent storage</li>
+  <li>Authenticate to Hugging Face if the model requires a license grant or token</li>
+  <li>Start <code>vllm serve</code> with the chosen model</li>
+  <li>Expose an internal or protected HTTP endpoint</li>
+  <li>Send structured student-summary requests to that endpoint</li>
+  <li>Log outputs and evaluation metadata under our control</li>
+</ol>
+
+<div class="callout-success">
+  <strong>Key distinction:</strong> This architecture is materially different from sending student data directly to an external API vendor&rsquo;s model endpoint. We control the model, inference server, prompt layer, and retention behavior much more directly.
+</div>
+
+<hr class="doc-divider">
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- MODEL SOURCES                                          -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<h2 id="model-sources">Open-Weight Model Sources and What Is Available</h2>
+
+<p>The main source for open-weight models today is <strong><a href="https://huggingface.co/models">Hugging Face Hub</a></strong>, which hosts <strong>over 2 million models</strong>.<sup><a href="#fn19">19</a></sup></p>
+
+<h3>Common Sources and Registries</h3>
+
+<table>
+  <thead><tr><th>Source</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td><strong><a href="https://huggingface.co/models">Hugging Face Hub</a></strong></td><td>Main repository for downloading and versioning model checkpoints<sup><a href="#fn19">19</a>, <a href="#fn20">20</a></sup></td></tr>
+    <tr><td><strong>Vendor org pages</strong></td><td>Meta Llama<sup><a href="#fn21">21</a></sup>, Qwen<sup><a href="#fn22">22</a></sup>, Mistral<sup><a href="#fn23">23</a></sup>, Google Gemma<sup><a href="#fn24">24</a></sup>, Microsoft Phi<sup><a href="#fn25">25</a></sup></td></tr>
+    <tr><td><strong>Vendor download pages</strong></td><td>E.g., Meta provides Llama access through its official download process<sup><a href="#fn26">26</a></sup></td></tr>
+    <tr><td><strong>Ollama library</strong></td><td>Convenient distribution path for local experimentation<sup><a href="#fn27">27</a>, <a href="#fn28">28</a></sup></td></tr>
+  </tbody>
+</table>
+
+<h3>Model Families Likely Most Relevant to Us</h3>
+<p>For student-performance summaries, strong candidates include:</p>
+<ul>
+  <li><strong>Llama family</strong> (widely supported, common default)</li>
+  <li><strong>Qwen family</strong> (strong open-model performance)</li>
+  <li><strong>Mistral / Ministral family</strong></li>
+  <li><strong>Gemma family</strong></li>
+  <li><strong>Phi family</strong></li>
+</ul>
+
+<div class="callout">
+  <strong>Note on terminology:</strong> Many teams say &ldquo;open source models&rdquo; when they really mean <strong>open-weight models</strong>. The important practical question is: can we download the weights, run them ourselves, and keep inference under our own control?
+</div>
+
+<hr class="doc-divider">
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- MODEL SIZE / QUANTIZATION                              -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<h2 id="model-size">Model Size, GPU Requirements, and Quantization</h2>
+
+<h3>Model Size vs GPU Memory</h3>
+<table>
+  <thead><tr><th>Model Size</th><th>VRAM (FP16)</th><th>VRAM (4-bit)</th><th>Typical Deployment</th></tr></thead>
+  <tbody>
+    <tr><td><strong>7B</strong></td><td>~14 GB</td><td>~4&ndash;6 GB</td><td>Runs anywhere (local, DGX, cloud)</td></tr>
+    <tr><td><strong>13B</strong></td><td>~26 GB</td><td>~8&ndash;10 GB</td><td>Ideal for DGX and most GPUs</td></tr>
+    <tr><td><strong>30B</strong></td><td>~60 GB</td><td>~15&ndash;20 GB</td><td>DGX (quantized) or A100-class GPUs</td></tr>
+    <tr><td><strong>70B</strong></td><td>~140 GB</td><td>~35&ndash;45 GB</td><td>Multi-GPU or high-end cloud only</td></tr>
+  </tbody>
+</table>
+
+<h3>What This Means for DGX Spark</h3>
+<div class="card">
+  <ul>
+    <li><strong>Comfortable range:</strong> 7B&ndash;13B models (full precision or quantized)</li>
+    <li><strong>Practical upper range:</strong> ~30B models (when quantized, e.g., 4-bit)</li>
+    <li><strong>Not ideal for:</strong> 70B models unless heavily optimized or distributed</li>
+  </ul>
+</div>
+
+<h3>Quantization Levels</h3>
+<table>
+  <thead><tr><th>Quantization</th><th>Memory Usage</th><th>Quality Impact</th></tr></thead>
+  <tbody>
+    <tr><td>FP16 (full precision)</td><td>100%</td><td>Highest fidelity</td></tr>
+    <tr><td>8-bit</td><td>~50%</td><td>Nearly identical in most cases</td></tr>
+    <tr><td>4-bit</td><td>~25%</td><td>Small quality reduction</td></tr>
+    <tr><td>2-bit</td><td>~12%</td><td>Noticeable degradation</td></tr>
+  </tbody>
+</table>
+
+<div class="callout-success">
+  <strong>Recommended:</strong> 4-bit quantization is typically the best balance of memory efficiency, speed, and output quality for structured summarization tasks.
+</div>
+
+<div class="callout-purple">
+  <strong>Key insight:</strong> For structured summarization tasks, smaller quantized models (7B&ndash;30B) often perform sufficiently well, making them practical for on-site deployment without requiring large-scale GPU infrastructure. This is why our proposed architecture does <strong>not</strong> depend on frontier-scale models.
+</div>
+
+<hr class="doc-divider">
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- ON-SITE HARDWARE                                       -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<h2 id="on-site">Can Purchased On-Site Hardware Actually Do the Job?</h2>
+
+<p><strong>Yes&mdash;very likely.</strong></p>
+
+<p>The summarization task we care about is not the same as frontier general reasoning. We are asking the model to:</p>
+<ul>
+  <li>digest structured student-performance data,</li>
+  <li>identify strengths and struggles,</li>
+  <li>and produce clear teacher-facing language.</li>
+</ul>
+
+<p>That is a good fit for smaller and mid-sized instruct models.</p>
+
+<p>Student summaries are especially compatible with smaller instruct models, 4-bit quantization, careful prompt design, and structured input. The biggest quality lever is often not raw model size; it is input organization, prompt design, and consistent deployment.</p>
+
+<div class="rec-banner">
+  <p>That reinforces the case for one primary on-site model stack.</p>
+</div>
+
+<hr class="doc-divider">
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- COST                                                   -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<h2 id="cost">Approximate Cost Thinking</h2>
+
+<p>These are not procurement quotes; they are planning-level approximations.</p>
+
+<h3>Cloud GPU Cost Characteristics</h3>
+<p>Per-summary cost on cloud GPU can be very low when we batch requests, keep output lengths controlled, use an appropriate open model, and avoid premium API pricing. The main variables are model size, actual input length, output token count, and whether the endpoint is warm or cold.</p>
+
+<h3>Why Cloud Is Still Useful Even If We Buy Hardware</h3>
+<ul>
+  <li>Failover</li>
+  <li>Overflow workloads</li>
+  <li>Trying models before standardizing</li>
+  <li>Benchmarking</li>
+</ul>
+
+<h3>Why On-Site Becomes Attractive Over Time</h3>
+<p>For recurring workloads, owned hardware changes the economics from <strong>&ldquo;pay every time the model runs&rdquo;</strong> into <strong>&ldquo;pay once for the machine, then mostly pay power/ops.&rdquo;</strong></p>
+<p>This is especially attractive when the institution can keep using the hardware after the initial project period.</p>
+
+<hr class="doc-divider">
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- PRIVACY                                                -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<h2 id="privacy">Data Privacy, IRB, and Student Data</h2>
+
+<div class="callout-warn">
+  <strong>This is one of the most important sections for internal discussion.</strong>
+</div>
+
+<h3>The Strongest Privacy Position</h3>
+<p>Run the model on-site, on hardware we control, inside network and access controls we already manage. That gives the clearest answer to:</p>
+<ul>
+  <li>Where did the student data go?</li>
+  <li>Who had access to it?</li>
+  <li>Was it sent to a public API?</li>
+  <li>Was it retained in someone else&rsquo;s system?</li>
+</ul>
+
+<h3>Why Cloud-Hosted Open Models Are Different from API Use</h3>
+<p>Using a cloud GPU to run our own open-weight model is <strong>not the same</strong> as using a third-party hosted LLM API. With cloud-hosted open models:</p>
+<ul>
+  <li>we choose the model,</li>
+  <li>we run the inference server,</li>
+  <li>we can minimize or disable application-side logging,</li>
+  <li>we can control what is persisted,</li>
+  <li>and there is no automatic model training on our prompts.</li>
+</ul>
+<p>However, the infrastructure still belongs to a third party, the deployment must be configured correctly, and institutional review may still be required.</p>
+
+<h3>What SOC 2 Type II Certification Means &mdash; and What It Does Not</h3>
+
+<div class="card">
+  <h4>What it is</h4>
+  <p>SOC 2 is an audit framework developed by the <strong>AICPA</strong> for evaluating controls related to security, availability, processing integrity, confidentiality, and privacy. A <strong>Type II</strong> report evaluates whether controls were <strong>operating effectively over a period of time</strong>.<sup><a href="#fn29">29</a>, <a href="#fn30">30</a></sup></p>
+</div>
+
+<div class="str-box">
+  <h4>What it helps with</h4>
+  <ul>
+    <li>Evidence that the provider has access control, change management, incident response, and data handling procedures reviewed by an independent auditor</li>
+    <li>Helpful in conversations with university IT, research administration, compliance reviewers, and project stakeholders</li>
+    <li>A <strong>positive trust signal</strong></li>
+  </ul>
+</div>
+
+<div class="weak-box">
+  <h4>What it does NOT mean</h4>
+  <ul>
+    <li>Automatically approved for our student data</li>
+    <li>Automatically IRB-approved</li>
+    <li>Automatically FERPA-compliant for our exact use case</li>
+    <li>That data cannot be exposed if we misconfigure the service</li>
+    <li>That institutional review is unnecessary</li>
+  </ul>
+</div>
+
+<div class="callout-purple">
+  <strong>Bottom line:</strong> SOC 2 Type II certification is best understood as a <strong>security/compliance maturity signal</strong>, not as an automatic green light for sensitive student-data processing.
+</div>
+
+<h3>Practical Privacy Recommendations</h3>
+<ol>
+  <li><strong>Primary summaries run on-site whenever possible.</strong></li>
+  <li><strong>Cloud is backup, not default.</strong></li>
+  <li><strong>If cloud is used, use the provider&rsquo;s more secure configuration</strong> (Runpod Secure Cloud, Lambda single-tenant/private options).</li>
+  <li><strong>Send only the minimum required data</strong> to the summarization service.</li>
+  <li><strong>Prefer structured performance signals over raw logs</strong> when possible.</li>
+  <li><strong>Log and retain outputs deliberately</strong>, not by default.</li>
+  <li><strong>Review IRB / institutional requirements</strong> before production use of student records in cloud environments.</li>
+</ol>
+
+<div class="rec-banner">
+  <p>We can get the benefits of LLM summarization without making cloud or public APIs the default home of student data.</p>
+</div>
+
+<hr class="doc-divider">
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- HYBRID                                                 -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<h2 id="hybrid">Why the Hybrid On-Site + Cloud-Backup Architecture Is Best</h2>
+
+<table>
+  <thead><tr><th>Problem</th><th>How the Hybrid Architecture Solves It</th></tr></thead>
+  <tbody>
+    <tr><td><strong>Consistency</strong></td><td>Tune prompts and context for one primary model environment and keep it stable</td></tr>
+    <tr><td><strong>Privacy</strong></td><td>Sensitive student data stays on-site by default</td></tr>
+    <tr><td><strong>Reliability</strong></td><td>If on-site hardware is unavailable, fail over to Runpod or Lambda</td></tr>
+    <tr><td><strong>Procurement / Value</strong></td><td>The institution retains the hardware asset while preserving operational flexibility</td></tr>
+    <tr><td><strong>Cost</strong></td><td>Avoid making every summary depend on a paid external API call</td></tr>
+    <tr><td><strong>Growth</strong></td><td>If demand spikes, cloud covers overflow</td></tr>
+  </tbody>
+</table>
+
+<hr class="doc-divider">
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- PROPOSED ARCHITECTURE                                  -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<h2 id="proposed-arch">Proposed Architecture for the Team</h2>
+
+<div class="arch-card">
+  <h3>Primary Environment</h3>
+  <div class="arch-row"><span class="arch-label arch-primary">Primary</span></div>
+  <ul>
+    <li>On-site DGX Spark or similar purchased hardware</li>
+    <li>One standardized open-weight instruct model</li>
+    <li>One inference engine (preferably <strong>vLLM</strong>)</li>
+    <li>One carefully tuned prompt/context pipeline</li>
+    <li>Internal protected API endpoint for the summarization service</li>
+  </ul>
+</div>
+
+<div class="arch-card">
+  <h3>Secondary / Failover Environment</h3>
+  <div class="arch-row"><span class="arch-label arch-secondary">Backup</span></div>
+  <ul>
+    <li>Runpod or Lambda</li>
+    <li>Same model family if possible</li>
+    <li>Same prompt contract</li>
+    <li>Same output schema</li>
+    <li>Same evaluation checks</li>
+  </ul>
+</div>
+
+<h3>Operational Pattern</h3>
+<ol class="steps">
+  <li>Student performance data is preprocessed into structured features/signals</li>
+  <li>Summarization requests go to the on-site inference service first</li>
+  <li>If on-site inference is unavailable or backlogged, the request is routed to the backup cloud environment</li>
+  <li>Summaries are stored under our normal project controls</li>
+</ol>
+
+<hr class="doc-divider">
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- CONCRETE RECOMMENDATION                                -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<h2 id="concrete-rec">Concrete Recommendation to Present to the Team</h2>
+
+<div class="rec-banner" style="text-align:left;">
+  <p style="text-align:center;">Run open-weight LLMs primarily on-site on purchased hardware, and maintain a cloud-based backup/failover path using Runpod or Lambda.</p>
+</div>
+
+<h3>Recommendation Details</h3>
+<ul>
+  <li>Use <strong>on-site hardware as the default inference environment</strong>.</li>
+  <li>Standardize on <strong>one primary open-weight model family</strong> and optimize prompts for that environment.</li>
+  <li>Use <strong>Runpod</strong> as the most cost-flexible burst/backup option.</li>
+  <li>Evaluate <strong>Lambda</strong> as the more enterprise/security-oriented backup option.</li>
+  <li>Avoid making premium hosted APIs the primary system of record for student summaries.</li>
+  <li>Treat cloud as <strong>backup and overflow</strong>, not default.</li>
+</ul>
+
+<h3>Why This Is the Best Approach</h3>
+<p>Because it gives us:</p>
+<ul>
+  <li>a repeatable summary engine,</li>
+  <li>stronger privacy positioning,</li>
+  <li>long-term cost control,</li>
+  <li>retained institutional value,</li>
+  <li>and resilience when local hardware is insufficient or down.</li>
+</ul>
+
+<div class="callout-success">
+  <strong>This is the most defensible architecture technically, operationally, and institutionally.</strong>
+</div>
+
+<!-- ═══════════════════════════════════════════════════════ -->
+<!-- SOURCES                                                -->
+<!-- ═══════════════════════════════════════════════════════ -->
+
+<div class="footnotes" id="sources">
+  <h2>Sources</h2>
+  <ol>
+    <li id="fn1">DigitalOcean, &ldquo;10 Leading AI Cloud Providers for Developers in 2026.&rdquo; <a href="https://www.digitalocean.com/resources/articles/leading-ai-cloud-providers">digitalocean.com</a></li>
+    <li id="fn2">Runpod pricing page. <a href="https://www.runpod.io/pricing">runpod.io/pricing</a></li>
+    <li id="fn3">Runpod GPU pricing page. <a href="https://www.runpod.io/gpu-pricing">runpod.io/gpu-pricing</a></li>
+    <li id="fn4">Runpod serverless pricing docs. <a href="https://docs.runpod.io/serverless/pricing">docs.runpod.io/serverless/pricing</a></li>
+    <li id="fn5">Runpod storage/network volume pricing docs. <a href="https://docs.runpod.io/pods/pricing">docs.runpod.io/pods/pricing</a> and <a href="https://docs.runpod.io/storage/network-volumes">docs.runpod.io/storage/network-volumes</a></li>
+    <li id="fn6">Runpod serverless vLLM docs. <a href="https://docs.runpod.io/serverless/vllm/get-started">docs.runpod.io/serverless/vllm</a></li>
+    <li id="fn7">Runpod SOC 2 Type II announcement. <a href="https://www.runpod.io/blog/runpod-achieves-soc-2-type-ii-certification">runpod.io/blog</a></li>
+    <li id="fn8">Runpod serverless vLLM docs. <a href="https://docs.runpod.io/serverless/vllm/get-started">docs.runpod.io</a></li>
+    <li id="fn9">Runpod security/compliance docs. <a href="https://docs.runpod.io/references/security-and-compliance">docs.runpod.io/references/security-and-compliance</a></li>
+    <li id="fn10">Runpod &ldquo;Zero GPU Pods on restart.&rdquo; <a href="https://docs.runpod.io/pods/troubleshooting/zero-gpus">docs.runpod.io</a></li>
+    <li id="fn11">Runpod Pod migration docs. <a href="https://docs.runpod.io/pods/troubleshooting/pod-migration">docs.runpod.io</a></li>
+    <li id="fn12">Lambda home page / trust &amp; security. <a href="https://lambda.ai/">lambda.ai</a></li>
+    <li id="fn13">Lambda pricing page. <a href="https://lambda.ai/pricing">lambda.ai/pricing</a></li>
+    <li id="fn14">Lambda pricing page, public instance examples. <a href="https://lambda.ai/pricing">lambda.ai/pricing</a></li>
+    <li id="fn15">Lambda public cloud docs. <a href="https://docs.lambda.ai/public-cloud/">docs.lambda.ai/public-cloud</a></li>
+    <li id="fn16">Lambda Trust Portal. <a href="https://trust.lambda.ai/">trust.lambda.ai</a></li>
+    <li id="fn17">vLLM supported models docs. <a href="https://docs.vllm.ai/en/stable/models/supported_models/">docs.vllm.ai</a></li>
+    <li id="fn18">vLLM Runpod deployment docs. <a href="https://docs.vllm.ai/en/latest/deployment/frameworks/runpod/">docs.vllm.ai</a></li>
+    <li id="fn19">Hugging Face Hub documentation. <a href="https://huggingface.co/docs/hub/index">huggingface.co/docs/hub</a></li>
+    <li id="fn20">Hugging Face Model Hub docs. <a href="https://huggingface.co/docs/hub/en/models-the-hub">huggingface.co/docs/hub/models</a></li>
+    <li id="fn21">Meta Llama on Hugging Face. <a href="https://huggingface.co/meta-llama">huggingface.co/meta-llama</a></li>
+    <li id="fn22">Qwen on Hugging Face. <a href="https://huggingface.co/Qwen">huggingface.co/Qwen</a></li>
+    <li id="fn23">Mistral AI on Hugging Face. <a href="https://huggingface.co/mistralai">huggingface.co/mistralai</a></li>
+    <li id="fn24">Google Gemma on Hugging Face. <a href="https://huggingface.co/google/gemma-3-4b-it">huggingface.co/google/gemma</a></li>
+    <li id="fn25">Microsoft Phi on Hugging Face. <a href="https://huggingface.co/microsoft/phi-4">huggingface.co/microsoft/phi-4</a></li>
+    <li id="fn26">Meta official Llama downloads. <a href="https://www.llama.com/llama-downloads/">llama.com/llama-downloads</a></li>
+    <li id="fn27">Ollama home page. <a href="https://ollama.com/">ollama.com</a></li>
+    <li id="fn28">Ollama model library. <a href="https://ollama.com/library">ollama.com/library</a></li>
+    <li id="fn29">AICPA SOC 2 overview. <a href="https://www.aicpa.org/">aicpa.org</a></li>
+    <li id="fn30">AWS SOC 2 explanation. <a href="https://aws.amazon.com/">aws.amazon.com</a></li>
+  </ol>
+</div>
+
+</body>
+</html>

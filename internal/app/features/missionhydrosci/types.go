@@ -44,10 +44,14 @@ type PlayData struct {
 	CodeFile        string // Build file name for wasm
 
 	// Game service config (injected into __mhsBridgeConfig for new builds)
-	LogServiceURL   string
-	LogServiceAuth  string
-	SaveServiceURL  string
-	SaveServiceAuth string
+	// Each URL is a full endpoint (e.g., "https://log.adroit.games/api/log/submit")
+	LogSubmitURL     string
+	LogAuth          string
+	StateSaveURL     string
+	StateLoadURL     string
+	SettingsSaveURL  string
+	SettingsLoadURL  string
+	SaveAuth         string
 }
 
 // OfflineData is the view model for the offline fallback page.

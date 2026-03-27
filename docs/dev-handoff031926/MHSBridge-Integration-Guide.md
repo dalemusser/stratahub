@@ -3,7 +3,7 @@
 > **What you need to do:**
 >
 > 1. **Get player identity from MHSBridge** — use `GetPlayerID()` and `GetPlayerName()` instead of calling `/api/user` or using a separate jslib for identity. **Remove the old jslib that fetched identity from `/api/user`.** Do not leave it in the project and do not use it in any way.
-> 2. **Get log and save service config from MHSBridge** — use `GetLogServiceConfig()` and `GetSaveServiceConfig()` for URLs and auth credentials. Do not hardcode service URLs or auth strings. They are currently hardcoded in the game, which prevents us from using services at other URLs. Making this change makes it possible to deploy in another environment without rebuilding.
+> 2. **Get service endpoint configs from MHSBridge** — use `GetLogSubmitConfig()`, `GetStateSaveConfig()`, `GetStateLoadConfig()`, `GetSettingsSaveConfig()`, and `GetSettingsLoadConfig()` for endpoint URLs and auth credentials. Each returns a full URL you POST to directly. Do not hardcode service URLs or auth strings. They are currently hardcoded in the game, which prevents us from using services at other URLs. Making this change makes it possible to deploy in another environment without rebuilding.
 > 3. **Use `user_id` instead of `playerId`** — we are transitioning to `user_id` as the identity key in all log and save payloads.
 > 4. **Navigate between units using MHSBridge** — use `GetUnitURL()`, `NavigateToUnit()`, and `CompleteUnit()` for all unit transitions instead of constructing URLs directly.
 > 5. **Replace the Unity-generated `index.html`** in each unit build folder with the provided replacement `index.html`. This replacement page sets up `window.__mhsBridgeConfig` before Unity starts. The Unity-generated `index.html` does not do this and must not be used. You can see the config chain in action at https://cdn.adroit.games/web/test-bridge-config.html — this test page demonstrates the same `/api/user` and `/api/game-config` fetches that the replacement `index.html` performs.
@@ -17,7 +17,7 @@
 This is an updated MHSBridge that replaces the previous version. The key changes:
 
 1. **Identity comes from the host page.** The host page sets `window.__mhsBridgeConfig` with the player's identity before Unity starts. No more separate `/api/user` calls needed.
-2. **Log and save service config comes from the host page.** URLs and auth credentials for stratalog and stratasave are no longer hardcoded — they come from the bridge config.
+2. **Service endpoint config comes from the host page.** Full endpoint URLs and auth credentials for stratalog and stratasave are no longer hardcoded — they come from the bridge config. Each URL is a complete endpoint (e.g., `https://save.adroit.games/api/state/save`) that you POST to directly.
 3. **Navigation supports a unitMap.** The host page can provide a map of unit names to URLs. This enables managed navigation (locked units, opaque URLs) alongside the existing relative URL navigation.
 4. **Backward compatible.** If `window.__mhsBridgeConfig` is absent (old host page), identity and service config are not available from the bridge. The game should fall back to its existing identity and service mechanisms.
 
@@ -26,7 +26,7 @@ This is an updated MHSBridge that replaces the previous version. The key changes
 - **`CompleteUnit()` works the same way.** Same parameters, same behavior in PWA and URL modes.
 - **`OnPWAReady` is still called by the host page.** It now accepts identity JSON but also accepts empty string (backward compat).
 - **The MHSBridge GameObject setup is identical.** Named "MHSBridge", in the first scene of every unit, `DontDestroyOnLoad`.
-- **Editor behavior uses development defaults.** `GetPlayerID()` returns "mhs_developer", and service configs point to production log/save endpoints so devs can test logging and saving from the Editor.
+- **Editor behavior uses development defaults.** `GetPlayerID()` returns "mhs_developer", and service configs point to production endpoints so devs can test logging, saving, and settings from the Editor.
 
 ---
 
@@ -52,8 +52,11 @@ Replace the existing file with the new `MHSBridge.cs`. New public API:
 |--------|---------|
 | `GetPlayerID()` | Returns user_id from config or OnPWAReady |
 | `GetPlayerName()` | Returns display name (new) |
-| `GetLogServiceConfig()` | Returns log service URL + auth, or null (new) |
-| `GetSaveServiceConfig()` | Returns save service URL + auth, or null (new) |
+| `GetLogSubmitConfig()` | Returns log submit endpoint URL + auth, or null (new) |
+| `GetStateSaveConfig()` | Returns state save endpoint URL + auth, or null (new) |
+| `GetStateLoadConfig()` | Returns state load endpoint URL + auth, or null (new) |
+| `GetSettingsSaveConfig()` | Returns settings save endpoint URL + auth, or null (new) |
+| `GetSettingsLoadConfig()` | Returns settings load endpoint URL + auth, or null (new) |
 | `GetUnitURL(unitName, out isLocked)` | Returns URL for a unit (unitMap or relative); null if locked (new) |
 | `CompleteUnit(unitId, nextUrl)` | Signals unit completion (unchanged) |
 | `NavigateToUnit(unitName)` | Navigates to unit via GetUnitURL (updated) |
@@ -85,40 +88,68 @@ Instead of hardcoded log service URL and auth:
 
 ```csharp
 // Old way (hardcoded):
-// string logUrl = "https://log.adroit.games";
+// string logUrl = "https://log.adroit.games/api/log/submit";
 // string logAuth = "Bearer hardcoded-key";
 
 // New way:
-var logConfig = MHSBridge.Instance.GetLogServiceConfig();
+var logConfig = MHSBridge.Instance.GetLogSubmitConfig();
 if (logConfig != null)
 {
-    string logUrl = logConfig.url;    // e.g., "https://log.adroit.games"
+    string logUrl = logConfig.url;    // e.g., "https://log.adroit.games/api/log/submit"
     string logAuth = logConfig.auth;  // e.g., "Bearer abc123..."
+    // POST directly to logUrl — no path appending needed
 }
 else
 {
     // Fall back to hardcoded values (old host page without config)
-    string logUrl = "https://log.adroit.games";
-    string logAuth = "Bearer hardcoded-key";
 }
 ```
 
-### Save Service
+### State Save/Load
 
-Same pattern:
+The game state (progress, inventory, etc.) is saved and loaded via separate endpoints:
 
 ```csharp
-var saveConfig = MHSBridge.Instance.GetSaveServiceConfig();
-if (saveConfig != null)
+// Save game state:
+var stateSave = MHSBridge.Instance.GetStateSaveConfig();
+if (stateSave != null)
 {
-    string saveUrl = saveConfig.url;
-    string saveAuth = saveConfig.auth;
+    // POST to stateSave.url (e.g., "https://save.adroit.games/api/state/save")
+    // Authorization: stateSave.auth
 }
-else
+
+// Load game state:
+var stateLoad = MHSBridge.Instance.GetStateLoadConfig();
+if (stateLoad != null)
 {
-    // Fall back to hardcoded values
+    // POST to stateLoad.url (e.g., "https://save.adroit.games/api/state/load")
+    // Authorization: stateLoad.auth
 }
 ```
+
+### Settings Save/Load
+
+Player settings (preferences, accessibility options, etc.) use separate endpoints:
+
+```csharp
+// Save player settings:
+var settingsSave = MHSBridge.Instance.GetSettingsSaveConfig();
+if (settingsSave != null)
+{
+    // POST to settingsSave.url (e.g., "https://save.adroit.games/api/settings/save")
+    // Authorization: settingsSave.auth
+}
+
+// Load player settings:
+var settingsLoad = MHSBridge.Instance.GetSettingsLoadConfig();
+if (settingsLoad != null)
+{
+    // POST to settingsLoad.url (e.g., "https://save.adroit.games/api/settings/load")
+    // Authorization: settingsLoad.auth
+}
+```
+
+All five service configs return a `ServiceConfig` with `url` (full endpoint) and `auth` (Authorization header value). If null, fall back to hardcoded values.
 
 ### Sending Identity to Stratalog
 
@@ -200,14 +231,11 @@ window.__mhsBridgeConfig = {
     name: "Dale Musser"
   },
   services: {
-    log: {
-      url: "https://log.adroit.games",
-      auth: "Bearer abc123..."
-    },
-    save: {
-      url: "https://save.adroit.games",
-      auth: "Bearer xyz789..."
-    }
+    log_submit:    { url: "https://log.adroit.games/api/log/submit",       auth: "Bearer abc123..." },
+    state_save:    { url: "https://save.adroit.games/api/state/save",      auth: "Bearer xyz789..." },
+    state_load:    { url: "https://save.adroit.games/api/state/load",      auth: "Bearer xyz789..." },
+    settings_save: { url: "https://save.adroit.games/api/settings/save",   auth: "Bearer xyz789..." },
+    settings_load: { url: "https://save.adroit.games/api/settings/load",   auth: "Bearer xyz789..." }
   },
   navigation: {
     unitMap: {                     // optional
@@ -222,7 +250,7 @@ window.__mhsBridgeConfig = {
 ```
 
 - **`identity`** — required. `user_id` and `name`.
-- **`services`** — required. `log` and `save` with `url` and `auth`.
+- **`services`** — required. Five service entries, each with `url` (full endpoint) and `auth` (Authorization header value): `log_submit`, `state_save`, `state_load`, `settings_save`, `settings_load`.
 - **`navigation.unitMap`** — optional. If present, `NavigateToUnit` uses it. If absent, relative navigation.
 
 The game reads this at startup. It does NOT make any network calls for identity or configuration — the host page provides everything.
@@ -250,7 +278,7 @@ You must be logged into StrataHub (e.g., dev.adroit.games) in your browser for t
 
 If you're running a build locally (localhost), the replacement `index.html` detects this and uses development defaults automatically:
 - `GetPlayerID()` returns "mhs_developer"
-- `GetLogServiceConfig()` and `GetSaveServiceConfig()` return production log/save URLs and auth
+- All service configs (`GetLogSubmitConfig()`, `GetStateSaveConfig()`, etc.) return production endpoint URLs and auth
 - No StrataHub login required — you can test logging and saving immediately
 
 ---
@@ -303,11 +331,20 @@ void Start()
     Debug.Log("Is PWA: " + MHSBridge.Instance.IsPWA);
     Debug.Log("Has Config: " + MHSBridge.Instance.HasConfig);
 
-    var log = MHSBridge.Instance.GetLogServiceConfig();
-    Debug.Log("Log URL: " + (log != null ? log.url : "null (using fallback)"));
+    var log = MHSBridge.Instance.GetLogSubmitConfig();
+    Debug.Log("Log Submit: " + (log != null ? log.url : "null (using fallback)"));
 
-    var save = MHSBridge.Instance.GetSaveServiceConfig();
-    Debug.Log("Save URL: " + (save != null ? save.url : "null (using fallback)"));
+    var stateSave = MHSBridge.Instance.GetStateSaveConfig();
+    Debug.Log("State Save: " + (stateSave != null ? stateSave.url : "null (using fallback)"));
+
+    var stateLoad = MHSBridge.Instance.GetStateLoadConfig();
+    Debug.Log("State Load: " + (stateLoad != null ? stateLoad.url : "null (using fallback)"));
+
+    var settingsSave = MHSBridge.Instance.GetSettingsSaveConfig();
+    Debug.Log("Settings Save: " + (settingsSave != null ? settingsSave.url : "null (using fallback)"));
+
+    var settingsLoad = MHSBridge.Instance.GetSettingsLoadConfig();
+    Debug.Log("Settings Load: " + (settingsLoad != null ? settingsLoad.url : "null (using fallback)"));
 }
 ```
 
@@ -316,12 +353,12 @@ void Start()
 1. **With replacement index.html + logged into StrataHub:**
    - `HasConfig` should be `true`
    - `GetPlayerID()` should return your login ID
-   - `GetLogServiceConfig()` should return URLs and auth
+   - All five service configs should return full endpoint URLs and auth
 
 2. **With replacement index.html on localhost:**
    - `HasConfig` should be `true` (localhost defaults)
    - `GetPlayerID()` returns "mhs_developer"
-   - Service configs return production log/save URLs and auth
+   - All service configs return production endpoint URLs and auth
 
 3. **With replacement index.html on remote host + NOT logged into StrataHub:**
    - `HasConfig` should be `false` (config fetch failed)
@@ -332,7 +369,7 @@ void Start()
    - `HasConfig` should be `true`
    - `IsPWA` should be `true`
    - `GetPlayerID()` should return the logged-in user's ID
-   - Service configs should return URLs and auth
+   - Service configs should return full endpoint URLs and auth
 
 ---
 
@@ -344,8 +381,9 @@ void Start()
 | Replace C# script | `Assets/Scripts/MHSBridge.cs` | New file (adds service config, unitMap, config loading) |
 | Get player ID | Wherever `/api/user` is used | Replace with `MHSBridge.Instance.GetPlayerID()` |
 | Identity key | Log/save JSON payloads | Use `user_id` instead of `playerId` for stratalog |
-| Get log config | Wherever log URL/auth is hardcoded | Use `MHSBridge.Instance.GetLogServiceConfig()` with hardcoded fallback |
-| Get save config | Wherever save URL/auth is hardcoded | Use `MHSBridge.Instance.GetSaveServiceConfig()` with hardcoded fallback |
+| Get log config | Wherever log URL/auth is hardcoded | Use `MHSBridge.Instance.GetLogSubmitConfig()` with hardcoded fallback |
+| Get state save/load | Wherever save URL/auth is hardcoded | Use `GetStateSaveConfig()` and `GetStateLoadConfig()` with hardcoded fallback |
+| Get settings save/load | Wherever settings URL/auth is hardcoded | Use `GetSettingsSaveConfig()` and `GetSettingsLoadConfig()` with hardcoded fallback |
 | Replace index.html | Each build folder | Drop in the provided replacement `index.html` |
 | Loader navigation | Loader scene startup | `GetUnitURL` and `NavigateToUnit` handle URL resolution automatically |
 | Signal unit complete | End-of-unit code | No change — `CompleteUnit()` works the same |

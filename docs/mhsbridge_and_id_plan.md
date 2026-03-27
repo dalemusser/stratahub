@@ -1,7 +1,8 @@
 # MHSBridge, Identity, and Game Hosting Plan
 
 **Date:** 2026-03-19
-**Status:** Planned (discussion complete, implementation not started)
+**Updated:** 2026-03-27 — Service config expanded from 2 base URLs to 5 full endpoint URLs; settings endpoints added
+**Status:** In progress (MHSBridge contract implemented, service config delivered via `/api/game-config`)
 
 ---
 
@@ -54,14 +55,11 @@ window.__mhsBridgeConfig = {
     name: "Dale Musser"
   },
   services: {
-    log: {
-      url: "https://log.adroit.games",
-      auth: "Bearer abc123..."
-    },
-    save: {
-      url: "https://save.adroit.games",
-      auth: "Bearer xyz789..."
-    }
+    log_submit:    { url: "https://log.adroit.games/api/log/submit",       auth: "Bearer abc123..." },
+    state_save:    { url: "https://save.adroit.games/api/state/save",      auth: "Bearer xyz789..." },
+    state_load:    { url: "https://save.adroit.games/api/state/load",      auth: "Bearer xyz789..." },
+    settings_save: { url: "https://save.adroit.games/api/settings/save",   auth: "Bearer xyz789..." },
+    settings_load: { url: "https://save.adroit.games/api/settings/load",   auth: "Bearer xyz789..." }
   },
   navigation: {
     unitMap: {                          // optional; omit for relative navigation
@@ -81,7 +79,7 @@ window.__mhsBridgeConfig = {
   - If present: use it (new builds).
   - If absent: fall back to legacy behavior (old builds — hardcoded service endpoints, relative navigation, existing identity mechanisms).
 - **`identity`** provides user_id and name. The game uses `user_id` for all logging and saving.
-- **`services`** provides URLs and full authorization headers for log and save services. The game uses these instead of hardcoded values.
+- **`services`** provides five named endpoint entries (`log_submit`, `state_save`, `state_load`, `settings_save`, `settings_load`), each with a full URL and authorization header. The game POSTs directly to these URLs instead of using hardcoded values.
 - **`navigation.unitMap`** (optional) maps logical unit names to URLs. If a unit's value is a URL string, it's available. If `null`, it's locked. If the unitMap is absent entirely, the loader/game falls back to relative URL navigation (`../unit2/`). The loader game decides whether to use the unitMap or relative navigation based on what's available.
 
 ### Why this shape
@@ -157,14 +155,11 @@ Response:
 {
   "game": "mhs",
   "services": {
-    "log": {
-      "url": "https://log.adroit.games",
-      "auth": "Bearer <stratalog-api-key>"
-    },
-    "save": {
-      "url": "https://save.adroit.games",
-      "auth": "Bearer <stratasave-api-key>"
-    }
+    "log_submit":    { "url": "https://log.adroit.games/api/log/submit",       "auth": "Bearer <stratalog-api-key>" },
+    "state_save":    { "url": "https://save.adroit.games/api/state/save",      "auth": "Bearer <stratasave-api-key>" },
+    "state_load":    { "url": "https://save.adroit.games/api/state/load",      "auth": "Bearer <stratasave-api-key>" },
+    "settings_save": { "url": "https://save.adroit.games/api/settings/save",   "auth": "Bearer <stratasave-api-key>" },
+    "settings_load": { "url": "https://save.adroit.games/api/settings/load",   "auth": "Bearer <stratasave-api-key>" }
   }
 }
 ```
@@ -192,18 +187,14 @@ The `game` query parameter is required. Different games can have different servi
 New config keys in `config.toml`, organized per game:
 
 ```toml
-[game_services.mhs]
-log_url = "https://log.adroit.games"
-log_auth = "Bearer <stratalog-api-key>"
-save_url = "https://save.adroit.games"
-save_auth = "Bearer <stratasave-api-key>"
-
-# Additional games can be added:
-# [game_services.anothergame]
-# log_url = "https://log.otherdomain.com"
-# log_auth = "Bearer <other-api-key>"
-# save_url = "https://save.otherdomain.com"
-# save_auth = "Bearer <other-api-key>"
+# Full endpoint URLs — games POST directly without constructing paths.
+game_mhs_log_submit_url    = "https://log.adroit.games/api/log/submit"
+game_mhs_log_auth          = "Bearer <stratalog-api-key>"
+game_mhs_state_save_url    = "https://save.adroit.games/api/state/save"
+game_mhs_state_load_url    = "https://save.adroit.games/api/state/load"
+game_mhs_settings_save_url = "https://save.adroit.games/api/settings/save"
+game_mhs_settings_load_url = "https://save.adroit.games/api/settings/load"
+game_mhs_save_auth         = "Bearer <stratasave-api-key>"
 ```
 
 ---
@@ -264,8 +255,12 @@ GetPlayerID()
   New: Returns user_id from stored config
   Legacy fallback: Returns empty string (game uses its existing identity mechanism)
 
-GetServiceConfig()  [NEW]
-  Returns log/save URLs and auth from stored config
+GetLogSubmitConfig()      [NEW]  Returns log submit endpoint URL + auth, or null
+GetStateSaveConfig()      [NEW]  Returns state save endpoint URL + auth, or null
+GetStateLoadConfig()      [NEW]  Returns state load endpoint URL + auth, or null
+GetSettingsSaveConfig()   [NEW]  Returns settings save endpoint URL + auth, or null
+GetSettingsLoadConfig()   [NEW]  Returns settings load endpoint URL + auth, or null
+  Each returns a ServiceConfig with url (full endpoint) and auth (Authorization header).
   Legacy fallback: Returns null (game uses hardcoded values)
 
 GetUnitURL(unitName)  [NEW]
@@ -574,10 +569,13 @@ Reference copies of the current MHSBridge implementation are in `stratahub/docs/
 ```
                     StrataHub Config (config.toml)
                     ┌──────────────────────────────┐
-                    │ game_log_url                  │
-                    │ game_log_auth                 │
-                    │ game_save_url                 │
-                    │ game_save_auth                │
+                    │ game_mhs_log_submit_url       │
+                    │ game_mhs_log_auth             │
+                    │ game_mhs_state_save_url       │
+                    │ game_mhs_state_load_url       │
+                    │ game_mhs_settings_save_url    │
+                    │ game_mhs_settings_load_url    │
+                    │ game_mhs_save_auth            │
                     └──────────┬───────────────────┘
                                │
               ┌────────────────┼────────────────────┐
@@ -603,7 +601,7 @@ Reference copies of the current MHSBridge implementation are in `stratahub/docs/
                 ┌───────┘       └────────┐
                 ▼                        ▼
          ┌─────────────┐        ┌──────────────┐
-         │  Stratalog   │        │  Stratasave   │
-         │  (logging)   │        │  (saves)      │
-         └─────────────┘        └──────────────┘
+         │  Stratalog   │        │  Stratasave          │
+         │  (logging)   │        │  (state + settings)  │
+         └─────────────┘        └──────────────────────┘
 ```

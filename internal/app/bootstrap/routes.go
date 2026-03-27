@@ -273,8 +273,15 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	// /sw.js and /manifest.json serve the Mission HydroSci PWA (used for the impact study).
 	missionHydroSciHandler := missionhydroscifeature.NewHandler(
 		deps.StrataHubMongoDatabase, errLog, appCfg.MHSCDNBaseURL,
-		missionhydroscifeature.GameServiceConfig{URL: appCfg.GameMHSLogURL, Auth: appCfg.GameMHSLogAuth},
-		missionhydroscifeature.GameServiceConfig{URL: appCfg.GameMHSSaveURL, Auth: appCfg.GameMHSSaveAuth},
+		missionhydroscifeature.GameServices{
+			LogSubmitURL:    appCfg.GameMHSLogSubmitURL,
+			LogAuth:         appCfg.GameMHSLogAuth,
+			StateSaveURL:    appCfg.GameMHSStateSaveURL,
+			StateLoadURL:    appCfg.GameMHSStateLoadURL,
+			SettingsSaveURL: appCfg.GameMHSSettingsSaveURL,
+			SettingsLoadURL: appCfg.GameMHSSettingsLoadURL,
+			SaveAuth:        appCfg.GameMHSSaveAuth,
+		},
 		logger,
 	)
 	missionHydroSciHandler.StaffAuthVerifier = staffAuthVerifier
@@ -463,13 +470,17 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	userinfofeature.MountRoutes(r, userInfoHandler)
 
 	// Game config API (provides service endpoints and credentials to games)
+	// Each service entry has a full endpoint URL so games POST directly.
 	gameConfigs := map[string]gameconfigfeature.GameConfigResponse{}
-	if appCfg.GameMHSLogURL != "" || appCfg.GameMHSSaveURL != "" {
+	if appCfg.GameMHSLogSubmitURL != "" || appCfg.GameMHSStateSaveURL != "" {
 		gameConfigs["mhs"] = gameconfigfeature.GameConfigResponse{
 			Game: "mhs",
 			Services: map[string]gameconfigfeature.ServiceEntry{
-				"log":  {URL: appCfg.GameMHSLogURL, Auth: appCfg.GameMHSLogAuth},
-				"save": {URL: appCfg.GameMHSSaveURL, Auth: appCfg.GameMHSSaveAuth},
+				"log_submit":    {URL: appCfg.GameMHSLogSubmitURL, Auth: appCfg.GameMHSLogAuth},
+				"state_save":    {URL: appCfg.GameMHSStateSaveURL, Auth: appCfg.GameMHSSaveAuth},
+				"state_load":    {URL: appCfg.GameMHSStateLoadURL, Auth: appCfg.GameMHSSaveAuth},
+				"settings_save": {URL: appCfg.GameMHSSettingsSaveURL, Auth: appCfg.GameMHSSaveAuth},
+				"settings_load": {URL: appCfg.GameMHSSettingsLoadURL, Auth: appCfg.GameMHSSaveAuth},
 			},
 		}
 	}

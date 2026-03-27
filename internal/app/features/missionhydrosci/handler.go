@@ -11,10 +11,16 @@ import (
 	"go.uber.org/zap"
 )
 
-// GameServiceConfig holds the URL and auth header for a game service (log or save).
-type GameServiceConfig struct {
-	URL  string
-	Auth string
+// GameServices holds all game service endpoint URLs and auth headers.
+// Each URL is a full endpoint (e.g., "https://log.adroit.games/api/log/submit").
+type GameServices struct {
+	LogSubmitURL    string
+	LogAuth         string
+	StateSaveURL    string
+	StateLoadURL    string
+	SettingsSaveURL string
+	SettingsLoadURL string
+	SaveAuth        string
 }
 
 // Handler is the dependency container for the Mission HydroSci (experimental) feature.
@@ -23,8 +29,7 @@ type Handler struct {
 	Log               *zap.Logger
 	ErrLog            *uierrors.ErrorLogger
 	CDNBaseURL        string // e.g., "https://cdn.adroit.games/mhs"
-	LogService        GameServiceConfig
-	SaveService       GameServiceConfig
+	Services          GameServices
 	ProgressStore     *mhsuserprogress.Store
 	DeviceStatusStore *mhsdevicestatus.Store
 	SettingsStore     *settingsstore.Store
@@ -32,14 +37,13 @@ type Handler struct {
 }
 
 // NewHandler constructs a new Handler.
-func NewHandler(db *mongo.Database, errLog *uierrors.ErrorLogger, cdnBaseURL string, logSvc, saveSvc GameServiceConfig, logger *zap.Logger) *Handler {
+func NewHandler(db *mongo.Database, errLog *uierrors.ErrorLogger, cdnBaseURL string, services GameServices, logger *zap.Logger) *Handler {
 	return &Handler{
 		DB:                db,
 		Log:               logger,
 		ErrLog:            errLog,
 		CDNBaseURL:        cdnBaseURL,
-		LogService:        logSvc,
-		SaveService:       saveSvc,
+		Services:          services,
 		ProgressStore:     mhsuserprogress.New(db),
 		DeviceStatusStore: mhsdevicestatus.New(db),
 		SettingsStore:     settingsstore.New(db),
