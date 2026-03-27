@@ -190,8 +190,7 @@
 
     function maskAuth(auth) {
       if (!auth) return '—';
-      if (auth.length <= 15) return auth.substring(0, 7) + '***';
-      return auth.substring(0, 12) + '***' + auth.substring(auth.length - 4);
+      return '<redacted>';
     }
 
     function setStatus(id, ok, text) {
@@ -264,7 +263,14 @@
           document.getElementById('gameconfig-settings-load-url').textContent = (servicesData.settings_load && servicesData.settings_load.url) || '(not configured)';
           document.getElementById('gameconfig-save-auth').textContent = maskAuth(servicesData.state_save && servicesData.state_save.auth);
           document.getElementById('gameconfig-fields').style.display = 'block';
-          document.getElementById('gameconfig-raw').textContent = JSON.stringify(data, null, 2);
+          var rawDisplay = JSON.parse(JSON.stringify(data));
+          if (rawDisplay.services) {
+            ['log_submit', 'state_save', 'state_load', 'settings_save', 'settings_load'].forEach(function(key) {
+              if (rawDisplay.services[key] && rawDisplay.services[key].auth)
+                rawDisplay.services[key].auth = '<redacted>';
+            });
+          }
+          document.getElementById('gameconfig-raw').textContent = JSON.stringify(rawDisplay, null, 2);
           document.getElementById('gameconfig-raw').style.display = 'block';
 
           // Enable service test buttons
