@@ -6,7 +6,7 @@ StrataHub is a web-based platform purpose-built to support the delivery, managem
 
 StrataHub was developed because no existing tools provide the specific combination of capabilities this project requires. Standard learning management systems such as Canvas or Google Classroom are designed for distributing assignments and grades, not for delivering a multi-unit educational game with fine-grained progress tracking. Game hosting platforms such as itch.io can serve game builds but offer no classroom management, student progress monitoring, or research data collection. Research data platforms do not integrate directly with game delivery or classroom workflows. StrataHub brings all of these functions together in a single platform tailored to the needs of the Mission HydroSci project.
 
-StrataHub is one component of the broader Strata system. StrataLog collects detailed learning analytics as students play the game. StrataSave persists student game state so progress is retained across sessions. The MHS Grader analyzes log data to assess student progress against curriculum-aligned criteria. Each of these components is described in its own section of this report. StrataHub coordinates with all of them — it is where teachers and students go, while the other services work behind the scenes to collect, store, and evaluate data.
+StrataHub is one component of the broader Strata system. StrataLog collects detailed learning analytics as students play the game. StrataSave persists student game state so progress is retained across sessions. The MHS Grader analyzes log data to assess student progress against curriculum-aligned criteria. Each of these components is described in its own section of this report. StrataHub coordinates with all of them. It is where teachers and students go, while the other services work behind the scenes to collect, store, and evaluate data.
 
 ## 2. Organizational Structure
 
@@ -28,11 +28,11 @@ StrataHub supports five user roles, each with capabilities appropriate to their 
 
 **Admins** have full access to all features within a workspace. They configure workspace settings including site branding, authentication methods, and feature options. They create and manage organizations, groups, leaders, coordinators, and members. They have access to all dashboards, reports, audit logs, and activity tracking. Admins can also create announcements that are displayed to all users in the workspace, providing a communication channel for important notices such as scheduled maintenance, study updates, or instructions for teachers.
 
-**Coordinators** are assigned to one or more organizations and serve as an intermediary management role, analogous to a district coordinator overseeing multiple schools. Coordinators can manage the organizations they are assigned to — including the groups, leaders, and members within those organizations — but cannot see or access data from organizations outside their assignment. This scoped access allows coordinators to support multiple schools without exposing data across organizational boundaries.
+**Coordinators** are assigned to one or more organizations and serve as an intermediary management role, analogous to a district coordinator overseeing multiple schools. Coordinators can manage the organizations they are assigned to, including the groups, leaders, and members within those organizations, but cannot see or access data from organizations outside their assignment. This scoped access allows coordinators to support multiple schools without exposing data across organizational boundaries.
 
 **Leaders** are teachers. Each leader is assigned to one or more groups (classes) and can manage the members (students) within those groups. Leaders access the Mission HydroSci Dashboard to monitor their students' progress through the game, view detailed performance data, and identify students who may need additional support. Leaders can also distribute resources and materials to their groups, track student activity, and manage unit progression for their students.
 
-**Analysts** have read-only access to aggregate data across the workspace. This role is intended for researchers who need to view system-wide metrics — such as organization counts, group counts, and member counts — without the ability to modify data or manage users.
+**Analysts** have read-only access to aggregate data across the workspace. This role is intended for researchers who need to view system-wide metrics, such as organization counts, group counts, and member counts, without the ability to modify data or manage users.
 
 **Members** are students. Members log into StrataHub to access Mission HydroSci. They play the game units in sequence, with each unit unlocking only after the previous one is completed. Members can also access surveys and other resources that have been assigned to their group by their teacher or an administrator.
 
@@ -58,11 +58,11 @@ Mission HydroSci currently consists of five curriculum-aligned units that must b
 
 ### Progressive Web App Delivery
 
-Mission HydroSci is delivered as a Progressive Web App (PWA). Students can install the game directly on their devices from the browser — no app store downloads or IT department involvement required. Once installed, the PWA launches like a native application with its own icon, runs in a full-screen window without browser chrome, and loads quickly because game assets are cached locally on the device. This provides a seamless, app-like experience on Chromebooks, laptops, and desktops without the overhead of managing native app installations across a school's device fleet.
+Mission HydroSci is delivered as a Progressive Web App (PWA). Students can install the game directly on their devices from the browser, with no app store downloads or IT department involvement required. Once installed, the PWA launches like a native application with its own icon, runs in a full-screen window without browser chrome, and loads quickly because game assets are cached locally on the device. This provides a seamless, app-like experience on Chromebooks, laptops, and desktops without the overhead of managing native app installations across a school's device fleet.
 
 ### Device Status Monitoring
 
-StrataHub tracks the status of each student's device, including the device type, whether the PWA is installed, local storage usage, and when the device was last seen. This information is visible to teachers and administrators on the MHS Dashboard, helping them identify students who may be experiencing technical issues — such as a device running low on storage or a student who hasn't connected in several days.
+StrataHub tracks the status of each student's device, including the device type, whether the PWA is installed, local storage usage, and when the device was last seen. This information is visible to teachers and administrators on the MHS Dashboard, helping them identify students who may be experiencing technical issues, such as a device running low on storage or a student who hasn't connected in several days.
 
 ## 5. Surveys and Materials
 
@@ -80,16 +80,16 @@ The Mission HydroSci Dashboard is the primary tool for teachers and researchers 
 
 ### Progress Grid
 
-The dashboard displays a grid with one row per student and columns representing each progress point in the curriculum. Progress points are specific milestones within each unit — such as completing an investigation, answering assessment questions, or finishing a simulation activity. There are 26 progress points across the five units.
+The dashboard displays a grid with one row per student and columns representing each progress point in the curriculum. Progress points are specific milestones within each unit, such as completing an investigation, answering assessment questions, or finishing a simulation activity. There are 26 progress points across the five units.
 
 ![MHS Dashboard showing the progress grid for a class at Hillsdale Middle School. Each row is a student and each column is a progress point across Units 1 through 5. Color-coded cells indicate whether each progress point is completed, in progress, flagged, or not yet reached.](images/mhs-dashboard.png)
 
 Each cell in the grid shows a visual status indicator:
 
-- **Completed (green)** — the student has passed this progress point
-- **Active (blue)** — the student is currently working on this progress point
-- **Flagged (yellow)** — the student completed the progress point but with results that warrant attention
-- **Not started (gray)** — the student has not yet reached this progress point
+- **Completed (green):** the student has passed this progress point
+- **Active (blue):** the student is currently working on this progress point
+- **Flagged (yellow):** the student completed the progress point but with results that warrant attention
+- **Not started (gray):** the student has not yet reached this progress point
 
 ### Flagged Progress Points
 
@@ -165,9 +165,9 @@ The Mission HydroSci project requires a combination of capabilities that no sing
 
 **Research data platforms** and survey tools like Qualtrics or REDCap are designed for data collection and analysis, not for delivering interactive content or managing classroom hierarchies. They cannot serve a game, track in-game events, or provide teachers with real-time progress dashboards.
 
-**Custom game portals** built for individual educational games do exist, but they typically address only one piece of the puzzle — such as hosting builds or collecting telemetry. They do not provide the full stack of classroom management, role-based access, progress gating, offline capability, device monitoring, survey distribution, materials management, and research-grade data collection that this project requires.
+**Custom game portals** built for individual educational games do exist, but they typically address only one piece of the puzzle, such as hosting builds or collecting telemetry. They do not provide the full stack of classroom management, role-based access, progress gating, offline capability, device monitoring, survey distribution, materials management, and research-grade data collection that this project requires.
 
-StrataHub was built because the project needed all of these capabilities working together in a single, integrated platform. Attempting to combine multiple existing tools would have created fragile integrations, data silos, inconsistent user experiences, and significant ongoing maintenance burden — while still leaving gaps in functionality.
+StrataHub was built because the project needed all of these capabilities working together in a single, integrated platform. Attempting to combine multiple existing tools would have created fragile integrations, data silos, inconsistent user experiences, and significant ongoing maintenance burden, while still leaving gaps in functionality.
 
 ## 9. Scalability
 
@@ -175,7 +175,7 @@ StrataHub is designed to support the scale of a multi-site educational research 
 
 The multi-workspace architecture allows separate research deployments to operate independently on isolated subdomains, each with their own organizations, users, settings, and data. This means the system can support multiple concurrent studies or deployment phases without interference between them.
 
-The underlying infrastructure uses cloud-hosted databases and web servers on Amazon Web Services (AWS), which can be scaled to meet increasing demand as the project grows. The system has been designed so that adding more schools and students does not require architectural changes — only the allocation of additional server resources if needed.
+The underlying infrastructure uses cloud-hosted databases and web servers on Amazon Web Services (AWS), which can be scaled to meet increasing demand as the project grows. The system has been designed so that adding more schools and students does not require architectural changes, only the allocation of additional server resources if needed.
 
 ## 10. Data Security and Privacy
 
@@ -191,7 +191,7 @@ StrataHub supports multiple authentication methods to accommodate the identity s
 
 ### Session Security
 
-User sessions are secured with encrypted cookies transmitted only over HTTPS. Sessions expire after a configurable period of inactivity, with a warning displayed before automatic logout. This protects against unauthorized access on shared or unattended devices — a common scenario in school computer labs.
+User sessions are secured with encrypted cookies transmitted only over HTTPS. Sessions expire after a configurable period of inactivity, with a warning displayed before automatic logout. This protects against unauthorized access on shared or unattended devices, a common scenario in school computer labs.
 
 ### Data Protection in Transit and at Rest
 
@@ -209,27 +209,27 @@ The multi-workspace architecture ensures complete data isolation between separat
 
 StrataHub provides the following capabilities in support of the Mission HydroSci research project:
 
-- **Multi-workspace architecture** — isolated environments for independent research deployments
-- **Organizational hierarchy** — workspaces, organizations, groups, and members mirroring the structure of districts, schools, classrooms, and students
-- **Role-based access** — five user roles (admin, coordinator, leader, analyst, member) with scoped permissions appropriate to each responsibility
-- **Multiple authentication methods** — Google, Clever, ClassLink, email verification, and password login to accommodate school identity systems
-- **Mission HydroSci game delivery** — browser-based access to all game units with sequential progression enforcement
-- **Progressive Web App** — installable game experience with fast loading and no app store requirements
-- **MHS Dashboard** — real-time progress grid showing every student's status across all units and 26 progress points
-- **Flagged progress detection** — automatic identification of students whose performance warrants teacher attention, with specific reason codes
-- **Performance metrics** — mistake counts, attempt tracking, and completion times for each progress point
-- **Device status monitoring** — device type, PWA installation status, storage usage, and last-seen tracking for each student
-- **Progress management** — ability for teachers and administrators to set or reset student unit progression
-- **Survey distribution** — delivery of research surveys to students via the Resources feature
-- **Materials distribution** — delivery of teacher guides and documentation via the Materials feature
-- **Organization management** — creation and management of schools and research sites with location, timezone, and contact information
-- **Group management** — creation and management of classes with leader assignment, member enrollment, and resource assignment
-- **Member management** — student roster management with add, remove, and bulk CSV upload capabilities
-- **Coordinator assignment** — scoped management access for district-level coordinators across multiple organizations
-- **Activity tracking** — login session and engagement monitoring for students and teachers
-- **Announcements** — workspace-wide communication to all users
-- **Audit logging** — accountability trail for all administrative actions
-- **Timezone-aware display** — timestamps shown in each organization's local timezone
-- **Session security** — encrypted cookies, HTTPS, idle timeout with warning, and CSRF protection
-- **Data isolation** — complete separation of data between workspaces and role-scoped visibility within workspaces
-- **Cloud infrastructure** — hosted on AWS with managed databases, scalable to hundreds of schools and tens of thousands of students
+- **Multi-workspace architecture:** isolated environments for independent research deployments
+- **Organizational hierarchy:** workspaces, organizations, groups, and members mirroring the structure of districts, schools, classrooms, and students
+- **Role-based access:** five user roles (admin, coordinator, leader, analyst, member) with scoped permissions appropriate to each responsibility
+- **Multiple authentication methods:** Google, Clever, ClassLink, email verification, and password login to accommodate school identity systems
+- **Mission HydroSci game delivery:** browser-based access to all game units with sequential progression enforcement
+- **Progressive Web App:** installable game experience with fast loading and no app store requirements
+- **MHS Dashboard:** real-time progress grid showing every student's status across all units and 26 progress points
+- **Flagged progress detection:** automatic identification of students whose performance warrants teacher attention, with specific reason codes
+- **Performance metrics:** mistake counts, attempt tracking, and completion times for each progress point
+- **Device status monitoring:** device type, PWA installation status, storage usage, and last-seen tracking for each student
+- **Progress management:** ability for teachers and administrators to set or reset student unit progression
+- **Survey distribution:** delivery of research surveys to students via the Resources feature
+- **Materials distribution:** delivery of teacher guides and documentation via the Materials feature
+- **Organization management:** creation and management of schools and research sites with location, timezone, and contact information
+- **Group management:** creation and management of classes with leader assignment, member enrollment, and resource assignment
+- **Member management:** student roster management with add, remove, and bulk CSV upload capabilities
+- **Coordinator assignment:** scoped management access for district-level coordinators across multiple organizations
+- **Activity tracking:** login session and engagement monitoring for students and teachers
+- **Announcements:** workspace-wide communication to all users
+- **Audit logging:** accountability trail for all administrative actions
+- **Timezone-aware display:** timestamps shown in each organization's local timezone
+- **Session security:** encrypted cookies, HTTPS, idle timeout with warning, and CSRF protection
+- **Data isolation:** complete separation of data between workspaces and role-scoped visibility within workspaces
+- **Cloud infrastructure:** hosted on AWS with managed databases, scalable to hundreds of schools and tens of thousands of students

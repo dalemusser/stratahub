@@ -1,0 +1,554 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StrataHub: Strata System Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fafafa;
+      --surface: #ffffff;
+      --text: #334155;
+      --text-light: #94a3b8;
+      --heading: #0f172a;
+      --accent: #3b82f6;
+      --accent-light: #eff6ff;
+      --border: #e2e8f0;
+      --green: #22c55e;
+      --radius: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.7;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 48px 32px 96px;
+    }
+
+    h1 {
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: var(--heading);
+      letter-spacing: -0.03em;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+      color: var(--text-light);
+      font-weight: 400;
+      margin-bottom: 32px;
+    }
+
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin-top: 56px;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin-top: 32px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      margin-bottom: 16px;
+    }
+
+    strong {
+      font-weight: 600;
+      color: var(--heading);
+    }
+
+    ul {
+      margin: 12px 0 18px 20px;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    figure {
+      margin: 28px 0;
+    }
+
+    img {
+      display: block;
+      max-width: 100%;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+
+    figcaption {
+      text-align: center;
+      font-size: 0.82rem;
+      color: var(--text-light);
+      margin-top: 10px;
+      line-height: 1.5;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px 28px;
+    }
+
+    /* Table of Contents */
+    .toc {
+      margin: 0 0 48px;
+    }
+
+    .toc .card {
+      padding: 28px 32px;
+    }
+
+    .toc-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-light);
+      margin-bottom: 14px;
+    }
+
+    .toc ol {
+      margin: 0;
+      padding-left: 20px;
+      columns: 2;
+      column-gap: 32px;
+    }
+
+    .toc li {
+      margin-bottom: 6px;
+      font-size: 0.92rem;
+    }
+
+    .toc a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .toc a:hover {
+      text-decoration: underline;
+    }
+
+    /* Section divider */
+    h2::before {
+      content: "";
+      display: block;
+      width: 40px;
+      height: 3px;
+      background: var(--accent);
+      border-radius: 2px;
+      margin-bottom: 12px;
+    }
+
+    /* Status indicators */
+    .status-list {
+      list-style: none;
+      margin: 12px 0 18px 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .status-list li {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 10px 14px;
+      font-size: 0.9rem;
+      margin-bottom: 0;
+    }
+
+    .status-list li strong {
+      display: block;
+      font-size: 0.82rem;
+      margin-bottom: 2px;
+    }
+
+    .dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-right: 4px;
+      vertical-align: middle;
+    }
+
+    .dot-green { background: #22c55e; }
+    .dot-blue { background: #3b82f6; }
+    .dot-yellow { background: #eab308; }
+    .dot-gray { background: #cbd5e1; }
+
+    /* Feature summary */
+    .summary-box {
+      margin-top: 20px;
+    }
+
+    .feature-grid {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .feature-grid li {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      margin-bottom: 0;
+    }
+
+    .feature-grid li strong {
+      display: block;
+      font-size: 0.82rem;
+      color: var(--accent);
+      margin-bottom: 2px;
+    }
+
+    /* Print */
+    @media print {
+      body { background: #fff; }
+      .container { padding: 20px; max-width: 100%; }
+      img { border-radius: 0; }
+      h2 { page-break-after: avoid; }
+      .toc { page-break-after: always; }
+      .status-list, .feature-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .container { padding: 24px 16px 64px; }
+      h1 { font-size: 1.8rem; }
+      .toc ol { columns: 1; }
+      .status-list { grid-template-columns: 1fr; }
+      .feature-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+<h1>StrataHub</h1>
+<div class="subtitle">Strata System Report</div>
+
+<div class="toc">
+  <div class="card">
+    <div class="toc-label">Contents</div>
+    <ol>
+      <li><a href="#purpose">Purpose and Overview</a></li>
+      <li><a href="#structure">Organizational Structure</a></li>
+      <li><a href="#roles">User Roles</a></li>
+      <li><a href="#delivery">Delivering Mission HydroSci to Students</a></li>
+      <li><a href="#surveys">Surveys and Materials</a></li>
+      <li><a href="#dashboard">The MHS Dashboard</a></li>
+      <li><a href="#management">Classroom and Research Site Management</a></li>
+      <li><a href="#existing-tools">Why Existing Tools Do Not Meet These Needs</a></li>
+      <li><a href="#scalability">Scalability</a></li>
+      <li><a href="#security">Data Security and Privacy</a></li>
+      <li><a href="#summary">Summary of Features</a></li>
+    </ol>
+  </div>
+</div>
+
+<!-- Section 1 -->
+<h2 id="purpose">1. Purpose and Overview</h2>
+
+<p>StrataHub is a web-based platform purpose-built to support the delivery, management, and research data collection for Mission HydroSci. It serves as the central hub through which teachers set up their classrooms, students access the game, and researchers monitor progress and collect data.</p>
+
+<p>StrataHub was developed because no existing tools provide the specific combination of capabilities this project requires. Standard learning management systems such as Canvas or Google Classroom are designed for distributing assignments and grades, not for delivering a multi-unit educational game with fine-grained progress tracking. Game hosting platforms such as itch.io can serve game builds but offer no classroom management, student progress monitoring, or research data collection. Research data platforms do not integrate directly with game delivery or classroom workflows. StrataHub brings all of these functions together in a single platform tailored to the needs of the Mission HydroSci project.</p>
+
+<p>StrataHub is one component of the broader Strata system. StrataLog collects detailed learning analytics as students play the game. StrataSave persists student game state so progress is retained across sessions. The MHS Grader analyzes log data to assess student progress against curriculum-aligned criteria. Each of these components is described in its own section of this report. StrataHub coordinates with all of them. It is where teachers and students go, while the other services work behind the scenes to collect, store, and evaluate data.</p>
+
+<!-- Section 2 -->
+<h2 id="structure">2. Organizational Structure</h2>
+
+<p>StrataHub organizes users and data in a hierarchy that mirrors the real-world structure of the research project.</p>
+
+<p><strong>Workspaces</strong> are the top-level containers. Each workspace is an isolated environment with its own users, settings, and data. A workspace can represent a research deployment, a school district, or any other organizational boundary that requires separation. Workspaces operate on their own subdomains, ensuring complete data isolation between deployments.</p>
+
+<p><strong>Organizations</strong> represent schools or research sites within a workspace. Each organization has a name, location (city and state), timezone, and contact information. The timezone setting ensures that timestamps displayed to teachers and researchers reflect the local time at each school.</p>
+
+<p><strong>Groups</strong> represent classes or sections within an organization. A group is typically a single teacher's class. Groups are the level at which surveys and materials are distributed, and at which students are enrolled. A teacher may have multiple groups representing different class periods or sections.</p>
+
+<p><strong>Members</strong> are students enrolled in one or more groups. Each member has a login identity and is associated with an organization. Their progress through Mission HydroSci, game state, and interaction data are all tied to their member identity.</p>
+
+<p>This structure allows the system to naturally represent the research project's deployment across multiple districts, schools, classrooms, and students while maintaining clear boundaries for data access and management responsibilities.</p>
+
+<!-- Section 3 -->
+<h2 id="roles">3. User Roles</h2>
+
+<p>StrataHub supports five user roles, each with capabilities appropriate to their responsibilities within the research project.</p>
+
+<p><strong>Admins</strong> have full access to all features within a workspace. They configure workspace settings including site branding, authentication methods, and feature options. They create and manage organizations, groups, leaders, coordinators, and members. They have access to all dashboards, reports, audit logs, and activity tracking. Admins can also create announcements that are displayed to all users in the workspace, providing a communication channel for important notices such as scheduled maintenance, study updates, or instructions for teachers.</p>
+
+<p><strong>Coordinators</strong> are assigned to one or more organizations and serve as an intermediary management role, analogous to a district coordinator overseeing multiple schools. Coordinators can manage the organizations they are assigned to, including the groups, leaders, and members within those organizations, but cannot see or access data from organizations outside their assignment. This scoped access allows coordinators to support multiple schools without exposing data across organizational boundaries.</p>
+
+<p><strong>Leaders</strong> are teachers. Each leader is assigned to one or more groups (classes) and can manage the members (students) within those groups. Leaders access the Mission HydroSci Dashboard to monitor their students' progress through the game, view detailed performance data, and identify students who may need additional support. Leaders can also distribute resources and materials to their groups, track student activity, and manage unit progression for their students.</p>
+
+<p><strong>Analysts</strong> have read-only access to aggregate data across the workspace. This role is intended for researchers who need to view system-wide metrics, such as organization counts, group counts, and member counts, without the ability to modify data or manage users.</p>
+
+<p><strong>Members</strong> are students. Members log into StrataHub to access Mission HydroSci. They play the game units in sequence, with each unit unlocking only after the previous one is completed. Members can also access surveys and other resources that have been assigned to their group by their teacher or an administrator.</p>
+
+<!-- Section 4 -->
+<h2 id="delivery">4. Delivering Mission HydroSci to Students</h2>
+
+<p>StrataHub manages the full lifecycle of delivering Mission HydroSci to students, from initial access through completion of all five units.</p>
+
+<h3>Accessing the Game</h3>
+
+<p>Students log into StrataHub using credentials appropriate to their school's authentication setup. StrataHub supports multiple authentication methods to accommodate the variety of identity systems used across schools, including Google, Clever, ClassLink, email-based verification, and password-based login. Administrators configure which authentication methods are available for their workspace.</p>
+
+<figure>
+  <img src="images/workspace-settings.png" alt="Workspace Settings page showing available authentication methods and Mission HydroSci member authorization options.">
+  <figcaption>Workspace Settings. Administrators configure authentication methods available to their users.</figcaption>
+</figure>
+
+<p>Once logged in, students navigate to Mission HydroSci where they see their current unit and overall progress.</p>
+
+<figure>
+  <img src="images/mission-hydrosci.png" alt="The Mission HydroSci unit selector showing all five units with download status and a Launch button.">
+  <figcaption>The Mission HydroSci unit selector as seen by a student, showing unit status and a Launch button for the current unit.</figcaption>
+</figure>
+
+<h3>Sequential Unit Progression</h3>
+
+<figure>
+  <img src="images/mhs-unit1.png" alt="Mission HydroSci Unit 1: Water Cycle gameplay showing a 3D environment with characters.">
+  <figcaption>Mission HydroSci Unit 1: Water Cycle. Students explore a 3D environment and interact with characters to investigate science concepts.</figcaption>
+</figure>
+
+<p>Mission HydroSci currently consists of five curriculum-aligned units that must be completed in order. StrataHub enforces this progression, ensuring that students advance through the units of the game as they complete each one.</p>
+
+<h3>Progressive Web App Delivery</h3>
+
+<p>Mission HydroSci is delivered as a Progressive Web App (PWA). Students can install the game directly on their devices from the browser, with no app store downloads or IT department involvement required. Once installed, the PWA launches like a native application with its own icon, runs in a full-screen window without browser chrome, and loads quickly because game assets are cached locally on the device. This provides a seamless, app-like experience on Chromebooks, laptops, and desktops without the overhead of managing native app installations across a school's device fleet.</p>
+
+<h3>Device Status Monitoring</h3>
+
+<p>StrataHub tracks the status of each student's device, including the device type, whether the PWA is installed, local storage usage, and when the device was last seen. This information is visible to teachers and administrators on the MHS Dashboard, helping them identify students who may be experiencing technical issues, such as a device running low on storage or a student who hasn't connected in several days.</p>
+
+<!-- Section 5 -->
+<h2 id="surveys">5. Surveys and Materials</h2>
+
+<p>StrataHub provides two mechanisms for distributing documents and resources to participants in the research project.</p>
+
+<p><strong>Resources</strong> are used to provide students with access to surveys. Surveys are created as external documents or forms and distributed to specific groups through the Resources feature. Students see their assigned resources when they log into StrataHub, ensuring that the right surveys reach the right students at the right time. Resources are assigned at the group level, so a teacher's class receives the surveys appropriate to their phase of the study.</p>
+
+<p><strong>Materials</strong> are used to provide teachers with guides, documentation, and other support materials. Teacher guides, implementation instructions, and reference documents are uploaded and assigned to groups so that leaders (teachers) can access them directly within StrataHub. This keeps all project-related materials in one place rather than relying on separate email distribution or file sharing.</p>
+
+<p>Both Resources and Materials can be managed by administrators and, where permissions allow, by coordinators.</p>
+
+<!-- Section 6 -->
+<h2 id="dashboard">6. The MHS Dashboard</h2>
+
+<p>The Mission HydroSci Dashboard is the primary tool for teachers and researchers to monitor student progress through the game. It provides a real-time, detailed view of every student's status across all five units and their individual progress points.</p>
+
+<h3>Progress Grid</h3>
+
+<p>The dashboard displays a grid with one row per student and columns representing each progress point in the curriculum. Progress points are specific milestones within each unit, such as completing an investigation, answering assessment questions, or finishing a simulation activity. There are 26 progress points across the five units.</p>
+
+<figure>
+  <img src="images/mhs-dashboard.png" alt="MHS Dashboard showing the progress grid for a class with color-coded cells for each progress point.">
+  <figcaption>The MHS Dashboard progress grid. Each row is a student and each column is a progress point across Units 1 through 5. Color-coded cells indicate completion status.</figcaption>
+</figure>
+
+<p>Each cell in the grid shows a visual status indicator:</p>
+
+<ul class="status-list">
+  <li><strong><span class="dot dot-green"></span> Completed</strong> The student has passed this progress point.</li>
+  <li><strong><span class="dot dot-blue"></span> Active</strong> The student is currently working on this progress point.</li>
+  <li><strong><span class="dot dot-yellow"></span> Flagged</strong> The student completed the progress point but with results that warrant attention.</li>
+  <li><strong><span class="dot dot-gray"></span> Not started</strong> The student has not yet reached this progress point.</li>
+</ul>
+
+<h3>Flagged Progress Points</h3>
+
+<p>When a student's performance at a progress point is flagged, the dashboard shows the specific reason. Reason codes include indicators such as exceeding the expected number of mistakes, scoring below a threshold, or requiring an unusual number of hints. This allows teachers to quickly identify which students may need additional support and what specific aspect of the content presented a challenge.</p>
+
+<h3>Performance Metrics</h3>
+
+<p>For each progress point, the dashboard can display:</p>
+
+<ul>
+  <li>The number of mistakes made during the activity</li>
+  <li>The number of attempts</li>
+  <li>The time taken to complete the activity</li>
+  <li>Whether the student passed on their first attempt or required multiple tries</li>
+</ul>
+
+<p>These metrics give teachers and researchers a granular view of how students are engaging with the curriculum, going well beyond a simple completion percentage.</p>
+
+<h3>Device Status</h3>
+
+<p>The dashboard includes device information for each student, showing:</p>
+
+<ul>
+  <li>The type of device being used</li>
+  <li>Whether the PWA is installed</li>
+  <li>Local storage usage and available quota</li>
+  <li>When the student's device was last seen by the system</li>
+</ul>
+
+<p>Devices that have not connected in more than seven days are flagged as stale, alerting teachers to potential issues with student access.</p>
+
+<h3>Progress Management</h3>
+
+<p>Teachers and administrators can set or reset a student's current unit from the dashboard. This is useful when a student needs to repeat a unit, when technical issues require a student's progress to be adjusted, or when the research protocol calls for specific progress assignments.</p>
+
+<h3>Timezone Awareness</h3>
+
+<p>All timestamps on the dashboard are displayed in the timezone of the student's organization, so a teacher in California sees times in Pacific time while a teacher in New York sees Eastern time. This avoids confusion when reviewing when students were last active or how long activities took.</p>
+
+<h3>Visibility for Teachers and Researchers</h3>
+
+<p>The MHS Dashboard gives teachers a level of visibility into student game performance that would not be possible with the game alone. Without this dashboard, a teacher would have no way to know which students are struggling with specific content, which students haven't played recently, or which students are ready to advance to the next unit. For researchers, the dashboard provides a real-time window into study progress across all participating classrooms, enabling early identification of implementation issues or patterns that may require attention.</p>
+
+<!-- Section 7 -->
+<h2 id="management">7. Classroom and Research Site Management</h2>
+
+<p>StrataHub provides a complete set of tools for setting up and managing the organizational structure of a research deployment.</p>
+
+<h3>Organizations</h3>
+
+<p>Administrators create organizations to represent each participating school or research site. Organization records include the school name, city, state, timezone, and contact information. Organizations can be activated or deactivated as schools join or leave the study.</p>
+
+<h3>Groups</h3>
+
+<p>Within each organization, administrators or leaders create groups to represent classes or sections. Each group is associated with one organization and can have one or more leaders (teachers) assigned to it. Groups are the unit at which students are enrolled, surveys are distributed, and materials are assigned.</p>
+
+<figure>
+  <img src="images/mhs-groups-manage-group.png" alt="Groups management page with organization sidebar, group table, and Manage Group dialog.">
+  <figcaption>Groups management. Organizations are listed in the sidebar, groups are displayed with their leader, member, and resource counts, and the Manage Group dialog provides access to all group operations.</figcaption>
+</figure>
+
+<h3>Member Management</h3>
+
+<p>Students are added to groups as members. Administrators, coordinators, and leaders can add and remove members from groups, and manage member information. Members are associated with an organization and enrolled in one or more groups.</p>
+
+<h3>Coordinator and Leader Assignment</h3>
+
+<p>Coordinators are assigned to specific organizations, giving them management access scoped to those schools. Leaders are assigned to specific groups, giving them access to the students in their classes. These assignments ensure that each person in the system sees only the data relevant to their role and responsibilities.</p>
+
+<h3>Activity Tracking</h3>
+
+<p>StrataHub tracks user activity including login sessions and engagement. Leaders can view activity summaries for their students, and administrators can view activity across the workspace. This helps identify patterns such as students who are not logging in or teachers who may need additional support.</p>
+
+<!-- Section 8 -->
+<h2 id="existing-tools">8. Why Existing Tools Do Not Meet These Needs</h2>
+
+<p>The Mission HydroSci project requires a combination of capabilities that no single existing platform provides.</p>
+
+<p><strong>Learning management systems</strong> such as Canvas, Google Classroom, and Schoology are designed for managing assignments, discussions, and grades. They can link to external content, but they do not support embedding and managing a multi-unit game within the platform, enforcing sequential unit progression, or displaying fine-grained in-game progress metrics. An LMS would treat the game as an opaque external link with no visibility into what happens after the student clicks it.</p>
+
+<p><strong>Game hosting platforms</strong> such as itch.io or Unity Play can serve game builds to a URL, but they provide no concept of classrooms, teachers, student rosters, or progress tracking. There is no way to gate unit progression, distribute surveys, or provide teachers with dashboards showing student performance.</p>
+
+<p><strong>Research data platforms</strong> and survey tools like Qualtrics or REDCap are designed for data collection and analysis, not for delivering interactive content or managing classroom hierarchies. They cannot serve a game, track in-game events, or provide teachers with real-time progress dashboards.</p>
+
+<p><strong>Custom game portals</strong> built for individual educational games do exist, but they typically address only one piece of the puzzle, such as hosting builds or collecting telemetry. They do not provide the full stack of classroom management, role-based access, progress gating, device monitoring, survey distribution, materials management, and research-grade data collection that this project requires.</p>
+
+<p>StrataHub was built because the project needed all of these capabilities working together in a single, integrated platform. Attempting to combine multiple existing tools would have created fragile integrations, data silos, inconsistent user experiences, and significant ongoing maintenance burden, while still leaving gaps in functionality.</p>
+
+<!-- Section 9 -->
+<h2 id="scalability">9. Scalability</h2>
+
+<p>StrataHub is designed to support the scale of a multi-site educational research project. The system architecture can reasonably support hundreds of schools, thousands of teachers, and tens of thousands of students within a single deployment.</p>
+
+<p>The multi-workspace architecture allows separate research deployments to operate independently on isolated subdomains, each with their own organizations, users, settings, and data. This means the system can support multiple concurrent studies or deployment phases without interference between them.</p>
+
+<p>The underlying infrastructure uses cloud-hosted databases and web servers on Amazon Web Services (AWS), which can be scaled to meet increasing demand as the project grows. The system has been designed so that adding more schools and students does not require architectural changes, only the allocation of additional server resources if needed.</p>
+
+<!-- Section 10 -->
+<h2 id="security">10. Data Security and Privacy</h2>
+
+<p>StrataHub implements multiple layers of security to protect student data and ensure that access is appropriately controlled.</p>
+
+<h3>Role-Based Access Control</h3>
+
+<p>Every action in StrataHub is governed by the user's role. Teachers can see only the students in their assigned groups. Coordinators can see only the organizations they are assigned to. Analysts have read-only access. Members can see only their own data. This ensures that no user can access data outside the scope of their responsibilities.</p>
+
+<h3>Authentication</h3>
+
+<p>StrataHub supports multiple authentication methods to accommodate the identity systems used by participating schools. These include Google SSO, Clever, ClassLink, email-based verification, and password authentication. School-compatible SSO options allow students to log in with credentials they already use, reducing the need for separate account management and minimizing the risk of credential-related issues.</p>
+
+<h3>Session Security</h3>
+
+<p>User sessions are secured with encrypted cookies transmitted only over HTTPS. Sessions expire after a configurable period of inactivity, with a warning displayed before automatic logout. This protects against unauthorized access on shared or unattended devices, a common scenario in school computer labs.</p>
+
+<h3>Data Protection in Transit and at Rest</h3>
+
+<p>All communication between users and StrataHub is encrypted using TLS (HTTPS). The system enforces CSRF (Cross-Site Request Forgery) protection on all state-changing operations, preventing unauthorized actions from being triggered by malicious external sites. Data is stored in managed database services on AWS infrastructure, which provides encryption at rest and access controls at the infrastructure level.</p>
+
+<h3>Audit Logging</h3>
+
+<p>StrataHub maintains audit logs of administrative actions, including user creation, role changes, group membership modifications, and configuration changes. These logs record who performed each action and when, providing an accountability trail for all management operations.</p>
+
+<h3>Data Isolation</h3>
+
+<p>The multi-workspace architecture ensures complete data isolation between separate deployments. Organizations, groups, members, and all associated data are scoped to their workspace and cannot be accessed from other workspaces. Within a workspace, role-based access control further restricts visibility to only the data each user is authorized to see.</p>
+
+<!-- Section 11 -->
+<h2 id="summary">11. Summary of Features</h2>
+
+<p>StrataHub provides the following capabilities in support of the Mission HydroSci research project:</p>
+
+<div class="summary-box">
+<ul class="feature-grid">
+  <li><strong>Multi-workspace architecture</strong> Isolated environments for independent research deployments</li>
+  <li><strong>Organizational hierarchy</strong> Workspaces, organizations, groups, and members mirroring the structure of districts, schools, classrooms, and students</li>
+  <li><strong>Role-based access</strong> Five user roles (admin, coordinator, leader, analyst, member) with scoped permissions appropriate to each responsibility</li>
+  <li><strong>Multiple authentication methods</strong> Google, Clever, ClassLink, email verification, and password login to accommodate school identity systems</li>
+  <li><strong>Mission HydroSci game delivery</strong> Browser-based access to all game units with sequential progression enforcement</li>
+  <li><strong>Progressive Web App</strong> Installable game experience with fast loading and no app store requirements</li>
+  <li><strong>MHS Dashboard</strong> Real-time progress grid showing every student's status across all units and 26 progress points</li>
+  <li><strong>Flagged progress detection</strong> Automatic identification of students whose performance warrants teacher attention, with specific reason codes</li>
+  <li><strong>Performance metrics</strong> Mistake counts, attempt tracking, and completion times for each progress point</li>
+  <li><strong>Device status monitoring</strong> Device type, PWA installation status, storage usage, and last-seen tracking for each student</li>
+  <li><strong>Progress management</strong> Ability for teachers and administrators to set or reset student unit progression</li>
+  <li><strong>Survey distribution</strong> Delivery of research surveys to students via the Resources feature</li>
+  <li><strong>Materials distribution</strong> Delivery of teacher guides and documentation via the Materials feature</li>
+  <li><strong>Organization management</strong> Creation and management of schools and research sites with location, timezone, and contact information</li>
+  <li><strong>Group management</strong> Creation and management of classes with leader assignment, member enrollment, and resource assignment</li>
+  <li><strong>Member management</strong> Student roster management with add, remove, and bulk CSV upload capabilities</li>
+  <li><strong>Coordinator assignment</strong> Scoped management access for district-level coordinators across multiple organizations</li>
+  <li><strong>Activity tracking</strong> Login session and engagement monitoring for students and teachers</li>
+  <li><strong>Announcements</strong> Workspace-wide communication to all users</li>
+  <li><strong>Audit logging</strong> Accountability trail for all administrative actions</li>
+  <li><strong>Timezone-aware display</strong> Timestamps shown in each organization's local timezone</li>
+  <li><strong>Session security</strong> Encrypted cookies, HTTPS, idle timeout with warning, and CSRF protection</li>
+  <li><strong>Data isolation</strong> Complete separation of data between workspaces and role-scoped visibility within workspaces</li>
+  <li><strong>Cloud infrastructure</strong> Hosted on AWS with managed databases, scalable to hundreds of schools and tens of thousands of students</li>
+</ul>
+</div>
+
+</div>
+</body>
+</html>
