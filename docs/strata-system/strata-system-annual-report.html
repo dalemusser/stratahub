@@ -1,0 +1,704 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Strata System: Annual Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fafafa;
+      --surface: #ffffff;
+      --text: #334155;
+      --text-light: #94a3b8;
+      --heading: #0f172a;
+      --accent: #3b82f6;
+      --accent-light: #eff6ff;
+      --border: #e2e8f0;
+      --green: #22c55e;
+      --yellow: #eab308;
+      --blue: #3b82f6;
+      --gray: #94a3b8;
+      --radius: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.7;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 48px 32px 96px;
+    }
+
+    h1 {
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: var(--heading);
+      letter-spacing: -0.03em;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+      color: var(--text-light);
+      font-weight: 400;
+      margin-bottom: 32px;
+    }
+
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin-top: 56px;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin-top: 32px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      margin-bottom: 16px;
+    }
+
+    strong {
+      font-weight: 600;
+      color: var(--heading);
+    }
+
+    ul, ol {
+      margin: 12px 0 18px 20px;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px 28px;
+    }
+
+    /* Table of Contents */
+    .toc {
+      margin: 0 0 48px;
+    }
+
+    .toc .card {
+      padding: 28px 32px;
+    }
+
+    .toc-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-light);
+      margin-bottom: 14px;
+    }
+
+    .toc ol {
+      margin: 0;
+      padding-left: 20px;
+      columns: 2;
+      column-gap: 32px;
+    }
+
+    .toc li {
+      margin-bottom: 6px;
+      font-size: 0.92rem;
+    }
+
+    .toc a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .toc a:hover {
+      text-decoration: underline;
+    }
+
+    /* Section divider */
+    h2::before {
+      content: "";
+      display: block;
+      width: 40px;
+      height: 3px;
+      background: var(--accent);
+      border-radius: 2px;
+      margin-bottom: 12px;
+    }
+
+    /* Component cards */
+    .component-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0 20px;
+    }
+
+    .component-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 20px;
+    }
+
+    .component-card h4 {
+      font-size: 0.92rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 2px;
+    }
+
+    .component-card .component-role {
+      font-size: 0.78rem;
+      color: var(--text-light);
+      margin-bottom: 8px;
+    }
+
+    .component-card p {
+      font-size: 0.88rem;
+      margin-bottom: 0;
+      line-height: 1.5;
+    }
+
+    /* Pipeline steps */
+    .pipeline {
+      list-style: none;
+      margin: 16px 0 20px 0;
+      padding: 0;
+      counter-reset: step;
+    }
+
+    .pipeline li {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 18px 16px 52px;
+      margin-bottom: 8px;
+      position: relative;
+      font-size: 0.93rem;
+      line-height: 1.6;
+    }
+
+    .pipeline li::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: 16px;
+      top: 16px;
+      width: 24px;
+      height: 24px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 50%;
+      font-size: 0.78rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .pipeline li strong {
+      display: block;
+      font-size: 0.88rem;
+      margin-bottom: 4px;
+    }
+
+    /* Component detail sections */
+    .component-section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px 28px;
+      margin: 16px 0 20px;
+    }
+
+    .component-section h3 {
+      margin-top: 0;
+      color: var(--accent);
+      font-size: 1rem;
+    }
+
+    .component-section p {
+      font-size: 0.93rem;
+      margin-bottom: 10px;
+    }
+
+    .component-section p:last-child {
+      margin-bottom: 0;
+    }
+
+    .component-section ul {
+      font-size: 0.93rem;
+      margin: 8px 0 12px 20px;
+    }
+
+    .component-section li {
+      margin-bottom: 4px;
+    }
+
+    .component-section .label {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-light);
+      margin-top: 14px;
+      margin-bottom: 6px;
+    }
+
+    .component-section .scale-note {
+      font-size: 0.85rem;
+      color: var(--text-light);
+      font-style: italic;
+      margin-top: 10px;
+      margin-bottom: 0;
+    }
+
+    /* Feature list */
+    .feature-list {
+      list-style: none;
+      margin: 16px 0 20px 0;
+      padding: 0;
+    }
+
+    .feature-list li {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 8px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .feature-list li strong {
+      color: var(--accent);
+      display: inline;
+    }
+
+    /* Security list */
+    .security-list {
+      list-style: none;
+      margin: 16px 0 20px 0;
+      padding: 0;
+    }
+
+    .security-list li {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .security-list li strong {
+      color: var(--heading);
+    }
+
+    /* Two-column value grid */
+    .value-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0 20px;
+    }
+
+    .value-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 20px;
+    }
+
+    .value-card h4 {
+      font-size: 0.82rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--text-light);
+      margin-bottom: 10px;
+    }
+
+    .value-card ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .value-card li {
+      font-size: 0.88rem;
+      line-height: 1.5;
+      margin-bottom: 6px;
+      padding-left: 14px;
+      position: relative;
+    }
+
+    .value-card li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 8px;
+      width: 6px;
+      height: 6px;
+      background: var(--accent);
+      border-radius: 50%;
+    }
+
+    /* Summary cards */
+    .summary-cards {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 16px 0 20px;
+    }
+
+    .summary-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+    }
+
+    .summary-card strong {
+      display: block;
+      font-size: 0.88rem;
+      color: var(--accent);
+      margin-bottom: 2px;
+    }
+
+    .summary-card span {
+      font-size: 0.82rem;
+      color: var(--text-light);
+      line-height: 1.4;
+    }
+
+    /* Print */
+    @media print {
+      body { background: #fff; }
+      .container { padding: 20px; max-width: 100%; }
+      h2 { page-break-after: avoid; }
+      .toc { page-break-after: always; }
+      .component-cards { grid-template-columns: 1fr 1fr; }
+      .summary-cards { grid-template-columns: 1fr 1fr; }
+      .value-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .container { padding: 24px 16px 64px; }
+      h1 { font-size: 1.8rem; }
+      .toc ol { columns: 1; }
+      .component-cards { grid-template-columns: 1fr; }
+      .summary-cards { grid-template-columns: 1fr; }
+      .value-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+<h1>Strata System</h1>
+<div class="subtitle">Annual Report</div>
+
+<div class="toc">
+  <div class="card">
+    <div class="toc-label">Contents</div>
+    <ol>
+      <li><a href="#overview">Overview</a></li>
+      <li><a href="#architecture">System Architecture</a></li>
+      <li><a href="#data-flow">End-to-End Data Flow</a></li>
+      <li><a href="#components">Core Components</a></li>
+      <li><a href="#properties">Key System Properties</a></li>
+      <li><a href="#security">Security and Data Practices</a></li>
+      <li><a href="#value">Educational and Research Value</a></li>
+      <li><a href="#custom">Why the System Was Custom-Built</a></li>
+      <li><a href="#summary">Summary</a></li>
+    </ol>
+  </div>
+</div>
+
+<!-- Section 1 -->
+<h2 id="overview">1. Overview</h2>
+
+<p>The Strata System is the integrated data and application platform developed to support the Mission HydroSci project. It provides authentication, gameplay delivery, data collection, state persistence, automated assessment, and teacher-facing dashboards within a unified architecture designed for both classroom use and educational research.</p>
+
+<p>The system enables students to interact with the Mission HydroSci game while preserving their progress, capturing gameplay interactions as structured data, and automatically evaluating and presenting performance to teachers in near-real-time. It collects only gameplay interaction data and game state information necessary for assessment, research, and session continuity.</p>
+
+<p>The Strata System consists of four primary components:</p>
+
+<div class="component-cards">
+  <div class="component-card">
+    <h4>StrataHub</h4>
+    <div class="component-role">Application Layer</div>
+    <p>Authentication, user management, game delivery, and dashboards</p>
+  </div>
+  <div class="component-card">
+    <h4>StrataLog</h4>
+    <div class="component-role">Event Collection</div>
+    <p>Gameplay event capture and analytics data store</p>
+  </div>
+  <div class="component-card">
+    <h4>StrataSave</h4>
+    <div class="component-role">State Persistence</div>
+    <p>Game state and player settings preservation across sessions</p>
+  </div>
+  <div class="component-card">
+    <h4>MHS Grader</h4>
+    <div class="component-role">Assessment Engine</div>
+    <p>Automated curriculum-aligned evaluation of student performance</p>
+  </div>
+</div>
+
+<p>Together, these components form a continuous pipeline from student gameplay to actionable classroom and research insights.</p>
+
+<!-- Section 2 -->
+<h2 id="architecture">2. System Architecture</h2>
+
+<p>The Strata System is designed as a set of independent but coordinated services:</p>
+
+<ul>
+  <li>Students access the system through StrataHub, which manages authentication and launches the game</li>
+  <li>The Mission HydroSci game runs in the browser as a Progressive Web App (PWA)</li>
+  <li>The game communicates with backend services during gameplay: StrataLog for event collection, StrataSave for state persistence</li>
+  <li>The MHS Grader processes event data and produces structured evaluations</li>
+  <li>Results are stored in a dedicated grading database and displayed in StrataHub dashboards</li>
+</ul>
+
+<p>Each component operates independently but shares a common authentication model and interoperates through well-defined data flows. This separation allows services to be updated, restarted, or scaled without disrupting the rest of the system.</p>
+
+<p>The system is deployed on cloud infrastructure (Amazon Web Services) and is designed to scale to support multiple schools and large numbers of concurrent students.</p>
+
+<!-- Section 3 -->
+<h2 id="data-flow">3. End-to-End Data Flow</h2>
+
+<p>The Strata System operates as a continuous pipeline connecting student activity to teacher-visible results:</p>
+
+<ol class="pipeline">
+  <li>
+    <strong>Student access and launch</strong>
+    A student logs into StrataHub using an approved authentication provider (e.g., Google, Clever, ClassLink). StrataHub verifies identity and launches the game with secure, session-scoped API credentials.
+  </li>
+  <li>
+    <strong>Gameplay interaction</strong>
+    The student plays Mission HydroSci in the browser, interacting with simulations, investigations, dialogues, and navigation tasks.
+  </li>
+  <li>
+    <strong>Event logging (StrataLog)</strong>
+    Gameplay actions are sent to StrataLog as structured, timestamped events. Each event includes both client and server timestamps, forming a precise, time-ordered behavioral record.
+  </li>
+  <li>
+    <strong>State persistence (StrataSave)</strong>
+    The game periodically saves progress and settings to StrataSave, allowing students to resume exactly where they left off across sessions.
+  </li>
+  <li>
+    <strong>Automated assessment (MHS Grader)</strong>
+    The MHS Grader continuously polls StrataLog for relevant events. When trigger events occur, it evaluates performance within defined attempt windows and produces structured progress evaluations (passed, flagged, active) with detailed metrics.
+  </li>
+  <li>
+    <strong>Dashboard presentation (StrataHub)</strong>
+    The MHS Dashboard retrieves evaluation data and displays it in a color-coded grid, allowing teachers and researchers to monitor progress in near-real-time.
+  </li>
+</ol>
+
+<p>This pipeline operates continuously and automatically, with no manual grading required.</p>
+
+<!-- Section 4 -->
+<h2 id="components">4. Core Components</h2>
+
+<div class="component-section">
+  <h3>StrataHub (Application Layer)</h3>
+  <p>StrataHub is the central interface for all users. It manages authentication, user access, game delivery, and the teacher-facing dashboard.</p>
+  <p>It organizes users into a hierarchy aligned with classroom and research deployment:</p>
+  <ul>
+    <li>Workspaces (top-level environments)</li>
+    <li>Organizations (schools or sites)</li>
+    <li>Groups (classes or sections)</li>
+    <li>Members (students)</li>
+  </ul>
+  <p>Role-based access includes administrators, analysts, coordinators, teachers (leaders), and students.</p>
+  <p>StrataHub delivers Mission HydroSci as a Progressive Web App (PWA), eliminating the need for app store distribution or device-level installation. It also hosts the MHS Dashboard, which provides near-real-time visibility into student progress across 26 curriculum-aligned progress points.</p>
+</div>
+
+<div class="component-section">
+  <h3>StrataLog (Event Collection)</h3>
+  <p>StrataLog captures detailed gameplay events in near-real-time. Each event represents a meaningful student action (e.g., completing a task, selecting an answer, interacting with a simulation).</p>
+  <div class="label">Key characteristics</div>
+  <ul>
+    <li>Dual timestamps (client and server) for accurate timing analysis</li>
+    <li>Flexible schema allowing evolving instrumentation</li>
+    <li>Secure, authenticated event submission</li>
+    <li>High-throughput ingestion for large-scale deployments</li>
+  </ul>
+  <p>StrataLog serves as both the data source for automated assessment and the research dataset for analyzing learning behaviors.</p>
+  <p class="scale-note">Over 700,000 gameplay events have been recorded to date, prior to the primary study period, demonstrating sustained system operation under real usage conditions.</p>
+</div>
+
+<div class="component-section">
+  <h3>StrataSave (State Persistence)</h3>
+  <p>StrataSave ensures continuity across gameplay sessions by storing:</p>
+  <ul>
+    <li>Game state: player position, progress, inventory, and activity state</li>
+    <li>Player settings: audio preferences, controls, and customization</li>
+  </ul>
+  <div class="label">Key features</div>
+  <ul>
+    <li>Multiple save states per player with configurable retention</li>
+    <li>Automatic cleanup of older saves</li>
+    <li>Upsert model for player settings (always current)</li>
+    <li>Fast, non-blocking save operations</li>
+  </ul>
+  <p>This allows students to resume exactly where they left off, which is essential in classroom environments with limited session time.</p>
+  <p class="scale-note">StrataSave has handled hundreds of thousands of API requests, with high-frequency operations such as settings loads occurring at the start of every session.</p>
+</div>
+
+<div class="component-section">
+  <h3>MHS Grader (Assessment Engine)</h3>
+  <p>The MHS Grader is a standalone background service that continuously evaluates student performance. It assesses 26 progress points across five curriculum units.</p>
+  <div class="label">Rule types</div>
+  <ul>
+    <li>Completion checks</li>
+    <li>Threshold-based evaluation</li>
+    <li>Weighted scoring</li>
+    <li>Time-based metrics</li>
+    <li>Multi-component aggregation</li>
+    <li>Zero-tolerance rules</li>
+  </ul>
+  <div class="label">Each evaluation produces</div>
+  <ul>
+    <li>A status (passed, flagged, active)</li>
+    <li>A reason code (if flagged)</li>
+    <li>Detailed performance metrics (mistakes, score, duration, attempts)</li>
+  </ul>
+  <div class="label">Key design features</div>
+  <ul>
+    <li>Attempt window isolation ensures replay-safe grading</li>
+    <li>Cursor-based processing guarantees no event loss or duplication</li>
+    <li>Near-real-time updates (typically within seconds of activity completion)</li>
+    <li>Rule versioning supports longitudinal research analysis</li>
+  </ul>
+</div>
+
+<!-- Section 5 -->
+<h2 id="properties">5. Key System Properties</h2>
+
+<p>The Strata System is designed to support both instruction and research:</p>
+
+<ul class="feature-list">
+  <li><strong>Near-real-time feedback:</strong> evaluations appear within seconds of activity completion</li>
+  <li><strong>Seamless student experience:</strong> progress resumes exactly where it left off</li>
+  <li><strong>Automated assessment:</strong> no manual grading required</li>
+  <li><strong>Detailed behavioral data:</strong> supports analysis of learning processes, not just outcomes</li>
+  <li><strong>Scalable architecture:</strong> supports large, multi-school deployments</li>
+  <li><strong>Secure access control:</strong> authenticated sessions and role-based permissions</li>
+  <li><strong>Data minimization:</strong> only essential gameplay and state data are stored</li>
+</ul>
+
+<!-- Section 6 -->
+<h2 id="security">6. Security and Data Practices</h2>
+
+<p>The system implements multiple layers of security:</p>
+
+<ul class="security-list">
+  <li><strong>Encrypted communication:</strong> all data transmitted via TLS</li>
+  <li><strong>Session-scoped credentials:</strong> issued by StrataHub for all game-service interactions</li>
+  <li><strong>Role-based access control:</strong> limits data visibility by user role</li>
+  <li><strong>Data isolation:</strong> enforced at workspace, organization, group, and player levels</li>
+  <li><strong>Session security:</strong> encrypted cookies, configurable idle timeouts, and CSRF protection</li>
+  <li><strong>Audit logging:</strong> administrative actions are recorded for accountability</li>
+</ul>
+
+<p>No unnecessary personal or unrelated student data is collected. The system stores only gameplay interaction data and state data required for its educational and research functions. These controls support secure handling of student data in accordance with institutional and research requirements.</p>
+
+<!-- Section 7 -->
+<h2 id="value">7. Educational and Research Value</h2>
+
+<p>The Strata System provides capabilities not achievable with traditional educational tools.</p>
+
+<div class="value-grid">
+  <div class="value-card">
+    <h4>For Teachers</h4>
+    <ul>
+      <li>Near-real-time visibility into student progress</li>
+      <li>Immediate identification of students who may benefit from additional support</li>
+      <li>Detailed insight into performance beyond pass/fail</li>
+    </ul>
+  </div>
+  <div class="value-card">
+    <h4>For Researchers</h4>
+    <ul>
+      <li>High-resolution behavioral data across full gameplay sessions</li>
+      <li>Ability to analyze timing, sequence, and patterns of learning</li>
+      <li>Support for studying how learning occurs, not just outcomes</li>
+    </ul>
+  </div>
+</div>
+
+<p>By integrating gameplay, data collection, assessment, and visualization into a single platform, the system enables both instructional support and rigorous research analysis.</p>
+
+<!-- Section 8 -->
+<h2 id="custom">8. Why the System Was Custom-Built</h2>
+
+<p>The Strata System was developed because no existing solution provides the required combination of capabilities:</p>
+
+<ul>
+  <li>Learning management systems do not support near-real-time game-based assessment</li>
+  <li>Game analytics platforms do not evaluate individual student learning outcomes</li>
+  <li>Standardized assessment tools cannot assess process-based, interactive learning</li>
+  <li>General-purpose storage and rule engines lack domain-specific integration</li>
+</ul>
+
+<p>The system combines near-real-time event capture, curriculum-aligned automated assessment, seamless state persistence, and teacher-facing visualization into a unified platform under full project control, suitable for a federally funded educational research environment.</p>
+
+<!-- Section 9 -->
+<h2 id="summary">9. Summary</h2>
+
+<p>The Strata System transforms student gameplay into near-real-time assessment and research insights.</p>
+
+<div class="summary-cards">
+  <div class="summary-card">
+    <strong>StrataHub</strong>
+    <span>Manages authentication, access, and dashboards</span>
+  </div>
+  <div class="summary-card">
+    <strong>StrataLog</strong>
+    <span>Captures detailed gameplay events</span>
+  </div>
+  <div class="summary-card">
+    <strong>StrataSave</strong>
+    <span>Preserves progress and settings</span>
+  </div>
+  <div class="summary-card">
+    <strong>MHS Grader</strong>
+    <span>Evaluates performance across 26 progress points</span>
+  </div>
+</div>
+
+<p>Together, these components form a scalable, secure, and purpose-built platform that supports both classroom instruction and the research goals of the Mission HydroSci project.</p>
+
+</div>
+</body>
+</html>

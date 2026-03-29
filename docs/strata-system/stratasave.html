@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StrataSave: Strata System Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fafafa;
+      --surface: #ffffff;
+      --text: #334155;
+      --text-light: #94a3b8;
+      --heading: #0f172a;
+      --accent: #3b82f6;
+      --accent-light: #eff6ff;
+      --border: #e2e8f0;
+      --green: #22c55e;
+      --radius: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.7;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 48px 32px 96px;
+    }
+
+    h1 {
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: var(--heading);
+      letter-spacing: -0.03em;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+      color: var(--text-light);
+      font-weight: 400;
+      margin-bottom: 32px;
+    }
+
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin-top: 56px;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin-top: 32px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      margin-bottom: 16px;
+    }
+
+    strong {
+      font-weight: 600;
+      color: var(--heading);
+    }
+
+    ul, ol {
+      margin: 12px 0 18px 20px;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    ol {
+      padding-left: 4px;
+    }
+
+    figure {
+      margin: 28px 0;
+    }
+
+    img {
+      display: block;
+      max-width: 100%;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+
+    figcaption {
+      text-align: center;
+      font-size: 0.82rem;
+      color: var(--text-light);
+      margin-top: 10px;
+      line-height: 1.5;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px 28px;
+    }
+
+    /* Table of Contents */
+    .toc {
+      margin: 0 0 48px;
+    }
+
+    .toc .card {
+      padding: 28px 32px;
+    }
+
+    .toc-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-light);
+      margin-bottom: 14px;
+    }
+
+    .toc ol {
+      margin: 0;
+      padding-left: 20px;
+      columns: 2;
+      column-gap: 32px;
+    }
+
+    .toc li {
+      margin-bottom: 6px;
+      font-size: 0.92rem;
+    }
+
+    .toc a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .toc a:hover {
+      text-decoration: underline;
+    }
+
+    /* Section divider */
+    h2::before {
+      content: "";
+      display: block;
+      width: 40px;
+      height: 3px;
+      background: var(--accent);
+      border-radius: 2px;
+      margin-bottom: 12px;
+    }
+
+    /* Data type cards */
+    .data-types {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin: 20px 0 24px;
+    }
+
+    .data-type-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+    }
+
+    .data-type-card h4 {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 8px;
+    }
+
+    .data-type-card p {
+      font-size: 0.88rem;
+      margin-bottom: 0;
+    }
+
+    /* Feature summary */
+    .summary-box {
+      margin-top: 20px;
+    }
+
+    .feature-grid {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .feature-grid li {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      margin-bottom: 0;
+    }
+
+    .feature-grid li strong {
+      display: block;
+      font-size: 0.82rem;
+      color: var(--accent);
+      margin-bottom: 2px;
+    }
+
+    /* Print */
+    @media print {
+      body { background: #fff; }
+      .container { padding: 20px; max-width: 100%; }
+      img { border-radius: 0; }
+      h2 { page-break-after: avoid; }
+      .toc { page-break-after: always; }
+      .feature-grid { grid-template-columns: 1fr 1fr; }
+      .data-types { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .container { padding: 24px 16px 64px; }
+      h1 { font-size: 1.8rem; }
+      .toc ol { columns: 1; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .data-types { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+<h1>StrataSave</h1>
+<div class="subtitle">Strata System Report</div>
+
+<div class="toc">
+  <div class="card">
+    <div class="toc-label">Contents</div>
+    <ol>
+      <li><a href="#purpose">Purpose and Overview</a></li>
+      <li><a href="#saved">What Gets Saved</a></li>
+      <li><a href="#persistence">How State Persistence Works</a></li>
+      <li><a href="#retention">Save Retention and Storage Management</a></li>
+      <li><a href="#console">Administrative Console</a></li>
+      <li><a href="#security">Data Security and Integrity</a></li>
+      <li><a href="#components">Relationship to Other Strata Components</a></li>
+      <li><a href="#existing-tools">Why a Custom Save Service Was Necessary</a></li>
+      <li><a href="#summary">Summary of Capabilities</a></li>
+    </ol>
+  </div>
+</div>
+
+<!-- Section 1 -->
+<h2 id="purpose">1. Purpose and Overview</h2>
+
+<p>StrataSave is the game state persistence service for the Mission HydroSci project. It saves and restores two categories of player data: game state (where a student is in the game and what they have accomplished within gameplay) and player settings (personal preferences such as audio volume and character appearance). Together, these capabilities allow students to close the game at any point and resume exactly where they left off in a later session, with all of their preferences intact.</p>
+
+<p>This continuity is essential for classroom use. Students typically play Mission HydroSci in scheduled class periods that do not align with natural stopping points in the game. A student may be partway through an investigation, in the middle of a dialogue sequence, or navigating between locations when class ends. Without reliable state persistence, that student would need to replay completed content in the next session, wasting instructional time and disrupting the learning experience. StrataSave ensures that every session picks up precisely where the previous one ended.</p>
+
+<p>StrataSave was purpose-built because the project requires a persistence service tailored to the structure of game engine state data (Unity), with support for authenticated access, per-player storage, configurable retention policies, and integration with the broader Strata system. General-purpose storage solutions do not provide this combination of features in a form suitable for educational deployment. StrataSave stores only game state and player preference data necessary to resume gameplay and does not store survey responses or unrelated student information.</p>
+
+<!-- Section 2 -->
+<h2 id="saved">2. What Gets Saved</h2>
+
+<p>StrataSave manages two distinct types of player data, each stored and retrieved through its own dedicated API.</p>
+
+<div class="data-types">
+  <div class="data-type-card">
+    <h4>Game State</h4>
+    <p>Complete internal state of a student's game session: position, dialogue progress, investigation status, inventory, and active quests. Multiple saves per player with configurable retention.</p>
+  </div>
+  <div class="data-type-card">
+    <h4>Player Settings</h4>
+    <p>Personal preferences: audio volumes, mouse sensitivity, character customization. One record per player per game, replaced on each save via upsert.</p>
+  </div>
+</div>
+
+<h3>Game State</h3>
+
+<p>Game state captures the complete internal state of a student's game session. When the game saves, it serializes its internal systems into a structured data payload and submits it to StrataSave. This payload includes:</p>
+
+<ul>
+  <li><strong>Player position:</strong> the student's location within the game world, including coordinates and the current scene</li>
+  <li><strong>Dialogue system state:</strong> which conversations have been completed, which dialogue nodes have been visited, and where the student is within any active dialogue sequence</li>
+  <li><strong>Investigation progress:</strong> which tasks have been started, which steps have been completed, and what data the student has collected</li>
+  <li><strong>Inventory and collected items:</strong> objects, tools, or samples the student has gathered during gameplay</li>
+  <li><strong>Active quest state:</strong> which objectives are currently assigned and what progress has been made toward each one</li>
+</ul>
+
+<p>Each save operation creates a new save record associated with the player and game. StrataSave supports multiple saved states per player, allowing the system to retain a history of save points rather than overwriting previous saves. A configurable retention policy defined at the game level controls how many saves are kept per player, with older saves cleaned up automatically. This ensures predictable and bounded storage per player.</p>
+
+<h3>Player Settings</h3>
+
+<p>Player settings capture personal preferences that affect how the game looks, sounds, and controls for each student. These settings are separate from game state because they persist independently: a student's preferred audio volume and character appearance should remain consistent regardless of which save point they load. Settings include:</p>
+
+<ul>
+  <li><strong>Audio preferences:</strong> master volume, music volume, sound effects volume, and dialogue volume, each stored as independent values</li>
+  <li><strong>Control preferences:</strong> mouse sensitivity, inversion settings, and other input configuration</li>
+  <li><strong>Character customization:</strong> the student's chosen character appearance, including selections for hair, skin, clothing, and accessories</li>
+  <li><strong>Display preferences:</strong> any visual settings the student has adjusted</li>
+</ul>
+
+<p>Settings use an upsert model. Each player has exactly one settings record per game. When settings are saved, the existing record is replaced entirely, ensuring that the stored settings always reflect the student's most recent choices.</p>
+
+<!-- Section 3 -->
+<h2 id="persistence">3. How State Persistence Works</h2>
+
+<h3>Save Operations</h3>
+
+<p>When the game triggers a save, either automatically at designated checkpoints or when a student exits, the game client serializes its internal state and sends it to StrataSave through a secure API call. The request includes the game identifier, the player identifier (linked to the student's StrataHub account), and the complete state payload. StrataSave stores this as a new save record with a server-generated timestamp.</p>
+
+<p>The save operation is designed to be fast and non-blocking so that it does not interrupt gameplay. The game can continue running while the save is transmitted and confirmed.</p>
+
+<h3>Load Operations</h3>
+
+<p>When a student launches Mission HydroSci, the game requests the most recent save state from StrataSave. If a saved state exists, the game deserializes the payload and restores all internal systems to their saved condition: the student appears at the correct location, with the correct inventory, at the correct point in any active dialogue or investigation. If no saved state exists, the game starts from the beginning.</p>
+
+<p>For player settings, the game loads the student's settings record at startup and applies the stored preferences before the student begins interacting with the game. This ensures that audio levels, controls, and character appearance are correct from the first moment of each session.</p>
+
+<h3>Authentication</h3>
+
+<p>All save and load operations require authentication. The game receives secure API credentials from StrataHub when the student launches the game, and these credentials are included with every request to StrataSave. This ensures that only authorized game sessions can read or write player data, and that each student can access only their own saves and settings.</p>
+
+<!-- Section 4 -->
+<h2 id="retention">4. Save Retention and Storage Management</h2>
+
+<p>StrataSave includes a configurable retention system that manages storage growth over time.</p>
+
+<h3>Retention Policy</h3>
+
+<p>Each game can be configured with a maximum number of saved states per player. When a new save would exceed this limit, StrataSave automatically removes the oldest saves for that player, keeping the most recent ones. This prevents unbounded storage growth while preserving enough save history to recover from any issues.</p>
+
+<h3>Asynchronous Cleanup</h3>
+
+<p>The cleanup of expired saves happens asynchronously after a successful save operation. This means the save itself completes immediately, and the removal of old saves occurs in the background. The student and the game are never delayed by housekeeping operations.</p>
+
+<h3>Storage Efficiency</h3>
+
+<p>Because player settings use an upsert model (one record per player per game, replaced on each save), settings storage remains constant per player regardless of how many times settings are saved. Game state storage grows with each save but is bounded by the retention policy.</p>
+
+<!-- Section 5 -->
+<h2 id="console">5. Administrative Console</h2>
+
+<p>StrataSave includes an administrative console that provides authorized team members with tools to inspect, verify, and manage saved data. This console supports development, testing, deployment verification, and troubleshooting.</p>
+
+<h3>States Browser</h3>
+
+<p>The States Browser allows team members to search for any player and view their saved game states. Each player entry shows the total number of saves on file. Selecting a player reveals a chronological list of their save records, and expanding any save displays the complete state payload as structured data. This tool is used during development to verify that the game is saving the correct data, and during support to diagnose issues when a student reports that their progress was not preserved.</p>
+
+<figure>
+  <img src="images/save-states-browser.png" alt="The States Browser showing a list of players with save counts and expandable game state detail.">
+  <figcaption>The States Browser showing a list of players with their save counts. Selecting a player reveals individual save records with expandable detail showing the complete game state data including player position, dialogue state, and inventory.</figcaption>
+</figure>
+
+<h3>Settings Browser</h3>
+
+<p>The Settings Browser provides a similar interface for player settings. Team members can search for a player and view their stored preferences, including audio volume levels, mouse sensitivity, and character customization choices. Because each player has exactly one settings record per game, this view shows the current settings rather than a history.</p>
+
+<figure>
+  <img src="images/save-settings-browser.png" alt="The Settings Browser showing a player's stored preferences including audio volumes and character customization.">
+  <figcaption>The Settings Browser showing a player's stored preferences including audio volumes, mouse sensitivity, and character customization selections.</figcaption>
+</figure>
+
+<h3>API Playground</h3>
+
+<p>The API Playground provides an interactive interface for testing save and load operations directly from the browser. Team members can construct save or load requests, execute them against the live API, and inspect the response. The playground also displays the equivalent command-line request, making it easy to reproduce operations outside the console. This tool is valuable during development for verifying API behavior and during integration testing for confirming that the game and StrataSave are communicating correctly.</p>
+
+<figure>
+  <img src="images/save-states-api-playground.png" alt="The States API Playground showing a test save request with a 201 Created response.">
+  <figcaption>The States API Playground showing an interactive interface for testing save and load operations. A test save request has been submitted and returned a 201 Created response, confirming successful storage.</figcaption>
+</figure>
+
+<h3>API Statistics</h3>
+
+<p>StrataSave tracks operational metrics for each of its four API operations: Load State, Save State, Load Settings, and Save Settings. The statistics dashboard displays total request counts, time-series charts of request volume and average response times, and error tracking over a configurable time period.</p>
+
+<p>These metrics provide visibility into how heavily the service is being used and whether it is performing within expected parameters. For example, the statistics show that Load Settings is by far the most frequent operation, reflecting the fact that settings are loaded at the start of every game session, while Save Settings occurs less frequently because settings change only when a student actively modifies a preference.</p>
+
+<figure>
+  <img src="images/save-api-statistics.png" alt="The API Statistics dashboard showing request counts for all four operations over a 30-day period.">
+  <figcaption>The API Statistics dashboard showing request counts for all four operations over a 30-day period: Load Settings with over 350,000 requests, Save State with nearly 10,000 requests, Load State with approximately 8,000 requests, and Save Settings with under 1,000 requests.</figcaption>
+</figure>
+
+<p>These metrics reflect sustained real-world usage during development and pilot deployment.</p>
+
+<!-- Section 6 -->
+<h2 id="security">6. Data Security and Integrity</h2>
+
+<h3>Secure Transmission</h3>
+
+<p>All communication between the game and StrataSave is encrypted using TLS (HTTPS). Player state data, which may include information about a student's progress within the game, is never transmitted in plain text.</p>
+
+<h3>Access Control</h3>
+
+<p>The StrataSave API requires authentication for all operations. API credentials are issued by StrataHub and scoped to individual game sessions. The administrative console uses role-based access with separate permissions for administrators and developers. The system includes safeguards to protect against abnormal or excessive request patterns.</p>
+
+<h3>Data Isolation</h3>
+
+<p>Each player's saved data is associated with their unique player identifier and game identifier. The API enforces that authenticated sessions can only access data belonging to the authenticated player, preventing any cross-player data access.</p>
+
+<h3>Data Reliability</h3>
+
+<p>Saved states and settings are stored in a managed database with automatic indexing. The upsert behavior for settings ensures that the stored record always reflects the most recent save, avoiding conflicts from concurrent writes. State saves are append-only (within retention limits), ensuring that new saves never corrupt existing ones.</p>
+
+<!-- Section 7 -->
+<h2 id="components">7. Relationship to Other Strata Components</h2>
+
+<p>StrataSave operates as part of the broader Strata system, with specific relationships to each other component:</p>
+
+<p><strong>StrataHub</strong> provides the authentication credentials that the game uses when communicating with StrataSave. StrataHub manages student accounts, classroom groupings, and game access. When a student launches Mission HydroSci through StrataHub, the game receives the credentials it needs to save and load that student's data from StrataSave.</p>
+
+<p><strong>StrataLog</strong> is the companion data service that records gameplay events for analytics and grading purposes. StrataLog and StrataSave both receive data from the game during gameplay, but they serve different roles. StrataLog records what happened (event history for analysis). StrataSave records where the student is (current state for continuity). The two services are independent and do not read from each other.</p>
+
+<p><strong>The MHS Grader</strong> processes StrataLog event data to produce student grades. It does not interact with StrataSave directly. However, the continuity that StrataSave provides is important for grading accuracy: because students can resume exactly where they left off, their gameplay event stream in StrataLog forms a continuous record without gaps or repeated content that would complicate grading logic.</p>
+
+<p>Together, these components ensure that students experience seamless gameplay sessions, teachers see accurate progress data, and researchers have access to clean, continuous behavioral records.</p>
+
+<!-- Section 8 -->
+<h2 id="existing-tools">8. Why a Custom Save Service Was Necessary</h2>
+
+<p>Several categories of existing tools were considered before building StrataSave:</p>
+
+<p><strong>Cloud storage services</strong> such as Amazon S3 or Google Cloud Storage can store arbitrary data, but they are designed for file storage, not for structured, per-player game state management with retention policies, authentication scoping, and upsert semantics. Building these features on top of generic cloud storage would require substantial custom logic while introducing unnecessary architectural complexity.</p>
+
+<p><strong>Game backend platforms</strong> such as PlayFab or GameSparks offer player data storage, but they are designed for commercial multiplayer games and include pricing models, feature sets, and data governance structures that do not align with the needs of a federally funded educational research project. They also introduce external dependencies for a critical system that must remain under the project team's direct control.</p>
+
+<p><strong>Database-as-a-service platforms</strong> such as Firebase Realtime Database or MongoDB Atlas provide hosted database access, but they require the game client to interact with the database directly or through generic API layers. StrataSave provides a purpose-built API with domain-specific operations (save state, load latest state, save settings, load settings) that match exactly how the game needs to interact with persistent storage.</p>
+
+<p>StrataSave was built because the project needed a save service that combines authenticated per-player storage, separate handling of game state and player settings, configurable retention with automatic cleanup, an administrative console for inspection and testing, and integration with the Strata authentication system. No existing tool provides this combination in a form appropriate for educational deployment under a federal grant.</p>
+
+<!-- Section 9 -->
+<h2 id="summary">9. Summary of Capabilities</h2>
+
+<p>StrataSave provides the following capabilities in support of the Mission HydroSci research project:</p>
+
+<div class="summary-box">
+<ul class="feature-grid">
+  <li><strong>Game state persistence</strong> Complete game state saved and restored so students resume exactly where they left off</li>
+  <li><strong>Player settings persistence</strong> Personal preferences stored independently and applied at the start of each session</li>
+  <li><strong>Multiple save support</strong> Each player can have multiple saved states, providing a history of save points</li>
+  <li><strong>Configurable retention</strong> Per-game limits on saved states with automatic cleanup of older saves</li>
+  <li><strong>Asynchronous cleanup</strong> Expired saves removed in the background without delaying active save operations</li>
+  <li><strong>Upsert settings model</strong> One settings record per player per game, always reflecting the most recent preferences</li>
+  <li><strong>Authenticated access</strong> Secure API credentials ensure only authorized game sessions can read or write player data</li>
+  <li><strong>Player data isolation</strong> API enforcement prevents cross-player data access</li>
+  <li><strong>Secure transmission</strong> All data encrypted in transit using TLS</li>
+  <li><strong>States Browser</strong> Administrative tool for searching players and inspecting saved game states</li>
+  <li><strong>Settings Browser</strong> Administrative tool for viewing stored player preferences</li>
+  <li><strong>API Playground</strong> Interactive interface for testing save and load operations with live API responses</li>
+  <li><strong>API Statistics</strong> Operational metrics tracking request volume, response times, and error rates for all four API operations</li>
+  <li><strong>Integration with the Strata system</strong> Purpose-built to work with StrataHub authentication and alongside StrataLog as part of the unified data infrastructure, supporting sustained real-world usage across hundreds of thousands of API requests</li>
+</ul>
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,660 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MHS Grader: Strata System Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fafafa;
+      --surface: #ffffff;
+      --text: #334155;
+      --text-light: #94a3b8;
+      --heading: #0f172a;
+      --accent: #3b82f6;
+      --accent-light: #eff6ff;
+      --border: #e2e8f0;
+      --green: #22c55e;
+      --yellow: #eab308;
+      --blue: #3b82f6;
+      --gray: #94a3b8;
+      --radius: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.7;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 48px 32px 96px;
+    }
+
+    h1 {
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: var(--heading);
+      letter-spacing: -0.03em;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+      color: var(--text-light);
+      font-weight: 400;
+      margin-bottom: 32px;
+    }
+
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin-top: 56px;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin-top: 32px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      margin-bottom: 16px;
+    }
+
+    strong {
+      font-weight: 600;
+      color: var(--heading);
+    }
+
+    ul, ol {
+      margin: 12px 0 18px 20px;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    ol {
+      padding-left: 4px;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px 28px;
+    }
+
+    /* Table of Contents */
+    .toc {
+      margin: 0 0 48px;
+    }
+
+    .toc .card {
+      padding: 28px 32px;
+    }
+
+    .toc-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-light);
+      margin-bottom: 14px;
+    }
+
+    .toc ol {
+      margin: 0;
+      padding-left: 20px;
+      columns: 2;
+      column-gap: 32px;
+    }
+
+    .toc li {
+      margin-bottom: 6px;
+      font-size: 0.92rem;
+    }
+
+    .toc a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .toc a:hover {
+      text-decoration: underline;
+    }
+
+    /* Section divider */
+    h2::before {
+      content: "";
+      display: block;
+      width: 40px;
+      height: 3px;
+      background: var(--accent);
+      border-radius: 2px;
+      margin-bottom: 12px;
+    }
+
+    /* Status indicators */
+    .status-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 16px 0 20px;
+    }
+
+    .status-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .dot {
+      width: 12px;
+      height: 12px;
+      border-radius: 50%;
+      flex-shrink: 0;
+      margin-top: 4px;
+    }
+
+    .dot-green { background: var(--green); }
+    .dot-yellow { background: var(--yellow); }
+    .dot-blue { background: var(--blue); }
+    .dot-gray { background: var(--gray); }
+
+    /* Reason codes */
+    .reason-list {
+      list-style: none;
+      margin: 16px 0 20px 0;
+      padding: 0;
+    }
+
+    .reason-list li {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 8px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .reason-code {
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.78rem;
+      font-weight: 600;
+      color: var(--accent);
+      background: var(--accent-light);
+      padding: 2px 8px;
+      border-radius: 4px;
+      display: inline-block;
+      margin-bottom: 4px;
+    }
+
+    /* Unit cards */
+    .unit-cards {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      margin: 16px 0 20px;
+    }
+
+    .unit-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 20px;
+    }
+
+    .unit-card h4 {
+      font-size: 0.88rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin-bottom: 4px;
+    }
+
+    .unit-card .unit-meta {
+      font-size: 0.78rem;
+      color: var(--text-light);
+      margin-bottom: 8px;
+    }
+
+    .unit-card p {
+      font-size: 0.88rem;
+      margin-bottom: 0;
+      line-height: 1.5;
+    }
+
+    /* Pipeline steps */
+    .pipeline {
+      list-style: none;
+      margin: 16px 0 20px 0;
+      padding: 0;
+      counter-reset: step;
+    }
+
+    .pipeline li {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px 14px 48px;
+      margin-bottom: 8px;
+      position: relative;
+      font-size: 0.93rem;
+    }
+
+    .pipeline li::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: 16px;
+      top: 14px;
+      width: 22px;
+      height: 22px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 50%;
+      font-size: 0.75rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Feature summary */
+    .summary-box {
+      margin-top: 20px;
+    }
+
+    .feature-grid {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .feature-grid li {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      margin-bottom: 0;
+    }
+
+    .feature-grid li strong {
+      display: block;
+      font-size: 0.82rem;
+      color: var(--accent);
+      margin-bottom: 2px;
+    }
+
+    /* Print */
+    @media print {
+      body { background: #fff; }
+      .container { padding: 20px; max-width: 100%; }
+      h2 { page-break-after: avoid; }
+      .toc { page-break-after: always; }
+      .feature-grid { grid-template-columns: 1fr 1fr; }
+      .status-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .container { padding: 24px 16px 64px; }
+      h1 { font-size: 1.8rem; }
+      .toc ol { columns: 1; }
+      .feature-grid { grid-template-columns: 1fr; }
+      .status-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+<h1>MHS Grader</h1>
+<div class="subtitle">Strata System Report</div>
+
+<div class="toc">
+  <div class="card">
+    <div class="toc-label">Contents</div>
+    <ol>
+      <li><a href="#purpose">Purpose and Overview</a></li>
+      <li><a href="#evaluates">What the Grader Evaluates</a></li>
+      <li><a href="#outcomes">Grading Outcomes</a></li>
+      <li><a href="#how">How the Grader Works</a></li>
+      <li><a href="#rules">Grading Rule Types</a></li>
+      <li><a href="#dashboard">Integration with the Dashboard</a></li>
+      <li><a href="#pipeline">Data Flow Pipeline</a></li>
+      <li><a href="#reliability">Reliability and Operational Design</a></li>
+      <li><a href="#components">Relationship to Other Strata Components</a></li>
+      <li><a href="#existing-tools">Why a Custom Grading Engine Was Necessary</a></li>
+      <li><a href="#summary">Summary of Capabilities</a></li>
+    </ol>
+  </div>
+</div>
+
+<!-- Section 1 -->
+<h2 id="purpose">1. Purpose and Overview</h2>
+
+<p>The MHS Grader is the automated assessment engine for the Mission HydroSci project. It continuously polls and processes gameplay event data captured by StrataLog, evaluates student performance against curriculum-aligned criteria, and produces structured progress evaluations that power the teacher-facing MHS Dashboard in StrataHub. The progress evaluations shown on the dashboard, whether a student passed, was flagged for attention, or is actively working on a progress point, originate from the MHS Grader.</p>
+
+<p>The grader evaluates 26 progress points distributed across the five units of the Mission HydroSci curriculum. Each progress point corresponds to a specific learning activity within the game, and each has its own grading rule that defines what constitutes successful performance. Some rules are simple completion checks. Others involve counting mistakes, computing weighted scores, measuring response times, or evaluating whether a student used specific reasoning strategies. This range of rule complexity reflects the diversity of skills assessed across the curriculum, from basic game orientation to constructing persuasive scientific arguments.</p>
+
+<p>The MHS Grader was purpose-built because the project requires an assessment system that can process high-volume gameplay event data in near-real-time, apply domain-specific grading logic that varies by activity type, produce detailed metrics beyond simple pass/fail outcomes, and integrate tightly with the StrataLog event pipeline and the StrataHub dashboard. No existing assessment platform the project evaluated provided this combination of capabilities for educational game analytics.</p>
+
+<!-- Section 2 -->
+<h2 id="evaluates">2. What the Grader Evaluates</h2>
+
+<h3>Curriculum Structure</h3>
+
+<p>Mission HydroSci is organized into five units, each focused on a core set of hydrology and scientific argumentation concepts. Within each unit, students complete a series of activities that teach and assess specific skills. The grader maps each assessable activity to a progress point.</p>
+
+<div class="unit-cards">
+  <div class="unit-card">
+    <h4>Unit 1: Orientation and Scientific Argumentation Basics</h4>
+    <div class="unit-meta">4 progress points</div>
+    <p>Students learn game controls, meet crew members, and are introduced to the structure of scientific arguments. Activities include orientation tasks, crew introductions, and identifying claims within arguments.</p>
+  </div>
+  <div class="unit-card">
+    <h4>Unit 2: Topographic Maps and Watersheds</h4>
+    <div class="unit-meta">7 progress points</div>
+    <p>Students learn to read topographic maps, understand the relationship between watershed size and water flow, and practice identifying parts of scientific arguments. Activities include matching topographic maps to elevation profiles, navigating using map features, investigating watershed properties, classifying argument components, and constructing a comparison argument about watershed size.</p>
+  </div>
+  <div class="unit-card">
+    <h4>Unit 3: Water Flow Direction and Dissolved Materials</h4>
+    <div class="unit-meta">5 progress points</div>
+    <p>Students learn how water flows through watersheds and how dissolved materials move with water. Activities include identifying flow direction from watershed maps, predicting pollutant spread, constructing arguments with reasoning and supporting evidence, navigating puzzle environments, and predicting nutrient distribution.</p>
+  </div>
+  <div class="unit-card">
+    <h4>Unit 4: Groundwater, Soil Infiltration, and Water Table</h4>
+    <div class="unit-meta">6 progress points</div>
+    <p>Students explore underground water systems, soil properties, and infiltration rates. Activities include water table concept puzzles, soil infiltration experiments across multiple difficulty levels, multi-component synthesis tasks, constructing persuasive scientific arguments, and matching plant water needs to soil properties.</p>
+  </div>
+  <div class="unit-card">
+    <h4>Unit 5: Water Cycle, Evaporation, and Condensation</h4>
+    <div class="unit-meta">4 progress points</div>
+    <p>Students investigate evaporation rates, condensation, and the water cycle. Activities include evaporation rate puzzles, water chamber manipulation experiments, countering faulty scientific claims about the water cycle, and fixing a solar still with zero tolerance for errors.</p>
+  </div>
+</div>
+
+<h3>Progress Points</h3>
+
+<p>Each of the 26 progress points is identified by a unit and point number (for example, U2P3 refers to Unit 2, Progress Point 3). The grader maintains a rule for each progress point that defines:</p>
+
+<ul>
+  <li><strong>Start events:</strong> the gameplay events that indicate a student has begun the activity, at which point the grader sets the progress point status to "active"</li>
+  <li><strong>Trigger events:</strong> the gameplay events that indicate a student has completed the activity, at which point the grader evaluates the rule and produces a grade</li>
+  <li><strong>Evaluation logic:</strong> the specific criteria applied to determine whether the student passed or should be flagged for attention</li>
+</ul>
+
+<!-- Section 3 -->
+<h2 id="outcomes">3. Grading Outcomes</h2>
+
+<h3>Status Values</h3>
+
+<p>For each progress point, the grader assigns one of three statuses:</p>
+
+<div class="status-grid">
+  <div class="status-item">
+    <span class="dot dot-green"></span>
+    <div><strong>Passed:</strong> the student completed the activity and demonstrated competency according to the grading criteria.</div>
+  </div>
+  <div class="status-item">
+    <span class="dot dot-yellow"></span>
+    <div><strong>Flagged:</strong> the student completed the activity but their performance warrants teacher attention. A reason code explains what triggered the flag.</div>
+  </div>
+  <div class="status-item">
+    <span class="dot dot-blue"></span>
+    <div><strong>Active:</strong> the student has started the activity but has not yet reached the completion point.</div>
+  </div>
+  <div class="status-item">
+    <span class="dot dot-gray"></span>
+    <div><strong>Not started:</strong> the student has not yet begun this activity.</div>
+  </div>
+</div>
+
+<h3>Reason Codes</h3>
+
+<p>When a student is flagged, the grader includes a reason code that provides specific information about why the flag was raised. Teachers and researchers can use these codes to understand the nature of a student's difficulty:</p>
+
+<ul class="reason-list">
+  <li>
+    <span class="reason-code">MISSING_SUCCESS_NODE</span><br>
+    The student did not reach a required success checkpoint within the activity, indicating they may not have completed a key step independently.
+  </li>
+  <li>
+    <span class="reason-code">TOO_MANY_NEGATIVES</span><br>
+    The student made more errors than the threshold allows, indicating repeated difficulty with the core concept.
+  </li>
+  <li>
+    <span class="reason-code">WRONG_ARG_SELECTED</span><br>
+    The student made too many incorrect selections when identifying argument components, indicating confusion about argument structure.
+  </li>
+  <li>
+    <span class="reason-code">BAD_FEEDBACK</span><br>
+    The student received negative feedback from the game more times than the threshold allows, indicating persistent difficulty navigating or solving the activity.
+  </li>
+  <li>
+    <span class="reason-code">SCORE_BELOW_THRESHOLD</span><br>
+    The student's computed score did not meet the minimum passing value, based on a weighted combination of correct and incorrect actions.
+  </li>
+  <li>
+    <span class="reason-code">HIT_YELLOW_NODE</span><br>
+    The student triggered a specific incorrect choice marker on their first attempt, indicating a fundamental misconception about the concept being assessed.
+  </li>
+</ul>
+
+<h3>Metrics</h3>
+
+<p>Beyond the pass or flag status, each grade includes a set of metrics that capture quantitative details about the student's performance. These metrics vary by progress point but commonly include:</p>
+
+<ul>
+  <li><strong>Mistake count:</strong> the number of errors the student made during the activity</li>
+  <li><strong>Score:</strong> a computed value based on weighted correct and incorrect actions</li>
+  <li><strong>Duration:</strong> total elapsed time from the start of the activity to completion</li>
+  <li><strong>Active duration:</strong> elapsed time with extended idle periods excluded, providing a more accurate measure of time on task</li>
+  <li><strong>Attempt counts:</strong> for multi-part activities, the number of attempts at each component</li>
+  <li><strong>Specific indicators:</strong> whether the student selected the correct answer, whether they used supporting evidence in an argument, and similar binary outcome measures</li>
+</ul>
+
+<p>These metrics give teachers and researchers a detailed picture of student performance that goes beyond a simple pass or fail determination.</p>
+
+<!-- Section 4 -->
+<h2 id="how">4. How the Grader Works</h2>
+
+<h3>Architecture</h3>
+
+<p>The MHS Grader runs as a standalone background service, separate from StrataHub and StrataLog. It connects to the same database cluster but operates independently, reading gameplay events from the StrataLog database and writing grades to its own database. This separation ensures that the grader can be updated, restarted, or scaled without affecting the other components of the Strata system.</p>
+
+<p>The grader has no web interface or HTTP server. It is a continuous processing engine that starts, connects to its data sources, and runs until stopped.</p>
+
+<h3>Scan and Evaluate Cycle</h3>
+
+<p>The grader operates on a continuous polling cycle:</p>
+
+<ol class="pipeline">
+  <li><strong>Scan for new events.</strong> The grader maintains a cursor that tracks the last event it processed. On each cycle, it queries StrataLog for gameplay events that match any of its registered trigger or start event keys, beginning from the cursor position.</li>
+  <li><strong>Handle unit starts.</strong> Certain events indicate that a student has entered a new unit. The grader updates its record of the most recently detected unit for that student.</li>
+  <li><strong>Set active status.</strong> When an event matches the start keys for a progress point, the grader creates or updates a grade record with status "active" for that student and progress point.</li>
+  <li><strong>Evaluate on trigger.</strong> When an event matches the trigger keys for a progress point, the grader runs the evaluation rule. The rule examines the student's gameplay events within the relevant time window and produces a grade.</li>
+  <li><strong>Advance the cursor.</strong> After processing a batch of events, the grader updates its cursor so the next scan starts from the correct position.</li>
+</ol>
+
+<h3>Attempt Windows</h3>
+
+<p>A key design feature of the grader is its use of attempt windows to isolate the events relevant to each evaluation. When a student triggers evaluation for a progress point, the grader looks back through the event history to find the boundaries of the current attempt:</p>
+
+<ul>
+  <li>The end boundary is the trigger event itself.</li>
+  <li>The start boundary is the previous trigger event for the same progress point, or the beginning of the student's event history if no previous trigger exists.</li>
+</ul>
+
+<p>Only events within this window are considered during evaluation. This design makes the grader replay-safe: if a student replays an activity, only the most recent attempt is evaluated, and prior attempts do not interfere with the current grade.</p>
+
+<h3>Idempotent Processing</h3>
+
+<p>The cursor-based scanning system ensures that the grader produces consistent results regardless of when it runs or how often it restarts. If the grader is stopped and restarted, it resumes from its last recorded cursor position and processes only events it has not yet seen. This property is essential for a production assessment system where reliability and consistency are critical.</p>
+
+<!-- Section 5 -->
+<h2 id="rules">5. Grading Rule Types</h2>
+
+<p>The 26 grading rules span a range of complexity, reflecting the variety of skills assessed across the curriculum.</p>
+
+<h3>Completion Rules</h3>
+
+<p>The simplest rules check only whether a student reached the completion point of an activity. If the trigger event fires, the student passes. These rules are used for orientation and narrative activities where the learning objective is exposure to content rather than demonstration of a specific skill.</p>
+
+<h3>Threshold Rules</h3>
+
+<p>Threshold rules count specific types of events within the attempt window and compare the count against a limit. A rule might flag a student if they received more than six instances of negative feedback during a navigation task, or if they made any errors at all in a zero-tolerance activity.</p>
+
+<h3>Scoring Rules</h3>
+
+<p>Scoring rules compute a numerical score based on weighted positive and negative events. A correct action might add one point while an incorrect action might subtract a fraction of a point, with a minimum passing score defined for the rule. Some scoring rules use capped penalties, where each category of error can reduce the score by at most a fixed amount, preventing a single type of repeated mistake from overwhelming the overall assessment. Others use bonus systems that award additional credit for using advanced strategies such as including supporting evidence in an argument.</p>
+
+<h3>Time-Based Rules</h3>
+
+<p>Some rules incorporate response time as a factor in the grade. An activity might award a duration bonus if the student answered within 30 seconds, a partial bonus for answers within 90 seconds, and no bonus for longer response times. Active duration calculations exclude extended idle periods (gaps longer than two minutes by default) to avoid penalizing students for interruptions.</p>
+
+<h3>Multi-Component Rules</h3>
+
+<p>Complex activities that span multiple game elements use multi-component rules that aggregate results across several sub-activities. Each component contributes to the overall score independently, and the component scores are summed and compared against an overall threshold.</p>
+
+<h3>Zero-Tolerance Rules</h3>
+
+<p>The strictest rule type requires perfect performance. If any negative event occurs during the attempt, the student is flagged. This rule type is used sparingly, only for activities where the learning objective demands precise execution and any error represents a meaningful misunderstanding of the concept.</p>
+
+<!-- Section 6 -->
+<h2 id="dashboard">6. Integration with the Dashboard</h2>
+
+<p>The grades produced by the MHS Grader are stored in a database that the MHS Dashboard reads when rendering the progress grid for a teacher or researcher.</p>
+
+<h3>Grade Storage</h3>
+
+<p>Each student's grades are stored as a single document containing all 26 progress points. For each progress point, the document records the status (passed, flagged, or active), the reason code if flagged, the computed metrics, the timestamps of the start and end events, the duration measurements, and the grading rule version that produced the grade. If a student has multiple attempts at a progress point, each attempt is recorded, providing a complete history of the student's performance trajectory.</p>
+
+<h3>Dashboard Display</h3>
+
+<p>When a teacher opens the MHS Dashboard, it queries the grade database for all students in the selected group. The dashboard renders a grid with students as rows and progress points as columns. Each cell displays the color-coded status: green for passed, yellow for flagged, blue for active, and gray for not started. Teachers can examine individual grades to see the reason code and metrics, giving them specific, actionable information about each student's performance.</p>
+
+<h3>Current Unit Tracking</h3>
+
+<p>The grader also records the most recently detected unit for each student, based on the most recent unit-start event encountered. This information appears on the dashboard, allowing teachers to see at a glance which unit each student is working on, even between graded activities.</p>
+
+<!-- Section 7 -->
+<h2 id="pipeline">7. Data Flow Pipeline</h2>
+
+<p>The complete data flow from student gameplay to teacher-visible grades follows this pipeline:</p>
+
+<ol class="pipeline">
+  <li>A student plays Mission HydroSci in their browser, launched through StrataHub.</li>
+  <li>The game sends gameplay events to StrataLog as the student interacts with activities, dialogues, simulations, and puzzles.</li>
+  <li>The MHS Grader, running as a background service, continuously polls StrataLog for events that match its registered trigger and start keys.</li>
+  <li>When a start event is detected, the grader sets the corresponding progress point to "active" for that student.</li>
+  <li>When a trigger event is detected, the grader retrieves the relevant events from the attempt window, applies the grading rule, and stores the resulting grade.</li>
+  <li>The MHS Dashboard in StrataHub queries the grade database and displays the color-coded progress grid to the teacher.</li>
+</ol>
+
+<p>This pipeline operates continuously and automatically. No manual intervention is required to grade student work or update the dashboard. Teachers see near-real-time progress data as students play.</p>
+
+<!-- Section 8 -->
+<h2 id="reliability">8. Reliability and Operational Design</h2>
+
+<h3>Cursor-Based Processing</h3>
+
+<p>The grader maintains a persistent cursor (the ID of the last processed event) in its database. This cursor survives service restarts, ensuring that no events are skipped or reprocessed after a restart. The cursor-based approach also means the grader can be stopped for maintenance and resumed without any data loss or inconsistency.</p>
+
+<h3>Configurable Scanning</h3>
+
+<p>The polling interval, batch size, and database connections are configurable through environment variables. The default polling interval is five seconds, meaning that new grades typically appear on the dashboard within seconds of a student completing an activity. The batch size controls how many events are processed per cycle, allowing the system to handle bursts of activity without falling behind.</p>
+
+<h3>Active Duration Calculation</h3>
+
+<p>The grader's active duration metric excludes idle gaps longer than a configurable threshold (two minutes by default). This ensures that time-on-task measurements accurately reflect engaged work time rather than clock time, which is important for research analysis and for rules that incorporate timing into their scoring.</p>
+
+<h3>Rule Versioning</h3>
+
+<p>Each grading rule carries a version identifier that is recorded with every grade it produces. If a rule is updated to reflect a curriculum change or a refinement in grading criteria, the version identifier changes, allowing researchers to distinguish grades produced under different rule versions when analyzing data.</p>
+
+<!-- Section 9 -->
+<h2 id="components">9. Relationship to Other Strata Components</h2>
+
+<p>The MHS Grader operates as part of the broader Strata system, with specific relationships to each other component:</p>
+
+<p><strong>StrataLog</strong> is the grader's primary data source. Every event the grader processes originates from StrataLog. The grader reads from the StrataLog database but never writes to it, maintaining a clean separation between event collection and event analysis.</p>
+
+<p><strong>StrataHub</strong> hosts the MHS Dashboard, which is the primary consumer of the grades the grader produces. StrataHub also manages the student accounts and classroom groups that give structure to the grade data. The grader does not communicate with StrataHub directly; they share data through the grade database.</p>
+
+<p><strong>StrataSave</strong> provides game state persistence so students can resume where they left off. While the grader does not interact with StrataSave, the continuity StrataSave provides is valuable for grading: because students resume at their last save point rather than replaying content, their event streams in StrataLog are clean and sequential, making the grader's attempt window logic reliable.</p>
+
+<p>Together, these components form a pipeline in which StrataLog collects the raw data, the MHS Grader transforms it into structured assessments, and the MHS Dashboard presents those assessments to teachers and researchers.</p>
+
+<!-- Section 10 -->
+<h2 id="existing-tools">10. Why a Custom Grading Engine Was Necessary</h2>
+
+<p>Several categories of existing assessment tools were considered before building the MHS Grader:</p>
+
+<p><strong>Learning management system (LMS) gradebooks</strong> such as those in Canvas, Blackboard, or Google Classroom are designed for manually entered grades, quiz scores, and assignment submissions. They cannot process near-real-time gameplay event streams, apply complex scoring rules with attempt windows, or produce the detailed metrics required for research-grade assessment of game-based learning activities.</p>
+
+<p><strong>Game analytics platforms</strong> such as GameAnalytics or Unity Analytics provide aggregate metrics about player behavior (session length, retention, feature usage) but are not designed to evaluate individual student performance against curriculum-specific criteria. They do not support custom grading rules or integration with educational dashboards.</p>
+
+<p><strong>Standardized assessment platforms</strong> such as those used for state testing are designed for fixed-form assessments with predetermined questions and answer keys. They cannot assess the open-ended, process-oriented activities in Mission HydroSci, where the evaluation depends on the sequence, timing, and pattern of student actions across an extended gameplay session.</p>
+
+<p><strong>Rule engine frameworks</strong> such as Drools or business rule management systems provide generic rule evaluation capabilities. However, they are designed for business process automation, not for processing ordered gameplay event streams with attempt windows, cursor-based scanning, and duration calculations. Adapting a generic rule engine to this domain would require extensive customization while introducing unnecessary complexity and dependencies.</p>
+
+<p>The MHS Grader was built because the project needed an assessment engine that combines near-real-time event stream processing, curriculum-specific grading rules with configurable thresholds, attempt window isolation for replay safety, detailed performance metrics beyond pass/fail, cursor-based idempotent processing, and tight integration with the StrataLog event pipeline and the StrataHub dashboard. No existing tool provides this combination.</p>
+
+<!-- Section 11 -->
+<h2 id="summary">11. Summary of Capabilities</h2>
+
+<p>The MHS Grader provides the following capabilities in support of the Mission HydroSci research project:</p>
+
+<div class="summary-box">
+<ul class="feature-grid">
+  <li><strong>Automated assessment</strong> 26 progress points evaluated continuously without manual intervention</li>
+  <li><strong>Curriculum alignment</strong> Each progress point maps to a specific learning activity and assessed skill within the five-unit curriculum</li>
+  <li><strong>Three-status grading</strong> Passed, flagged, and active statuses provide teachers with clear, actionable information</li>
+  <li><strong>Reason codes</strong> Flagged grades include specific codes explaining the nature of the performance concern</li>
+  <li><strong>Detailed metrics</strong> Mistake counts, scores, durations, attempt counts, and specific indicators recorded for each grade</li>
+  <li><strong>Diverse rule types</strong> Completion checks, threshold rules, weighted scoring, time-based scoring, multi-component evaluation, and zero-tolerance rules</li>
+  <li><strong>Attempt window isolation</strong> Only the most recent attempt is evaluated, making the grader safe for students who replay activities</li>
+  <li><strong>Cursor-based processing</strong> Persistent cursor ensures no events are skipped or duplicated across restarts</li>
+  <li><strong>Near-real-time grading</strong> Default five-second polling interval delivers grades to the dashboard within seconds of activity completion</li>
+  <li><strong>Active duration tracking</strong> Idle periods excluded from time measurements for accurate time-on-task analysis</li>
+  <li><strong>Current unit tracking</strong> Records which unit each student is working on for dashboard display</li>
+  <li><strong>Rule versioning</strong> Each grade records the rule version that produced it, supporting longitudinal research analysis</li>
+  <li><strong>Standalone operation</strong> Runs independently of StrataHub and StrataLog, connecting only through shared databases</li>
+  <li><strong>Integration with the Strata system</strong> Purpose-built to read from StrataLog and produce grades for the MHS Dashboard as part of the unified assessment pipeline</li>
+</ul>
+</div>
+
+</div>
+</body>
+</html>

@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>StrataLog: Strata System Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fafafa;
+      --surface: #ffffff;
+      --text: #334155;
+      --text-light: #94a3b8;
+      --heading: #0f172a;
+      --accent: #3b82f6;
+      --accent-light: #eff6ff;
+      --border: #e2e8f0;
+      --green: #22c55e;
+      --radius: 12px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.7;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 48px 32px 96px;
+    }
+
+    h1 {
+      font-size: 2.4rem;
+      font-weight: 700;
+      color: var(--heading);
+      letter-spacing: -0.03em;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+      color: var(--text-light);
+      font-weight: 400;
+      margin-bottom: 32px;
+    }
+
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin-top: 56px;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin-top: 32px;
+      margin-bottom: 10px;
+    }
+
+    p {
+      margin-bottom: 16px;
+    }
+
+    strong {
+      font-weight: 600;
+      color: var(--heading);
+    }
+
+    ul, ol {
+      margin: 12px 0 18px 20px;
+    }
+
+    li {
+      margin-bottom: 6px;
+    }
+
+    ol {
+      padding-left: 4px;
+    }
+
+    figure {
+      margin: 28px 0;
+    }
+
+    img {
+      display: block;
+      max-width: 100%;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+    }
+
+    figcaption {
+      text-align: center;
+      font-size: 0.82rem;
+      color: var(--text-light);
+      margin-top: 10px;
+      line-height: 1.5;
+    }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px 28px;
+    }
+
+    /* Table of Contents */
+    .toc {
+      margin: 0 0 48px;
+    }
+
+    .toc .card {
+      padding: 28px 32px;
+    }
+
+    .toc-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-light);
+      margin-bottom: 14px;
+    }
+
+    .toc ol {
+      margin: 0;
+      padding-left: 20px;
+      columns: 2;
+      column-gap: 32px;
+    }
+
+    .toc li {
+      margin-bottom: 6px;
+      font-size: 0.92rem;
+    }
+
+    .toc a {
+      color: var(--accent);
+      text-decoration: none;
+      font-weight: 500;
+    }
+
+    .toc a:hover {
+      text-decoration: underline;
+    }
+
+    /* Section divider */
+    h2::before {
+      content: "";
+      display: block;
+      width: 40px;
+      height: 3px;
+      background: var(--accent);
+      border-radius: 2px;
+      margin-bottom: 12px;
+    }
+
+    /* Pipeline steps */
+    .pipeline {
+      list-style: none;
+      margin: 16px 0 20px 0;
+      padding: 0;
+      counter-reset: step;
+    }
+
+    .pipeline li {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px 14px 48px;
+      margin-bottom: 8px;
+      position: relative;
+      font-size: 0.93rem;
+    }
+
+    .pipeline li::before {
+      counter-increment: step;
+      content: counter(step);
+      position: absolute;
+      left: 16px;
+      top: 14px;
+      width: 22px;
+      height: 22px;
+      background: var(--accent);
+      color: #fff;
+      border-radius: 50%;
+      font-size: 0.75rem;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* Feature summary */
+    .summary-box {
+      margin-top: 20px;
+    }
+
+    .feature-grid {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+    }
+
+    .feature-grid li {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+      margin-bottom: 0;
+    }
+
+    .feature-grid li strong {
+      display: block;
+      font-size: 0.82rem;
+      color: var(--accent);
+      margin-bottom: 2px;
+    }
+
+    /* Print */
+    @media print {
+      body { background: #fff; }
+      .container { padding: 20px; max-width: 100%; }
+      img { border-radius: 0; }
+      h2 { page-break-after: avoid; }
+      .toc { page-break-after: always; }
+      .feature-grid { grid-template-columns: 1fr 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .container { padding: 24px 16px 64px; }
+      h1 { font-size: 1.8rem; }
+      .toc ol { columns: 1; }
+      .feature-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+<h1>StrataLog</h1>
+<div class="subtitle">Strata System Report</div>
+
+<div class="toc">
+  <div class="card">
+    <div class="toc-label">Contents</div>
+    <ol>
+      <li><a href="#purpose">Purpose and Overview</a></li>
+      <li><a href="#logged">What Gets Logged</a></li>
+      <li><a href="#collection">How Events Are Collected</a></li>
+      <li><a href="#dashboard">How StrataLog Data Powers the Dashboard</a></li>
+      <li><a href="#research">Supporting Research Data Collection</a></li>
+      <li><a href="#security">Data Security and Integrity</a></li>
+      <li><a href="#components">Relationship to Other Strata Components</a></li>
+      <li><a href="#existing-tools">Why a Custom Logging Service Was Necessary</a></li>
+      <li><a href="#summary">Summary of Capabilities</a></li>
+    </ol>
+  </div>
+</div>
+
+<!-- Section 1 -->
+<h2 id="purpose">1. Purpose and Overview</h2>
+
+<p>StrataLog is the learning analytics service for the Mission HydroSci project. It captures, stores, and provides access to detailed gameplay event data generated as students play the game. Key gameplay actions a student takes, including interactions such as starting an investigation, answering an assessment question, and completing a simulation, are recorded by StrataLog as structured events with precise timing information.</p>
+
+<p>This data serves two critical purposes. First, it is the foundation for all automated student assessment. The MHS Grader, described in its own section of this report, continuously analyzes StrataLog data to determine whether students have passed, are struggling with, or are actively working on each progress point in the curriculum. Without StrataLog, there would be no data for the grader to evaluate. Second, the collected data constitutes a rich research dataset capturing how students interact with the game at a granular level, enabling analysis of learning behaviors, interaction patterns, and curriculum effectiveness.</p>
+
+<p>StrataLog was purpose-built because the project requires a logging service that can accept high-volume, flexible event data from a game client in near-real-time, store it reliably, and make it available for both automated processing and research queries. General-purpose analytics platforms are designed for web traffic or application monitoring, not for capturing the specific structure of educational gameplay events. StrataLog is tailored to this role. StrataLog captures gameplay interaction data and does not store survey responses or unrelated student information.</p>
+
+<!-- Section 2 -->
+<h2 id="logged">2. What Gets Logged</h2>
+
+<p>As students play Mission HydroSci, the game sends event data to StrataLog throughout each session. These events capture what the student is doing at each moment during gameplay.</p>
+
+<h3>Event Structure</h3>
+
+<p>Each event recorded by StrataLog includes a standard set of fields:</p>
+
+<ul>
+  <li><strong>Game identifier:</strong> which game generated the event (currently Mission HydroSci)</li>
+  <li><strong>Player identifier:</strong> which student (member) produced the event, linked to their StrataHub identity</li>
+  <li><strong>Event type:</strong> the category of action that occurred (for example, a dialogue interaction, an assessment response, a simulation action, or a navigation event)</li>
+  <li><strong>Event key:</strong> a specific identifier for the exact action within the game, used by the grading system to determine when a student has reached a particular progress point</li>
+  <li><strong>Client timestamp:</strong> the time at which the event occurred on the student's device</li>
+  <li><strong>Server timestamp:</strong> the time at which the event was received and stored by StrataLog</li>
+  <li><strong>Event data:</strong> additional details specific to the event type, such as which dialogue node was visited, what answer was selected, how many attempts were made, or what score was achieved</li>
+</ul>
+
+<h3>Flexible Schema</h3>
+
+<p>StrataLog uses a flexible data model that accepts any additional fields the game includes with an event. This means the game development team can add new event types or include new data fields at any time without requiring changes to StrataLog itself. As the game evolves and new units are added, StrataLog automatically accommodates the new event data. This flexibility is important for a research project where the instrumentation of the game may be refined over time as researchers identify new behaviors they want to capture.</p>
+
+<figure>
+  <img src="images/recent-logs.png" alt="The StrataLog Recent Logs view showing live event data streaming in from Mission HydroSci with expandable JSON detail.">
+  <figcaption>The Recent Logs view showing live event data streaming in from Mission HydroSci. Each entry displays the game name, event type, player identifier, and timestamp. Expanding an entry reveals the full event data including position coordinates and device information.</figcaption>
+</figure>
+
+<h3>Volume and Continuity</h3>
+
+<p>A single student playing a single unit of Mission HydroSci may generate dozens to hundreds of individual events. Across classrooms and schools, event volumes grow rapidly from tens of thousands to hundreds of thousands of events as usage scales. StrataLog is designed to handle this volume reliably, ensuring that events are captured even when many students are playing simultaneously across multiple schools.</p>
+
+<!-- Section 3 -->
+<h2 id="collection">3. How Events Are Collected</h2>
+
+<h3>Near-Real-Time Ingestion</h3>
+
+<p>The Mission HydroSci game sends events to StrataLog through a secure API as students play, with support for batching when connectivity is limited. Events can be submitted individually or in batches for efficiency. When network conditions require it, the game can accumulate events locally and submit them in a batch when connectivity is restored, ensuring that gameplay data is reliably captured despite temporary network interruptions.</p>
+
+<h3>Timestamp Integrity</h3>
+
+<p>Each event carries two timestamps. The client timestamp records when the event actually occurred on the student's device. The server timestamp records when StrataLog received and stored the event. This dual-timestamp design is essential for accurate analysis. If a batch of events is submitted after a brief network delay, the client timestamps still reflect the true timing of student actions, allowing the grading system and researchers to accurately measure how long activities took and in what order events occurred.</p>
+
+<h3>Authentication</h3>
+
+<p>All event submissions are authenticated using secure, session-scoped API credentials issued by StrataHub. The game receives these credentials when the student launches the game, ensuring that only authorized game sessions can submit log data. This prevents unauthorized data from entering the system and ensures that every event can be traced to a legitimate game session.</p>
+
+<!-- Section 4 -->
+<h2 id="dashboard">4. How StrataLog Data Powers the Dashboard</h2>
+
+<p>StrataLog is the data source that makes the MHS Dashboard possible. The connection between gameplay and the teacher-facing dashboard flows through a processing pipeline:</p>
+
+<ol class="pipeline">
+  <li><strong>Students play the game.</strong> As they interact with Mission HydroSci, events are sent to StrataLog in near-real-time.</li>
+  <li><strong>The MHS Grader evaluates events.</strong> The grading engine continuously monitors StrataLog for specific trigger events that correspond to curriculum-aligned progress points. When a trigger event is detected, the grader evaluates the student's performance at that progress point based on the surrounding event data.</li>
+  <li><strong>Progress evaluations are produced.</strong> For each progress point, the grader determines whether the student passed, was flagged for performance that warrants attention, or is still actively working. It also records metrics such as mistake counts, attempt counts, and time spent.</li>
+  <li><strong>The dashboard displays results.</strong> The MHS Dashboard in StrataHub reads these progress evaluations and presents them as the color-coded progress grid that teachers and researchers use to monitor student progress.</li>
+</ol>
+
+<p>Without StrataLog capturing relevant gameplay events with accurate timing and detail, none of this downstream processing would be possible. The grader would have nothing to evaluate, and the dashboard would have nothing to display.</p>
+
+<!-- Section 5 -->
+<h2 id="research">5. Supporting Research Data Collection</h2>
+
+<p>Beyond powering the automated assessment pipeline, StrataLog serves as a comprehensive research data collection system.</p>
+
+<h3>Detailed Behavioral Record</h3>
+
+<p>StrataLog captures a detailed record of student interactions with the game. This goes well beyond what a simple completion or score record would provide. Researchers can examine:</p>
+
+<ul>
+  <li>The sequence of actions a student took during an activity</li>
+  <li>How long a student spent on each part of an investigation</li>
+  <li>How many attempts a student made before succeeding</li>
+  <li>Which dialogue options a student explored</li>
+  <li>How a student's performance changed across units over time</li>
+</ul>
+
+<p>This level of detail supports research questions about learning processes, not just learning outcomes.</p>
+
+<h3>Data Export</h3>
+
+<p>StrataLog provides tools for querying and exporting event data. Researchers can filter events by game, student, event type, and time range, then download the results for analysis in external tools. This allows the research team to work with the raw event data using their preferred statistical and analytical methods.</p>
+
+<h3>Developer Console</h3>
+
+<p>StrataLog includes an administrative console that provides authorized team members with tools to browse, search, and inspect log data. This console is used during development to verify that the game is generating the expected events, during deployment to confirm that data is flowing correctly, and during research to explore event patterns and verify data quality.</p>
+
+<figure>
+  <img src="images/log-browser.png" alt="The Log Browser showing a list of players and their log counts with expandable event detail.">
+  <figcaption>The Log Browser allows team members to search for individual students and inspect their event history. Each event can be expanded to reveal the full data payload.</figcaption>
+</figure>
+
+<p>The Log Browser provides per-player views showing each student's total event count and a chronological list of their events. Selecting any event reveals its complete data, providing visibility into exactly what the game recorded for each interaction.</p>
+
+<figure>
+  <img src="images/log-api-playground.png" alt="The Log API Playground showing an interactive interface for testing event submission with a successful response.">
+  <figcaption>The API Playground provides an interactive interface for testing event submission. Team members can construct and send test events, see the API response, and view the equivalent command-line request.</figcaption>
+</figure>
+
+<p>The API Playground allows developers to test event submission directly from the console, verifying that the API is functioning correctly and that events are being accepted and stored as expected.</p>
+
+<h3>API Statistics</h3>
+
+<p>StrataLog tracks operational metrics for its API, including the total number of events submitted, request counts, average response times, and error rates. These statistics are displayed on a dashboard with time-series charts, giving the team visibility into system health and data flow volume.</p>
+
+<figure>
+  <img src="images/log-api-statistics.png" alt="The API Statistics dashboard showing over 700,000 log submissions with request count and response time charts.">
+  <figcaption>The API Statistics dashboard showing over 700,000 log submissions, with request count and average response time charts, error tracking, and data management tools.</figcaption>
+</figure>
+
+<!-- Section 6 -->
+<h2 id="security">6. Data Security and Integrity</h2>
+
+<h3>Secure Transmission</h3>
+
+<p>All communication between the game and StrataLog is encrypted using TLS (HTTPS). Event data is never transmitted in plain text.</p>
+
+<h3>Access Control</h3>
+
+<p>The StrataLog API requires authentication for all data submission and retrieval. The administrative console uses role-based access with separate permissions for administrators and developers. The system is designed to handle high-volume requests efficiently.</p>
+
+<h3>Audit Trail</h3>
+
+<p>StrataLog maintains an audit log of administrative actions and authentication events. Failed API requests are recorded for debugging and compliance purposes.</p>
+
+<h3>Data Reliability</h3>
+
+<p>Events are stored in a managed database with automatic indexing for efficient querying. The system is designed so that events are persisted reliably, ensuring that the research dataset remains complete and accurate throughout the study.</p>
+
+<!-- Section 7 -->
+<h2 id="components">7. Relationship to Other Strata Components</h2>
+
+<p>StrataLog operates as part of the broader Strata system, with specific relationships to each other component:</p>
+
+<p><strong>StrataHub</strong> provides the authentication credentials that the game uses when submitting events to StrataLog. StrataHub also hosts the MHS Dashboard, which displays the results of processing StrataLog data.</p>
+
+<p><strong>The MHS Grader</strong> reads event data from StrataLog to evaluate student performance at each progress point. StrataLog is the grader's primary data source.</p>
+
+<p><strong>StrataSave</strong> handles a different aspect of the student experience: persisting game state so students can resume where they left off. StrataLog and StrataSave are independent services that both receive data from the game, but for different purposes. StrataLog records what happened (events). StrataSave records where the student is (game state).</p>
+
+<p>Together, these components form a pipeline in which StrataLog is the foundational data collection layer. Everything that the system knows about how students interact with Mission HydroSci originates as events captured by StrataLog.</p>
+
+<!-- Section 8 -->
+<h2 id="existing-tools">8. Why a Custom Logging Service Was Necessary</h2>
+
+<p>Several categories of existing tools were considered before building StrataLog:</p>
+
+<p><strong>Web analytics platforms</strong> such as Google Analytics or Mixpanel are designed for tracking page views, clicks, and user flows on websites. They do not support the structured, high-frequency event data generated by an educational game, and they do not provide the precise timestamp control needed for measuring activity durations. They also raise data privacy concerns when used with student data.</p>
+
+<p><strong>Application performance monitoring tools</strong> such as Datadog or New Relic are designed for monitoring server health, error rates, and response times. They are not built to capture and store gameplay events as a research dataset.</p>
+
+<p><strong>Research data platforms</strong> such as REDCap are designed for survey data and clinical trial records, not for near-real-time ingestion of thousands of gameplay events per student session.</p>
+
+<p><strong>Generic logging services</strong> such as the ELK stack (Elasticsearch, Logstash, Kibana) can ingest flexible data, but they are designed for system logs and infrastructure monitoring. Adapting them to serve as a research-grade gameplay event store with precise timing, student identity tracking, and integration with a custom grading pipeline would require substantial customization while introducing unnecessary complexity.</p>
+
+<p>StrataLog was built because the project needed a logging service that combines near-real-time ingestion of flexible gameplay events, precise dual-timestamp recording, secure authenticated access, reliable storage, research-quality data export, and tight integration with the grading and dashboard pipeline. No existing tool provides this combination.</p>
+
+<!-- Section 9 -->
+<h2 id="summary">9. Summary of Capabilities</h2>
+
+<p>StrataLog provides the following capabilities in support of the Mission HydroSci research project:</p>
+
+<div class="summary-box">
+<ul class="feature-grid">
+  <li><strong>Near-real-time event capture</strong> Gameplay events ingested as students play, with support for individual and batch submission</li>
+  <li><strong>Flexible event schema</strong> Accepts any event type and data fields without requiring schema changes</li>
+  <li><strong>Dual timestamps</strong> Client and server timestamps for accurate timing analysis regardless of network conditions</li>
+  <li><strong>Authenticated ingestion</strong> Secure, session-scoped API credentials ensure only authorized game sessions submit data</li>
+  <li><strong>Automated assessment foundation</strong> Event data feeds the MHS Grader, which produces the progress evaluations displayed on the teacher dashboard</li>
+  <li><strong>Research data collection</strong> Detailed behavioral record of student gameplay interactions available for research analysis</li>
+  <li><strong>Data export</strong> Query and download tools for researchers to extract event data by game, student, event type, and time range</li>
+  <li><strong>Developer console</strong> Administrative interface for browsing, searching, and inspecting log data</li>
+  <li><strong>Secure transmission</strong> All data encrypted in transit using TLS</li>
+  <li><strong>Access control</strong> Role-based permissions for the administrative console and API key authentication for data submission</li>
+  <li><strong>API statistics</strong> Operational metrics tracking request volume, response times, and error rates for system monitoring</li>
+  <li><strong>Audit logging</strong> Administrative actions and authentication events recorded for accountability</li>
+  <li><strong>Scalable storage</strong> Designed to handle high volumes of events across many students and schools, with over 700,000 log submissions recorded to date, prior to the primary study period, demonstrating sustained system operation under real usage conditions</li>
+  <li><strong>Integration with the Strata system</strong> Purpose-built to work with StrataHub, the MHS Grader, and the MHS Dashboard as part of a unified analytics pipeline</li>
+</ul>
+</div>
+
+</div>
+</body>
+</html>
