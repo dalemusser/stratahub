@@ -31,6 +31,9 @@ type DBDeps struct {
 	// MHSGrader database for reading progress grades (same cluster, different database)
 	MHSGraderDatabase *mongo.Database
 
+	// Stratalog database for reading game log data (same cluster, different database)
+	StratalogDatabase *mongo.Database
+
 	// FileStorage for material file uploads
 	FileStorage storage.Store
 

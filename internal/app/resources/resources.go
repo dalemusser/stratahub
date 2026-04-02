@@ -13,7 +13,7 @@ import (
 
 // Embed the shared template files and configuration files.
 //
-//go:embed templates/*.gohtml mhs_progress_points.json
+//go:embed templates/*.gohtml mhs_progress_points.json mhs_grading_rules.json
 var FS embed.FS
 
 // Embed assets (CSS, JS) for bundling into the binary.

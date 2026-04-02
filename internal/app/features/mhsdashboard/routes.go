@@ -25,6 +25,15 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 
 		// AI-powered student performance summary
 		pr.Get("/summary", h.ServeSummary)
+
+		// Debug tools (admin/coordinator only — enforced in handlers)
+		pr.Get("/debug/students", h.ServeDebugStudents)
+		pr.Get("/debug/student/{userID}", h.ServeDebugDetail)
+
+		// Maps tab (admin/coordinator only — enforced in handlers)
+		pr.Get("/maps/positions", h.ServeMapPositions)
+		pr.Get("/maps/scenes", h.ServeMapScenes)
+		pr.Get("/maps/members", h.ServeMapMembers)
 	})
 
 	return r

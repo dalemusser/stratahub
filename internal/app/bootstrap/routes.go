@@ -558,9 +558,10 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		wsr.Mount("/activity", activityfeature.Routes(activityHandler, sessionMgr))
 
 		// MHS Leader Dashboard (Mission HydroSci progress tracking)
-		mhsDashboardHandler := mhsdashboardfeature.NewHandler(deps.StrataHubMongoDatabase, deps.MHSGraderDatabase, errLog, logger)
+		mhsDashboardHandler := mhsdashboardfeature.NewHandler(deps.StrataHubMongoDatabase, deps.MHSGraderDatabase, deps.StratalogDatabase, errLog, logger)
 		mhsDashboardHandler.ClaudeAPIKey = appCfg.ClaudeAPIKey
 		mhsDashboardHandler.ClaudeModel = appCfg.ClaudeModel
+		mhsDashboardHandler.ActiveGapThreshold = appCfg.MHSActiveGapThreshold
 		wsr.Mount("/mhsdashboard", mhsdashboardfeature.Routes(mhsDashboardHandler, sessionMgr))
 
 		// Mission HydroSci (experimental copy of MHS delivery for admin/coordinator development)

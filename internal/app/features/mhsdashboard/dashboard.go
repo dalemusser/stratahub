@@ -243,6 +243,8 @@ func (h *Handler) ServeGrid(w http.ResponseWriter, r *http.Request) {
 	// Build headers for the grid
 	unitHeaders, pointHeaders := h.buildHeaders(cfg)
 
+	gridIsAdmin := role == "admin" || role == "coordinator" || role == "superadmin"
+
 	if len(groups) == 0 {
 		data := GridData{
 			UnitHeaders:           unitHeaders,
@@ -250,6 +252,7 @@ func (h *Handler) ServeGrid(w http.ResponseWriter, r *http.Request) {
 			Members:               nil,
 			CSRFToken:             csrf.Token(r),
 			EnableClaudeSummaries: gridEnableSummaries,
+			IsAdmin:               gridIsAdmin,
 		}
 		templates.Render(w, r, "mhsdashboard_grid", data)
 		return
@@ -314,6 +317,7 @@ func (h *Handler) ServeGrid(w http.ResponseWriter, r *http.Request) {
 		SortBy:                sortBy,
 		SortDir:               sortDir,
 		EnableClaudeSummaries: gridEnableSummaries,
+		IsAdmin:               gridIsAdmin,
 	}
 
 	templates.Render(w, r, "mhsdashboard_grid", data)

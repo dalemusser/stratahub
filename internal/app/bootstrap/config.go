@@ -21,6 +21,7 @@ var appConfigKeys = []config.AppKey{
 	{Name: "mongo_max_pool_size", Default: 100, Desc: "MongoDB max connection pool size (default: 100)"},
 	{Name: "mongo_min_pool_size", Default: 10, Desc: "MongoDB min connection pool size (default: 10)"},
 	{Name: "mhsgrader_database", Default: "mhsgrader", Desc: "MHSGrader database for progress grades (same cluster)"},
+	{Name: "stratalog_database", Default: "stratalog", Desc: "Stratalog database for game log data (same cluster)"},
 	{Name: "session_key", Default: "dev-only-change-me-please-0123456789ABCDEF", Desc: "Session signing key (must be strong in production)"},
 	{Name: "session_name", Default: "stratahub-session", Desc: "Session cookie name"},
 	{Name: "session_domain", Default: "", Desc: "Session cookie domain (blank means current host)"},
@@ -96,6 +97,9 @@ var appConfigKeys = []config.AppKey{
 	// Claude API configuration
 	{Name: "claude_api_key", Default: "", Desc: "Anthropic API key for AI summaries (sk-ant-...)"},
 	{Name: "claude_model", Default: "claude-sonnet-4-20250514", Desc: "Claude model ID for AI summaries"},
+
+	// MHS grading threshold (must match mhsgrader's active_gap_threshold)
+	{Name: "mhs_active_gap_threshold", Default: "2m", Desc: "Gaps longer than this excluded from active duration (must match mhsgrader)"},
 }
 
 // LoadConfig loads WAFFLE core config and app-specific config.
@@ -123,6 +127,7 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 		MongoMaxPoolSize:  uint64(appValues.Int("mongo_max_pool_size")),
 		MongoMinPoolSize:  uint64(appValues.Int("mongo_min_pool_size")),
 		MHSGraderDatabase: appValues.String("mhsgrader_database"),
+		StratalogDatabase: appValues.String("stratalog_database"),
 		SessionKey:    appValues.String("session_key"),
 		SessionName:   appValues.String("session_name"),
 		SessionDomain: appValues.String("session_domain"),
@@ -197,6 +202,9 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 		// Claude API
 		ClaudeAPIKey: appValues.String("claude_api_key"),
 		ClaudeModel:  appValues.String("claude_model"),
+
+		// MHS active gap threshold
+		MHSActiveGapThreshold: appValues.Duration("mhs_active_gap_threshold", 2*time.Minute),
 	}
 
 	// Auto-derive session domain in multi-workspace mode if not explicitly set.

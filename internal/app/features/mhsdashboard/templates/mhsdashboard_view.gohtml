@@ -729,6 +729,18 @@
             onclick="switchTab('analytics')">
       Analytics
     </button>
+    {{ if .IsAdmin }}
+    <button id="mhs-tab-btn-debug" type="button"
+            class="px-4 py-2 text-sm font-medium mhs-tab-inactive"
+            onclick="switchTab('debug')">
+      Debug
+    </button>
+    <button id="mhs-tab-btn-maps" type="button"
+            class="px-4 py-2 text-sm font-medium mhs-tab-inactive"
+            onclick="switchTab('maps')">
+      Maps
+    </button>
+    {{ end }}
   </div>
 
   <!-- Tab-Specific Legend Row -->
@@ -783,6 +795,36 @@
         <span class="text-slate-600">Not Downloaded</span>
       </div>
     </div>
+    <!-- Maps Legend -->
+    {{ if .IsAdmin }}
+    <div id="mhs-legend-maps" class="hidden items-center gap-4 text-xs">
+      <div class="flex items-center gap-1.5">
+        <span class="inline-block w-6 h-0.5 rounded" style="background: linear-gradient(to right, #3b82f6, #ef4444);"></span>
+        <span class="text-slate-600">Path (blue=start, red=end)</span>
+      </div>
+    </div>
+    {{ end }}
+    <!-- Debug Legend -->
+    {{ if .IsAdmin }}
+    <div id="mhs-legend-debug" class="hidden items-center gap-4 text-xs">
+      <div class="flex items-center gap-1.5">
+        <span class="inline-block w-3.5 h-3.5 rounded bg-red-100 border border-red-300"></span>
+        <span class="text-slate-600">Error</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="inline-block w-3.5 h-3.5 rounded bg-amber-100 border border-amber-300"></span>
+        <span class="text-slate-600">Warning</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="inline-block w-3.5 h-3.5 rounded bg-green-100 border border-green-300"></span>
+        <span class="text-slate-600">Start Event</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="inline-block w-3.5 h-3.5 rounded bg-blue-100 border border-blue-300"></span>
+        <span class="text-slate-600">End Event</span>
+      </div>
+    </div>
+    {{ end }}
     <!-- Analytics Legend -->
     <div id="mhs-legend-analytics" class="hidden items-center gap-4 text-xs">
       <div class="flex items-center gap-1.5">
@@ -1040,6 +1082,12 @@
       updateCountdown();
       return;
     }
+    // Skip auto-refresh while the debug or maps tab is active
+    if (activeTab === 'debug' || activeTab === 'maps') {
+      countdown = 30;
+      updateCountdown();
+      return;
+    }
     // Skip auto-refresh while a set-progress menu is open
     if (document.querySelector('.set-progress-menu:not(.hidden)')) {
       countdown = 30;
@@ -1062,17 +1110,23 @@
     var panels = {
       progress: document.getElementById('mhs-tab-progress'),
       devices: document.getElementById('mhs-tab-devices'),
-      analytics: document.getElementById('mhs-tab-analytics')
+      analytics: document.getElementById('mhs-tab-analytics'),
+      debug: document.getElementById('mhs-tab-debug'),
+      maps: document.getElementById('mhs-tab-maps')
     };
     var buttons = {
       progress: document.getElementById('mhs-tab-btn-progress'),
       devices: document.getElementById('mhs-tab-btn-devices'),
-      analytics: document.getElementById('mhs-tab-btn-analytics')
+      analytics: document.getElementById('mhs-tab-btn-analytics'),
+      debug: document.getElementById('mhs-tab-btn-debug'),
+      maps: document.getElementById('mhs-tab-btn-maps')
     };
     var legends = {
       progress: document.getElementById('mhs-legend-progress'),
       devices: document.getElementById('mhs-legend-devices'),
-      analytics: document.getElementById('mhs-legend-analytics')
+      analytics: document.getElementById('mhs-legend-analytics'),
+      debug: document.getElementById('mhs-legend-debug'),
+      maps: document.getElementById('mhs-legend-maps')
     };
 
     for (var key in panels) {
@@ -1087,7 +1141,439 @@
         if (legends[key]) { legends[key].classList.add('hidden'); legends[key].classList.remove('flex'); }
       }
     }
+
+    // Auto-load debug students when switching to debug tab
+    if (tab === 'debug') {
+      var debugContent = document.getElementById('mhs-debug-content');
+      if (debugContent && !debugContent.dataset.loaded) {
+        loadDebugStudents();
+      }
+    }
+
+    // Auto-load maps data when switching to maps tab
+    if (tab === 'maps') {
+      mapsInit();
+    }
   };
+
+  // Debug tab functions
+  window.loadDebugStudents = function() {
+    var groupSelect = document.getElementById('group-select');
+    var group = groupSelect ? groupSelect.value : '';
+    if (!group) return;
+    var el = document.getElementById('mhs-debug-content');
+    if (!el) return;
+    el.innerHTML = '<div class="p-8 text-center text-sm text-slate-500">Loading...</div>';
+    fetch('/mhsdashboard/debug/students?group=' + encodeURIComponent(group))
+      .then(function(r) { return r.text(); })
+      .then(function(html) {
+        el.innerHTML = html;
+        el.dataset.loaded = '1';
+      })
+      .catch(function() {
+        el.innerHTML = '<div class="p-8 text-center text-sm text-red-500">Failed to load debug data.</div>';
+      });
+  };
+
+  window.loadDebugDetail = function(userID, name) {
+    var groupSelect = document.getElementById('group-select');
+    var group = groupSelect ? groupSelect.value : '';
+    var el = document.getElementById('mhs-debug-content');
+    if (!el) return;
+    el.innerHTML = '<div class="p-8 text-center text-sm text-slate-500">Loading detail for ' + name + '...</div>';
+    fetch('/mhsdashboard/debug/student/' + userID + '?group=' + encodeURIComponent(group))
+      .then(function(r) { return r.text(); })
+      .then(function(html) { el.innerHTML = html; })
+      .catch(function() {
+        el.innerHTML = '<div class="p-8 text-center text-sm text-red-500">Failed to load detail.</div>';
+      });
+  };
+
+  window.loadDebugDetailUnit = function(userID, unit) {
+    var groupSelect = document.getElementById('group-select');
+    var group = groupSelect ? groupSelect.value : '';
+    var el = document.getElementById('mhs-debug-content');
+    if (!el) return;
+    el.innerHTML = '<div class="p-8 text-center text-sm text-slate-500">Loading...</div>';
+    var url = '/mhsdashboard/debug/student/' + userID + '?group=' + encodeURIComponent(group);
+    if (unit) url += '&unit=' + encodeURIComponent(unit);
+    fetch(url)
+      .then(function(r) { return r.text(); })
+      .then(function(html) { el.innerHTML = html; })
+      .catch(function() {
+        el.innerHTML = '<div class="p-8 text-center text-sm text-red-500">Failed to load detail.</div>';
+      });
+  };
+
+  window.toggleTimelinePositions = function() {
+    var show = document.getElementById('debug-show-positions');
+    var rows = document.querySelectorAll('.debug-cat-position');
+    rows.forEach(function(r) { r.style.display = (show && show.checked) ? '' : 'none'; });
+  };
+
+  window.toggleTimelineFilter = function() {
+    var showDialogue = document.getElementById('debug-show-dialogue');
+    var showQuest = document.getElementById('debug-show-quest');
+    document.querySelectorAll('.debug-cat-dialogue').forEach(function(r) {
+      r.style.display = (showDialogue && showDialogue.checked) ? '' : 'none';
+    });
+    document.querySelectorAll('.debug-cat-quest').forEach(function(r) {
+      r.style.display = (showQuest && showQuest.checked) ? '' : 'none';
+    });
+  };
+
+  window.downloadAnomalyReport = function() {
+    var container = document.getElementById('debug-detail-container');
+    if (!container) return;
+    var studentName = container.dataset.studentName || 'Unknown';
+    var loginId = container.dataset.loginId || '';
+    var unit = container.dataset.selectedUnit || 'all';
+    var dataEl = document.getElementById('debug-anomaly-data');
+    if (!dataEl) return;
+    var anomalies;
+    try { anomalies = JSON.parse(dataEl.textContent); } catch(e) { return; }
+    if (!anomalies || !anomalies.length) return;
+
+    var lines = [];
+    lines.push('Anomaly Report');
+    lines.push('==============');
+    lines.push('Student: ' + studentName);
+    lines.push('Login ID: ' + loginId);
+    lines.push('Unit: ' + (unit || 'All Units'));
+    lines.push('Date: ' + new Date().toISOString().split('T')[0]);
+    lines.push('Total Anomalies: ' + anomalies.length);
+    lines.push('');
+
+    var errors = anomalies.filter(function(a) { return a.severity === 'error'; });
+    var warnings = anomalies.filter(function(a) { return a.severity === 'warning'; });
+    if (errors.length) lines.push('Errors: ' + errors.length);
+    if (warnings.length) lines.push('Warnings: ' + warnings.length);
+    lines.push('');
+    lines.push('Details');
+    lines.push('-------');
+
+    anomalies.forEach(function(a, i) {
+      lines.push('');
+      lines.push((i + 1) + '. [' + a.severity.toUpperCase() + '] ' + a.type);
+      if (a.pointID) lines.push('   Point: ' + a.pointID);
+      if (a.unit) lines.push('   Unit: ' + a.unit);
+      lines.push('   ' + a.description);
+    });
+
+    var text = lines.join('\n');
+    var blob = new Blob([text], { type: 'text/plain' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    var safeName = studentName.replace(/[^a-zA-Z0-9]/g, '_');
+    a.download = 'anomaly-report-' + safeName + '-' + (unit || 'all') + '.txt';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  // Hide position events by default after debug content loads
+  var debugObserver = new MutationObserver(function() {
+    var rows = document.querySelectorAll('.debug-cat-position');
+    if (rows.length > 0) {
+      var show = document.getElementById('debug-show-positions');
+      if (!show || !show.checked) {
+        rows.forEach(function(r) { r.style.display = 'none'; });
+      }
+    }
+  });
+  var debugEl = document.getElementById('mhs-debug-content');
+  if (debugEl) debugObserver.observe(debugEl, { childList: true, subtree: true });
+
+  // --- Maps tab ---
+  var mapsInitialized = false;
+  var mapsPositions = [];
+  var mapsBounds = null;
+
+  window.mapsInit = function() {
+    if (mapsInitialized) return;
+    mapsInitialized = true;
+    mapsLoadMembers();
+    mapsLoadScenes();
+  };
+
+  function mapsLoadMembers() {
+    var groupSelect = document.getElementById('group-select');
+    var group = groupSelect ? groupSelect.value : '';
+    if (!group) return;
+    var sel = document.getElementById('maps-student-select');
+    if (!sel) return;
+    fetch('/mhsdashboard/maps/members?group=' + encodeURIComponent(group))
+      .then(function(r) { return r.json(); })
+      .then(function(members) {
+        sel.innerHTML = '<option value="">Select student...</option>';
+        members.forEach(function(m) {
+          var opt = document.createElement('option');
+          opt.value = m.id;
+          opt.textContent = m.name;
+          sel.appendChild(opt);
+        });
+      })
+      .catch(function() {
+        sel.innerHTML = '<option value="">Failed to load</option>';
+      });
+  }
+
+  function mapsLoadScenes() {
+    var sel = document.getElementById('maps-scene-select');
+    if (!sel) return;
+    fetch('/mhsdashboard/maps/scenes')
+      .then(function(r) { return r.json(); })
+      .then(function(scenes) {
+        sel.innerHTML = '<option value="">Select scene...</option>';
+        // Sort by unit then name
+        scenes.sort(function(a, b) {
+          if (a.unit !== b.unit) return a.unit < b.unit ? -1 : 1;
+          return a.name < b.name ? -1 : 1;
+        });
+        scenes.forEach(function(s) {
+          var opt = document.createElement('option');
+          opt.value = s.name;
+          opt.textContent = s.name + ' (' + s.unit + ')';
+          sel.appendChild(opt);
+        });
+      })
+      .catch(function() {
+        sel.innerHTML = '<option value="">Failed to load</option>';
+      });
+  }
+
+  window.mapsLoadPositions = function() {
+    var studentSel = document.getElementById('maps-student-select');
+    var sceneSel = document.getElementById('maps-scene-select');
+    var status = document.getElementById('maps-status');
+    var empty = document.getElementById('maps-empty');
+    var canvas = document.getElementById('maps-canvas');
+    if (!studentSel || !sceneSel) return;
+
+    var userID = studentSel.value;
+    var scene = sceneSel.value;
+    if (!userID || !scene) {
+      mapsPositions = [];
+      mapsBounds = null;
+      if (canvas) mapsClearCanvas(canvas);
+      if (empty) { empty.textContent = 'Select a student and scene to view position data.'; empty.classList.remove('hidden'); }
+      if (status) status.textContent = '';
+      return;
+    }
+
+    if (status) status.textContent = 'Loading...';
+    if (empty) empty.classList.add('hidden');
+
+    fetch('/mhsdashboard/maps/positions?user=' + encodeURIComponent(userID) + '&scene=' + encodeURIComponent(scene))
+      .then(function(r) { return r.json(); })
+      .then(function(data) {
+        mapsPositions = data.positions || [];
+        mapsBounds = data.bounds || null;
+        if (status) status.textContent = mapsPositions.length + ' position' + (mapsPositions.length !== 1 ? 's' : '');
+        if (mapsPositions.length === 0) {
+          if (empty) { empty.textContent = 'No position data for this student/scene.'; empty.classList.remove('hidden'); }
+          if (canvas) mapsClearCanvas(canvas);
+        } else {
+          if (empty) empty.classList.add('hidden');
+          mapsRender();
+        }
+      })
+      .catch(function() {
+        if (status) status.textContent = 'Failed to load positions.';
+        mapsPositions = [];
+        mapsBounds = null;
+        if (canvas) mapsClearCanvas(canvas);
+      });
+  };
+
+  function mapsClearCanvas(canvas) {
+    var ctx = canvas.getContext('2d');
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+  }
+
+  function mapsRender() {
+    var canvas = document.getElementById('maps-canvas');
+    if (!canvas || !mapsPositions.length || !mapsBounds) return;
+
+    var rect = canvas.parentElement.getBoundingClientRect();
+    var dpr = window.devicePixelRatio || 1;
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    canvas.style.width = rect.width + 'px';
+    canvas.style.height = rect.height + 'px';
+
+    var ctx = canvas.getContext('2d');
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, rect.width, rect.height);
+
+    var pad = 40;
+    var bx = mapsBounds.minX;
+    var bz = mapsBounds.minZ;
+    var bw = mapsBounds.maxX - mapsBounds.minX;
+    var bh = mapsBounds.maxZ - mapsBounds.minZ;
+    if (bw === 0) bw = 1;
+    if (bh === 0) bh = 1;
+
+    var drawW = rect.width - pad * 2;
+    var drawH = rect.height - pad * 2;
+
+    // Maintain aspect ratio
+    var scaleX = drawW / bw;
+    var scaleZ = drawH / bh;
+    var scale = Math.min(scaleX, scaleZ);
+    var offsetX = pad + (drawW - bw * scale) / 2;
+    var offsetZ = pad + (drawH - bh * scale) / 2;
+
+    function toCanvasX(x) { return offsetX + (x - bx) * scale; }
+    function toCanvasZ(z) { return offsetZ + (z - bz) * scale; }
+
+    // Draw grid lines
+    ctx.strokeStyle = 'rgba(46, 139, 192, 0.15)';
+    ctx.lineWidth = 1;
+    var gridStep = Math.pow(10, Math.floor(Math.log10(Math.max(bw, bh))) - 1);
+    if (gridStep < 1) gridStep = 1;
+    // Make sure we don't draw too many grid lines
+    while (Math.max(bw, bh) / gridStep > 20) gridStep *= 2;
+    while (Math.max(bw, bh) / gridStep < 4) gridStep /= 2;
+
+    var startX = Math.floor(bx / gridStep) * gridStep;
+    for (var gx = startX; gx <= mapsBounds.maxX; gx += gridStep) {
+      var cx = toCanvasX(gx);
+      ctx.beginPath(); ctx.moveTo(cx, pad); ctx.lineTo(cx, rect.height - pad); ctx.stroke();
+    }
+    var startZ = Math.floor(bz / gridStep) * gridStep;
+    for (var gz = startZ; gz <= mapsBounds.maxZ; gz += gridStep) {
+      var cz = toCanvasZ(gz);
+      ctx.beginPath(); ctx.moveTo(pad, cz); ctx.lineTo(rect.width - pad, cz); ctx.stroke();
+    }
+
+    // Draw axis labels
+    ctx.fillStyle = '#7fb3d3';
+    ctx.font = '10px sans-serif';
+    ctx.textAlign = 'center';
+    for (var gx = startX; gx <= mapsBounds.maxX; gx += gridStep) {
+      ctx.fillText(Math.round(gx), toCanvasX(gx), rect.height - pad + 14);
+    }
+    ctx.textAlign = 'right';
+    for (var gz = startZ; gz <= mapsBounds.maxZ; gz += gridStep) {
+      ctx.fillText(Math.round(gz), pad - 6, toCanvasZ(gz) + 3);
+    }
+
+    // Draw path as connected line segments with color gradient (blue→red)
+    var n = mapsPositions.length;
+    for (var i = 1; i < n; i++) {
+      var t = i / (n - 1); // 0..1
+      var r = Math.round(59 + t * (239 - 59));
+      var g = Math.round(130 + t * (68 - 130));
+      var b = Math.round(246 + t * (68 - 246));
+      ctx.strokeStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(toCanvasX(mapsPositions[i - 1].x), toCanvasZ(mapsPositions[i - 1].z));
+      ctx.lineTo(toCanvasX(mapsPositions[i].x), toCanvasZ(mapsPositions[i].z));
+      ctx.stroke();
+    }
+
+    // Draw dots
+    for (var i = 0; i < n; i++) {
+      var t = n > 1 ? i / (n - 1) : 0;
+      var r = Math.round(59 + t * (239 - 59));
+      var g = Math.round(130 + t * (68 - 130));
+      var b = Math.round(246 + t * (68 - 246));
+      ctx.fillStyle = 'rgb(' + r + ',' + g + ',' + b + ')';
+      ctx.beginPath();
+      ctx.arc(toCanvasX(mapsPositions[i].x), toCanvasZ(mapsPositions[i].z), 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Draw start/end markers
+    if (n > 0) {
+      // Start marker (larger, blue circle with outline)
+      ctx.fillStyle = '#3b82f6';
+      ctx.strokeStyle = '#e8f4f8';
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.arc(toCanvasX(mapsPositions[0].x), toCanvasZ(mapsPositions[0].z), 6, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+
+      // End marker (larger, red circle with outline)
+      ctx.fillStyle = '#ef4444';
+      ctx.beginPath();
+      ctx.arc(toCanvasX(mapsPositions[n - 1].x), toCanvasZ(mapsPositions[n - 1].z), 6, 0, Math.PI * 2);
+      ctx.fill(); ctx.stroke();
+    }
+
+    // Axis labels
+    ctx.fillStyle = '#7fb3d3';
+    ctx.font = '11px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('X', rect.width / 2, rect.height - 4);
+    ctx.save();
+    ctx.translate(10, rect.height / 2);
+    ctx.rotate(-Math.PI / 2);
+    ctx.fillText('Z', 0, 0);
+    ctx.restore();
+
+    // Store canvas-space mapping for tooltip
+    canvas.dataset.mapsOffsetX = offsetX;
+    canvas.dataset.mapsOffsetZ = offsetZ;
+    canvas.dataset.mapsScale = scale;
+    canvas.dataset.mapsBx = bx;
+    canvas.dataset.mapsBz = bz;
+  }
+
+  // Tooltip on hover
+  (function() {
+    var canvas = document.getElementById('maps-canvas');
+    var tooltip = document.getElementById('maps-tooltip');
+    if (!canvas || !tooltip) return;
+
+    canvas.addEventListener('mousemove', function(e) {
+      if (!mapsPositions.length) { tooltip.classList.add('hidden'); return; }
+      var rect = canvas.getBoundingClientRect();
+      var mx = e.clientX - rect.left;
+      var mz = e.clientY - rect.top;
+      var oX = parseFloat(canvas.dataset.mapsOffsetX || 0);
+      var oZ = parseFloat(canvas.dataset.mapsOffsetZ || 0);
+      var sc = parseFloat(canvas.dataset.mapsScale || 1);
+      var bbx = parseFloat(canvas.dataset.mapsBx || 0);
+      var bbz = parseFloat(canvas.dataset.mapsBz || 0);
+
+      // Find nearest point
+      var best = -1;
+      var bestDist = 15; // max pixel distance for tooltip
+      for (var i = 0; i < mapsPositions.length; i++) {
+        var px = oX + (mapsPositions[i].x - bbx) * sc;
+        var pz = oZ + (mapsPositions[i].z - bbz) * sc;
+        var d = Math.sqrt((mx - px) * (mx - px) + (mz - pz) * (mz - pz));
+        if (d < bestDist) { bestDist = d; best = i; }
+      }
+
+      if (best >= 0) {
+        var p = mapsPositions[best];
+        var time = p.time ? new Date(p.time).toLocaleTimeString() : '';
+        tooltip.textContent = 'x:' + p.x.toFixed(1) + ' z:' + p.z.toFixed(1) + (time ? ' @ ' + time : '') + ' (#' + (best + 1) + '/' + mapsPositions.length + ')';
+        tooltip.style.left = (e.clientX - rect.left + 12) + 'px';
+        tooltip.style.top = (e.clientY - rect.top - 28) + 'px';
+        tooltip.classList.remove('hidden');
+      } else {
+        tooltip.classList.add('hidden');
+      }
+    });
+
+    canvas.addEventListener('mouseleave', function() {
+      tooltip.classList.add('hidden');
+    });
+  })();
+
+  // Re-render maps on resize
+  window.addEventListener('resize', function() {
+    if (activeTab === 'maps' && mapsPositions.length > 0) {
+      mapsRender();
+    }
+  });
 
   // Analytics metric switching
   window.switchAnalyticsMetric = function(metric) {

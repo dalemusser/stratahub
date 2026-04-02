@@ -1,0 +1,162 @@
+{{ define "mhsdashboard_debug_detail" }}
+<div class="p-4"
+     data-student-name="{{ .StudentName }}"
+     data-login-id="{{ .LoginID }}"
+     data-selected-unit="{{ .SelectedUnit }}"
+     id="debug-detail-container">
+  <!-- Header with back button -->
+  <div class="mb-4 flex items-center justify-between">
+    <div class="flex items-center gap-3">
+      <button type="button"
+              class="text-sm text-[#5cb8e6] hover:text-[#8ed0f0] hover:underline"
+              onclick="loadDebugStudents()">
+        &larr; Back to list
+      </button>
+      <h3 class="text-sm font-bold text-[#e8f4f8]">{{ .StudentName }}</h3>
+      <span class="text-[10px] font-mono text-[#7fb3d3]">{{ .LoginID }}</span>
+    </div>
+    <div class="flex items-center gap-2">
+      <label for="debug-unit-filter" class="text-xs text-[#b1d4e0]">Unit:</label>
+      <select id="debug-unit-filter"
+              class="text-xs border border-[#1e3a5f] rounded px-2 py-0.5 bg-[#0c2d48] text-[#e8f4f8]"
+              onchange="loadDebugDetailUnit('{{ .StudentID }}', this.value)">
+        <option value="" {{ if eq .SelectedUnit "" }}selected{{ end }}>All Units</option>
+        {{ range .UnitOptions }}
+        <option value="{{ . }}" {{ if eq . $.SelectedUnit }}selected{{ end }}>{{ . }}</option>
+        {{ end }}
+      </select>
+      <span class="text-xs text-[#7fb3d3]">{{ .TotalEvents }} events</span>
+      <span class="text-xs text-[#4a7a9b]">({{ .TimezoneAbbr }})</span>
+      {{ if .Anomalies }}
+      <button type="button"
+              class="text-xs px-2 py-1 border border-[#1e3a5f] rounded bg-[#0c2d48] text-[#5cb8e6] hover:text-[#8ed0f0] hover:border-[#2e8bc0] font-medium"
+              onclick="downloadAnomalyReport()">
+        Download Report
+      </button>
+      {{ end }}
+    </div>
+  </div>
+
+  <!-- Anomalies Section -->
+  {{ if .Anomalies }}
+  <div class="mb-4 border border-[#1e3a5f] rounded-lg overflow-hidden">
+    <div class="bg-[#0c2d48] px-3 py-1.5 text-xs font-bold text-[#e8f4f8] border-b border-[#1e3a5f]">
+      Anomalies ({{ len .Anomalies }})
+    </div>
+    <div class="divide-y divide-[#1e3a5f]">
+      {{ range .Anomalies }}
+      <div class="px-3 py-2 flex items-start gap-2 text-xs
+        {{ if eq .Severity "error" }}bg-red-950/40{{ else if eq .Severity "warning" }}bg-amber-950/40{{ else }}bg-blue-950/40{{ end }}">
+        <span class="flex-shrink-0 mt-0.5 w-5 h-5 flex items-center justify-center rounded-full text-[11px] font-bold
+          {{ if eq .Severity "error" }}bg-red-900/80 text-red-300{{ else if eq .Severity "warning" }}bg-amber-900/80 text-amber-300{{ else }}bg-blue-900/80 text-blue-300{{ end }}">
+          {{ if eq .Severity "error" }}!{{ else if eq .Severity "warning" }}?{{ else }}i{{ end }}
+        </span>
+        <div class="flex-1 min-w-0">
+          <span class="font-medium text-[#e8f4f8]">
+            {{ if .PointID }}{{ .PointID }}{{ end }}
+            {{ if .Unit }}({{ .Unit }}){{ end }}
+          </span>
+          <span class="text-[#b1d4e0] ml-1">{{ .Description }}</span>
+        </div>
+        <span class="flex-shrink-0 ml-2 px-2 py-0.5 rounded text-[10px] font-bold
+          {{ if eq .Type "pencil" }}bg-red-900/60 text-red-300{{ else if eq .Type "empty" }}bg-amber-900/60 text-amber-300{{ else if eq .Type "duplicate" }}bg-purple-900/60 text-purple-300{{ else if eq .Type "event_no_grade" }}bg-red-900/60 text-red-300{{ else }}bg-[#1e3a5f] text-[#b1d4e0]{{ end }}">
+          {{ .Type }}
+        </span>
+      </div>
+      {{ end }}
+    </div>
+  </div>
+  {{ end }}
+
+  <!-- Timeline Section -->
+  <div class="border border-[#1e3a5f] rounded-lg overflow-hidden">
+    <div class="bg-[#0c2d48] px-3 py-1.5 text-xs font-bold text-[#e8f4f8] border-b border-[#1e3a5f] flex items-center justify-between">
+      <span>Event Timeline</span>
+      <div class="flex items-center gap-2">
+        <label class="flex items-center gap-1 text-[10px] text-[#7fb3d3] font-normal cursor-pointer">
+          <input type="checkbox" id="debug-show-positions" class="w-3 h-3" onchange="toggleTimelinePositions()">
+          Show positions
+        </label>
+        <label class="flex items-center gap-1 text-[10px] text-[#7fb3d3] font-normal cursor-pointer">
+          <input type="checkbox" id="debug-show-dialogue" class="w-3 h-3" checked onchange="toggleTimelineFilter()">
+          Dialogue
+        </label>
+        <label class="flex items-center gap-1 text-[10px] text-[#7fb3d3] font-normal cursor-pointer">
+          <input type="checkbox" id="debug-show-quest" class="w-3 h-3" checked onchange="toggleTimelineFilter()">
+          Quests
+        </label>
+      </div>
+    </div>
+    <div class="max-h-[500px] overflow-y-auto mhs-styled-scrollbar">
+      <table class="w-full text-sm border-collapse">
+        <thead class="sticky top-0 bg-[#0c2d48] z-10">
+          <tr class="text-[#b1d4e0] border-b border-[#1e3a5f]">
+            <th class="text-left px-2 py-1.5 font-medium w-16">Time</th>
+            <th class="text-left px-2 py-1.5 font-medium w-14">Elapsed</th>
+            <th class="text-left px-2 py-1.5 font-medium w-14">Active</th>
+            <th class="text-left px-2 py-1.5 font-medium w-12">Gap</th>
+            <th class="text-left px-2 py-1.5 font-medium w-56">Event</th>
+            <th class="text-left px-2 py-1.5 font-medium w-24">Scene</th>
+            <th class="text-left px-2 py-1.5 font-medium">Details</th>
+            <th class="text-left px-2 py-1.5 font-medium w-32">Annotation</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ range .Timeline }}
+          {{ if .DateStr }}
+          <tr class="debug-timeline-row debug-date-separator">
+            <td colspan="8" class="px-2 py-1.5 text-center text-xs font-medium text-[#5cb8e6] bg-[#0c2d48]/60 border-b border-[#1e3a5f]">
+              &mdash; {{ .DateStr }} &mdash;
+            </td>
+          </tr>
+          {{ end }}
+          <tr class="border-b border-[#1e3a5f]/60 debug-timeline-row debug-cat-{{ .Category }}
+            {{ if .IsAnomaly }}bg-red-950/30{{ else if .IsStartEvent }}bg-[#0a2a1a]{{ else if .IsEndEvent }}bg-[#2a0f0f]{{ else if eq .Category "waypoint" }}bg-indigo-950/30{{ end }}"
+            {{ if gt .GapSeconds 300.0 }}style="border-top: 2px solid #d97706;"{{ end }}>
+            <td class="px-2 py-1 font-mono text-[#7fb3d3] whitespace-nowrap">{{ .TimestampStr }}</td>
+            <td class="px-2 py-1 font-mono text-[#4a7a9b] whitespace-nowrap">{{ .ElapsedDisplay }}</td>
+            <td class="px-2 py-1 font-mono text-[#5a9ab5] whitespace-nowrap">{{ .ActiveElapsedDisplay }}</td>
+            <td class="px-2 py-1 text-[#4a7a9b] whitespace-nowrap">
+              {{ if .GapDisplay }}
+              <span class="{{ if gt .GapSeconds 300.0 }}text-amber-400 font-medium{{ end }}">{{ .GapDisplay }}</span>
+              {{ end }}
+            </td>
+            <td class="px-2 py-1 text-[#e8f4f8] whitespace-nowrap">
+              {{ .EventType }}
+              {{ if .EventKey }}
+              <span class="text-[#5a9ab5] font-mono block">{{ .EventKey }}</span>
+              {{ end }}
+            </td>
+            <td class="px-2 py-1 text-[#7fb3d3] whitespace-nowrap truncate max-w-[120px]" title="{{ .SceneName }}">{{ .SceneName }}</td>
+            <td class="px-2 py-1 text-[#b1d4e0]">
+              {{ .DataSummary }}
+              {{ if .IsAnomaly }}
+              <span class="text-red-400 font-medium ml-1">[{{ .AnomalyNote }}]</span>
+              {{ end }}
+            </td>
+            <td class="px-2 py-1 whitespace-nowrap">
+              {{ if .Annotation }}
+              <span class="text-[10px] font-medium px-1.5 py-0.5 rounded
+                {{ if .IsStartEvent }}bg-green-900/60 text-green-300
+                {{ else if .IsEndEvent }}bg-blue-900/60 text-blue-300
+                {{ else }}bg-[#1e3a5f] text-[#b1d4e0]{{ end }}">
+                {{ .Annotation }}
+              </span>
+              {{ end }}
+            </td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  {{ if .Anomalies }}
+  <script id="debug-anomaly-data" type="application/json">
+  [{{ range $i, $a := .Anomalies }}{{ if $i }},{{ end }}
+    {"type":"{{ $a.Type }}","severity":"{{ $a.Severity }}","pointID":"{{ $a.PointID }}","unit":"{{ $a.Unit }}","description":"{{ $a.Description }}","timestamp":"{{ $a.Timestamp }}"}{{ end }}
+  ]
+  </script>
+  {{ end }}
+</div>
+{{ end }}

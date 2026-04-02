@@ -36,6 +36,9 @@ type AppConfig struct {
 	// MHSGrader database (for reading progress grades - same cluster, different database)
 	MHSGraderDatabase string // Database name for MHSGrader grades (default: mhsgrader)
 
+	// Stratalog database (for reading game log data - same cluster, different database)
+	StratalogDatabase string // Database name for Stratalog log data (default: stratalog)
+
 	// Session management configuration
 	SessionKey    string        // Secret key for signing session cookies (must be strong in production)
 	SessionName   string        // Cookie name for sessions (default: stratahub-session)
@@ -116,4 +119,8 @@ type AppConfig struct {
 	// Claude API configuration (for AI-powered student performance summaries)
 	ClaudeAPIKey string // Anthropic API key (e.g., "sk-ant-...")
 	ClaudeModel  string // Claude model ID (e.g., "claude-sonnet-4-20250514")
+
+	// MHS active gap threshold: gaps longer than this are excluded from active duration.
+	// Must match mhsgrader's active_gap_threshold for consistent results.
+	MHSActiveGapThreshold time.Duration
 }

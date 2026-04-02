@@ -330,4 +330,45 @@
 </div>
 {{ end }}
 
+<!-- Debug Tab Panel (admin only) -->
+{{ if .IsAdmin }}
+<div id="mhs-tab-debug" class="hidden h-full overflow-auto bg-white">
+  <div id="mhs-debug-content">
+    <div class="p-8 text-center text-sm text-slate-500">Select the Debug tab to load student anomaly data.</div>
+  </div>
+</div>
+{{ end }}
+
+<!-- Maps Tab Panel (admin only) -->
+{{ if .IsAdmin }}
+<div id="mhs-tab-maps" class="hidden h-full overflow-auto" style="background: #0c2d48;">
+  <div class="p-4">
+    <!-- Controls row -->
+    <div class="flex items-center gap-4 mb-4">
+      <div class="flex items-center gap-2">
+        <label class="text-sm font-medium text-[#b1d4e0]">Student</label>
+        <select id="maps-student-select" class="text-sm rounded border border-[#145374] bg-[#1e3a5f] text-[#e8f4f8] px-2 py-1" onchange="mapsLoadPositions()">
+          <option value="">Select student...</option>
+        </select>
+      </div>
+      <div class="flex items-center gap-2">
+        <label class="text-sm font-medium text-[#b1d4e0]">Scene</label>
+        <select id="maps-scene-select" class="text-sm rounded border border-[#145374] bg-[#1e3a5f] text-[#e8f4f8] px-2 py-1" onchange="mapsLoadPositions()">
+          <option value="">Select scene...</option>
+        </select>
+      </div>
+      <div id="maps-status" class="text-sm text-[#7fb3d3]"></div>
+    </div>
+    <!-- Canvas area -->
+    <div class="relative rounded border border-[#145374] bg-[#1e3a5f]" style="height: calc(100vh - 280px); min-height: 400px;">
+      <canvas id="maps-canvas" class="w-full h-full" style="display: block;"></canvas>
+      <div id="maps-empty" class="absolute inset-0 flex items-center justify-center text-[#7fb3d3] text-sm">
+        Select a student and scene to view position data.
+      </div>
+      <div id="maps-tooltip" class="hidden absolute px-2 py-1 rounded text-xs bg-[#0c2d48] text-[#e8f4f8] border border-[#145374] pointer-events-none" style="z-index: 10;"></div>
+    </div>
+  </div>
+</div>
+{{ end }}
+
 {{ end }}
