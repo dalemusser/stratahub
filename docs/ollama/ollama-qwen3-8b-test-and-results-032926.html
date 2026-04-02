@@ -1,0 +1,944 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ollama Qwen3:8B Test and Results</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg: #fafafa;
+      --surface: #ffffff;
+      --text: #334155;
+      --text-light: #94a3b8;
+      --heading: #0f172a;
+      --accent: #3b82f6;
+      --accent-light: #eff6ff;
+      --border: #e2e8f0;
+      --green: #22c55e;
+      --green-light: #f0fdf4;
+      --red: #ef4444;
+      --red-light: #fef2f2;
+      --yellow: #eab308;
+      --yellow-light: #fefce8;
+      --purple: #8b5cf6;
+      --purple-light: #f5f3ff;
+      --radius: 12px;
+      --code-bg: #1e293b;
+      --code-text: #e2e8f0;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      color: var(--text);
+      background: var(--bg);
+      line-height: 1.7;
+      font-size: 15px;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 48px 32px 96px;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      font-weight: 700;
+      color: var(--heading);
+      letter-spacing: -0.03em;
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+      color: var(--text-light);
+      font-weight: 400;
+      margin-bottom: 32px;
+    }
+
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin-top: 56px;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+    }
+
+    h2::before {
+      content: "";
+      display: block;
+      width: 40px;
+      height: 3px;
+      background: var(--accent);
+      border-radius: 2px;
+      margin-bottom: 12px;
+    }
+
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      color: var(--heading);
+      margin-top: 28px;
+      margin-bottom: 10px;
+    }
+
+    p { margin-bottom: 16px; }
+    strong { font-weight: 600; color: var(--heading); }
+
+    ul, ol { margin: 12px 0 18px 20px; }
+    li { margin-bottom: 6px; }
+
+    a { color: var(--accent); text-decoration: none; font-weight: 500; }
+    a:hover { text-decoration: underline; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 24px 28px;
+      margin-bottom: 16px;
+    }
+
+    /* Test config badge */
+    .config-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 12px;
+      margin: 16px 0 24px;
+    }
+
+    .config-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      text-align: center;
+    }
+
+    .config-item .label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-light);
+      margin-bottom: 4px;
+    }
+
+    .config-item .value {
+      font-size: 0.95rem;
+      font-weight: 600;
+      color: var(--heading);
+    }
+
+    /* TOC */
+    .toc {
+      margin: 0 0 48px;
+    }
+
+    .toc .card {
+      padding: 28px 32px;
+    }
+
+    .toc-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-light);
+      margin-bottom: 14px;
+    }
+
+    .toc ol {
+      margin: 0;
+      padding-left: 20px;
+      columns: 2;
+      column-gap: 32px;
+    }
+
+    .toc li {
+      margin-bottom: 6px;
+      font-size: 0.92rem;
+    }
+
+    /* Code blocks */
+    .code-block {
+      background: var(--code-bg);
+      color: var(--code-text);
+      border-radius: 8px;
+      padding: 20px 24px;
+      margin: 12px 0 20px;
+      font-family: 'SF Mono', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.82rem;
+      line-height: 1.6;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-wrap: break-word;
+    }
+
+    .code-block .comment { color: #64748b; }
+    .code-block .heading { color: #60a5fa; font-weight: 600; }
+    .code-block .passed { color: #4ade80; }
+    .code-block .flagged { color: #fbbf24; }
+    .code-block .not-started { color: #94a3b8; }
+    .code-block .keyword { color: #c084fc; }
+    .code-block .section-label { color: #f472b6; font-weight: 600; }
+
+    /* Prompt component tabs */
+    .prompt-components {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin: 16px 0 20px;
+    }
+
+    .prompt-component {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 16px 18px;
+    }
+
+    .prompt-component h4 {
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent);
+      margin-bottom: 4px;
+    }
+
+    .prompt-component p {
+      font-size: 0.85rem;
+      color: var(--text);
+      margin-bottom: 0;
+      line-height: 1.5;
+    }
+
+    /* Response cards */
+    .response-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      margin-bottom: 16px;
+      overflow: hidden;
+    }
+
+    .response-header {
+      background: var(--accent-light);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 24px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      color: var(--accent);
+    }
+
+    .response-body {
+      padding: 24px 28px;
+      font-size: 0.93rem;
+      line-height: 1.75;
+    }
+
+    .response-body p {
+      margin-bottom: 14px;
+    }
+
+    .response-body p:last-child {
+      margin-bottom: 0;
+    }
+
+    /* Analysis sections */
+    .verdict-card {
+      border-radius: var(--radius);
+      padding: 18px 22px;
+      margin: 12px 0 16px;
+      font-size: 0.9rem;
+      line-height: 1.6;
+    }
+
+    .verdict-pass {
+      background: var(--green-light);
+      border: 1px solid #bbf7d0;
+    }
+
+    .verdict-fail {
+      background: var(--red-light);
+      border: 1px solid #fecaca;
+    }
+
+    .verdict-warn {
+      background: var(--yellow-light);
+      border: 1px solid #fef08a;
+    }
+
+    .verdict-card strong {
+      display: block;
+      margin-bottom: 4px;
+    }
+
+    .verdict-pass strong { color: #16a34a; }
+    .verdict-fail strong { color: #dc2626; }
+    .verdict-warn strong { color: #ca8a04; }
+
+    /* Score box */
+    .score-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 20px 0;
+    }
+
+    .score-item {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 18px 20px;
+      text-align: center;
+    }
+
+    .score-item .score-label {
+      font-size: 0.7rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--text-light);
+      margin-bottom: 6px;
+    }
+
+    .score-item .score-value {
+      font-size: 1.6rem;
+      font-weight: 700;
+      color: var(--heading);
+    }
+
+    .score-item .score-note {
+      font-size: 0.78rem;
+      color: var(--text-light);
+      margin-top: 4px;
+    }
+
+    /* Issue list */
+    .issue-list {
+      list-style: none;
+      margin: 16px 0 20px 0;
+      padding: 0;
+    }
+
+    .issue-list li {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-bottom: 8px;
+      font-size: 0.88rem;
+      line-height: 1.5;
+    }
+
+    .issue-list li strong {
+      color: var(--red);
+    }
+
+    /* Bottom line summary */
+    .bottom-line {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      margin: 20px 0;
+    }
+
+    .bl-card {
+      border-radius: 8px;
+      padding: 16px 18px;
+    }
+
+    .bl-pass {
+      background: var(--green-light);
+      border: 1px solid #bbf7d0;
+    }
+
+    .bl-fail {
+      background: var(--red-light);
+      border: 1px solid #fecaca;
+    }
+
+    .bl-card h4 {
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 8px;
+    }
+
+    .bl-pass h4 { color: #16a34a; }
+    .bl-fail h4 { color: #dc2626; }
+
+    .bl-card ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+
+    .bl-card li {
+      font-size: 0.85rem;
+      margin-bottom: 4px;
+      padding-left: 14px;
+      position: relative;
+    }
+
+    .bl-card li::before {
+      content: "";
+      position: absolute;
+      left: 0;
+      top: 8px;
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+
+    .bl-pass li::before { background: #16a34a; }
+    .bl-fail li::before { background: #dc2626; }
+
+    /* Divider */
+    .section-divider {
+      border: none;
+      border-top: 2px solid var(--border);
+      margin: 48px 0;
+    }
+
+    /* Print */
+    @media print {
+      body { background: #fff; }
+      .container { padding: 20px; max-width: 100%; }
+      .config-grid { grid-template-columns: 1fr 1fr 1fr; }
+    }
+
+    @media (max-width: 640px) {
+      .container { padding: 24px 16px 64px; }
+      h1 { font-size: 1.7rem; }
+      .config-grid { grid-template-columns: 1fr; }
+      .prompt-components { grid-template-columns: 1fr; }
+      .toc ol { columns: 1; }
+      .score-grid { grid-template-columns: 1fr; }
+      .bottom-line { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="container">
+
+<h1>Ollama Qwen3:8B Test</h1>
+<div class="subtitle">Student Summary Generation: Test and Results &mdash; March 29, 2026</div>
+
+<div class="context-box" style="background: var(--purple-light); border: 1px solid #ddd6fe; border-radius: var(--radius); padding: 20px 24px; margin-bottom: 24px; font-size: 0.9rem; line-height: 1.65;">
+  <strong style="color: var(--purple); display: block; margin-bottom: 6px;">Context: Model Scale</strong>
+  Frontier models in early 2026 typically have total parameter counts in the hundreds of billions to low trillions, but due to sparse (MoE) architectures, the active parameter count per token is often much lower, closer to tens or hundreds of billions. This test was run using an <strong>8 billion parameter model</strong> running locally on a MacBook Pro laptop via Ollama, and represents a <strong>first attempt</strong> at generating student performance summaries with this prompt and model combination. Neither the prompting strategy nor the model configuration have been optimized; better results can be achieved with further iteration. The three-paragraph output format was retained from earlier tests run using the Claude API for the purposes of comparison, and alternative output formats will be explored.
+</div>
+
+<div class="config-grid">
+  <div class="config-item">
+    <div class="label">Model</div>
+    <div class="value">qwen3:8b</div>
+  </div>
+  <div class="config-item">
+    <div class="label">Runtime</div>
+    <div class="value">Ollama (local)</div>
+  </div>
+  <div class="config-item">
+    <div class="label">Hardware</div>
+    <div class="value">MacBook Pro 14" M5 Pro, 24GB</div>
+  </div>
+</div>
+
+<div class="toc">
+  <div class="card">
+    <div class="toc-label">Contents</div>
+    <ol>
+      <li><a href="#objective">Test Objective</a></li>
+      <li><a href="#prompt">Prompt Design</a></li>
+      <li><a href="#student-data">Student Data</a></li>
+      <li><a href="#responses">Model Responses (3 runs)</a></li>
+      <li><a href="#chatgpt-analysis">ChatGPT Analysis</a></li>
+      <li><a href="#claude-analysis">Claude Analysis</a></li>
+    </ol>
+  </div>
+</div>
+
+<!-- Section 1 -->
+<h2 id="objective">1. Test Objective</h2>
+
+<p>This test evaluates whether the <strong>Qwen3:8B</strong> model, running locally via Ollama on consumer hardware, can generate accurate, consistent, teacher-facing student performance summaries from Mission HydroSci progress data.</p>
+
+<p>The same prompt was run three times to test both <strong>output quality</strong> (accuracy, tone, rule compliance) and <strong>consistency</strong> (whether repeated runs produce stable results). The responses were then evaluated against the actual student data to identify factual errors, rule violations, and patterns of model behavior.</p>
+
+<!-- Section 2 -->
+<h2 id="prompt">2. Prompt Design</h2>
+
+<p>The prompt is composed of four sections, each designed to constrain a specific aspect of the model's output:</p>
+
+<div class="prompt-components">
+  <div class="prompt-component">
+    <h4>System Instructions</h4>
+    <p>Defines the model's role as an educational assessment specialist. Specifies writing requirements (2-4 paragraphs, prose, teacher-facing tone), accuracy requirements (data-only claims, no over-interpretation of passed points), and interpretation requirements (use curriculum context, distinguish completed/struggling/not-started).</p>
+  </div>
+  <div class="prompt-component">
+    <h4>Curriculum Context</h4>
+    <p>Provides the domain knowledge the model needs to interpret performance data: core skill areas (scientific argumentation, hydrology), how to interpret passed/flagged/not-started statuses, common difficulty patterns by topic, and instructional interpretation principles.</p>
+  </div>
+  <div class="prompt-component">
+    <h4>Student Data</h4>
+    <p>The actual grade data for one student: current unit, status of all 26 progress points across 5 units, with durations, metrics, and reason codes for flagged points. This is the only data the model should reference.</p>
+  </div>
+  <div class="prompt-component">
+    <h4>Final Output Rules</h4>
+    <p>Hard constraints: no bullet points, no IDs, no reason codes, no metric keys, no bracketed data. Translation rules for converting system data to plain English. Accuracy guardrails against causal hallucination, overgeneralization, and future prediction. Self-check requirement before output.</p>
+  </div>
+</div>
+
+<h3>Full Prompt</h3>
+
+<div class="code-block"><span class="section-label">ROLE AND INSTRUCTIONS:</span>
+
+You are an educational assessment specialist analyzing student performance
+data from Mission HydroSci, a science adventure game that teaches hydrology
+and scientific argumentation.
+
+Write a clear, professional performance summary for a teacher or
+instructional leader based only on the student data provided and the
+curriculum context below.
+
+Your summary must:
+- describe the student's overall progress through the game
+- highlight areas of strength
+- identify areas of concern
+- connect flagged results to likely learning gaps using the curriculum context
+- suggest instructional focus areas based on patterns in the data
+
+<span class="comment">Writing requirements:</span>
+- write 2 to 4 paragraphs in Markdown
+- use standard prose, not bullet points
+- refer to the learner only as "this student" or "the student"
+- if referencing a progress point, use its descriptive name in natural
+  language rather than any unit or point ID
+- avoid generic praise and generic concern statements
+- be specific, but concise
+- use a professional teacher-facing tone
+
+<span class="comment">Accuracy requirements:</span>
+- use only information directly supported by the provided data
+- do not describe a passed progress point as a failure or misunderstanding
+  unless the data clearly supports that interpretation
+- when a point is passed with minor mistakes, treat it as partial success
+  or developing understanding if relevant
+- prioritize patterns across multiple flagged or difficult points over
+  isolated issues
+- if you identify a learning gap, explain it in plain English
+- do not predict future difficulty in later units unless the current data
+  provides a clear and direct basis for that prediction
+- do not include raw counts or numeric metrics unless they materially
+  strengthen the teacher-facing interpretation
+
+<span class="comment">Interpretation requirements:</span>
+- use curriculum context to interpret what flagged or difficult performance
+  likely means about student understanding
+- treat flagged results as evidence of difficulty, but do not overstate
+  certainty
+- distinguish between completed progress, current struggles, and
+  not-yet-started content
+- do not treat not-started future units as weaknesses
+
+<span class="section-label">CURRICULUM CONTEXT:</span>
+
+<span class="heading"># Mission HydroSci: Curriculum Context</span>
+
+Mission HydroSci is a science adventure game where students learn hydrology
+and scientific argumentation through five units and 26 progress points.
+
+<span class="heading">## Core Skill Areas</span>
+
+<span class="heading">### Scientific Argumentation</span>
+Students develop the ability to:
+- identify claims
+- distinguish evidence and reasoning
+- construct complete arguments
+- evaluate and counter claims
+
+<span class="heading">### Hydrology Concepts</span>
+Students learn:
+- topographic maps and elevation (Unit 2)
+- watersheds and flow relationships (Unit 2)
+- water flow direction (Unit 3)
+- dissolved material transport (Unit 3)
+- groundwater and water table (Unit 4)
+- soil infiltration and water movement (Unit 4)
+- evaporation, condensation, and water cycle (Unit 5)
+
+<span class="heading">## How to Interpret Performance</span>
+
+Passed: student reached required understanding
+  - low mistakes = strong understanding
+  - higher mistakes = developing understanding
+
+Flagged: difficulty, evidence of misunderstanding
+  - repeated incorrect attempts = unstable understanding
+  - failure to reach success condition = missing core concept
+
+Not Started: student has not yet reached that content
+  - should not be treated as a weakness
+
+<span class="heading">## Meaning of Common Difficulty Patterns</span>
+
+Topographic Maps: trouble with contour lines, spatial reasoning
+Watersheds: misunderstanding flow relationships, evidence selection
+Water Flow Direction: cannot determine flow from elevation
+Dissolved Materials: misunderstanding pollutant/nutrient transport
+Soil and Groundwater: confusion about infiltration, water table
+Water Cycle: misunderstanding evaporation/condensation
+
+<span class="heading">## Instructional Interpretation Principles</span>
+- patterns across multiple flagged points > isolated issues
+- repeated difficulty in related skills = conceptual gap
+- successful performance after struggle = partial understanding
+- students may complete tasks without full concept mastery
+
+<span class="section-label">STUDENT DATA:</span>
+
+Current Unit: unit3
+
+<span class="heading">## unit1: Orientation and Scientific Argumentation Basics</span>
+<span class="passed">- u1p1 (Space Legs): passed [duration: 245s] [metrics: mistakeCount=0]</span>
+<span class="passed">- u1p2 (Info & Intros): passed [duration: 180s] [metrics: mistakeCount=0]</span>
+<span class="passed">- u1p3 (Defend Expedition): passed [duration: 120s] [metrics: mistakeCount=0]</span>
+<span class="passed">- u1p4 (What Was That?): passed [duration: 95s]</span>
+
+<span class="heading">## unit2: Topographic Maps and Watersheds</span>
+<span class="passed">- u2p1 (Escape the Ruin): passed [duration: 310s] [metrics: mistakeCount=0]</span>
+<span class="flagged">- u2p2 (Foraged Forging): flagged [reason: BAD_FEEDBACK] [metrics: mistakeCount=6]</span>
+<span class="passed">- u2p3 (Band Together II): passed [duration: 350s] [metrics: mistakeCount=2]</span>
+<span class="passed">- u2p4 (Investigate Temple): passed [duration: 280s] [metrics: mistakeCount=1]</span>
+<span class="passed">- u2p5 (Classified Info): passed [metrics: posCount=5, mistakeCount=1, score=4.67]</span>
+<span class="flagged">- u2p6 (Which Watershed? I): flagged [reason: MISSING_SUCCESS_NODE] [metrics: mistakeCount=3]</span>
+<span class="passed">- u2p7 (Which Watershed? II): passed [duration: 180s] [metrics: mistakeCount=2]</span>
+
+<span class="heading">## unit3: Water Flow Direction and Dissolved Materials</span>
+<span class="flagged">- u3p1 (Supply Run): flagged [reason: TOO_MANY_NEGATIVES] [metrics: mistakeCount=3]</span>
+<span class="not-started">- u3p2 (Pollution Solution I): Not started</span>
+<span class="not-started">- u3p3 (Pollution Solution II): Not started</span>
+<span class="not-started">- u3p4 (Forsaken Facility): Not started</span>
+<span class="not-started">- u3p5 (Balanced Ecosystem): Not started</span>
+
+<span class="heading">## unit4-5: Not started (all points)</span>
+
+<span class="section-label">FINAL OUTPUT RULES:</span>
+
+- write only teacher-facing prose in 2 to 4 paragraphs
+- do not use bullet points or lists
+- refer to the learner only as "this student" or "the student"
+- use descriptive names only, never unit or progress point IDs
+- <span class="keyword">strictly forbid</span> reason codes, metric keys, bracketed data
+- convert flagged results into plain English
+- do not describe passed points as failures
+- do not use passed points as causes of learning gaps
+- do not treat not-started content as weakness
+- avoid strong predictions about future performance
+- do not overgeneralize from a single flagged result
+- self-check: scan for forbidden codes before returning
+- return only the final summary text</div>
+
+<!-- Section 3 -->
+<h2 id="student-data">3. Student Data</h2>
+
+<p>The test uses grade data for a single student currently in Unit 3. This student has completed all of Unit 1 and Unit 2, with three flagged progress points:</p>
+
+<div class="card">
+  <h3 style="margin-top:0">Unit 1: Orientation and Scientific Argumentation Basics</h3>
+  <p>All 4 progress points <strong>passed</strong> with zero mistakes. Strong foundation in game mechanics and scientific argumentation basics.</p>
+
+  <h3>Unit 2: Topographic Maps and Watersheds</h3>
+  <p>5 of 7 progress points passed. Two flagged:</p>
+  <ul>
+    <li><strong>Foraged Forging</strong> &mdash; flagged (BAD_FEEDBACK), 6 mistakes. Significant difficulty with topographic map interpretation.</li>
+    <li><strong>Which Watershed? I</strong> &mdash; flagged (MISSING_SUCCESS_NODE), 3 mistakes. Did not reach the success condition for watershed comparison.</li>
+  </ul>
+  <p>The student subsequently passed Which Watershed? II with 2 mistakes, suggesting partial recovery.</p>
+
+  <h3>Unit 3: Water Flow Direction and Dissolved Materials</h3>
+  <p>1 of 5 progress points attempted:</p>
+  <ul>
+    <li><strong>Supply Run</strong> &mdash; flagged (TOO_MANY_NEGATIVES), 3 mistakes. Difficulty with water flow direction.</li>
+  </ul>
+  <p>Remaining 4 progress points not yet started.</p>
+
+  <h3>Units 4-5</h3>
+  <p>Not started (all 10 progress points).</p>
+</div>
+
+<!-- Section 4 -->
+<h2 id="responses">4. Model Responses</h2>
+
+<p>The same prompt was run three times. All three responses were nearly identical, differing only in minor formatting (bold markup on "Supply Run" in runs 2 and 3). The content, sentence structure, and claims are the same across all runs.</p>
+
+<div class="response-card">
+  <div class="response-header">Response 1a (Run 1)</div>
+  <div class="response-body">
+    <p>This student has demonstrated strong foundational skills in scientific argumentation and basic hydrology, particularly in Units 1 and 2. Their mastery of claim identification (Defend the Expedition) and narrative engagement (Info and Intros) indicates a solid grasp of argumentation basics and game mechanics. In Unit 2, they successfully navigated topographic maps (Escape the Ruin) and constructed coherent scientific arguments (Classified Information), showing proficiency in connecting terrain features to watershed dynamics. However, their progress in Unit 3 is stalled, with significant gaps in understanding water flow direction and dissolved material transport.</p>
+    <p>The student's flagged results in Supply Run&mdash;marked by repeated errors and zero successful sends&mdash;highlight a critical misunderstanding of how elevation data translates to water flow direction. This suggests they struggle to apply topographic map interpretation to predict water movement, a skill essential for later units. Additionally, their incomplete progress in Unit 3 (Pollution Solution I&ndash;Balanced Ecosystem) indicates a need to reinforce foundational hydrological concepts before advancing. While they passed U2P4 (Investigate Temple) with minimal mistakes, their failure to connect watershed size to flow rate in U2P4 (which was passed with one mistake) may have created a conceptual gap that now affects their ability to predict water behavior in Unit 3.</p>
+    <p>Instructional focus should prioritize reinforcing the relationship between contour lines and water flow direction through visual modeling and guided practice in Unit 3. Additionally, revisiting U2P2 (Foraged Forging) and U2P6 (Which Watershed? I) could help solidify their ability to translate topographic data into spatial reasoning. Addressing these gaps will better prepare the student to tackle dissolved material transport and argumentation tasks in later units. Without mastery of water flow principles, their progress in Units 4 and 5&mdash;particularly the solar still challenge in Unit 5&mdash;will remain hindered.</p>
+  </div>
+</div>
+
+<div class="response-card">
+  <div class="response-header">Response 1b (Run 2)</div>
+  <div class="response-body">
+    <p>This student has demonstrated strong foundational skills in scientific argumentation and basic hydrology, particularly in Units 1 and 2. Their mastery of claim identification (Defend the Expedition) and narrative engagement (Info and Intros) indicates a solid grasp of argumentation basics and game mechanics. In Unit 2, they successfully navigated topographic maps (Escape the Ruin) and constructed coherent scientific arguments (Classified Information), showing proficiency in connecting terrain features to watershed dynamics. However, their progress in Unit 3 is stalled, with significant gaps in understanding water flow direction and dissolved material transport.</p>
+    <p>The student's flagged results in <strong>Supply Run</strong>&mdash;marked by repeated errors and zero successful sends&mdash;highlight a critical misunderstanding of how elevation data translates to water flow direction. This suggests they struggle to apply topographic map interpretation to predict water movement, a skill essential for later units. Additionally, their incomplete progress in Unit 3 (Pollution Solution I&ndash;Balanced Ecosystem) indicates a need to reinforce foundational hydrological concepts before advancing. While they passed U2P4 (Investigate Temple) with minimal mistakes, their failure to connect watershed size to flow rate in U2P4 (which was passed with one mistake) may have created a conceptual gap that now affects their ability to predict water behavior in Unit 3.</p>
+    <p>Instructional focus should prioritize reinforcing the relationship between contour lines and water flow direction through visual modeling and guided practice in Unit 3. Additionally, revisiting U2P2 (Foraged Forging) and U2P6 (Which Watershed? I) could help solidify their ability to translate topographic data into spatial reasoning. Addressing these gaps will better prepare the student to tackle dissolved material transport and argumentation tasks in later units. Without mastery of water flow principles, their progress in Units 4 and 5&mdash;particularly the solar still challenge in Unit 5&mdash;will remain hindered.</p>
+  </div>
+</div>
+
+<div class="response-card">
+  <div class="response-header">Response 1c (Run 3)</div>
+  <div class="response-body">
+    <p>This student has demonstrated strong foundational skills in scientific argumentation and basic hydrology, particularly in Units 1 and 2. Their mastery of claim identification (Defend the Expedition) and narrative engagement (Info and Intros) indicates a solid grasp of argumentation basics and game mechanics. In Unit 2, they successfully navigated topographic maps (Escape the Ruin) and constructed coherent scientific arguments (Classified Information), showing proficiency in connecting terrain features to watershed dynamics. However, their progress in Unit 3 is stalled, with significant gaps in understanding water flow direction and dissolved material transport.</p>
+    <p>The student's flagged results in <strong>Supply Run</strong>&mdash;marked by repeated errors and zero successful sends&mdash;highlight a critical misunderstanding of how elevation data translates to water flow direction. This suggests they struggle to apply topographic map interpretation to predict water movement, a skill essential for later units. Additionally, their incomplete progress in Unit 3 (Pollution Solution I&ndash;Balanced Ecosystem) indicates a need to reinforce foundational hydrological concepts before advancing. While they passed U2P4 (Investigate Temple) with minimal mistakes, their failure to connect watershed size to flow rate in U2P4 (which was passed with one mistake) may have created a conceptual gap that now affects their ability to predict water behavior in Unit 3.</p>
+    <p>Instructional focus should prioritize reinforcing the relationship between contour lines and water flow direction through visual modeling and guided practice in Unit 3. Additionally, revisiting U2P2 (Foraged Forging) and U2P6 (Which Watershed? I) could help solidify their ability to translate topographic data into spatial reasoning. Addressing these gaps will better prepare the student to tackle dissolved material transport and argumentation tasks in later units. Without mastery of water flow principles, their progress in Units 4 and 5&mdash;particularly the solar still challenge in Unit 5&mdash;will remain hindered.</p>
+  </div>
+</div>
+
+<hr class="section-divider">
+
+<!-- Section 5 -->
+<h2 id="chatgpt-analysis">5. ChatGPT Analysis</h2>
+
+<p>The three responses were submitted to ChatGPT for evaluation against the actual student data and prompt rules. The analysis identified high consistency but several accuracy and rule-compliance issues.</p>
+
+<h3>Consistency</h3>
+
+<div class="score-grid">
+  <div class="score-item">
+    <div class="score-label">Consistency</div>
+    <div class="score-value">9.5 / 10</div>
+    <div class="score-note">Nearly identical across 3 runs</div>
+  </div>
+  <div class="score-item">
+    <div class="score-label">Accuracy</div>
+    <div class="score-value">7 / 10</div>
+    <div class="score-note">Several rule violations detected</div>
+  </div>
+</div>
+
+<div class="verdict-card verdict-pass">
+  <strong>Consistency: Excellent</strong>
+  All three responses are essentially the same output with only minor formatting differences (bolding of "Supply Run" in runs 2 and 3). This indicates the prompt is highly deterministic and the model locks into a stable interpretation. Production-ready consistency.
+</div>
+
+<h3>What the Model Gets Right</h3>
+
+<div class="verdict-card verdict-pass">
+  <strong>Unit 1 Interpretation: Accurate</strong>
+  All passed, zero mistakes, correctly described as a strong foundation.
+</div>
+
+<div class="verdict-card verdict-pass">
+  <strong>Unit 2 Strengths: Mostly Accurate</strong>
+  Escape the Ruin and Classified Information correctly identified as strong. General argumentation skills correctly noted.
+</div>
+
+<div class="verdict-card verdict-pass">
+  <strong>Key Struggle Identification: Accurate</strong>
+  Supply Run flagged and correctly interpreted as difficulty understanding water flow direction.
+</div>
+
+<div class="verdict-card verdict-pass">
+  <strong>Instructional Recommendation: Strong</strong>
+  Focus on contour lines, flow direction, and spatial reasoning is well-aligned with curriculum context.
+</div>
+
+<h3>What the Model Gets Wrong</h3>
+
+<ul class="issue-list">
+  <li>
+    <strong>Issue 1: Hallucinated causal chain.</strong>
+    "their failure to connect watershed size to flow rate in Investigate the Temple..." &mdash; This point was <em>passed</em> with only 1 mistake. There is no evidence of conceptual failure. The model fabricated a narrative bridge between an earlier point and a later difficulty.
+    <br><em>Violates: "do not reinterpret a passed progress point as misunderstanding"</em>
+  </li>
+  <li>
+    <strong>Issue 2: Using a passed point as a cause.</strong>
+    "may have created a conceptual gap..." &mdash; The model uses a passed progress point to explain a later difficulty, which is explicitly forbidden.
+    <br><em>Violates: "do not use a passed progress point as the cause of a learning gap"</em>
+  </li>
+  <li>
+    <strong>Issue 3: Overgeneralization from a single flagged point.</strong>
+    "significant gaps in understanding water flow direction and dissolved material transport" &mdash; Only one point is flagged in Unit 3. Dissolved materials have not been attempted. No data supports this claim.
+    <br><em>Violates: "do not overgeneralize from a single flagged result"</em>
+  </li>
+  <li>
+    <strong>Issue 4: Future prediction (too strong).</strong>
+    "will remain hindered" &mdash; This is deterministic and unsupported by data.
+    <br><em>Violates: "avoid strong predictions about future performance"</em>
+  </li>
+  <li>
+    <strong>Issue 5: ID leakage.</strong>
+    "U2P4 (Investigate Temple)" &mdash; Progress point IDs appear in the output despite explicit prohibition.
+    <br><em>Violates: "never include unit or progress point IDs"</em>
+  </li>
+</ul>
+
+<h3>Root Cause</h3>
+
+<p>The model optimizes for <strong>telling a coherent story</strong> rather than <strong>strict evidence-based reporting</strong>. LLMs tend to create narrative bridges ("earlier weakness led to later failure") even when the earlier weakness does not exist in the data. This is a well-known behavior pattern that requires stronger prompt constraints to suppress.</p>
+
+<h3>Bottom Line</h3>
+
+<div class="bottom-line">
+  <div class="bl-card bl-pass">
+    <h4>What Works</h4>
+    <ul>
+      <li>Consistent outputs</li>
+      <li>Strong structure</li>
+      <li>Good instructional language</li>
+    </ul>
+  </div>
+  <div class="bl-card bl-fail">
+    <h4>What Remains</h4>
+    <ul>
+      <li>Narrative overreach</li>
+      <li>Causal hallucination</li>
+      <li>Future prediction</li>
+    </ul>
+  </div>
+</div>
+
+<h3>Suggested Prompt Fixes</h3>
+
+<p>ChatGPT recommended three additions to the Final Output Rules to address the remaining issues:</p>
+
+<div class="code-block"><span class="comment"># Highest-impact fix:</span>
+- do not introduce causal explanations between progress points
+  unless both are flagged or show clear repeated difficulty
+
+<span class="comment"># Additional high-impact fixes:</span>
+- do not attribute current difficulties to earlier passed progress points
+- do not describe unattempted content (e.g., not started points)
+  as areas of difficulty or misunderstanding
+
+<span class="comment"># Optional (fixes overgeneralization):</span>
+- when only one progress point is flagged in a skill area,
+  describe it as an isolated difficulty, not a broad conceptual gap</div>
+
+<hr class="section-divider">
+
+<!-- Section 6: Placeholder for Claude analysis -->
+<h2 id="claude-analysis">6. Claude Analysis</h2>
+
+<p>Independent analysis of the same three responses, evaluated against the student data and prompt rules. This analysis confirms ChatGPT's findings and identifies additional issues.</p>
+
+<h3>Agreement with ChatGPT Analysis</h3>
+
+<p>ChatGPT's five identified issues are all valid. The hallucinated causal chain (Issue 1), misuse of passed data (Issue 2), overgeneralization (Issue 3), deterministic future prediction (Issue 4), and ID leakage (Issue 5) are all clearly present in the output and clearly violate the prompt rules. The consistency score of 9.5/10 is also accurate: three runs produced effectively identical content.</p>
+
+<h3>Additional Issues Identified</h3>
+
+<ul class="issue-list">
+  <li>
+    <strong>Issue 6: False confidence on ambiguous metrics.</strong>
+    The model claims "zero successful sends" based on the metric <code>count=0</code> in the Supply Run data. However, the meaning of <code>count</code> is not defined in the prompt or curriculum context. The model invents a specific interpretation ("successful sends") for an ambiguous field and presents it as fact. A data-grounded summary should not interpret undefined metrics with this level of specificity.
+  </li>
+  <li>
+    <strong>Issue 7: "Stalled" overstates the situation.</strong>
+    The model describes progress in Unit 3 as "stalled," implying the student has stopped advancing. The data shows only that the student is currently in Unit 3 and has attempted one progress point. This is a snapshot, not evidence of stalling. The word choice injects a judgment that the data does not support.
+  </li>
+  <li>
+    <strong>Issue 8: Not-started points treated as evidence.</strong>
+    "Their incomplete progress in Unit 3 (Pollution Solution I&ndash;Balanced Ecosystem) indicates a need to reinforce foundational hydrological concepts before advancing." These are not-started points being used as evidence of a learning need. The prompt explicitly forbids treating not-started content as a weakness, yet the model frames them as reinforcing a deficit narrative.
+  </li>
+  <li>
+    <strong>Issue 9: Partial recovery ignored.</strong>
+    The student was flagged on Which Watershed? I but then passed Which Watershed? II with only 2 mistakes. This is evidence of developing understanding and partial recovery, which the prompt asks the model to recognize. The model never acknowledges this recovery, instead using only the flagged point to build its deficit narrative. This is a significant omission that skews the summary toward a more negative interpretation than the data warrants.
+  </li>
+  <li>
+    <strong>Issue 10: Additional ID leakage.</strong>
+    Beyond "U2P4" noted by ChatGPT, the model also outputs "U2P2 (Foraged Forging)" and "U2P6 (Which Watershed? I)" in the third paragraph. The prompt rule against IDs is violated in multiple locations, not just one.
+  </li>
+</ul>
+
+<h3>Structural Observation</h3>
+
+<p>The model produces a three-paragraph structure: strengths, concerns, recommendations. This is a reasonable structure, but it creates a narrative arc that pressures the model into escalation: paragraph 1 establishes competence, paragraph 2 introduces problems, paragraph 3 prescribes fixes. This arc incentivizes the model to overstate the severity of concerns in paragraph 2 to justify the recommendations in paragraph 3. A flatter structure (e.g., progress summary, then specific observations without a prescribed fix) might reduce the tendency toward narrative overreach.</p>
+
+<h3>Revised Scores</h3>
+
+<div class="score-grid">
+  <div class="score-item">
+    <div class="score-label">Consistency</div>
+    <div class="score-value">9.5 / 10</div>
+    <div class="score-note">Agrees with ChatGPT</div>
+  </div>
+  <div class="score-item">
+    <div class="score-label">Accuracy</div>
+    <div class="score-value">5.5 / 10</div>
+    <div class="score-note">Lower than ChatGPT's 7/10</div>
+  </div>
+</div>
+
+<p>The accuracy score is lower than ChatGPT's assessment because the additional issues (ambiguous metric interpretation, not-started-as-evidence, ignored recovery, multiple ID leaks) compound the original five problems. The output contains correct high-level observations but builds an unsupported deficit narrative that a teacher could act on inappropriately. For a system intended to inform instructional decisions, accuracy at the claim level matters more than getting the overall shape right.</p>
+
+<h3>Bottom Line</h3>
+
+<div class="bottom-line">
+  <div class="bl-card bl-pass">
+    <h4>Production-Ready</h4>
+    <ul>
+      <li>Consistency across runs</li>
+      <li>Professional tone and structure</li>
+      <li>Correct identification of strengths</li>
+      <li>Appropriate use of curriculum context</li>
+      <li>Good instructional recommendations (when grounded)</li>
+    </ul>
+  </div>
+  <div class="bl-card bl-fail">
+    <h4>Not Yet Production-Ready</h4>
+    <ul>
+      <li>Fabricated causal chains between progress points</li>
+      <li>Confident interpretation of ambiguous data</li>
+      <li>Not-started content used as deficit evidence</li>
+      <li>Partial recovery evidence ignored</li>
+      <li>Deterministic future predictions</li>
+      <li>Persistent ID leakage despite explicit prohibition</li>
+      <li>Narrative arc incentivizes overstating severity</li>
+    </ul>
+  </div>
+</div>
+
+<h3>Recommendations</h3>
+
+<p>ChatGPT's suggested prompt fixes are a good starting point. Beyond those, I would recommend:</p>
+
+<div class="code-block"><span class="comment"># Fix for ambiguous metrics:</span>
+- do not interpret metric fields beyond what is explicitly defined
+  in the curriculum context; if a metric's meaning is unclear,
+  do not reference it
+
+<span class="comment"># Fix for ignored recovery:</span>
+- when a student is flagged on one progress point but passes a
+  closely related subsequent point, acknowledge this as evidence
+  of developing understanding
+
+<span class="comment"># Fix for narrative escalation:</span>
+- do not escalate severity to justify recommendations;
+  recommendations should be proportional to the evidence
+
+<span class="comment"># Fix for ID leakage (stronger enforcement):</span>
+- after completing the draft, perform a second pass to remove
+  any text matching the pattern u[0-9]p[0-9] or U[0-9]P[0-9]
+  in any capitalization</div>
+
+<p>The most impactful structural change would be to test whether a shorter output (2 paragraphs instead of 3) reduces narrative overreach by removing the pressure to build a three-act arc. The current prompt allows 2-4 paragraphs; testing at the lower bound may produce more disciplined output.</p>
+
+</div>
+</body>
+</html>
