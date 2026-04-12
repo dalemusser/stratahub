@@ -1,0 +1,141 @@
+{{ define "mhsbuilds_assignments" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full">
+  <div class="mb-4 flex items-center">
+    <a href="/mhsbuilds/collections"
+       class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2 whitespace-nowrap flex-shrink-0"
+       title="Go back">
+      &larr; Back
+    </a>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📦 Assignments — {{ .CollectionName }}</h1>
+  </div>
+
+  <div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm flex-1 mb-2">
+    {{ if .IsUnused }}
+    <p class="text-gray-500 dark:text-gray-400">This collection is not assigned anywhere. It can be safely deleted.</p>
+    {{ else }}
+
+    <!-- Workspaces -->
+    <h2 class="text-base font-semibold text-gray-800 dark:text-gray-200 mb-2">Active in Workspaces</h2>
+    {{ if .Workspaces }}
+    <div class="overflow-x-auto mb-6">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="border-b dark:border-gray-600">
+            <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">Workspace</th>
+            <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">Subdomain</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ range .Workspaces }}
+          <tr class="border-b dark:border-gray-700">
+            <td class="py-2 px-2 text-gray-900 dark:text-gray-100">{{ .Name }}</td>
+            <td class="py-2 px-2"><code class="text-xs bg-gray-100 dark:bg-gray-700 px-1 rounded">{{ .Subdomain }}</code></td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+    </div>
+    {{ else }}
+    <p class="text-gray-500 dark:text-gray-400 mb-6">Not active in any workspace.</p>
+    {{ end }}
+
+    <!-- Groups -->
+    <h2 class="text-base font-semibold text-gray-800 dark:text-gray-200 mb-2">Pinned to Groups</h2>
+    {{ if .Groups }}
+    <div class="overflow-x-auto mb-6">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="border-b dark:border-gray-600">
+            <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">Group</th>
+            <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">Workspace</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ range .Groups }}
+          <tr class="border-b dark:border-gray-700">
+            <td class="py-2 px-2 text-gray-900 dark:text-gray-100">{{ .GroupName }}</td>
+            <td class="py-2 px-2 text-gray-600 dark:text-gray-400">{{ .WorkspaceName }}</td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+    </div>
+    {{ else }}
+    <p class="text-gray-500 dark:text-gray-400 mb-6">Not pinned to any groups.</p>
+    {{ end }}
+
+    <!-- Users -->
+    <h2 class="text-base font-semibold text-gray-800 dark:text-gray-200 mb-2">User Overrides</h2>
+    {{ if .Users }}
+    <div class="overflow-x-auto mb-6">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="border-b dark:border-gray-600">
+            <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">User</th>
+            <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">Login ID</th>
+            <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">Workspace</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ range .Users }}
+          <tr class="border-b dark:border-gray-700">
+            <td class="py-2 px-2 text-gray-900 dark:text-gray-100">{{ .UserName }}</td>
+            <td class="py-2 px-2 font-mono text-gray-600 dark:text-gray-400">{{ .LoginID }}</td>
+            <td class="py-2 px-2 text-gray-600 dark:text-gray-400">{{ .WorkspaceName }}</td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+    </div>
+    {{ else }}
+    <p class="text-gray-500 dark:text-gray-400 mb-6">No user overrides.</p>
+    {{ end }}
+
+    {{ end }}
+
+    <!-- All MHS Enabled Groups -->
+    <div class="flex items-center gap-4 mb-2">
+      <h2 class="text-base font-semibold text-gray-800 dark:text-gray-200">All Groups with Mission HydroSci</h2>
+      <form method="GET" action="/mhsbuilds/collections/{{ .CollectionID }}/assignments" class="flex items-center gap-2">
+        <label class="text-xs text-gray-500 dark:text-gray-400">Workspace:</label>
+        <select name="ws" onchange="this.form.submit()"
+                class="text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400">
+          <option value="all"{{ if eq .SelectedWorkspace "all" }} selected{{ end }}>All</option>
+          {{ range .WorkspaceOptions }}
+          <option value="{{ .ID }}"{{ if .Selected }} selected{{ end }}>{{ .Name }} ({{ .Subdomain }})</option>
+          {{ end }}
+        </select>
+      </form>
+    </div>
+    {{ if .EnabledGroups }}
+    <div class="overflow-x-auto mb-6">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="border-b dark:border-gray-600">
+            <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">Group</th>
+            <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">Workspace</th>
+            <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">Collection</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ range .EnabledGroups }}
+          <tr class="border-b dark:border-gray-700">
+            <td class="py-2 px-2 text-gray-900 dark:text-gray-100">{{ .GroupName }}</td>
+            <td class="py-2 px-2 text-gray-600 dark:text-gray-400">{{ .WorkspaceName }}</td>
+            <td class="py-2 px-2 text-gray-600 dark:text-gray-400">{{ .CollectionUsed }}</td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+    </div>
+    {{ else }}
+    <p class="text-gray-500 dark:text-gray-400 mb-6">No groups have Mission HydroSci enabled.</p>
+    {{ end }}
+
+  </div>
+</div>
+{{ end }}

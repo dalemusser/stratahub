@@ -104,6 +104,14 @@ type AppConfig struct {
 	// MHS Content Delivery
 	MHSCDNBaseURL string // CDN base URL for MHS game builds (e.g., "https://cdn.adroit.games/mhs")
 
+	// MHS S3 storage (separate from materials storage — may use a different bucket/credentials)
+	MHSS3Region          string // AWS region for MHS CDN S3 bucket
+	MHSS3Bucket          string // S3 bucket name (e.g., "adroit-cdn")
+	MHSS3Prefix          string // Key prefix for MHS builds (e.g., "mhs/")
+	MHSS3ACL             string // Default ACL for uploaded objects (e.g., "public-read")
+	MHSS3AccessKeyID     string // AWS access key (optional, uses default credential chain if empty)
+	MHSS3SecretAccessKey string // AWS secret key (optional)
+
 	// Game service endpoints (per-game full endpoint URLs and auth)
 	// Used by /api/game-config to provide service credentials to games.
 	// URLs include the full path (e.g., "https://log.adroit.games/api/log/submit")

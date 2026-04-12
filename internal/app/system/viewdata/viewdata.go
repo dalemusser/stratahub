@@ -80,6 +80,10 @@ type BaseVM struct {
 
 	// BuildTime is the compile-time build stamp (e.g., "20260323-184500" or "dev").
 	BuildTime string
+
+	// Maintenance mode (shown as banner for admin/superadmin)
+	MaintenanceMode    bool
+	MaintenanceMessage string
 }
 
 // storageProvider is set by Init and used to generate logo URLs.
@@ -104,6 +108,23 @@ func GetBuildTime() string {
 type AnnouncementLoader func(ctx context.Context) []AnnouncementVM
 
 var announcementLoader AnnouncementLoader
+
+// MaintenanceInfo holds maintenance mode state for display.
+type MaintenanceInfo struct {
+	Active  bool
+	Message string
+}
+
+// MaintenanceLoader returns the current maintenance mode state.
+type MaintenanceLoader func(ctx context.Context) MaintenanceInfo
+
+var maintenanceLoader MaintenanceLoader
+
+// SetMaintenanceLoader sets the function used to check maintenance mode.
+// Call this once at startup from bootstrap.
+func SetMaintenanceLoader(loader MaintenanceLoader) {
+	maintenanceLoader = loader
+}
 
 // Init sets the storage provider for generating logo URLs.
 // Call this once at startup from bootstrap.
@@ -203,6 +224,13 @@ func NewBaseVM(r *http.Request, db *mongo.Database, title, backDefault string) B
 	// One-shot login actions JavaScript (set by loginactions.Middleware)
 	if js := loginactions.ScriptsFromContext(r.Context()); js != "" {
 		vm.LoginActionsJS = template.JS(js)
+	}
+
+	// Maintenance mode banner (admin/superadmin only)
+	if signedIn && (role == "admin" || role == "superadmin") && maintenanceLoader != nil {
+		info := maintenanceLoader(r.Context())
+		vm.MaintenanceMode = info.Active
+		vm.MaintenanceMessage = info.Message
 	}
 
 	return vm

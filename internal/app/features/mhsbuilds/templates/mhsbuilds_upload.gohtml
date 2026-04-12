@@ -1,0 +1,90 @@
+{{ define "mhsbuilds_upload" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full">
+  <div class="mb-4 flex items-center">
+    <a href="/mhsbuilds/collections"
+       class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
+       title="Go back">
+      &larr; Back
+    </a>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📦 Upload MHS Build</h1>
+  </div>
+
+  <div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm flex-1 mb-2">
+    {{ if .Error }}
+    <div class="mb-4 p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded max-w-xl">
+      {{ .Error }}
+    </div>
+    {{ end }}
+
+    <form method="POST" action="/mhsbuilds/upload" enctype="multipart/form-data" class="space-y-3 max-w-xl">
+      <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}" />
+
+      <div>
+        <label for="file" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Build Zip File</label>
+        <input
+          type="file"
+          id="file"
+          name="file"
+          accept=".zip"
+          required
+          class="block w-full text-sm text-gray-900 dark:text-gray-100
+                 file:mr-4 file:py-2 file:px-4
+                 file:rounded file:border-0
+                 file:text-sm file:font-semibold
+                 file:bg-indigo-50 file:text-indigo-700
+                 dark:file:bg-indigo-900 dark:file:text-indigo-300
+                 hover:file:bg-indigo-100 dark:hover:file:bg-indigo-800"
+        />
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          Zip containing unit folders (e.g., unit1/Build/..., unit2/Build/...). Max 1.5 GB.
+        </p>
+      </div>
+
+      <div>
+        <label for="build_identifier" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Build Identifier</label>
+        <input
+          type="text"
+          id="build_identifier"
+          name="build_identifier"
+          placeholder="e.g., CICDTesting/20260401-10923"
+          class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+        />
+        <p class="mt-1 text-xs text-gray-500 dark:text-gray-400">
+          CI/CD build name for traceability. Pre-filled from the zip filename if left blank.
+        </p>
+      </div>
+
+      <div class="flex gap-2 pt-2">
+        <button
+          type="submit"
+          class="bg-indigo-600 text-white px-3 py-1 rounded text-sm hover:bg-indigo-700"
+        >
+          Analyze Build
+        </button>
+        <a href="/mhsbuilds/collections" class="px-3 py-1 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</a>
+      </div>
+    </form>
+
+    <div class="mt-6 pt-4 border-t dark:border-gray-700">
+      <a href="/mhsbuilds/manual" class="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">
+        Or create a collection manually from existing S3 files
+      </a>
+    </div>
+  </div>
+</div>
+
+<script>
+document.getElementById('file').addEventListener('change', function() {
+  const idField = document.getElementById('build_identifier');
+  if (idField.value === '' && this.files.length > 0) {
+    let name = this.files[0].name;
+    name = name.replace(/\.zip$/i, '');
+    idField.value = name;
+  }
+});
+</script>
+{{ end }}

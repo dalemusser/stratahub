@@ -2,6 +2,7 @@
 package bootstrap
 
 import (
+	"github.com/dalemusser/stratahub/internal/app/store/globalsettings"
 	"github.com/dalemusser/stratahub/internal/app/system/mailer"
 	"github.com/dalemusser/stratahub/internal/app/system/tasks"
 	"github.com/dalemusser/waffle/pantry/storage"
@@ -36,6 +37,12 @@ type DBDeps struct {
 
 	// FileStorage for material file uploads
 	FileStorage storage.Store
+
+	// MHSStorage for uploading game builds to the MHS CDN S3 bucket
+	MHSStorage storage.Store
+
+	// GlobalSettingsStore for system-wide settings (maintenance mode, etc.)
+	GlobalSettingsStore *globalsettings.Store
 
 	// Mailer for sending emails (verification codes, etc.)
 	Mailer *mailer.Mailer

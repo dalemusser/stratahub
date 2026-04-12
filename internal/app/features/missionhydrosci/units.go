@@ -2,10 +2,10 @@
 package missionhydrosci
 
 import (
-	"fmt"
 	"net/http"
 
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
+	"github.com/dalemusser/stratahub/internal/app/system/format"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -14,7 +14,7 @@ import (
 
 // ServeUnits renders the single-launch unit page with progress tracking.
 func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
-	manifest := h.loadContentManifest()
+	manifest, _ := h.resolveManifest(r)
 
 	// Load user progress
 	var currentUnit, userLoginID string
@@ -56,12 +56,13 @@ func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
 		}
 
 		units[i] = UnitVM{
-			ID:        u.ID,
-			Title:     u.Title,
-			Version:   u.Version,
-			TotalSize: u.TotalSize,
-			SizeLabel: formatBytes(u.TotalSize),
-			Status:    status,
+			ID:              u.ID,
+			Title:           u.Title,
+			Version:         u.Version,
+			BuildIdentifier: u.BuildIdentifier,
+			TotalSize:       u.TotalSize,
+			SizeLabel:       format.Bytes(u.TotalSize),
+			Status:          status,
 		}
 	}
 
@@ -86,33 +87,27 @@ func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
 		mhsMemberAuth = settings.GetMHSMemberAuth()
 	}
 
+	// Resolve effective collection info
+	collInfo := h.resolveEffectiveCollectionInfo(r)
+
 	data := UnitsData{
-		BaseVM:         viewdata.LoadBase(r, h.DB),
-		Units:          units,
-		CDNBaseURL:     h.CDNBaseURL,
-		CurrentUnit:    currentUnit,
-		CompletedUnits: completedUnits,
-		UserLoginID:    userLoginID,
-		IsComplete:     isComplete,
-		NextUnitID:     nextUnitID,
-		MHSMemberAuth:  mhsMemberAuth,
+		BaseVM:                 viewdata.LoadBase(r, h.DB),
+		Units:                  units,
+		CDNBaseURL:             h.CDNBaseURL,
+		CurrentUnit:            currentUnit,
+		CompletedUnits:         completedUnits,
+		UserLoginID:            userLoginID,
+		IsComplete:             isComplete,
+		NextUnitID:             nextUnitID,
+		MHSMemberAuth:          mhsMemberAuth,
+		CollectionOverride:     collInfo.IsOverride,
+		CollectionOverrideName: collInfo.Name,
+		ActiveCollectionName:   collInfo.Name,
+		ActiveCollectionID:     collInfo.ID,
+		ActiveCollectionDesc:   collInfo.Description,
 	}
 	data.Title = "Mission HydroSci"
 
 	templates.Render(w, r, "missionhydrosci_units", data)
 }
 
-// formatBytes converts bytes to a human-readable string.
-func formatBytes(b int64) string {
-	const mb = 1024 * 1024
-	const gb = 1024 * mb
-
-	switch {
-	case b >= gb:
-		return fmt.Sprintf("%.1f GB", float64(b)/float64(gb))
-	case b >= mb:
-		return fmt.Sprintf("%.1f MB", float64(b)/float64(mb))
-	default:
-		return fmt.Sprintf("%.1f KB", float64(b)/1024)
-	}
-}

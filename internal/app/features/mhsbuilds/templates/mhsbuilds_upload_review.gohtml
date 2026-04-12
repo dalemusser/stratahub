@@ -1,0 +1,104 @@
+{{ define "mhsbuilds_upload_review" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full">
+  <div class="mb-4 flex items-center">
+    <a href="/mhsbuilds/upload"
+       class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2"
+       title="Go back">
+      &larr; Back
+    </a>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📦 Review Build Upload</h1>
+  </div>
+
+  <div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm flex-1 mb-2">
+    {{ if .Error }}
+    <div class="mb-4 p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded max-w-xl">
+      {{ .Error }}
+    </div>
+    {{ end }}
+
+    <form method="POST" action="/mhsbuilds/upload/confirm" class="space-y-3 max-w-3xl">
+      <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}" />
+      <input type="hidden" name="temp_file_path" value="{{ .TempFilePath }}" />
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Build Identifier</label>
+        <input
+          type="text"
+          name="build_identifier"
+          value="{{ .BuildIdentifier }}"
+          class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 max-w-xl"
+        />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Collection Name</label>
+        <input
+          type="text"
+          name="collection_name"
+          value="{{ .CollectionName }}"
+          class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 max-w-xl"
+        />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description (optional)</label>
+        <textarea
+          name="collection_description"
+          rows="2"
+          class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400 max-w-xl"
+          placeholder="Notes about this build..."
+        ></textarea>
+      </div>
+
+      <h2 class="text-base font-semibold text-gray-800 dark:text-gray-200 pt-2">Detected Units</h2>
+
+      <div class="overflow-x-auto">
+        <table class="min-w-full text-sm">
+          <thead>
+            <tr class="border-b dark:border-gray-600">
+              <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">Unit</th>
+              <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">Files</th>
+              <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">Size</th>
+              <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">Current Version</th>
+              <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">New Version</th>
+            </tr>
+          </thead>
+          <tbody>
+            {{ range .DetectedUnits }}
+            <tr class="border-b dark:border-gray-700">
+              <td class="py-2 px-2 font-medium text-gray-900 dark:text-gray-100">{{ .UnitID }}</td>
+              <td class="py-2 px-2 text-gray-600 dark:text-gray-400">{{ .FileCount }}</td>
+              <td class="py-2 px-2 text-gray-600 dark:text-gray-400">{{ .SizeLabel }}</td>
+              <td class="py-2 px-2 text-gray-600 dark:text-gray-400">{{ if .LatestVersion }}v{{ .LatestVersion }}{{ else }}—{{ end }}</td>
+              <td class="py-2 px-2">
+                <input
+                  type="text"
+                  name="version_{{ .UnitID }}"
+                  value="{{ .SuggestedNext }}"
+                  required
+                  class="w-24 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-1 rounded text-sm focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                />
+              </td>
+            </tr>
+            {{ end }}
+          </tbody>
+        </table>
+      </div>
+
+      <div class="flex gap-2 pt-2">
+        <button
+          type="submit"
+          class="bg-green-600 text-white px-3 py-1 rounded text-sm hover:bg-green-700"
+        >
+          Confirm &amp; Upload to CDN
+        </button>
+        <a href="/mhsbuilds/upload" class="px-3 py-1 border dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Cancel</a>
+      </div>
+    </form>
+  </div>
+</div>
+{{ end }}

@@ -16,4 +16,9 @@ type GroupAppSetting struct {
 	EnabledAt     time.Time          `bson:"enabled_at"`
 	EnabledByID   primitive.ObjectID `bson:"enabled_by_id"`
 	EnabledByName string             `bson:"enabled_by_name"`
+
+	// MHSCollectionID pins this group to a specific MHS collection.
+	// When set, members of this group play from this collection instead of the workspace active.
+	// Only relevant when AppID is "missionhydrosci".
+	MHSCollectionID *primitive.ObjectID `bson:"mhs_collection_id,omitempty"`
 }

@@ -241,7 +241,57 @@
       </div>
     </div>
   </details>
+
+  <!-- Collapsible version details -->
+  <details id="manage-version" class="mt-4 max-w-lg mx-auto w-full">
+    <summary class="text-sm text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
+      Manage version
+    </summary>
+    <div id="manage-version-content" class="mt-2 bg-white dark:bg-gray-800 rounded shadow p-3">
+      {{ if .ActiveCollectionName }}
+      <div class="flex items-center justify-between mb-2">
+        <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ .ActiveCollectionName }}</span>
+        {{ if .CollectionOverride }}
+        <span class="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">Override</span>
+        {{ end }}
+      </div>
+      {{ if .ActiveCollectionDesc }}
+      <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">{{ .ActiveCollectionDesc }}</p>
+      {{ end }}
+      <div class="text-xs text-gray-500 dark:text-gray-400 space-y-0.5 mb-3">
+        {{ range .Units }}
+        <div>{{ .Title }} — <span class="font-mono">v{{ .Version }}</span>{{ if .BuildIdentifier }} — <span class="font-mono">{{ .BuildIdentifier }}</span>{{ end }}</div>
+        {{ end }}
+      </div>
+      <div class="flex gap-2">
+        <button onclick="mhsRequestCollectionPicker()" class="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700">Change</button>
+        {{ if .CollectionOverride }}
+        <form method="POST" action="/missionhydrosci/api/collection-override/clear" class="inline">
+          <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}" />
+          <button type="submit" class="px-3 py-1 text-xs border dark:border-gray-600 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Use default</button>
+        </form>
+        {{ end }}
+      </div>
+      {{ else }}
+      <p class="text-sm text-gray-500 dark:text-gray-400">No collection is currently active.</p>
+      {{ end }}
+    </div>
+  </details>
 </div>
+
+  <!-- Collection picker modal -->
+  <div id="collection-picker-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center">
+    <div class="absolute inset-0 bg-black/40" onclick="mhsCloseCollectionPicker()"></div>
+    <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-300 dark:border-gray-600 max-w-md w-full p-4 space-y-3 mx-4">
+      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Choose Collection</h2>
+      <div id="collection-picker-list" class="max-h-64 overflow-y-auto space-y-1">
+        <div class="text-sm text-gray-500 dark:text-gray-400 p-2">Loading...</div>
+      </div>
+      <div class="flex justify-start pt-2 border-t border-gray-200 dark:border-gray-700">
+        <button type="button" class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" onclick="mhsCloseCollectionPicker()">Close</button>
+      </div>
+    </div>
+  </div>
 
 <script src="/assets/js/mhs-delivery.js?v={{ mhsDeliveryVersion }}"></script>
 <script>
@@ -1201,9 +1251,107 @@
         mhsCloseAuthModal();
       } else if (!helpModal.classList.contains('hidden')) {
         mhsCloseHelp();
+      } else if (!document.getElementById('collection-picker-modal').classList.contains('hidden')) {
+        mhsCloseCollectionPicker();
       }
     }
   });
+
+  // Collection picker with auth gate for members
+  window.mhsRequestCollectionPicker = function() {
+    if (isMember && memberAuthMode !== 'trust') {
+      showAuthModal(
+        'Change collection',
+        'Authorization required to change the active collection.',
+        function() { mhsOpenCollectionPicker(); }
+      );
+    } else {
+      mhsOpenCollectionPicker();
+    }
+  };
+
+  // Collection picker
+  var activeCollectionID = '{{ .ActiveCollectionID }}';
+  var hasOverride = {{ if .CollectionOverride }}true{{ else }}false{{ end }};
+
+  window.mhsOpenCollectionPicker = function() {
+    var modal = document.getElementById('collection-picker-modal');
+    var list = document.getElementById('collection-picker-list');
+    modal.classList.remove('hidden');
+    list.innerHTML = '<div class="text-sm text-gray-500 dark:text-gray-400 p-2">Loading...</div>';
+
+    fetch('/missionhydrosci/api/collections')
+      .then(function(r) { return r.json(); })
+      .then(function(collections) {
+        var defaultActive = !hasOverride;
+        var html = '<button onclick="mhsSelectCollection(\'default\')" class="w-full text-left px-3 py-2 text-sm rounded ' + (defaultActive ? 'bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-300 dark:border-indigo-700' : 'hover:bg-gray-100 dark:hover:bg-gray-700') + ' text-gray-700 dark:text-gray-300">';
+        html += '<span class="font-medium">Default</span>';
+        if (defaultActive) html += ' <span class="text-xs text-indigo-600 dark:text-indigo-400">(current)</span>';
+        html += '<span class="block text-xs text-gray-500 dark:text-gray-400">Use group/workspace active collection</span>';
+        html += '</button>';
+        for (var i = 0; i < collections.length; i++) {
+          var c = collections[i];
+          var isCurrent = hasOverride && (c.id === activeCollectionID);
+          html += '<button onclick="mhsSelectCollection(\'' + c.id + '\')" class="w-full text-left px-3 py-2 text-sm rounded ' + (isCurrent ? 'bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-300 dark:border-indigo-700' : 'hover:bg-gray-100 dark:hover:bg-gray-700') + ' text-gray-700 dark:text-gray-300">';
+          html += '<span class="font-medium">' + escapeHtml(c.name) + '</span>';
+          if (isCurrent) html += ' <span class="text-xs text-indigo-600 dark:text-indigo-400">(current)</span>';
+          html += '<span class="block text-xs text-gray-500 dark:text-gray-400 font-mono">' + escapeHtml(c.units_summary) + '</span>';
+          html += '</button>';
+        }
+        list.innerHTML = html;
+      })
+      .catch(function() {
+        list.innerHTML = '<div class="text-sm text-red-500 p-2">Failed to load collections.</div>';
+      });
+  };
+
+  window.mhsCloseCollectionPicker = function() {
+    document.getElementById('collection-picker-modal').classList.add('hidden');
+  };
+
+  window.mhsSelectCollection = function(id) {
+    var form = new FormData();
+    form.append('collection_id', id);
+    fetch('/missionhydrosci/api/collection-override', {
+      method: 'POST',
+      headers: { 'X-CSRF-Token': '{{ .CSRFToken }}' },
+      body: form
+    }).then(function(r) {
+      if (r.ok) {
+        // Reload with hash to keep Manage version open and signal success
+        window.location.href = '/missionhydrosci/units?vc=1#manage-version';
+      } else {
+        alert('Failed to set collection. Please try again.');
+      }
+    }).catch(function() {
+      alert('Failed to set collection.');
+    });
+  };
+
+  function escapeHtml(s) {
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(s));
+    return d.innerHTML;
+  }
+
+  // Auto-open Manage version and show success after collection change
+  if (new URLSearchParams(window.location.search).get('vc') === '1') {
+    var details = document.getElementById('manage-version');
+    if (details) {
+      details.open = true;
+      // Show brief success indicator
+      var content = document.getElementById('manage-version-content');
+      if (content) {
+        var msg = document.createElement('div');
+        msg.className = 'mb-2 p-2 text-xs rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300';
+        msg.textContent = 'Collection updated.';
+        content.insertBefore(msg, content.firstChild);
+        setTimeout(function() { msg.remove(); }, 4000);
+      }
+    }
+    // Clean URL
+    history.replaceState(null, '', '/missionhydrosci/units');
+  }
 })();
 </script>
 {{ end }}

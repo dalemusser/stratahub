@@ -7,12 +7,13 @@ import (
 
 // UnitVM represents a unit in the unit list UI.
 type UnitVM struct {
-	ID        string
-	Title     string
-	Version   string
-	TotalSize int64  // Total download size in bytes
-	SizeLabel string // Human-readable size (e.g., "45 MB")
-	Status    string // "completed", "current", "future"
+	ID              string
+	Title           string
+	Version         string
+	BuildIdentifier string // CI/CD build name for traceability
+	TotalSize       int64  // Total download size in bytes
+	SizeLabel       string // Human-readable size (e.g., "45 MB")
+	Status          string // "completed", "current", "future"
 }
 
 // UnitsData is the view model for the unit selector page.
@@ -25,7 +26,12 @@ type UnitsData struct {
 	UserLoginID    string   // For building the play URL with ?id=
 	IsComplete     bool     // True when all units are done
 	NextUnitID     string   // Unit after CurrentUnit, empty if last/complete
-	MHSMemberAuth  string   // "trust", "keyword", "staffauth" — controls member auth modal
+	MHSMemberAuth          string // "trust", "keyword", "staffauth" — controls member auth modal
+	CollectionOverride     bool   // True when a per-user override is active
+	CollectionOverrideName string // Name of the override collection
+	ActiveCollectionName   string // Name of the effective collection being used
+	ActiveCollectionID     string // ID of the effective collection (for picker highlight)
+	ActiveCollectionDesc   string // Description of the effective collection
 }
 
 // PlayData is the view model for the game launcher page.
@@ -67,14 +73,15 @@ type ContentManifestFile struct {
 
 // ContentManifestUnit represents a unit in the content manifest.
 type ContentManifestUnit struct {
-	ID            string                `json:"id"`
-	Title         string                `json:"title"`
-	Version       string                `json:"version"`
-	DataFile      string                `json:"dataFile"`
-	FrameworkFile string                `json:"frameworkFile"`
-	CodeFile      string                `json:"codeFile"`
-	Files         []ContentManifestFile `json:"files"`
-	TotalSize     int64                 `json:"totalSize"`
+	ID              string                `json:"id"`
+	Title           string                `json:"title"`
+	Version         string                `json:"version"`
+	BuildIdentifier string                `json:"buildIdentifier,omitempty"`
+	DataFile        string                `json:"dataFile"`
+	FrameworkFile   string                `json:"frameworkFile"`
+	CodeFile        string                `json:"codeFile"`
+	Files           []ContentManifestFile `json:"files"`
+	TotalSize       int64                 `json:"totalSize"`
 }
 
 // ContentManifest is the JSON response for the content manifest API.

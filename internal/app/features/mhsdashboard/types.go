@@ -93,6 +93,10 @@ type MemberRow struct {
 	Devices      []DeviceInfo      // Device readiness info
 	UnitProgress map[string]string // unit ID → "completed"/"current"/"future"
 	CurrentUnit  string            // Unit ID the student is currently in (from grader)
+
+	// Collection info
+	HasCollectionOverride bool   // True if user has a per-user collection override
+	CollectionName        string // Name of the effective collection (override or group/workspace)
 }
 
 // UnitHeader represents header info for a unit.

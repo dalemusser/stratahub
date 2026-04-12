@@ -273,6 +273,13 @@
 
       <!-- Main Content (footer stays at bottom of this area) -->
       <main class="flex-1 h-screen overflow-hidden bg-gray-100 dark:bg-gray-900 flex flex-col">
+        <!-- Maintenance Mode Banner (admin/superadmin only) -->
+        {{ if .MaintenanceMode }}
+        <div class="bg-orange-500 text-white px-4 py-2 text-sm">
+          <span>🔧</span> <strong>Maintenance mode{{ if .MaintenanceMessage }}:{{ end }}</strong>{{ if .MaintenanceMessage }} {{ .MaintenanceMessage }}{{ end }}
+        </div>
+        {{ end }}
+
         <!-- Announcement Banners -->
         {{ if .Announcements }}
         <div id="announcement-banners" class="announcement-banners">

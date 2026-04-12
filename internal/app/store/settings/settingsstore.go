@@ -65,6 +65,7 @@ func (s *Store) Save(ctx context.Context, workspaceID primitive.ObjectID, settin
 			"enabled_auth_methods":    settings.EnabledAuthMethods,
 			"mhs_member_auth":          settings.MHSMemberAuth,
 			"mhs_member_auth_keyword":  settings.MHSMemberAuthKeyword,
+			"mhs_active_collection_id": settings.MHSActiveCollectionID,
 			"enable_claude_summaries":  settings.EnableClaudeSummaries,
 			"claude_model":            settings.ClaudeModel,
 			"updated_at":             settings.UpdatedAt,

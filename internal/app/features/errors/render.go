@@ -40,6 +40,10 @@ type pageData struct {
 	Announcements  []viewdata.AnnouncementVM
 	LoginActionsJS string
 
+	// Maintenance mode (required by layout banner)
+	MaintenanceMode    bool
+	MaintenanceMessage string
+
 	// Build version
 	BuildTime string
 

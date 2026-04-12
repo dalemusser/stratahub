@@ -1,0 +1,94 @@
+{{ define "mhsbuilds_collection_detail" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full">
+  <div class="mb-4 flex items-start justify-between gap-4">
+    <div class="flex items-center min-w-0">
+      <a href="/mhsbuilds/collections"
+         class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-3 whitespace-nowrap flex-shrink-0"
+         title="Go back">
+        &larr; Back
+      </a>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100 min-w-0">📦 {{ .Name }}</h1>
+    </div>
+    <div class="flex gap-2 flex-shrink-0">
+      {{ if .IsActive }}
+      <span class="inline-flex items-center px-3 py-1.5 rounded text-sm font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+        Active for this workspace
+      </span>
+      <form method="POST" action="/mhsbuilds/collections/deactivate"
+            onsubmit="return confirm('Deactivate this collection? Mission HydroSci will be unavailable to members until a collection is activated.')">
+        <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}" />
+        <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded text-sm hover:bg-red-700">
+          Deactivate
+        </button>
+      </form>
+      {{ else }}
+      <form method="POST" action="/mhsbuilds/collections/{{ .ID }}/activate">
+        <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}" />
+        <button
+          type="submit"
+          class="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700"
+        >
+          Activate for Workspace
+        </button>
+      </form>
+      {{ end }}
+    </div>
+  </div>
+
+  <div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm flex-1 mb-2">
+    {{ if .Description }}
+    <div class="mb-4">
+      <dt class="text-gray-500 dark:text-gray-400 text-xs uppercase">Description</dt>
+      <dd class="text-gray-900 dark:text-gray-100">{{ .Description }}</dd>
+    </div>
+    {{ end }}
+    <div class="flex gap-8 mb-4">
+      <div>
+        <dt class="text-gray-500 dark:text-gray-400 text-xs uppercase">Created</dt>
+        <dd class="text-gray-900 dark:text-gray-100">{{ .CreatedAt.Format "2006-01-02 15:04 UTC" }}</dd>
+      </div>
+      <div>
+        <dt class="text-gray-500 dark:text-gray-400 text-xs uppercase">Created By</dt>
+        <dd class="text-gray-900 dark:text-gray-100">{{ .CreatedByName }}</dd>
+      </div>
+    </div>
+
+    <h2 class="text-base font-semibold text-gray-800 dark:text-gray-200 mb-3">Units</h2>
+
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="border-b dark:border-gray-600">
+            <th class="text-left py-3 px-2 text-gray-700 dark:text-gray-300">Unit</th>
+            <th class="text-left py-3 px-2 text-gray-700 dark:text-gray-300">Title</th>
+            <th class="text-left py-3 px-2 text-gray-700 dark:text-gray-300">Version</th>
+            <th class="text-left py-3 px-2 text-gray-700 dark:text-gray-300">Build</th>
+            <th class="text-left py-3 px-2 text-gray-700 dark:text-gray-300">Files</th>
+            <th class="text-left py-3 px-2 text-gray-700 dark:text-gray-300">Size</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ range .Units }}
+          <tr class="border-b dark:border-gray-700">
+            <td class="py-3 px-2 font-medium text-gray-900 dark:text-gray-100">{{ .UnitID }}</td>
+            <td class="py-3 px-2 text-gray-600 dark:text-gray-400">{{ .Title }}</td>
+            <td class="py-3 px-2">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                v{{ .Version }}
+              </span>
+            </td>
+            <td class="py-3 px-2 text-gray-600 dark:text-gray-400 text-xs font-mono">{{ .BuildIdentifier }}</td>
+            <td class="py-3 px-2 text-gray-600 dark:text-gray-400">{{ .FileCount }}</td>
+            <td class="py-3 px-2 text-gray-600 dark:text-gray-400">{{ .SizeLabel }}</td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+{{ end }}

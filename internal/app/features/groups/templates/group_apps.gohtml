@@ -3,44 +3,67 @@
 {{ end }}
 
 {{ define "content" }}
-<div class="flex items-center mb-2">
-  <a href="{{ .BackURL }}"
-     class="text-sm px-3 py-1 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 mr-2"
-     title="Go back">
-    &larr; Back
-  </a>
-  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Manage Apps &mdash; {{ .GroupName }}</h1>
-</div>
-
-<div class="mb-6 text-sm text-gray-600 dark:text-gray-400 max-w-xl">
-  <p>Enable or disable apps for members in this group. Leaders, coordinators, and admins always have access to all apps.</p>
-</div>
-
-<div class="max-w-xl space-y-4">
-  {{ range .Apps }}
-  <div class="flex items-center justify-between p-4 border rounded bg-white dark:bg-gray-800 dark:border-gray-700">
-    <div>
-      <div class="font-medium text-gray-900 dark:text-gray-100">{{ .Name }}</div>
-      <div class="text-sm text-gray-500 dark:text-gray-400">{{ .Description }}</div>
-    </div>
-    <form method="post" action="/groups/{{ $.GroupID }}/apps/toggle">
-      <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
-      <input type="hidden" name="return" value="{{ $.BackURL }}">
-      <input type="hidden" name="app_id" value="{{ .ID }}">
-      <input type="hidden" name="action" value="{{ if .Enabled }}disable{{ else }}enable{{ end }}">
-      {{ if .Enabled }}
-      <button type="submit" class="relative w-11 h-6 rounded-full bg-green-600 cursor-pointer"
-              title="Click to disable">
-        <span class="absolute top-0.5 left-5 h-5 w-5 rounded-full bg-white shadow"></span>
-      </button>
-      {{ else }}
-      <button type="submit" class="relative w-11 h-6 rounded-full bg-gray-300 dark:bg-gray-600 cursor-pointer"
-              title="Click to enable">
-        <span class="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow"></span>
-      </button>
-      {{ end }}
-    </form>
+<div class="flex flex-col h-full">
+  <div class="flex items-center mb-4">
+    <a href="{{ .BackURL }}"
+       class="text-sm px-3 py-1 border rounded hover:bg-gray-50 dark:hover:bg-gray-700 dark:border-gray-600 mr-2"
+       title="Go back">
+      &larr; Back
+    </a>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Manage Apps &mdash; {{ .GroupName }}</h1>
   </div>
-  {{ end }}
+
+  <div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm flex-1 mb-2">
+    <p class="text-gray-500 dark:text-gray-400 mb-4">
+      Enable or disable apps for members in this group. Leaders, coordinators, and admins always have access to all apps.
+    </p>
+
+    <div class="space-y-4 max-w-xl">
+      {{ range .Apps }}
+      <div class="p-4 border rounded dark:border-gray-700">
+        <div class="flex items-center justify-between">
+          <div>
+            <div class="font-medium text-gray-900 dark:text-gray-100">{{ .Name }}</div>
+            <div class="text-sm text-gray-500 dark:text-gray-400">{{ .Description }}</div>
+          </div>
+          <form method="post" action="/groups/{{ $.GroupID }}/apps/toggle">
+            <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
+            <input type="hidden" name="return" value="{{ $.BackURL }}">
+            <input type="hidden" name="app_id" value="{{ .ID }}">
+            <input type="hidden" name="action" value="{{ if .Enabled }}disable{{ else }}enable{{ end }}">
+            {{ if .Enabled }}
+            <button type="submit" class="relative w-11 h-6 rounded-full bg-green-600 cursor-pointer"
+                    title="Click to disable">
+              <span class="absolute top-0.5 left-5 h-5 w-5 rounded-full bg-white shadow"></span>
+            </button>
+            {{ else }}
+            <button type="submit" class="relative w-11 h-6 rounded-full bg-gray-300 dark:bg-gray-600 cursor-pointer"
+                    title="Click to enable">
+              <span class="absolute top-0.5 left-0.5 h-5 w-5 rounded-full bg-white shadow"></span>
+            </button>
+            {{ end }}
+          </form>
+        </div>
+        {{ if and .Enabled (eq .ID "missionhydrosci") }}
+        <div class="mt-3 pt-3 border-t dark:border-gray-700">
+          <form method="post" action="/groups/{{ $.GroupID }}/apps/mhs-collection" class="flex items-center gap-2 flex-wrap">
+            <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}">
+            <input type="hidden" name="return" value="{{ $.BackURL }}">
+            <label class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">Collection:</label>
+            <select name="mhs_collection_id"
+                    class="text-sm border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 rounded px-2 py-1 focus:outline-none focus:ring-2 focus:ring-indigo-400 max-w-xs">
+              <option value="active"{{ if not $.MHSCollectionID }} selected{{ end }}>Use workspace active (default)</option>
+              {{ range $.MHSCollectionOptions }}
+              <option value="{{ .ID }}"{{ if eq .ID $.MHSCollectionID }} selected{{ end }}>{{ .Name }}</option>
+              {{ end }}
+            </select>
+            <button type="submit" class="px-3 py-1 bg-indigo-600 text-white rounded text-xs hover:bg-indigo-700">Save</button>
+          </form>
+        </div>
+        {{ end }}
+      </div>
+      {{ end }}
+    </div>
+  </div>
 </div>
 {{ end }}

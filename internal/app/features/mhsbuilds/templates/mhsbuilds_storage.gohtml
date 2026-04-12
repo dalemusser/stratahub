@@ -1,0 +1,116 @@
+{{ define "mhsbuilds_storage" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full">
+  <div class="mb-4 flex items-center justify-between">
+    <div class="flex items-center">
+      <a href="/mhsbuilds/collections"
+         class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2 whitespace-nowrap flex-shrink-0"
+         title="Go back">
+        &larr; Back
+      </a>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📦 S3 Storage</h1>
+    </div>
+    <form method="POST" action="/mhsbuilds/storage/sync">
+      <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}" />
+      <button type="submit" class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+        Sync from S3
+      </button>
+    </form>
+  </div>
+
+  <div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-gray-700 dark:text-gray-300 text-sm flex-1 mb-2">
+    {{ if .SyncMessage }}
+    <div class="mb-4 p-2 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 rounded">
+      {{ .SyncMessage }}
+    </div>
+    {{ end }}
+
+    {{ if .Error }}
+    <div class="mb-4 p-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded">
+      {{ .Error }}
+    </div>
+    {{ end }}
+
+    <p class="text-gray-500 dark:text-gray-400 mb-4">
+      Unit versions registered in the database. Click "Sync from S3" to discover new versions uploaded to S3 storage.
+    </p>
+
+    {{ if not .Builds }}
+    <p class="text-gray-500 dark:text-gray-400">No builds registered. Click "Sync from S3" to discover builds.</p>
+    {{ else }}
+    <div class="overflow-x-auto">
+      <table class="min-w-full text-sm">
+        <thead>
+          <tr class="border-b dark:border-gray-600">
+            <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">Unit</th>
+            <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">Version</th>
+            <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">Build Identifier</th>
+            <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">Files</th>
+            <th class="text-left py-2 px-2 text-gray-700 dark:text-gray-300">Size</th>
+            <th class="text-center py-2 px-2 text-gray-700 dark:text-gray-300">In Collections</th>
+            <th class="text-right py-2 px-2 text-gray-700 dark:text-gray-300">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ range .Builds }}
+          <tr class="border-b dark:border-gray-700">
+            <td class="py-2 px-2 font-medium text-gray-900 dark:text-gray-100">{{ .UnitID }}</td>
+            <td class="py-2 px-2">
+              <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                v{{ .Version }}
+              </span>
+            </td>
+            <td class="py-2 px-2">
+              <form method="POST" action="/mhsbuilds/storage/build/{{ .ID }}/identifier" class="flex items-center gap-1">
+                <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}" />
+                <input
+                  type="text"
+                  name="build_identifier"
+                  value="{{ .BuildIdentifier }}"
+                  class="flex-1 min-w-0 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 px-2 py-0.5 rounded text-xs focus:outline-none focus:ring-1 focus:ring-indigo-400"
+                />
+                <button type="submit" class="px-2 py-0.5 text-xs bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded hover:bg-gray-300 dark:hover:bg-gray-500 flex-shrink-0" title="Save">Save</button>
+              </form>
+            </td>
+            <td class="py-2 px-2 text-gray-600 dark:text-gray-400">{{ .FileCount }}</td>
+            <td class="py-2 px-2 text-gray-600 dark:text-gray-400">{{ .SizeLabel }}</td>
+            <td class="py-2 px-2 text-center">
+              {{ if gt .CollectionCount 0 }}
+              <form
+                method="get"
+                action="/mhsbuilds/storage/build/{{ .ID }}/collections_modal"
+                hx-get="/mhsbuilds/storage/build/{{ .ID }}/collections_modal"
+                hx-target="#modal-root"
+                hx-swap="innerHTML"
+              >
+                <button type="submit" class="px-2 py-0.5 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700 cursor-pointer">
+                  {{ .CollectionCount }}
+                </button>
+              </form>
+              {{ else }}
+              <span class="text-xs text-gray-400 dark:text-gray-500">0</span>
+              {{ end }}
+            </td>
+            <td class="py-2 px-2 text-right">
+              {{ if .CanDelete }}
+              <form method="POST" action="/mhsbuilds/storage/delete/{{ .UnitID }}/{{ .Version }}"
+                    onsubmit="return confirm('Delete {{ .UnitID }} v{{ .Version }} from S3 and database? This cannot be undone.')">
+                <input type="hidden" name="csrf_token" value="{{ $.CSRFToken }}" />
+                <button type="submit" class="px-2 py-0.5 text-xs bg-red-600 text-white rounded hover:bg-red-700">Delete</button>
+              </form>
+              {{ end }}
+            </td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+    </div>
+    {{ end }}
+  </div>
+</div>
+
+<div id="modal-root"></div>
+{{ end }}

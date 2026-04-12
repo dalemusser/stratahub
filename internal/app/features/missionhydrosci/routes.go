@@ -23,13 +23,17 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 		pr.Get("/api/manifest", h.ServeContentManifest)
 		pr.Get("/api/progress", h.ServeProgress)
 		pr.Post("/api/progress/complete", h.HandleCompleteUnit)
-		pr.Post("/api/progress/reset", h.HandleResetProgress)
 		pr.Post("/api/progress/set-unit", h.HandleSetToUnit)
 		pr.Post("/api/device-status", h.HandleDeviceStatus)
 		pr.Post("/api/auth/start", h.HandleStaffAuthStart)
 		pr.Post("/api/auth/verify", h.HandleStaffAuthVerify)
 		pr.Post("/api/auth/resend", h.HandleStaffAuthResend)
 		pr.Post("/api/auth/keyword", h.HandleKeywordVerify)
+
+		// Collection override (per-user, all roles — members need staff-auth via the picker UI)
+		pr.Get("/api/collections", h.ServeCollectionList)
+		pr.Post("/api/collection-override", h.HandleSetCollectionOverride)
+		pr.Post("/api/collection-override/clear", h.HandleClearCollectionOverride)
 	})
 
 	return r

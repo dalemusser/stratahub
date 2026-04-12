@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/dalemusser/stratahub/internal/app/store/globalsettings"
 	"github.com/dalemusser/stratahub/internal/app/system/indexes"
 	"github.com/dalemusser/stratahub/internal/app/system/mailer"
 	"github.com/dalemusser/stratahub/internal/app/system/seeding"
@@ -100,6 +101,29 @@ func ConnectDB(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig
 		return DBDeps{}, fmt.Errorf("unknown storage type: %s", appCfg.StorageType)
 	}
 
+	// Initialize MHS S3 storage (separate from materials storage)
+	var mhsStorage storage.Store
+	if appCfg.MHSS3Bucket != "" {
+		s3Cfg := storage.S3Config{
+			Region:     appCfg.MHSS3Region,
+			Bucket:     appCfg.MHSS3Bucket,
+			Prefix:     appCfg.MHSS3Prefix,
+			DefaultACL: appCfg.MHSS3ACL,
+		}
+		if appCfg.MHSS3AccessKeyID != "" {
+			s3Cfg.AccessKeyID = appCfg.MHSS3AccessKeyID
+			s3Cfg.SecretAccessKey = appCfg.MHSS3SecretAccessKey
+		}
+		mhsStorage, err = storage.NewS3(ctx, s3Cfg)
+		if err != nil {
+			return DBDeps{}, fmt.Errorf("failed to initialize MHS S3 storage: %w", err)
+		}
+		logger.Info("initialized MHS S3 storage",
+			zap.String("bucket", appCfg.MHSS3Bucket),
+			zap.String("prefix", appCfg.MHSS3Prefix),
+		)
+	}
+
 	// Initialize email mailer
 	mail := mailer.New(mailer.Config{
 		Host:     appCfg.MailSMTPHost,
@@ -114,12 +138,17 @@ func ConnectDB(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig
 		zap.Int("port", appCfg.MailSMTPPort),
 	)
 
+	// Initialize global settings store (maintenance mode, etc.)
+	gsStore := globalsettings.New(db)
+
 	return DBDeps{
 		StrataHubMongoClient:   client,
 		StrataHubMongoDatabase: db,
 		MHSGraderDatabase:      mhsGraderDB,
 		StratalogDatabase:      stratalogDB,
 		FileStorage:            store,
+		MHSStorage:             mhsStorage,
+		GlobalSettingsStore:    gsStore,
 		Mailer:                 mail,
 	}, nil
 }

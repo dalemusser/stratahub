@@ -27,6 +27,7 @@ type groupListItem struct {
 	LeadersCount           int
 	MembersCount           int
 	AssignedResourcesCount int
+	AppIcons               []string // Emoji icons for enabled apps
 }
 
 // groupListData is the view model for the groups list page.

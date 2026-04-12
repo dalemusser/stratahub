@@ -11,6 +11,7 @@ import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	settingsstore "github.com/dalemusser/stratahub/internal/app/store/settings"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
+	"github.com/dalemusser/stratahub/internal/app/system/format"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
@@ -724,8 +725,8 @@ func (h *Handler) loadDeviceMap(ctx context.Context, r *http.Request, members []
 			StorageUsage:  s.StorageUsage,
 			StorageQuota:  s.StorageQuota,
 			StoragePct:    pct,
-			StorageUsed:   formatBytes(s.StorageUsage),
-			StorageTotal:  formatBytes(s.StorageQuota),
+			StorageUsed:   format.Bytes(s.StorageUsage),
+			StorageTotal:  format.Bytes(s.StorageQuota),
 			LastSeen:      s.LastSeen,
 			IsStale:       now.Sub(s.LastSeen) > staleDeviceThreshold,
 		})
@@ -919,14 +920,28 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 			}
 		}
 
+		// Check for per-user collection override
+		var hasOverride bool
+		var collName string
+		if p, ok := mhsProgress[member.ID.Hex()]; ok && p.CollectionOverrideID != nil && !p.CollectionOverrideID.IsZero() {
+			hasOverride = true
+			if coll, err := h.CollectionStore.GetByID(ctx, *p.CollectionOverrideID); err == nil {
+				collName = coll.Name
+			} else {
+				collName = "(unknown)"
+			}
+		}
+
 		result[i] = MemberRow{
-			ID:           member.ID.Hex(),
-			Name:         member.FullName,
-			IsEven:       i%2 == 0,
-			Cells:        cells,
-			Devices:      deviceMap[member.ID.Hex()],
-			UnitProgress: unitProgress,
-			CurrentUnit:  currentUnit,
+			ID:                    member.ID.Hex(),
+			Name:                  member.FullName,
+			IsEven:                i%2 == 0,
+			Cells:                 cells,
+			Devices:               deviceMap[member.ID.Hex()],
+			UnitProgress:          unitProgress,
+			CurrentUnit:           currentUnit,
+			HasCollectionOverride: hasOverride,
+			CollectionName:        collName,
 		}
 	}
 
@@ -1071,18 +1086,3 @@ func (h *Handler) formatTimeInOrgTimezone(ctx context.Context, orgID primitive.O
 	return localTime.Format("Jan 2, 2006 3:04 PM"), tzAbbr
 }
 
-// formatBytes converts bytes to a human-readable string (MB or GB).
-func formatBytes(b int64) string {
-	const (
-		mb = 1024 * 1024
-		gb = 1024 * 1024 * 1024
-	)
-	switch {
-	case b >= gb:
-		return fmt.Sprintf("%.1f GB", float64(b)/float64(gb))
-	case b >= mb:
-		return fmt.Sprintf("%.0f MB", float64(b)/float64(mb))
-	default:
-		return fmt.Sprintf("%d B", b)
-	}
-}

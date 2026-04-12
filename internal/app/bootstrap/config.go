@@ -84,6 +84,14 @@ var appConfigKeys = []config.AppKey{
 	// MHS Content Delivery
 	{Name: "mhs_cdn_base_url", Default: "", Desc: "CDN base URL for MHS game builds (e.g., https://cdn.adroit.games/mhs)"},
 
+	// MHS S3 storage (separate from materials storage — may use a different bucket/credentials)
+	{Name: "mhs_s3_region", Default: "", Desc: "AWS region for MHS CDN S3 bucket"},
+	{Name: "mhs_s3_bucket", Default: "", Desc: "S3 bucket name for MHS game builds (e.g., adroit-cdn)"},
+	{Name: "mhs_s3_prefix", Default: "mhs/", Desc: "S3 key prefix for MHS builds"},
+	{Name: "mhs_s3_acl", Default: "public-read", Desc: "Default ACL for MHS build uploads"},
+	{Name: "mhs_s3_access_key_id", Default: "", Desc: "AWS access key for MHS S3 (optional, uses default chain if empty)"},
+	{Name: "mhs_s3_secret_access_key", Default: "", Desc: "AWS secret key for MHS S3 (optional)"},
+
 	// Game service endpoints (for /api/game-config)
 	// Full endpoint URLs so games can POST directly without constructing paths.
 	{Name: "game_mhs_log_submit_url", Default: "", Desc: "Log submit endpoint (e.g., https://log.adroit.games/api/log/submit)"},
@@ -189,6 +197,14 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 
 		// MHS Content Delivery
 		MHSCDNBaseURL: appValues.String("mhs_cdn_base_url"),
+
+		// MHS S3 storage
+		MHSS3Region:          appValues.String("mhs_s3_region"),
+		MHSS3Bucket:          appValues.String("mhs_s3_bucket"),
+		MHSS3Prefix:          appValues.String("mhs_s3_prefix"),
+		MHSS3ACL:             appValues.String("mhs_s3_acl"),
+		MHSS3AccessKeyID:     appValues.String("mhs_s3_access_key_id"),
+		MHSS3SecretAccessKey: appValues.String("mhs_s3_secret_access_key"),
 
 		// Game service endpoints
 		GameMHSLogSubmitURL:    appValues.String("game_mhs_log_submit_url"),

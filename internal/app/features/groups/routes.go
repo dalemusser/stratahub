@@ -50,6 +50,7 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 		// MANAGE APPS
 		pr.Get("/{id}/apps", h.ServeGroupApps)
 		pr.Post("/{id}/apps/toggle", h.HandleToggleApp)
+		pr.Post("/{id}/apps/mhs-collection", h.HandleSetMHSCollection)
 
 		// ASSIGN RESOURCES — THIS IS WHAT YOUR 404 NEEDS
 		pr.Get("/{id}/assign_resources", h.ServeAssignResources)

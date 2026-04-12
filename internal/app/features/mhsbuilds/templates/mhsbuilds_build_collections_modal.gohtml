@@ -1,0 +1,31 @@
+{{ define "mhsbuilds_build_collections_modal" }}
+<div class="fixed inset-0 z-50 flex items-center justify-center">
+  <!-- Overlay -->
+  <div class="absolute inset-0 bg-black/40" onclick="document.getElementById('modal-root').innerHTML=''"></div>
+
+  <!-- Modal -->
+  <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-300 dark:border-gray-600 max-w-md w-full p-4 space-y-4 mx-4">
+    <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Collections — {{ .UnitID }} v{{ .Version }}</h2>
+
+    {{ if .Collections }}
+    <div class="space-y-2">
+      {{ range .Collections }}
+      <div class="p-2 bg-gray-50 dark:bg-gray-700 rounded text-sm text-gray-900 dark:text-gray-100">
+        {{ . }}
+      </div>
+      {{ end }}
+    </div>
+    {{ else }}
+    <p class="text-sm text-gray-500 dark:text-gray-400">This version is not in any collection.</p>
+    {{ end }}
+
+    <div class="flex justify-center pt-2 border-t border-gray-200 dark:border-gray-700">
+      <button type="button"
+              class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700"
+              onclick="document.getElementById('modal-root').innerHTML=''">
+        Close
+      </button>
+    </div>
+  </div>
+</div>
+{{ end }}

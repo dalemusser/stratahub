@@ -74,7 +74,14 @@ func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 		if _, err := masStore.DeleteByLeader(ctx, uid); err != nil {
 			return err
 		}
-		// 3) Delete the user (role: leader)
+		// 3) Remove MHS user progress and device status
+		if _, err := h.DB.Collection("mhs_user_progress").DeleteMany(ctx, bson.M{"user_id": uid}); err != nil {
+			return err
+		}
+		if _, err := h.DB.Collection("mhs_device_status").DeleteMany(ctx, bson.M{"user_id": uid}); err != nil {
+			return err
+		}
+		// 4) Delete the user (role: leader)
 		if _, err := h.DB.Collection("users").DeleteOne(ctx, bson.M{"_id": uid, "role": "leader"}); err != nil {
 			return err
 		}

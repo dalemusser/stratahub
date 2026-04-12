@@ -24,6 +24,7 @@ import (
 	profilefeature "github.com/dalemusser/stratahub/internal/app/features/profile"
 	materialsfeature "github.com/dalemusser/stratahub/internal/app/features/materials"
 	membersfeature "github.com/dalemusser/stratahub/internal/app/features/members"
+	mhsbuildsfeature "github.com/dalemusser/stratahub/internal/app/features/mhsbuilds"
 	mhsdashboardfeature "github.com/dalemusser/stratahub/internal/app/features/mhsdashboard"
 	missionhydroscifeature "github.com/dalemusser/stratahub/internal/app/features/missionhydrosci"
 	"github.com/dalemusser/stratahub/internal/app/store/emailverify"
@@ -50,6 +51,7 @@ import (
 	workspacestore "github.com/dalemusser/stratahub/internal/app/store/workspaces"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/auditlog"
+	"github.com/dalemusser/stratahub/internal/app/system/maintenance"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/waffle/config"
@@ -133,6 +135,18 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		return vms
 	})
 
+	// Set up maintenance loader for viewdata (shows banner for admin/superadmin)
+	viewdata.SetMaintenanceLoader(func(ctx context.Context) viewdata.MaintenanceInfo {
+		gs, err := deps.GlobalSettingsStore.Get(ctx)
+		if err != nil {
+			return viewdata.MaintenanceInfo{}
+		}
+		return viewdata.MaintenanceInfo{
+			Active:  gs.MaintenanceMode,
+			Message: gs.MaintenanceMessage,
+		}
+	})
+
 	// Create error logger for handlers.
 	errLog := errorsfeature.NewErrorLogger(logger)
 
@@ -166,6 +180,9 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	// Login actions middleware: reads one-shot login_actions_js from session,
 	// passes it through context for layout template emission, then clears it.
 	r.Use(loginactions.Middleware(sessionMgr))
+
+	// Maintenance mode: blocks non-admin users when maintenance is enabled.
+	r.Use(maintenance.Middleware(deps.GlobalSettingsStore, deps.StrataHubMongoDatabase, logger))
 
 	// Stale cookie cleanup: remove old generic cookie names from before per-app naming.
 	// This runs on every request but only sets headers when old cookies are actually present.
@@ -282,6 +299,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 			SettingsLoadURL: appCfg.GameMHSSettingsLoadURL,
 			SaveAuth:        appCfg.GameMHSSaveAuth,
 		},
+		sessionMgr,
 		logger,
 	)
 	missionHydroSciHandler.StaffAuthVerifier = staffAuthVerifier
@@ -462,7 +480,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	})
 
 	// Workspace management (superadmin only, apex domain - no workspace required)
-	workspacesHandler := workspacesfeature.NewHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, auditLogger, appCfg.PrimaryDomain, logger)
+	workspacesHandler := workspacesfeature.NewHandler(deps.StrataHubMongoDatabase, deps.FileStorage, deps.GlobalSettingsStore, errLog, auditLogger, appCfg.PrimaryDomain, logger)
 	r.Mount("/workspaces", workspacesfeature.Routes(workspacesHandler, sessionMgr))
 
 	// User info API (for games to identify the current player - no workspace required for backward compat)
@@ -563,6 +581,10 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		mhsDashboardHandler.ClaudeModel = appCfg.ClaudeModel
 		mhsDashboardHandler.ActiveGapThreshold = appCfg.MHSActiveGapThreshold
 		wsr.Mount("/mhsdashboard", mhsdashboardfeature.Routes(mhsDashboardHandler, sessionMgr))
+
+		// MHS Build Management (upload builds, manage collections)
+		mhsBuildsHandler := mhsbuildsfeature.NewHandler(deps.StrataHubMongoDatabase, deps.MHSStorage, appCfg.MHSCDNBaseURL, errLog, logger)
+		wsr.Mount("/mhsbuilds", mhsbuildsfeature.Routes(mhsBuildsHandler, sessionMgr))
 
 		// Mission HydroSci (experimental copy of MHS delivery for admin/coordinator development)
 		wsr.Mount("/missionhydrosci", missionhydroscifeature.Routes(missionHydroSciHandler, sessionMgr))

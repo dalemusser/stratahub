@@ -40,6 +40,9 @@ type SiteSettings struct {
 	MHSMemberAuth        string `bson:"mhs_member_auth,omitempty" json:"mhs_member_auth,omitempty"`
 	MHSMemberAuthKeyword string `bson:"mhs_member_auth_keyword,omitempty" json:"mhs_member_auth_keyword,omitempty"`
 
+	// MHS active collection — per-workspace selection of which unit collection members see
+	MHSActiveCollectionID *primitive.ObjectID `bson:"mhs_active_collection_id,omitempty" json:"mhs_active_collection_id,omitempty"`
+
 	// MHS AI summaries
 	EnableClaudeSummaries bool   `bson:"enable_claude_summaries,omitempty" json:"enable_claude_summaries,omitempty"`
 	ClaudeModel           string `bson:"claude_model,omitempty" json:"claude_model,omitempty"`

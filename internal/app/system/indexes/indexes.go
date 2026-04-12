@@ -80,6 +80,12 @@ func EnsureAll(ctx context.Context, db *mongo.Database) error {
 	if err := ensureMHSDeviceStatus(ctx, db); err != nil {
 		problems = append(problems, "mhs_device_status: "+err.Error())
 	}
+	if err := ensureMHSBuilds(ctx, db); err != nil {
+		problems = append(problems, "mhs_builds: "+err.Error())
+	}
+	if err := ensureMHSCollections(ctx, db); err != nil {
+		problems = append(problems, "mhs_collections: "+err.Error())
+	}
 
 	if len(problems) > 0 {
 		return errors.New(strings.Join(problems, "; "))
@@ -971,6 +977,44 @@ func ensureMHSUserProgress(ctx context.Context, db *mongo.Database) error {
 			},
 			Options: options.Index().
 				SetName("idx_mhsprogress_workspace_loginid"),
+		},
+	})
+}
+
+func ensureMHSBuilds(ctx context.Context, db *mongo.Database) error {
+	c := db.Collection("mhs_builds")
+	return ensureIndexSet(ctx, c, []mongo.IndexModel{
+		// Unique per unit+version
+		{
+			Keys: bson.D{
+				{Key: "unit_id", Value: 1},
+				{Key: "version", Value: 1},
+			},
+			Options: options.Index().
+				SetUnique(true).
+				SetName("uniq_mhsbuild_unit_version"),
+		},
+		// List builds newest first
+		{
+			Keys: bson.D{
+				{Key: "created_at", Value: -1},
+			},
+			Options: options.Index().
+				SetName("idx_mhsbuild_created"),
+		},
+	})
+}
+
+func ensureMHSCollections(ctx context.Context, db *mongo.Database) error {
+	c := db.Collection("mhs_collections")
+	return ensureIndexSet(ctx, c, []mongo.IndexModel{
+		// List collections newest first
+		{
+			Keys: bson.D{
+				{Key: "created_at", Value: -1},
+			},
+			Options: options.Index().
+				SetName("idx_mhscollection_created"),
 		},
 	})
 }

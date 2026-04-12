@@ -19,7 +19,9 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/txn"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/go-chi/chi/v5"
+	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )
 
@@ -130,7 +132,35 @@ func (h *Handler) cascadeDeleteOrg(ctx context.Context, orgID primitive.ObjectID
 		h.Log.Debug("deleted group_memberships", zap.Int64("count", cnt), zap.String("org_id", idHex))
 	}
 
-	// 5. Delete all groups for this organization.
+	// 5. Delete group_app_settings for this org's groups (includes MHS collection pins).
+	groupIDs := getGroupIDsForOrg(ctx, db, orgID)
+	if len(groupIDs) > 0 {
+		if res, err := db.Collection("group_app_settings").DeleteMany(ctx, bson.M{"group_id": bson.M{"$in": groupIDs}}); err != nil {
+			h.Log.Error("failed to delete group_app_settings for org", zap.Error(err), zap.String("org_id", idHex))
+			return err
+		} else if res.DeletedCount > 0 {
+			h.Log.Debug("deleted group_app_settings", zap.Int64("count", res.DeletedCount), zap.String("org_id", idHex))
+		}
+	}
+
+	// 6. Delete MHS user progress and device status for this org's users.
+	userIDs := getUserIDsForOrg(ctx, db, orgID)
+	if len(userIDs) > 0 {
+		if res, err := db.Collection("mhs_user_progress").DeleteMany(ctx, bson.M{"user_id": bson.M{"$in": userIDs}}); err != nil {
+			h.Log.Error("failed to delete mhs_user_progress for org", zap.Error(err), zap.String("org_id", idHex))
+			return err
+		} else if res.DeletedCount > 0 {
+			h.Log.Debug("deleted mhs_user_progress", zap.Int64("count", res.DeletedCount), zap.String("org_id", idHex))
+		}
+		if res, err := db.Collection("mhs_device_status").DeleteMany(ctx, bson.M{"user_id": bson.M{"$in": userIDs}}); err != nil {
+			h.Log.Error("failed to delete mhs_device_status for org", zap.Error(err), zap.String("org_id", idHex))
+			return err
+		} else if res.DeletedCount > 0 {
+			h.Log.Debug("deleted mhs_device_status", zap.Int64("count", res.DeletedCount), zap.String("org_id", idHex))
+		}
+	}
+
+	// 7. Delete all groups for this organization (after app settings are cleaned up).
 	if cnt, err := grpStore.DeleteByOrg(ctx, orgID); err != nil {
 		h.Log.Error("failed to delete groups", zap.Error(err), zap.String("org_id", idHex))
 		return err
@@ -138,7 +168,7 @@ func (h *Handler) cascadeDeleteOrg(ctx context.Context, orgID primitive.ObjectID
 		h.Log.Debug("deleted groups", zap.Int64("count", cnt), zap.String("org_id", idHex))
 	}
 
-	// 6. Delete all users for this organization.
+	// 8. Delete all users for this organization.
 	// Note: Only deletes users with role "member" or "leader" that belong to this org.
 	// System users (admin/analyst) don't have organization_id set.
 	if cnt, err := usrStore.DeleteByOrg(ctx, orgID); err != nil {
@@ -148,7 +178,7 @@ func (h *Handler) cascadeDeleteOrg(ctx context.Context, orgID primitive.ObjectID
 		h.Log.Debug("deleted users", zap.Int64("count", cnt), zap.String("org_id", idHex))
 	}
 
-	// 7. Delete the organization itself.
+	// 9. Delete the organization itself.
 	cnt, err := orgStore.Delete(ctx, orgID)
 	if err != nil {
 		h.Log.Error("failed to delete organization", zap.Error(err), zap.String("org_id", idHex))
@@ -159,4 +189,44 @@ func (h *Handler) cascadeDeleteOrg(ctx context.Context, orgID primitive.ObjectID
 	}
 
 	return nil
+}
+
+// getGroupIDsForOrg returns all group IDs belonging to an organization.
+func getGroupIDsForOrg(ctx context.Context, db *mongo.Database, orgID primitive.ObjectID) []primitive.ObjectID {
+	cursor, err := db.Collection("groups").Find(ctx, bson.M{"organization_id": orgID})
+	if err != nil {
+		return nil
+	}
+	defer cursor.Close(ctx)
+	var results []struct {
+		ID primitive.ObjectID `bson:"_id"`
+	}
+	if cursor.All(ctx, &results) != nil {
+		return nil
+	}
+	ids := make([]primitive.ObjectID, len(results))
+	for i, r := range results {
+		ids[i] = r.ID
+	}
+	return ids
+}
+
+// getUserIDsForOrg returns all user IDs belonging to an organization.
+func getUserIDsForOrg(ctx context.Context, db *mongo.Database, orgID primitive.ObjectID) []primitive.ObjectID {
+	cursor, err := db.Collection("users").Find(ctx, bson.M{"organization_id": orgID})
+	if err != nil {
+		return nil
+	}
+	defer cursor.Close(ctx)
+	var results []struct {
+		ID primitive.ObjectID `bson:"_id"`
+	}
+	if cursor.All(ctx, &results) != nil {
+		return nil
+	}
+	ids := make([]primitive.ObjectID, len(results))
+	for i, r := range results {
+		ids[i] = r.ID
+	}
+	return ids
 }

@@ -137,11 +137,15 @@ func (h *Handler) deleteWorkspaceData(ctx context.Context, wsID primitive.Object
 	// Delete in order of dependencies
 	collections := []string{
 		"group_memberships",
+		"group_app_settings",
 		"coordinator_assignments",
 		"material_assignments",
+		"mhs_user_progress",
+		"mhs_device_status",
 		"sessions",
 		"activity_events",
 		"audit_events",
+		"site_settings",
 		"groups",
 		"users",
 		"organizations",

@@ -41,5 +41,9 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 	r.Get("/{id}/delete", h.ServeDeleteConfirm)
 	r.Post("/{id}/delete", h.HandleDelete)
 
+	// MAINTENANCE - system-wide maintenance mode toggle
+	r.Get("/maintenance", h.ServeMaintenance)
+	r.Post("/maintenance", h.HandleMaintenance)
+
 	return r
 }

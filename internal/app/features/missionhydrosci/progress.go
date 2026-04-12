@@ -64,38 +64,6 @@ func (h *Handler) ServeProgress(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-// HandleResetProgress deletes the user's progress record and returns JSON {"ok": true}.
-// Only non-member roles may reset progress.
-func (h *Handler) HandleResetProgress(w http.ResponseWriter, r *http.Request) {
-	user, ok := auth.CurrentUser(r)
-	if !ok {
-		http.Error(w, "unauthorized", http.StatusUnauthorized)
-		return
-	}
-
-	// TODO: restore after testing — members should not be able to reset their own progress
-	// if user.Role == "member" {
-	// 	http.Error(w, "forbidden", http.StatusForbidden)
-	// 	return
-	// }
-	_ = user.Role // suppress unused warning
-
-	wsID := workspace.IDFromRequest(r)
-	userID, err := primitive.ObjectIDFromHex(user.ID)
-	if err != nil {
-		http.Error(w, "invalid user", http.StatusBadRequest)
-		return
-	}
-
-	if err := h.ProgressStore.Delete(r.Context(), wsID, userID); err != nil {
-		h.Log.Error("failed to reset progress", zap.Error(err))
-		http.Error(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"ok":true}`))
-}
 
 // setToUnitRequest is the JSON body for POST /api/progress/set-unit.
 type setToUnitRequest struct {
@@ -195,7 +163,14 @@ func (h *Handler) HandleCompleteUnit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	progress, err := h.ProgressStore.CompleteUnit(r.Context(), wsID, userID, req.Unit)
+	// Get total units from the active manifest for this user
+	manifest, _ := h.resolveManifest(r)
+	totalUnits := len(manifest.Units)
+	if totalUnits == 0 {
+		totalUnits = 5 // fallback
+	}
+
+	progress, err := h.ProgressStore.CompleteUnit(r.Context(), wsID, userID, req.Unit, totalUnits)
 	if err != nil {
 		h.Log.Error("failed to complete unit", zap.Error(err))
 		http.Error(w, "internal error", http.StatusInternalServerError)

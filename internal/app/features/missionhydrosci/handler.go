@@ -3,9 +3,12 @@ package missionhydrosci
 
 import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/store/mhsbuilds"
+	"github.com/dalemusser/stratahub/internal/app/store/mhscollections"
 	"github.com/dalemusser/stratahub/internal/app/store/mhsdevicestatus"
 	"github.com/dalemusser/stratahub/internal/app/store/mhsuserprogress"
 	settingsstore "github.com/dalemusser/stratahub/internal/app/store/settings"
+	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/staffauth"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
@@ -33,11 +36,14 @@ type Handler struct {
 	ProgressStore     *mhsuserprogress.Store
 	DeviceStatusStore *mhsdevicestatus.Store
 	SettingsStore     *settingsstore.Store
+	CollectionStore   *mhscollections.Store
+	BuildStore        *mhsbuilds.Store
+	SessionMgr        *auth.SessionManager
 	StaffAuthVerifier *staffauth.Verifier
 }
 
 // NewHandler constructs a new Handler.
-func NewHandler(db *mongo.Database, errLog *uierrors.ErrorLogger, cdnBaseURL string, services GameServices, logger *zap.Logger) *Handler {
+func NewHandler(db *mongo.Database, errLog *uierrors.ErrorLogger, cdnBaseURL string, services GameServices, sm *auth.SessionManager, logger *zap.Logger) *Handler {
 	return &Handler{
 		DB:                db,
 		Log:               logger,
@@ -47,5 +53,8 @@ func NewHandler(db *mongo.Database, errLog *uierrors.ErrorLogger, cdnBaseURL str
 		ProgressStore:     mhsuserprogress.New(db),
 		DeviceStatusStore: mhsdevicestatus.New(db),
 		SettingsStore:     settingsstore.New(db),
+		CollectionStore:   mhscollections.New(db),
+		BuildStore:        mhsbuilds.New(db),
+		SessionMgr:        sm,
 	}
 }

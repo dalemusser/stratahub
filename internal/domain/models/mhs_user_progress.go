@@ -20,6 +20,10 @@ type MHSUserProgress struct {
 	LoginID        string             `bson:"login_id" json:"login_id"`
 	CurrentUnit    string             `bson:"current_unit" json:"current_unit"`
 	CompletedUnits []string           `bson:"completed_units" json:"completed_units"`
+
+	// CollectionOverrideID is the per-user collection override.
+	// When set, this user plays from this collection instead of the group/workspace default.
+	CollectionOverrideID *primitive.ObjectID `bson:"collection_override_id,omitempty" json:"collection_override_id,omitempty"`
 	CreatedAt      time.Time          `bson:"created_at" json:"created_at"`
 	UpdatedAt      time.Time          `bson:"updated_at" json:"updated_at"`
 }

@@ -328,6 +328,18 @@ func (h *Handler) fetchGroupsList(
 		})
 	}
 
+	// Load enabled app icons for groups on this page
+	if len(rows) > 0 {
+		groupIDs := make([]primitive.ObjectID, len(rows))
+		for i, row := range rows {
+			groupIDs[i] = row.ID
+		}
+		appsByGroup := loadAppIconsByGroup(ctx, h.DB, groupIDs)
+		for i := range rows {
+			rows[i].AppIcons = appsByGroup[rows[i].ID.Hex()]
+		}
+	}
+
 	// Build cursors
 	prevCur, nextCur := "", ""
 	if shown > 0 {
@@ -416,4 +428,32 @@ func (h *Handler) ServeGroupManageModal(w http.ResponseWriter, r *http.Request) 
 	}
 
 	templates.RenderSnippet(w, "group_manage_group_modal", data)
+}
+
+// loadAppIconsByGroup returns a map of group ID hex → slice of app emoji icons
+// for all enabled apps across the given group IDs.
+func loadAppIconsByGroup(ctx context.Context, db *mongo.Database, groupIDs []primitive.ObjectID) map[string][]string {
+	result := make(map[string][]string)
+	cursor, err := db.Collection("group_app_settings").Find(ctx, bson.M{
+		"group_id": bson.M{"$in": groupIDs},
+	})
+	if err != nil {
+		return result
+	}
+	defer cursor.Close(ctx)
+
+	for cursor.Next(ctx) {
+		var doc struct {
+			GroupID primitive.ObjectID `bson:"group_id"`
+			AppID   string            `bson:"app_id"`
+		}
+		if cursor.Decode(&doc) != nil {
+			continue
+		}
+		if app, ok := models.FindApp(doc.AppID); ok {
+			key := doc.GroupID.Hex()
+			result[key] = append(result[key], app.MenuIcon)
+		}
+	}
+	return result
 }

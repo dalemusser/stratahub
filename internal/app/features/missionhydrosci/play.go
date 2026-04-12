@@ -17,7 +17,7 @@ import (
 func (h *Handler) ServePlay(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unit")
 
-	manifest := h.loadContentManifest()
+	manifest, _ := h.resolveManifest(r)
 	var unitTitle, unitVersion string
 	var nextUnitID, nextUnitVersion string
 	var dataFile, frameworkFile, codeFile string

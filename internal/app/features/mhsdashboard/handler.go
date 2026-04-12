@@ -6,6 +6,7 @@ import (
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/store/logdata"
+	"github.com/dalemusser/stratahub/internal/app/store/mhscollections"
 	"github.com/dalemusser/stratahub/internal/app/store/mhsdevicestatus"
 	"github.com/dalemusser/stratahub/internal/app/store/mhsuserprogress"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -22,6 +23,7 @@ type Handler struct {
 	ErrLog                *uierrors.ErrorLogger
 	DeviceStatusStore     *mhsdevicestatus.Store
 	ProgressStore         *mhsuserprogress.Store
+	CollectionStore       *mhscollections.Store
 	ClaudeAPIKey          string        // Anthropic API key for AI summaries
 	ClaudeModel           string        // Claude model ID
 	ActiveGapThreshold    time.Duration // Gaps longer than this excluded from active duration (default: 2m)
@@ -37,6 +39,7 @@ func NewHandler(db, gradesDB, logDB *mongo.Database, errLog *uierrors.ErrorLogge
 		ErrLog:            errLog,
 		DeviceStatusStore: mhsdevicestatus.New(db),
 		ProgressStore:     mhsuserprogress.New(db),
+		CollectionStore:   mhscollections.New(db),
 	}
 	if logDB != nil {
 		h.LogStore = logdata.New(logDB)

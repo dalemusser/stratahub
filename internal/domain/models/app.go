@@ -16,7 +16,7 @@ var AvailableApps = []AppDefinition{
 		ID:          "missionhydrosci",
 		Name:        "Mission HydroSci",
 		Description: "Mission HydroSci single launch experience with auto-download and progress tracking",
-		MenuIcon:    "\U0001F30A", // water wave emoji
+		MenuIcon:    "\U0001F4A7", // water drop emoji 💧
 		MenuPath:    "/missionhydrosci/units",
 		MenuTitle:   "Mission HydroSci",
 	},

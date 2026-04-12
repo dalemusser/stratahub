@@ -1,0 +1,85 @@
+{{ define "mhsbuilds_collections" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full">
+  <div class="mb-4 flex items-center justify-between">
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📦 MHS Collections</h1>
+    <div class="flex gap-2">
+      <a href="/mhsbuilds/storage"
+         class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+        S3 Storage
+      </a>
+      <a href="/mhsbuilds/manual"
+         class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+        Create Manually
+      </a>
+      <a href="/mhsbuilds/upload"
+         class="px-4 py-2 bg-indigo-600 text-white rounded text-sm hover:bg-indigo-700">
+        Upload Build
+      </a>
+    </div>
+  </div>
+
+  {{ if not .Collections }}
+  <div class="p-4 bg-white dark:bg-gray-800 rounded shadow text-sm flex-1 mb-2 flex items-center justify-center">
+    <div class="text-center text-gray-500 dark:text-gray-400">
+      <p class="mb-2">No collections yet.</p>
+      <p>Upload a build or create a collection manually to get started.</p>
+    </div>
+  </div>
+  {{ else }}
+  <div class="bg-white dark:bg-gray-800 rounded shadow overflow-x-auto flex-1 mb-2">
+    <table class="min-w-full text-sm">
+      <thead>
+        <tr class="border-b dark:border-gray-600">
+          <th class="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Name</th>
+          <th class="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Units</th>
+          <th class="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Created</th>
+          <th class="text-left py-3 px-4 text-gray-700 dark:text-gray-300">By</th>
+          <th class="text-left py-3 px-4 text-gray-700 dark:text-gray-300">Status</th>
+          <th class="text-right py-3 px-4 text-gray-700 dark:text-gray-300">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{ range .Collections }}
+        <tr class="border-b dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
+          <td class="py-3 px-4 font-medium text-gray-900 dark:text-gray-100">{{ .Name }}</td>
+          <td class="py-3 px-4 text-gray-600 dark:text-gray-400 text-xs font-mono">{{ .UnitsSummary }}</td>
+          <td class="py-3 px-4 text-gray-600 dark:text-gray-400">{{ .CreatedAt.Format "2006-01-02 15:04" }}</td>
+          <td class="py-3 px-4 text-gray-600 dark:text-gray-400">{{ .CreatedByName }}</td>
+          <td class="py-3 px-4">
+            {{ if .IsActive }}
+            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+              Active
+            </span>
+            {{ end }}
+          </td>
+          <td class="py-3 px-4 text-right">
+            <form
+              method="get"
+              action="/mhsbuilds/collections/{{ .ID }}/manage_modal"
+              hx-get="/mhsbuilds/collections/{{ .ID }}/manage_modal"
+              hx-target="#modal-root"
+              hx-swap="innerHTML"
+            >
+              <button
+                type="submit"
+                class="bg-indigo-600 text-white px-2 py-1 rounded text-xs hover:bg-indigo-700"
+                title="Manage"
+              >
+                Manage
+              </button>
+            </form>
+          </td>
+        </tr>
+        {{ end }}
+      </tbody>
+    </table>
+  </div>
+  {{ end }}
+</div>
+
+<div id="modal-root"></div>
+{{ end }}

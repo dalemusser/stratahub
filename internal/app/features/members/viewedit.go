@@ -492,7 +492,17 @@ func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 			zap.String("user_id", uid.Hex()),
 			zap.Int64("deleted_count", res.DeletedCount))
 
-		// 2) Delete the member user itself (guard on role to be safe)
+		// 2) Remove MHS user progress (collection overrides, unit progress)
+		if _, err := h.DB.Collection("mhs_user_progress").DeleteMany(ctx, bson.M{"user_id": uid}); err != nil {
+			return err
+		}
+
+		// 3) Remove MHS device status records
+		if _, err := h.DB.Collection("mhs_device_status").DeleteMany(ctx, bson.M{"user_id": uid}); err != nil {
+			return err
+		}
+
+		// 4) Delete the member user itself (guard on role to be safe)
 		deletedCount, err := h.Users.DeleteMember(ctx, uid)
 		if err != nil {
 			return err

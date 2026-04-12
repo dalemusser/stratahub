@@ -214,11 +214,12 @@
       <div class="p-4 bg-white dark:bg-gray-800 rounded shadow flex-1 mb-2 overflow-auto">
         <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
           <colgroup>
-            <col style="width: 28%;" />
-            <col style="width: 28%;" />
-            <col style="width: 8rem;" />
-            <col style="width: 8rem;" />
-            <col style="width: 8rem;" />
+            <col style="width: 26%;" />
+            <col style="width: 26%;" />
+            <col style="width: 7rem;" />
+            <col style="width: 7rem;" />
+            <col style="width: 7rem;" />
+            <col style="width: 4rem;" />
             <col style="width: 10rem;" />
           </colgroup>
           <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs">
@@ -228,6 +229,7 @@
               <th class="px-2 py-2 text-center">Leaders</th>
               <th class="px-2 py-2 text-center">Members</th>
               <th class="px-2 py-2 text-center">Resources</th>
+              <th class="px-2 py-2 text-center">Apps</th>
               <th class="px-2 py-2 text-right">Actions</th>
             </tr>
           </thead>
@@ -246,6 +248,7 @@
               <td class="px-2 py-2 align-middle text-center">{{ .LeadersCount }}</td>
               <td class="px-2 py-2 align-middle text-center">{{ .MembersCount }}</td>
               <td class="px-2 py-2 align-middle text-center">{{ .AssignedResourcesCount }}</td>
+              <td class="px-2 py-2 align-middle text-center">{{ range .AppIcons }}{{ . }} {{ end }}</td>
               <td class="px-2 py-2 align-middle text-right">
                 <form
                   method="get"

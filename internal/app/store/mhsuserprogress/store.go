@@ -24,18 +24,25 @@ func New(db *mongo.Database) *Store {
 	return &Store{c: db.Collection("mhs_user_progress")}
 }
 
-// unitOrder is the fixed sequence of units.
-var unitOrder = []string{"unit1", "unit2", "unit3", "unit4", "unit5"}
-
 // unitNumber returns the 1-based position of a unit ID (0 if invalid).
+// Accepts any "unitN" format where N is a positive integer.
 func unitNumber(id string) int {
-	if len(id) == 5 && id[:4] == "unit" {
+	if len(id) > 4 && id[:4] == "unit" {
 		n, err := strconv.Atoi(id[4:])
-		if err == nil && n >= 1 && n <= 5 {
+		if err == nil && n >= 1 {
 			return n
 		}
 	}
 	return 0
+}
+
+// unitsUpTo returns a slice of unit IDs from "unit1" to "unitN".
+func unitsUpTo(n int) []string {
+	units := make([]string, n)
+	for i := 0; i < n; i++ {
+		units[i] = fmt.Sprintf("unit%d", i+1)
+	}
+	return units
 }
 
 // GetOrCreate finds the progress record for (workspace, user).
@@ -85,7 +92,7 @@ func (s *Store) SetToUnit(ctx context.Context, workspaceID, userID primitive.Obj
 		return fmt.Errorf("invalid unit: %s", targetUnit)
 	}
 
-	completed := unitOrder[:num-1] // units before targetUnit
+	completed := unitsUpTo(num - 1) // units before targetUnit
 	now := time.Now().UTC()
 
 	filter := bson.M{"workspace_id": workspaceID, "user_id": userID}
@@ -129,9 +136,41 @@ func (s *Store) ListByUserIDs(ctx context.Context, workspaceID primitive.ObjectI
 	return result, nil
 }
 
+// SetCollectionOverride sets or clears the per-user collection override.
+// Pass nil to clear the override (return to group/workspace default).
+// Uses upsert to ensure the document exists even if the user hasn't played yet.
+func (s *Store) SetCollectionOverride(ctx context.Context, workspaceID, userID primitive.ObjectID, collectionID *primitive.ObjectID) error {
+	now := time.Now().UTC()
+	filter := bson.M{"workspace_id": workspaceID, "user_id": userID}
+	set := bson.M{"updated_at": now}
+	if collectionID != nil && !collectionID.IsZero() {
+		set["collection_override_id"] = collectionID
+	}
+
+	update := bson.M{
+		"$set": set,
+		"$setOnInsert": bson.M{
+			"_id":             primitive.NewObjectID(),
+			"workspace_id":    workspaceID,
+			"user_id":         userID,
+			"current_unit":    "unit1",
+			"completed_units": []string{},
+			"created_at":      now,
+		},
+	}
+	if collectionID == nil || collectionID.IsZero() {
+		update["$unset"] = bson.M{"collection_override_id": ""}
+	}
+
+	opts := options.Update().SetUpsert(true)
+	_, err := s.c.UpdateOne(ctx, filter, update, opts)
+	return err
+}
+
 // CompleteUnit marks a unit as completed and advances current_unit.
+// totalUnits is the number of units in the active collection (e.g., 5 or 6).
 // Idempotent: if the unit is already completed or before current_unit, returns current state.
-func (s *Store) CompleteUnit(ctx context.Context, workspaceID, userID primitive.ObjectID, unitID string) (models.MHSUserProgress, error) {
+func (s *Store) CompleteUnit(ctx context.Context, workspaceID, userID primitive.ObjectID, unitID string, totalUnits int) (models.MHSUserProgress, error) {
 	num := unitNumber(unitID)
 	if num == 0 {
 		// Invalid unit ID — return current state
@@ -163,10 +202,10 @@ func (s *Store) CompleteUnit(ctx context.Context, workspaceID, userID primitive.
 
 	// Determine next unit
 	var nextUnit string
-	if num >= 5 {
+	if num >= totalUnits {
 		nextUnit = "complete"
 	} else {
-		nextUnit = unitOrder[num] // num is 1-based, so unitOrder[num] gives next
+		nextUnit = fmt.Sprintf("unit%d", num+1)
 	}
 
 	now := time.Now().UTC()

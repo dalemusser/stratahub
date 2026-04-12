@@ -8,6 +8,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/policy/grouppolicy"
 	groupappstore "github.com/dalemusser/stratahub/internal/app/store/groupapps"
 	groupstore "github.com/dalemusser/stratahub/internal/app/store/groups"
+	"github.com/dalemusser/stratahub/internal/app/store/mhscollections"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
@@ -20,6 +21,65 @@ import (
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
 )
+
+// HandleSetMHSCollection sets or clears the MHS collection pin for a group.
+func (h *Handler) HandleSetMHSCollection(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	}
+
+	gid := chi.URLParam(r, "id")
+	groupOID, err := primitive.ObjectIDFromHex(gid)
+	if err != nil {
+		http.Error(w, "bad group id", http.StatusBadRequest)
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Short())
+	defer cancel()
+	db := h.DB
+
+	// Verify access
+	group, err := groupstore.New(db).GetByID(ctx, groupOID)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+
+	canManage, _ := grouppolicy.CanManageGroup(ctx, db, r, group.ID, group.OrganizationID)
+	if !canManage {
+		uierrors.RenderForbidden(w, r, "You do not have access to this group.", "/groups")
+		return
+	}
+
+	collIDStr := r.FormValue("mhs_collection_id")
+	appStore := groupappstore.New(db)
+
+	if collIDStr == "" || collIDStr == "active" {
+		// Clear the pin
+		if err := appStore.SetMHSCollection(ctx, groupOID, nil); err != nil {
+			h.ErrLog.LogServerError(w, r, "failed to clear MHS collection pin", err, "Failed to update.", "/groups/"+gid+"/apps")
+			return
+		}
+	} else {
+		collOID, err := primitive.ObjectIDFromHex(collIDStr)
+		if err != nil {
+			http.Error(w, "invalid collection id", http.StatusBadRequest)
+			return
+		}
+		if err := appStore.SetMHSCollection(ctx, groupOID, &collOID); err != nil {
+			h.ErrLog.LogServerError(w, r, "failed to set MHS collection pin", err, "Failed to update.", "/groups/"+gid+"/apps")
+			return
+		}
+	}
+
+	dest := "/groups/" + gid + "/apps"
+	if ret := r.FormValue("return"); ret != "" {
+		dest += "?return=" + ret
+	}
+	http.Redirect(w, r, dest, http.StatusSeeOther)
+}
 
 // ServeGroupApps renders the Manage Apps page for a group.
 func (h *Handler) ServeGroupApps(w http.ResponseWriter, r *http.Request) {
@@ -98,6 +158,32 @@ func (h *Handler) ServeGroupApps(w http.ResponseWriter, r *http.Request) {
 		GroupID:   gid,
 		GroupName: group.Name,
 		Apps:      items,
+	}
+
+	// Load MHS collection pin info if MHS is enabled
+	if enabledSet["missionhydrosci"] {
+		// Get current pin from the MHS app setting
+		for _, s := range enabledSettings {
+			if s.AppID == "missionhydrosci" && s.MHSCollectionID != nil {
+				data.MHSCollectionID = s.MHSCollectionID.Hex()
+				// Look up collection name
+				collStore := mhscollections.New(db)
+				if coll, err := collStore.GetByID(ctx, *s.MHSCollectionID); err == nil {
+					data.MHSCollectionName = coll.Name
+				}
+				break
+			}
+		}
+
+		// Load available collections for the dropdown
+		collStore := mhscollections.New(db)
+		if collections, err := collStore.List(ctx, 50); err == nil {
+			opts := make([]mhsCollectionOption, len(collections))
+			for i, c := range collections {
+				opts[i] = mhsCollectionOption{ID: c.ID.Hex(), Name: c.Name}
+			}
+			data.MHSCollectionOptions = opts
+		}
 	}
 
 	templates.Render(w, r, "group_apps", data)
