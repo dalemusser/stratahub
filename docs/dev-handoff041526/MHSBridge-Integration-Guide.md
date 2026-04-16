@@ -1,4 +1,4 @@
-# MHSBridge Integration Guide (2026-03-19)
+# MHSBridge Integration Guide (2026-04-15)
 
 > **What you need to do:**
 >
@@ -6,7 +6,8 @@
 > 2. **Get service endpoint configs from MHSBridge** — use `GetLogSubmitConfig()`, `GetStateSaveConfig()`, `GetStateLoadConfig()`, `GetSettingsSaveConfig()`, and `GetSettingsLoadConfig()` for endpoint URLs and auth credentials. Each returns a full URL you POST to directly. Do not hardcode service URLs or auth strings. They are currently hardcoded in the game, which prevents us from using services at other URLs. Making this change makes it possible to deploy in another environment without rebuilding.
 > 3. **Use `user_id` instead of `playerId`** — we are transitioning to `user_id` as the identity key in all log and save payloads.
 > 4. **Navigate between units using MHSBridge** — use `GetUnitURL()`, `NavigateToUnit()`, and `CompleteUnit()` for all unit transitions instead of constructing URLs directly.
-> 5. **Replace the Unity-generated `index.html`** in each unit build folder with the provided replacement `index.html`. This replacement page sets up `window.__mhsBridgeConfig` before Unity starts. The Unity-generated `index.html` does not do this and must not be used. You can see the config chain in action at https://cdn.adroit.games/web/test-bridge-config.html — this test page demonstrates the same `/api/user` and `/api/game-config` fetches that the replacement `index.html` performs.
+> 5. **Call `EndGame()` from the end-of-game screen** — when the player finishes the game and clicks Continue/Return, call `MHSBridge.Instance.EndGame()`. The game owns the end-of-game experience. StrataHub no longer shows its own end-of-game overlay.
+> 6. **Replace the Unity-generated `index.html`** in each unit build folder with the provided replacement `index.html`. This replacement page sets up `window.__mhsBridgeConfig` before Unity starts. The Unity-generated `index.html` does not do this and must not be used. You can see the config chain in action at https://cdn.adroit.games/web/test-bridge-config.html — this test page demonstrates the same `/api/user` and `/api/game-config` fetches that the replacement `index.html` performs.
 >
 > **Why are we doing this?** The game currently has hardcoded domains, API keys, and URL patterns baked into the build. This makes it impossible to rotate credentials, change service endpoints, or host builds differently without rebuilding the game. We have a longer-term plan to support uploading new builds directly to StrataHub, serving all hosting contexts (PWA, URL-launched, developer testing) from a single set of game files in S3, managing build versions and channels (production/staging), and generating content manifests automatically. By making these MHSBridge changes now — where the game gets everything it needs from the host page config — **you won't need to make any further game-side changes** when that infrastructure rolls out. The game becomes portable and host-agnostic.
 >
@@ -23,10 +24,11 @@ This is an updated MHSBridge that replaces the previous version. The key changes
 
 ## What Is NOT Changing
 
-- **`CompleteUnit()` works the same way.** Same parameters, same behavior in PWA and URL modes.
+- **`CompleteUnit()` works the same way.** Same parameters, same behavior in PWA and URL modes. Call it for every unit, including the last one.
 - **`OnPWAReady` is still called by the host page.** It now accepts identity JSON but also accepts empty string (backward compat).
 - **The MHSBridge GameObject setup is identical.** Named "MHSBridge", in the first scene of every unit, `DontDestroyOnLoad`.
 - **Editor behavior uses development defaults.** `GetPlayerID()` returns "mhs_developer", and service configs point to production endpoints so devs can test logging, saving, and settings from the Editor.
+- **`EndGame()` is a no-op in the Editor.** It logs a message but takes no action, so development testing is unaffected.
 
 ---
 
@@ -41,6 +43,7 @@ Replace the existing file with the new `MHSBridge.jslib`. New functions added:
 | `MHSBridge_GetConfig` | Returns the full `window.__mhsBridgeConfig` as JSON |
 | `MHSBridge_Free` | Frees memory (unchanged) |
 | `MHSBridge_NotifyUnitComplete` | Tells host page a unit is done (unchanged) |
+| `MHSBridge_EndGame` | Signals game ended — calls `window.mhsEndGame()` or closes tab (new) |
 | `MHSBridge_NavigateToUnit` | Navigates to a URL (no longer carries URL params forward) |
 | `MHSBridge_GetUnitURL` | Returns URL for a unit (from unitMap or relative fallback) |
 
@@ -397,6 +400,14 @@ void Start()
    - `GetPlayerID()` should return the logged-in user's ID
    - Service configs should return full endpoint URLs and auth
 
+5. **EndGame in PWA mode:**
+   - After completing the final unit and seeing the end-of-game screen, click Continue
+   - Should navigate to the Mission HydroSci units page with all units showing as completed
+
+6. **EndGame in URL mode (browser tab):**
+   - After the end-of-game screen, click Continue
+   - Tab should close, or show "You can close this tab now" if the browser blocks it
+
 ---
 
 ## Summary of Changes
@@ -413,4 +424,5 @@ void Start()
 | Replace index.html | Each build folder | Drop in the provided replacement `index.html` |
 | Loader navigation | Loader scene startup | `GetUnitURL` and `NavigateToUnit` handle URL resolution automatically |
 | Signal unit complete | End-of-unit code | No change — `CompleteUnit()` works the same |
+| Signal end of game | End-of-game screen Continue button | Call `MHSBridge.Instance.EndGame()` (new) |
 | Build directory layout | S3 upload structure | No change — sibling folders still work |
