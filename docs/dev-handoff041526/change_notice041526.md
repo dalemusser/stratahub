@@ -109,16 +109,16 @@ The game is installed as a Progressive Web App on the student's device (e.g., a 
 
 ### Scenario 2: Browser tab (launched from Mission HydroSci in a browser)
 
-The game is played in a browser tab after the student logs into StrataHub and navigates to Mission HydroSci. The game loads in the same tab or a new tab.
+The game is played in a browser after the student logs into StrataHub and navigates to Mission HydroSci. When not running as an installed PWA, Mission HydroSci opens the game in a new tab via `window.open()`. StrataHub remains open in the original tab.
 
 - **Identity:** Injected by StrataHub via `__mhsBridgeConfig` (same as PWA)
 - **Service endpoints:** Injected by StrataHub via `__mhsBridgeConfig` (same as PWA)
-- **Unit transitions:** Same as PWA — StrataHub handles transitions within the tab.
-- **Back button:** The student can use the browser's back button or close the tab. StrataHub is typically open in another tab.
-- **End of game:** `EndGame()` navigates back to the Mission HydroSci units page.
+- **Unit transitions:** Same as PWA — StrataHub handles transitions within the game tab.
+- **Returning to StrataHub:** The student closes the game tab. StrataHub is open in the original tab.
+- **End of game:** `EndGame()` navigates the game tab back to the Mission HydroSci units page.
 - **MHSBridge.IsPWA:** `true` (StrataHub's service worker is registered, so `OnPWAReady` fires)
 
-From MHSBridge's perspective, Scenarios 1 and 2 are identical. The only difference is how the student launched the app and how they return to StrataHub.
+From MHSBridge's perspective, Scenarios 1 and 2 are identical. The only difference is that Scenario 1 runs in the PWA's own window while Scenario 2 runs in a new browser tab.
 
 ### Scenario 3: URL-launched (standalone, not from Mission HydroSci)
 
