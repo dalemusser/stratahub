@@ -437,11 +437,18 @@
       }
 
       function completeAndTransition(nextUnit, isFinal) {
-        cleanupUnity();
         if (isFinal || !nextUnit) {
-          showGameComplete();
+          // Final unit — the game owns the end-of-game experience.
+          // Don't clean up Unity or show an overlay. The game will call
+          // MHSBridge.EndGame() when the player is ready to leave.
+          //
+          // Backward compatibility: Older builds (before April 2026 MHSBridge update)
+          // don't have EndGame(). The player can use the back button in the upper left
+          // to return to StrataHub. The game stays running on its end-of-game screen.
+          // TODO: Remove this note once all builds use the new MHSBridge with EndGame().
           return;
         }
+        cleanupUnity();
 
         // Check if next unit is already cached
         var mgr = new MHSDeliveryManager({
@@ -537,6 +544,16 @@
       window.mhsUnitComplete = function(completedUnitId) {
         console.log('MHS: mhsUnitComplete called with', completedUnitId);
         handleUnitComplete();
+      };
+
+      // MHSBridge callback — the game calls this when the player has finished
+      // the game and is ready to exit (from the end-of-game screen).
+      // New in April 2026 MHSBridge update. Older builds don't call this —
+      // the player uses the back button instead.
+      // TODO: Remove backward compatibility note once all builds use the new MHSBridge.
+      window.mhsEndGame = function() {
+        console.log('MHS: mhsEndGame called — returning to units page');
+        window.location.href = '/missionhydrosci/units';
       };
 
       // Expose for cleanup script
