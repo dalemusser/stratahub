@@ -1,205 +1,131 @@
 # MHSBridge Integration Guide (2026-04-15)
 
-> **What you need to do:**
->
-> 1. **Get player identity from MHSBridge** — use `GetPlayerID()` and `GetPlayerName()` instead of calling `/api/user` or using a separate jslib for identity. **Remove the old jslib that fetched identity from `/api/user`.** Do not leave it in the project and do not use it in any way.
-> 2. **Get service endpoint configs from MHSBridge** — use `GetLogSubmitConfig()`, `GetStateSaveConfig()`, `GetStateLoadConfig()`, `GetSettingsSaveConfig()`, and `GetSettingsLoadConfig()` for endpoint URLs and auth credentials. Each returns a full URL you POST to directly. Do not hardcode service URLs or auth strings. They are currently hardcoded in the game, which prevents us from using services at other URLs. Making this change makes it possible to deploy in another environment without rebuilding.
-> 3. **Use `user_id` instead of `playerId`** — we are transitioning to `user_id` as the identity key in all log and save payloads.
-> 4. **Navigate between units using MHSBridge** — use `GetUnitURL()`, `NavigateToUnit()`, and `CompleteUnit()` for all unit transitions instead of constructing URLs directly.
-> 5. **Call `EndGame()` from the end-of-game screen** — when the player finishes the game and clicks Continue/Return, call `MHSBridge.Instance.EndGame()`. The game owns the end-of-game experience. StrataHub no longer shows its own end-of-game overlay.
-> 6. **Replace the Unity-generated `index.html`** in each unit build folder with the provided replacement `index.html`. This replacement page sets up `window.__mhsBridgeConfig` before Unity starts. The Unity-generated `index.html` does not do this and must not be used. You can see the config chain in action at https://cdn.adroit.games/web/test-bridge-config.html — this test page demonstrates the same `/api/user` and `/api/game-config` fetches that the replacement `index.html` performs.
->
-> **Why are we doing this?** The game currently has hardcoded domains, API keys, and URL patterns baked into the build. This makes it impossible to rotate credentials, change service endpoints, or host builds differently without rebuilding the game. We have a longer-term plan to support uploading new builds directly to StrataHub, serving all hosting contexts (PWA, URL-launched, developer testing) from a single set of game files in S3, managing build versions and channels (production/staging), and generating content manifests automatically. By making these MHSBridge changes now — where the game gets everything it needs from the host page config — **you won't need to make any further game-side changes** when that infrastructure rolls out. The game becomes portable and host-agnostic.
->
-> For the full long-term plan, see [MHSBridge, Identity, and Game Hosting Plan](../mhsbridge_and_id_plan.md).
+## Overview
 
-## What Changed
+MHSBridge is the bridge between the Unity WebGL game and its hosting environment. It provides player identity, service endpoint configuration, unit navigation, and game lifecycle management. The game gets everything it needs from the host page rather than hardcoding domains, API keys, or URL patterns.
 
-This is an updated MHSBridge that replaces the previous version. The key changes:
-
-1. **Identity comes from the host page.** The host page sets `window.__mhsBridgeConfig` with the player's identity before Unity starts. No more separate `/api/user` calls needed.
-2. **Service endpoint config comes from the host page.** Full endpoint URLs and auth credentials for stratalog and stratasave are no longer hardcoded — they come from the bridge config. Each URL is a complete endpoint (e.g., `https://save.adroit.games/api/state/save`) that you POST to directly.
-3. **Navigation supports a unitMap.** The host page can provide a map of unit names to URLs. This enables managed navigation (locked units, opaque URLs) alongside the existing relative URL navigation.
-4. **Backward compatible.** If `window.__mhsBridgeConfig` is absent (old host page), identity and service config are not available from the bridge. The game should fall back to its existing identity and service mechanisms.
-
-## What Is NOT Changing
-
-- **`CompleteUnit()` works the same way.** Same parameters, same behavior in PWA and URL modes. Call it for every unit, including the last one.
-- **`OnPWAReady` is still called by the host page.** It now accepts identity JSON but also accepts empty string (backward compat).
-- **The MHSBridge GameObject setup is identical.** Named "MHSBridge", in the first scene of every unit, `DontDestroyOnLoad`.
-- **Editor behavior uses development defaults.** `GetPlayerID()` returns "mhs_developer", and service configs point to production endpoints so devs can test logging, saving, and settings from the Editor.
-- **`EndGame()` is a no-op in the Editor.** It logs a message but takes no action, so development testing is unaffected.
+MHSBridge operates in two modes, determined automatically:
+- **PWA mode** — the game runs inside StrataHub. Unit transitions, progress tracking, and downloads are managed by StrataHub.
+- **URL mode** — the game runs standalone in a browser tab. Navigation uses relative URLs between unit folders.
 
 ---
 
-## Files to Update
+## Files
 
-### 1. `Assets/Plugins/WebGL/MHSBridge.jslib`
+| File | Location in Unity Project | Purpose |
+|------|--------------------------|---------|
+| `MHSBridge.cs` | `Assets/Scripts/MHSBridge.cs` | C# bridge script |
+| `MHSBridge.jslib` | `Assets/Plugins/WebGL/MHSBridge.jslib` | JavaScript plugin for browser interop |
+| `index.html` | Each unit's build folder (replaces Unity-generated index.html) | Host page for URL-launched builds |
 
-Replace the existing file with the new `MHSBridge.jslib`. New functions added:
+## GameObject Setup
 
-| Function | Purpose |
-|----------|---------|
-| `MHSBridge_GetConfig` | Returns the full `window.__mhsBridgeConfig` as JSON |
-| `MHSBridge_Free` | Frees memory (unchanged) |
-| `MHSBridge_NotifyUnitComplete` | Tells host page a unit is done (unchanged) |
-| `MHSBridge_EndGame` | Signals game ended — calls `window.mhsEndGame()` or closes tab (new) |
-| `MHSBridge_NavigateToUnit` | Navigates to a URL (no longer carries URL params forward) |
-| `MHSBridge_GetUnitURL` | Returns URL for a unit (from unitMap or relative fallback) |
-
-### 2. `Assets/Scripts/MHSBridge.cs`
-
-Replace the existing file with the new `MHSBridge.cs`. New public API:
-
-| Method | Purpose |
-|--------|---------|
-| `GetPlayerID()` | Returns user_id from config or OnPWAReady |
-| `GetPlayerName()` | Returns display name (new) |
-| `GetLogSubmitConfig()` | Returns log submit endpoint URL + auth, or null (new) |
-| `GetStateSaveConfig()` | Returns state save endpoint URL + auth, or null (new) |
-| `GetStateLoadConfig()` | Returns state load endpoint URL + auth, or null (new) |
-| `GetSettingsSaveConfig()` | Returns settings save endpoint URL + auth, or null (new) |
-| `GetSettingsLoadConfig()` | Returns settings load endpoint URL + auth, or null (new) |
-| `GetUnitURL(unitName, out isLocked)` | Returns URL for a unit (unitMap or relative); null if locked (new) |
-| `CompleteUnit(unitId, nextUrl)` | Signals unit completion (unchanged) |
-| `EndGame()` | Signals the game has ended — exits back to StrataHub or closes tab (new) |
-| `NavigateToUnit(unitName)` | Navigates to unit via GetUnitURL (updated) |
-| `IsPWA` | True if in PWA mode (unchanged) |
-| `HasConfig` | True if `__mhsBridgeConfig` was found (new) |
-
-### 3. GameObject Setup
-
-**No change.** Same as before — empty GameObject named "MHSBridge" with the script attached, in the first scene of every unit and the loader.
+Create an empty GameObject named `MHSBridge` with the `MHSBridge.cs` script attached. Place it in the first scene of every unit and the loader. The script uses `DontDestroyOnLoad` and a singleton pattern.
 
 ---
 
-## How to Use the New API
+## API Reference
+
+### Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `Instance` | `MHSBridge` | Singleton instance |
+| `IsPWA` | `bool` | True if running inside StrataHub (PWA or browser via Mission HydroSci) |
+| `HasConfig` | `bool` | True if `window.__mhsBridgeConfig` was present and parsed |
+
+### Identity
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| `GetPlayerID()` | `string` | Player's user_id (login_id). Empty string if not available. |
+| `GetPlayerName()` | `string` | Player's display name. Empty string if not available. |
+
+### Service Endpoints
+
+Each method returns a `ServiceConfig` with `url` (full endpoint) and `auth` (Authorization header value), or `null` if not configured.
+
+| Method | Endpoint |
+|--------|----------|
+| `GetLogSubmitConfig()` | Log submission (e.g., `https://log.adroit.games/api/log/submit`) |
+| `GetStateSaveConfig()` | Game state save (e.g., `https://save.adroit.games/api/state/save`) |
+| `GetStateLoadConfig()` | Game state load (e.g., `https://save.adroit.games/api/state/load`) |
+| `GetSettingsSaveConfig()` | Player settings save (e.g., `https://save.adroit.games/api/settings/save`) |
+| `GetSettingsLoadConfig()` | Player settings load (e.g., `https://save.adroit.games/api/settings/load`) |
+
+### Navigation
+
+| Method | Description |
+|--------|-------------|
+| `GetUnitURL(unitName, out isLocked)` | Returns URL for a unit. Uses unitMap if available, otherwise relative URL. Returns null with `isLocked=true` if the unit is locked. |
+| `NavigateToUnit(unitName)` | Navigates to a unit by name. No-op in PWA mode. |
+| `CompleteUnit(unitId, nextUrl)` | Signals a unit is complete. In PWA mode, notifies StrataHub. In URL mode, navigates to `nextUrl`. |
+| `EndGame()` | Signals the game has ended. In PWA mode, returns to StrataHub. In URL mode, closes the tab or shows exit message. |
+
+---
+
+## Implementation Guide
 
 ### Player Identity
-
-Replace all `/api/user` calls with:
 
 ```csharp
 string userId = MHSBridge.Instance.GetPlayerID();
 string userName = MHSBridge.Instance.GetPlayerName();
 ```
 
-`GetPlayerID()` returns the `user_id` value. For now, this is the login_id (e.g., "dale@example.com"). In a future phase, it will be the user's database ID. **Use `user_id` as the key name** when sending to stratalog and stratasave.
-
-### Log Service
-
-Instead of hardcoded log service URL and auth:
+Use `user_id` as the identity key in all log and save payloads:
 
 ```csharp
-// Old way (hardcoded):
-// string logUrl = "https://log.adroit.games/api/log/submit";
-// string logAuth = "Bearer hardcoded-key";
+// Log payload:  { "game": "mhs", "user_id": "dale@example.com", "eventType": "...", ... }
+// Save payload: { "user_id": "dale@example.com", "game": "mhs", "save_data": { ... } }
+```
 
-// New way:
+### Service Endpoints
+
+```csharp
 var logConfig = MHSBridge.Instance.GetLogSubmitConfig();
 if (logConfig != null)
 {
-    string logUrl = logConfig.url;    // e.g., "https://log.adroit.games/api/log/submit"
-    string logAuth = logConfig.auth;  // e.g., "Bearer abc123..."
-    // POST directly to logUrl — no path appending needed
+    // POST directly to logConfig.url
+    // Authorization header: logConfig.auth
 }
-else
-{
-    // Fall back to hardcoded values (old host page without config)
-}
-```
 
-### State Save/Load
-
-The game state (progress, inventory, etc.) is saved and loaded via separate endpoints:
-
-```csharp
-// Save game state:
 var stateSave = MHSBridge.Instance.GetStateSaveConfig();
-if (stateSave != null)
-{
-    // POST to stateSave.url (e.g., "https://save.adroit.games/api/state/save")
-    // Authorization: stateSave.auth
-}
-
-// Load game state:
 var stateLoad = MHSBridge.Instance.GetStateLoadConfig();
-if (stateLoad != null)
-{
-    // POST to stateLoad.url (e.g., "https://save.adroit.games/api/state/load")
-    // Authorization: stateLoad.auth
-}
-```
-
-### Settings Save/Load
-
-Player settings (preferences, accessibility options, etc.) use separate endpoints:
-
-```csharp
-// Save player settings:
 var settingsSave = MHSBridge.Instance.GetSettingsSaveConfig();
-if (settingsSave != null)
-{
-    // POST to settingsSave.url (e.g., "https://save.adroit.games/api/settings/save")
-    // Authorization: settingsSave.auth
-}
-
-// Load player settings:
 var settingsLoad = MHSBridge.Instance.GetSettingsLoadConfig();
-if (settingsLoad != null)
-{
-    // POST to settingsLoad.url (e.g., "https://save.adroit.games/api/settings/load")
-    // Authorization: settingsLoad.auth
-}
+// Same pattern: check for null, use .url and .auth
 ```
 
-All five service configs return a `ServiceConfig` with `url` (full endpoint) and `auth` (Authorization header value). If null, fall back to hardcoded values.
-
-### Sending Identity to Stratalog
-
-We are transitioning from `playerId` to `user_id` as the identity key. Use `user_id` in all new code — stratalog accepts both during the transition:
-
-```csharp
-// The identity key should be "user_id" in the JSON payload
-string userId = MHSBridge.Instance.GetPlayerID();
-
-// In your log submission JSON:
-// { "game": "mhs", "user_id": "dale@example.com", "eventType": "...", ... }
-```
-
-### Sending Identity to Stratasave
-
-Stratasave already uses `user_id` — no change needed in the key name:
-
-```csharp
-string userId = MHSBridge.Instance.GetPlayerID();
-
-// In your save submission JSON:
-// { "user_id": "dale@example.com", "game": "mhs", "save_data": { ... } }
-```
+All URLs are complete endpoints — POST directly to them without appending paths.
 
 ### Unit Completion
 
-**No change** — same as before. Call `CompleteUnit` for every unit, including the last one:
+Call `CompleteUnit` at the end of every unit's gameplay, including the last one. Always provide the next unit's relative URL.
 
 ```csharp
 // End of Unit 1:
 MHSBridge.Instance.CompleteUnit("unit1", "../unit2/index.html");
 
+// End of Unit 2:
+MHSBridge.Instance.CompleteUnit("unit2", "../unit3/index.html");
+
 // End of Unit 5 (currently the last unit):
 MHSBridge.Instance.CompleteUnit("unit5", "../unit6/index.html");
 ```
 
-Note: Always provide the next unit URL even for the last unit. In PWA mode, the URL is ignored (StrataHub handles the transition). In URL mode, if the next unit doesn't exist yet, the navigation simply won't happen. When unit 6 is added, no code change is needed — `CompleteUnit` will transition to it automatically.
+In PWA mode, the `nextUrl` parameter is ignored — StrataHub handles the transition. In URL mode, it navigates to the next unit. If the next unit doesn't exist yet (e.g., unit 6 isn't built yet), the navigation simply won't happen. When unit 6 is added, no code change is needed.
 
 ### End of Game
 
-**New.** Call `EndGame()` from the game's end-of-game screen when the player clicks Continue/Return:
+Call `EndGame()` from the game's end-of-game screen when the player clicks Continue or Return.
 
 ```csharp
 // Player clicks Continue on the end-of-game congratulatory screen:
 MHSBridge.Instance.EndGame();
 ```
+
+The game owns the end-of-game experience — design the congratulatory screen however you want. StrataHub does not show its own overlay.
 
 **The flow for the final unit:**
 1. Unit gameplay completes → call `CompleteUnit("unit5", "../unit6/index.html")`
@@ -207,31 +133,28 @@ MHSBridge.Instance.EndGame();
 3. Player clicks Continue → call `EndGame()`
 
 **What EndGame does:**
-- **PWA mode (StrataHub):** Navigates back to the Mission HydroSci units page
-- **Browser tab (not PWA):** Closes the tab, or shows "You can close this tab now" if the browser blocks it
+- **PWA mode:** Navigates back to the Mission HydroSci units page in StrataHub
+- **URL mode (browser tab):** Closes the tab. If the browser blocks it, shows "You can close this tab now."
 - **Editor:** Logs a message (no-op)
 
-**Important:** `CompleteUnit` and `EndGame` are separate calls with different purposes:
-- `CompleteUnit` = "This unit's gameplay is done" (signals progress)
-- `EndGame` = "The player is done and wants to leave" (exits the game)
+**CompleteUnit vs EndGame:**
+- `CompleteUnit` = "This unit's gameplay is done" → signals progress and transitions to the next unit
+- `EndGame` = "The player is done and wants to leave" → exits the game
 
 ### Loader Navigation
 
-The loader navigates to units by name — `GetUnitURL` uses the unitMap if one is present, otherwise returns a relative URL:
+The loader navigates to the student's current unit:
 
 ```csharp
 void Start()
 {
     string userId = MHSBridge.Instance.GetPlayerID();
     string currentUnit = DetermineCurrentUnit(userId); // Your save data logic
-
     MHSBridge.Instance.NavigateToUnit(currentUnit);
 }
 ```
 
-Unit locking was introduced because students figured out the URL pattern (e.g., changing `unit1` to `unit5` in the address bar) and skipped ahead to future units. The unitMap prevents this — a unit is locked when its entry is explicitly `null`. The host page builds the unitMap from the student's progress: completed and current units get real URLs, future units get `null`. If there's no unitMap at all (e.g., developer builds), nothing is ever locked and `GetUnitURL` returns a relative URL.
-
-If the target unit is locked, `NavigateToUnit` logs a warning and does nothing. Your code can check explicitly:
+Units can be locked via the unitMap. A locked unit has a `null` entry in the map — `GetUnitURL` returns null with `isLocked=true`:
 
 ```csharp
 bool isLocked;
@@ -247,9 +170,11 @@ else if (url != null)
 }
 ```
 
+If no unitMap is present (e.g., developer builds), nothing is ever locked and `GetUnitURL` returns relative URLs.
+
 ---
 
-## The Host Page Contract
+## Host Page Configuration
 
 The host page sets this JavaScript global before Unity starts:
 
@@ -279,42 +204,26 @@ window.__mhsBridgeConfig = {
 ```
 
 - **`identity`** — required. `user_id` and `name`.
-- **`services`** — required. Five service entries, each with `url` (full endpoint) and `auth` (Authorization header value): `log_submit`, `state_save`, `state_load`, `settings_save`, `settings_load`.
-- **`navigation.unitMap`** — optional. If present, `NavigateToUnit` uses it. If absent, relative navigation.
+- **`services`** — required. Five service entries, each with `url` (full endpoint) and `auth` (Authorization header value).
+- **`navigation.unitMap`** — optional. If present, `NavigateToUnit` uses it. If absent, relative URL navigation.
 
 The game reads this at startup. It does NOT make any network calls for identity or configuration — the host page provides everything.
 
----
+### How the Config is Provided
 
-## How the Host Page Provides the Config
+**StrataHub (PWA and browser):** The Go template injects the config server-side from the authenticated session and server configuration.
 
-### Mission HydroSci (PWA mode)
+**Developer builds (URL mode):** The provided replacement `index.html` fetches identity from StrataHub's `/api/user` and service config from `/api/game-config?game=mhs`, assembles `__mhsBridgeConfig`, then starts Unity. You must be logged into StrataHub in your browser for this to work.
 
-StrataHub's Go template injects the config server-side from the authenticated session and server configuration. The service credentials never appear in the HTML source — they are rendered by the server at request time.
+**Localhost:** The replacement `index.html` detects localhost and uses development defaults automatically — `GetPlayerID()` returns "mhs_developer" and all service configs return production endpoint URLs. No StrataHub login required.
 
-### Developer Builds (URL mode)
-
-We provide a replacement `index.html` that you drop into your build folders (replacing Unity's generated `index.html`). This replacement page:
-
-1. Fetches identity from StrataHub: `GET /api/user`
-2. Fetches service config from StrataHub: `GET /api/game-config?game=mhs`
-3. Assembles `window.__mhsBridgeConfig`
-4. Starts Unity
-
-You must be logged into StrataHub (e.g., dev.adroit.games) in your browser for this to work.
-
-### Local Testing (localhost)
-
-If you're running a build locally (localhost), the replacement `index.html` detects this and uses development defaults automatically:
-- `GetPlayerID()` returns "mhs_developer"
-- All service configs (`GetLogSubmitConfig()`, `GetStateSaveConfig()`, etc.) return production endpoint URLs and auth
-- No StrataHub login required — you can test logging and saving immediately
+**Editor:** Development defaults are built into `MHSBridge.cs` — same as localhost.
 
 ---
 
-## S3 Directory Structure
+## Build Directory Structure
 
-**No change.** Same sibling folder structure:
+Each unit is in its own folder with the replacement `index.html`:
 
 ```
 my-build/
@@ -327,10 +236,15 @@ my-build/
     Build/
     StreamingAssets/
   unit2/
-    ...
+    index.html
+    Build/
+    StreamingAssets/
+  ...
 ```
 
-## Build Settings
+The replacement `index.html` auto-detects the build name from the folder name (e.g., `unit1/index.html` loads `Build/unit1.loader.js`).
+
+### Build File Extensions
 
 The replacement `index.html` expects Unity WebGL build files with the `.unityweb` extension:
 
@@ -342,15 +256,13 @@ Build/
   BuildName.wasm.unityweb
 ```
 
-We recommend using Brotli compression for the `.unityweb` files. If your builds produce different file extensions (e.g., `.gz` or no extension), you will need to edit the file extension references in `index.html` to match.
+If your builds produce different file extensions (e.g., `.gz` or no extension), edit the file extension references in `index.html` to match.
 
 ---
 
 ## Testing
 
 ### Quick Smoke Test
-
-Add this temporarily to verify the bridge is working:
 
 ```csharp
 void Start()
@@ -361,68 +273,48 @@ void Start()
     Debug.Log("Has Config: " + MHSBridge.Instance.HasConfig);
 
     var log = MHSBridge.Instance.GetLogSubmitConfig();
-    Debug.Log("Log Submit: " + (log != null ? log.url : "null (using fallback)"));
+    Debug.Log("Log Submit: " + (log != null ? log.url : "null"));
 
     var stateSave = MHSBridge.Instance.GetStateSaveConfig();
-    Debug.Log("State Save: " + (stateSave != null ? stateSave.url : "null (using fallback)"));
+    Debug.Log("State Save: " + (stateSave != null ? stateSave.url : "null"));
 
     var stateLoad = MHSBridge.Instance.GetStateLoadConfig();
-    Debug.Log("State Load: " + (stateLoad != null ? stateLoad.url : "null (using fallback)"));
+    Debug.Log("State Load: " + (stateLoad != null ? stateLoad.url : "null"));
 
     var settingsSave = MHSBridge.Instance.GetSettingsSaveConfig();
-    Debug.Log("Settings Save: " + (settingsSave != null ? settingsSave.url : "null (using fallback)"));
+    Debug.Log("Settings Save: " + (settingsSave != null ? settingsSave.url : "null"));
 
     var settingsLoad = MHSBridge.Instance.GetSettingsLoadConfig();
-    Debug.Log("Settings Load: " + (settingsLoad != null ? settingsLoad.url : "null (using fallback)"));
+    Debug.Log("Settings Load: " + (settingsLoad != null ? settingsLoad.url : "null"));
 }
 ```
 
 ### Test Scenarios
 
-1. **With replacement index.html + logged into StrataHub:**
-   - `HasConfig` should be `true`
-   - `GetPlayerID()` should return your login ID
-   - All five service configs should return full endpoint URLs and auth
+1. **URL-launched + logged into StrataHub:**
+   - `HasConfig` = `true`, `IsPWA` = `false`
+   - `GetPlayerID()` returns your login ID
+   - All service configs return endpoint URLs and auth
 
-2. **With replacement index.html on localhost:**
-   - `HasConfig` should be `true` (localhost defaults)
+2. **Localhost:**
+   - `HasConfig` = `true`, `IsPWA` = `false`
    - `GetPlayerID()` returns "mhs_developer"
-   - All service configs return production endpoint URLs and auth
+   - All service configs return production endpoint URLs
 
-3. **With replacement index.html on remote host + NOT logged into StrataHub:**
-   - `HasConfig` should be `false` (config fetch failed)
+3. **URL-launched + NOT logged into StrataHub:**
+   - `HasConfig` = `false`
    - `GetPlayerID()` returns empty string
    - Service configs return null
 
-4. **In StrataHub PWA:**
-   - `HasConfig` should be `true`
-   - `IsPWA` should be `true`
-   - `GetPlayerID()` should return the logged-in user's ID
-   - Service configs should return full endpoint URLs and auth
+4. **StrataHub (PWA or browser):**
+   - `HasConfig` = `true`, `IsPWA` = `true`
+   - `GetPlayerID()` returns the logged-in user's ID
+   - Service configs return endpoint URLs and auth
 
-5. **EndGame in PWA mode:**
-   - After completing the final unit and seeing the end-of-game screen, click Continue
-   - Should navigate to the Mission HydroSci units page with all units showing as completed
-
-6. **EndGame in URL mode (browser tab):**
+5. **EndGame in PWA/browser mode:**
    - After the end-of-game screen, click Continue
-   - Tab should close, or show "You can close this tab now" if the browser blocks it
+   - Navigates to the Mission HydroSci units page with all units completed
 
----
-
-## Summary of Changes
-
-| What | Where | Change |
-|------|-------|--------|
-| Replace jslib | `Assets/Plugins/WebGL/MHSBridge.jslib` | New file (adds GetConfig, GetUnitURL; updates GetPlayerID, NavigateToUnit) |
-| Replace C# script | `Assets/Scripts/MHSBridge.cs` | New file (adds service config, unitMap, config loading) |
-| Get player ID | Wherever `/api/user` is used | Replace with `MHSBridge.Instance.GetPlayerID()` |
-| Identity key | Log/save JSON payloads | Use `user_id` instead of `playerId` for stratalog |
-| Get log config | Wherever log URL/auth is hardcoded | Use `MHSBridge.Instance.GetLogSubmitConfig()` with hardcoded fallback |
-| Get state save/load | Wherever save URL/auth is hardcoded | Use `GetStateSaveConfig()` and `GetStateLoadConfig()` with hardcoded fallback |
-| Get settings save/load | Wherever settings URL/auth is hardcoded | Use `GetSettingsSaveConfig()` and `GetSettingsLoadConfig()` with hardcoded fallback |
-| Replace index.html | Each build folder | Drop in the provided replacement `index.html` |
-| Loader navigation | Loader scene startup | `GetUnitURL` and `NavigateToUnit` handle URL resolution automatically |
-| Signal unit complete | End-of-unit code | No change — `CompleteUnit()` works the same |
-| Signal end of game | End-of-game screen Continue button | Call `MHSBridge.Instance.EndGame()` (new) |
-| Build directory layout | S3 upload structure | No change — sibling folders still work |
+6. **EndGame in URL mode:**
+   - After the end-of-game screen, click Continue
+   - Tab closes, or shows "You can close this tab now"
