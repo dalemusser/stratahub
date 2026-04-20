@@ -602,6 +602,84 @@
       var loadingText = document.getElementById('loading-text');
       var loadingOverlay = document.getElementById('loading-overlay');
 
+      // --- Crash reporting ---
+      var crashPhase = 'loading'; // tracks current phase: loading, compiling, running
+      var crashReported = false;  // prevent duplicate reports
+
+      function reportCrash(type, message, stack, phase) {
+        if (crashReported) return;
+        crashReported = true;
+
+        var logUrl = '{{ .LogSubmitURL }}';
+        var logAuth = '{{ .LogAuth }}';
+        if (!logUrl) { console.warn('MHS crash: no log endpoint configured'); return; }
+
+        // Match the device format used by Unity game log events
+        var device = {
+          os: navigator.platform || '',
+          platform: 'UnityWebGL',
+          processors: navigator.hardwareConcurrency || 0,
+          memory: navigator.deviceMemory ? navigator.deviceMemory * 1024 : 0,
+          resolution: {
+            width: screen.width || 0,
+            height: screen.height || 0
+          },
+          userAgent: navigator.userAgent || '',
+          online: navigator.onLine
+        };
+        if (performance && performance.memory) {
+          device.jsHeapUsedMB = Math.round(performance.memory.usedJSHeapSize / 1048576);
+          device.jsHeapTotalMB = Math.round(performance.memory.totalJSHeapSize / 1048576);
+        }
+
+        var payload = {
+          game: 'mhs',
+          playerId: '{{ .UserLoginID }}',
+          eventType: 'crash',
+          version: unitVersion,
+          data: {
+            type: type || 'unknown',
+            message: String(message || '').substring(0, 2000),
+            stack: String(stack || '').substring(0, 4000),
+            phase: phase || crashPhase,
+            unitId: unitId,
+            workspace: window.location.hostname.split('.')[0],
+            isPWA: !!(navigator.serviceWorker && navigator.serviceWorker.controller)
+          },
+          device: device
+        };
+
+        var body = JSON.stringify(payload);
+        console.error('MHS crash report:', payload);
+
+        // Use fetch with keepalive for reliability during page unload.
+        // sendBeacon can't set Authorization headers and triggers CORS issues.
+        try {
+          fetch(logUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': logAuth },
+            body: body,
+            keepalive: true
+          }).catch(function() {});
+        } catch (e) {
+          // keepalive fetch may throw if body is too large (64KB limit)
+          fetch(logUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': logAuth },
+            body: body
+          }).catch(function() {});
+        }
+      }
+
+      window.onerror = function(message, source, lineno, colno, error) {
+        reportCrash('runtime_error', message, error && error.stack ? error.stack : (source + ':' + lineno + ':' + colno), crashPhase);
+      };
+
+      window.onunhandledrejection = function(event) {
+        var reason = event.reason || {};
+        reportCrash('unhandled_rejection', reason.message || String(reason), reason.stack || '', crashPhase);
+      };
+
       // Aspect-ratio-preserving resize (matches dev build: 1400x800, 7:4 ratio).
       // In fullscreen mode, CSS handles sizing via viewport units (see <style> above)
       // to avoid iPad Safari's unreliable JS dimension reporting. This JS path
@@ -655,6 +733,7 @@
       script.src = loaderUrl;
       script.onload = function() {
         loadingText.textContent = 'Starting Unity...';
+        crashPhase = 'compiling';
 
         createUnityInstance(canvas, {
           dataUrl: buildUrl + '/{{ .DataFile }}',
@@ -671,10 +750,12 @@
             loadingText.textContent = 'Loading assets...';
           } else if (progress < 0.9) {
             loadingText.textContent = 'Compiling...';
+            crashPhase = 'compiling';
           } else {
             loadingText.textContent = 'Almost ready...';
           }
         }).then(function(instance) {
+          crashPhase = 'running';
           window.__unityInstance = instance;
           canvas = instance.Module.canvas;
           loadingOverlay.classList.add('hidden');
@@ -691,11 +772,13 @@
           loadingBar.style.width = '100%';
           loadingBar.style.background = '#ef4444';
           console.error('Unity load error:', err);
+          reportCrash('load_error', err.message, err.stack || '', crashPhase);
         });
       };
       script.onerror = function() {
         loadingText.textContent = 'Failed to load game. Is this unit downloaded?';
         loadingBar.style.width = '100%';
+        reportCrash('load_error', 'Failed to load Unity loader script: ' + loaderUrl, '', 'loading');
         loadingBar.style.background = '#ef4444';
       };
       document.body.appendChild(script);

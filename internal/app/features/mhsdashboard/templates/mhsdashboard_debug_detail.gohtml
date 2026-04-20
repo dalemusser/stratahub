@@ -1,4 +1,5 @@
 {{ define "mhsdashboard_debug_detail" }}
+<style>.debug-hidden { display: none; }</style>
 <div class="p-4"
      data-student-name="{{ .StudentName }}"
      data-login-id="{{ .LoginID }}"
@@ -27,6 +28,10 @@
       </select>
       <span class="text-xs text-[#7fb3d3]">{{ .TotalEvents }} events</span>
       <span class="text-xs text-[#4a7a9b]">({{ .TimezoneAbbr }})</span>
+      <button type="button"
+              onclick="loadDebugDetailUnit('{{ .StudentID }}', document.getElementById('debug-unit-filter').value)"
+              class="text-[10px] text-[#5cb8e6] hover:text-[#8ed0f0] border border-[#1e3a5f] rounded px-1.5 py-0.5 hover:bg-[#0a1e33]"
+              title="Refresh log entries">Refresh</button>
       {{ if .Anomalies }}
       <button type="button"
               class="text-xs px-2 py-1 border border-[#1e3a5f] rounded bg-[#0c2d48] text-[#5cb8e6] hover:text-[#8ed0f0] hover:border-[#2e8bc0] font-medium"
@@ -71,20 +76,24 @@
   <!-- Timeline Section -->
   <div class="border border-[#1e3a5f] rounded-lg overflow-hidden">
     <div class="bg-[#0c2d48] px-3 py-1.5 text-xs font-bold text-[#e8f4f8] border-b border-[#1e3a5f] flex items-center justify-between">
-      <span>Event Timeline</span>
       <div class="flex items-center gap-2">
-        <label class="flex items-center gap-1 text-[10px] text-[#7fb3d3] font-normal cursor-pointer">
-          <input type="checkbox" id="debug-show-positions" class="w-3 h-3" onchange="toggleTimelinePositions()">
-          Show positions
-        </label>
-        <label class="flex items-center gap-1 text-[10px] text-[#7fb3d3] font-normal cursor-pointer">
-          <input type="checkbox" id="debug-show-dialogue" class="w-3 h-3" checked onchange="toggleTimelineFilter()">
-          Dialogue
-        </label>
-        <label class="flex items-center gap-1 text-[10px] text-[#7fb3d3] font-normal cursor-pointer">
-          <input type="checkbox" id="debug-show-quest" class="w-3 h-3" checked onchange="toggleTimelineFilter()">
-          Quests
-        </label>
+        <span>Event Timeline</span>
+        <button id="debug-sort-toggle" onclick="toggleTimelineSort()" class="text-[10px] bg-[#0a1e33] text-[#7fb3d3] border border-[#1e3a5f] rounded px-1.5 py-0.5 hover:text-[#e8f4f8] font-normal" title="Reverse order">Oldest first ↓</button>
+      </div>
+      <div class="flex items-center gap-3">
+        <span id="debug-checkbox-container" class="flex items-center gap-2">
+          <label class="flex items-center gap-1 text-[10px] text-[#7fb3d3] font-normal cursor-pointer">
+            <input type="checkbox" id="debug-show-positions" class="w-3 h-3" onchange="toggleTimelineFilter()">
+            Positions
+          </label>
+          <label class="flex items-center gap-1 text-[10px] text-[#7fb3d3] font-normal cursor-pointer">
+            <input type="checkbox" id="debug-show-input" class="w-3 h-3" onchange="toggleTimelineFilter()">
+            Inputs
+          </label>
+        </span>
+        <select id="debug-event-type-filter" onchange="toggleTimelineFilter()" class="text-[10px] bg-[#0a1e33] text-[#7fb3d3] border border-[#1e3a5f] rounded px-1 py-0.5">
+          <option value="all">All event types</option>
+        </select>
       </div>
     </div>
     <div class="max-h-[500px] overflow-y-auto mhs-styled-scrollbar">
@@ -101,7 +110,7 @@
             <th class="text-left px-2 py-1.5 font-medium w-32">Annotation</th>
           </tr>
         </thead>
-        <tbody>
+        <tbody id="debug-timeline-tbody">
           {{ range .Timeline }}
           {{ if .DateStr }}
           <tr class="debug-timeline-row debug-date-separator">
@@ -110,8 +119,9 @@
             </td>
           </tr>
           {{ end }}
-          <tr class="border-b border-[#1e3a5f]/60 debug-timeline-row debug-cat-{{ .Category }}
+          <tr class="border-b border-[#1e3a5f]/60 debug-timeline-row debug-cat-{{ .Category }}{{ if or (eq .Category "position") (eq .Category "input") }} debug-hidden{{ end }}
             {{ if .IsAnomaly }}bg-red-950/30{{ else if .IsStartEvent }}bg-[#0a2a1a]{{ else if .IsEndEvent }}bg-[#2a0f0f]{{ else if eq .Category "waypoint" }}bg-indigo-950/30{{ end }}"
+            data-event-type="{{ .EventType }}"
             {{ if gt .GapSeconds 300.0 }}style="border-top: 2px solid #d97706;"{{ end }}>
             <td class="px-2 py-1 font-mono text-[#7fb3d3] whitespace-nowrap">{{ .TimestampStr }}</td>
             <td class="px-2 py-1 font-mono text-[#4a7a9b] whitespace-nowrap">{{ .ElapsedDisplay }}</td>
@@ -129,10 +139,11 @@
             </td>
             <td class="px-2 py-1 text-[#7fb3d3] whitespace-nowrap truncate max-w-[120px]" title="{{ .SceneName }}">{{ .SceneName }}</td>
             <td class="px-2 py-1 text-[#b1d4e0]">
-              {{ .DataSummary }}
-              {{ if .IsAnomaly }}
-              <span class="text-red-400 font-medium ml-1">[{{ .AnomalyNote }}]</span>
-              {{ end }}
+              <div class="flex items-start gap-1">
+                <span class="flex-1">{{ .DataSummary }}{{ if .IsAnomaly }} <span class="text-red-400 font-medium">[{{ .AnomalyNote }}]</span>{{ end }}</span>
+                <button type="button" onclick="viewEventJSON(this)" class="text-sm text-[#5cb8e6] hover:text-[#8ed0f0] flex-shrink-0 px-0.5" title="View full event details" data-json="{{ .DataJSON }}" data-type="{{ .EventType }}" data-id="{{ .ID }}">&#128269;</button>
+                <button type="button" onclick="downloadEventJSON(this)" class="text-sm text-[#5cb8e6] hover:text-[#8ed0f0] flex-shrink-0 px-0.5" title="Download full event as JSON" data-json="{{ .DataJSON }}" data-type="{{ .EventType }}" data-id="{{ .ID }}">&#11015;</button>
+              </div>
             </td>
             <td class="px-2 py-1 whitespace-nowrap">
               {{ if .Annotation }}
@@ -148,6 +159,18 @@
           {{ end }}
         </tbody>
       </table>
+    </div>
+  </div>
+
+  <!-- Event detail modal -->
+  <div id="debug-event-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center">
+    <div class="absolute inset-0 bg-black/50" onclick="document.getElementById('debug-event-modal').classList.add('hidden')"></div>
+    <div class="relative bg-[#0c2d48] border border-[#1e3a5f] rounded-lg shadow-lg max-w-2xl w-full mx-4 flex flex-col" style="max-height: 80vh;">
+      <div class="flex items-center justify-between px-4 py-2 border-b border-[#1e3a5f] flex-shrink-0">
+        <h3 id="debug-event-modal-title" class="text-sm font-bold text-[#e8f4f8]">Event Details</h3>
+        <button onclick="document.getElementById('debug-event-modal').classList.add('hidden')" class="text-[#7fb3d3] hover:text-[#e8f4f8] text-lg">&times;</button>
+      </div>
+      <pre id="debug-event-modal-body" class="overflow-auto p-4 text-xs text-[#b1d4e0] font-mono whitespace-pre-wrap min-h-0"></pre>
     </div>
   </div>
 

@@ -241,4 +241,7 @@ type TimelineEntry struct {
 	DateStr              string // date portion, e.g. "Apr 1, 2026" — only set on first event of a new day
 	ElapsedDisplay       string // wall-clock elapsed from first event, e.g. "12:34"
 	ActiveElapsedDisplay string // elapsed excluding gaps > threshold, e.g. "8:21"
+
+	// Full data as JSON string for download/inspection
+	DataJSON string
 }

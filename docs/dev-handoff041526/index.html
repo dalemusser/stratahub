@@ -65,6 +65,97 @@
     var GAME_ID = 'mhs';
 
     // =========================================================================
+    // Crash reporting
+    //
+    // Captures Unity/WASM crashes and sends them to stratalog.
+    // No game changes required — these handlers run on the host page.
+    // =========================================================================
+    var crashPhase = 'loading';
+    var crashReported = false;
+
+    function reportCrash(type, message, stack, phase) {
+      if (crashReported) return;
+      crashReported = true;
+
+      var config = window.__mhsBridgeConfig;
+      var logUrl = config && config.services && config.services.log_submit ? config.services.log_submit.url : null;
+      var logAuth = config && config.services && config.services.log_submit ? config.services.log_submit.auth : null;
+
+      // Match the device format used by Unity game log events
+      var device = {
+        os: navigator.platform || '',
+        platform: 'UnityWebGL',
+        processors: navigator.hardwareConcurrency || 0,
+        memory: navigator.deviceMemory ? navigator.deviceMemory * 1024 : 0,
+        resolution: {
+          width: screen.width || 0,
+          height: screen.height || 0
+        },
+        userAgent: navigator.userAgent || '',
+        online: navigator.onLine
+      };
+      if (performance && performance.memory) {
+        device.jsHeapUsedMB = Math.round(performance.memory.usedJSHeapSize / 1048576);
+        device.jsHeapTotalMB = Math.round(performance.memory.totalJSHeapSize / 1048576);
+      }
+
+      // Detect unit from URL path (e.g., /unit3/index.html → unit3)
+      var pathParts = window.location.pathname.replace(/\/index\.html$/, '').split('/');
+      var detectedUnit = pathParts[pathParts.length - 1] || pathParts[pathParts.length - 2] || 'unknown';
+
+      var payload = {
+        game: 'mhs',
+        playerId: config && config.identity ? config.identity.user_id : 'unknown',
+        eventType: 'crash',
+        version: 'unknown',
+        data: {
+          type: type || 'unknown',
+          message: String(message || '').substring(0, 2000),
+          stack: String(stack || '').substring(0, 4000),
+          phase: phase || crashPhase,
+          unitId: detectedUnit,
+          workspace: window.location.hostname.split('.')[0],
+          isPWA: false
+        },
+        device: device
+      };
+
+      console.error('MHS crash report:', payload);
+
+      if (!logUrl) {
+        console.warn('MHS crash: no log endpoint configured (localhost or config fetch failed)');
+        return;
+      }
+
+      var body = JSON.stringify(payload);
+      // Use fetch with keepalive for reliability during page unload.
+      // sendBeacon can't set Authorization headers and triggers CORS issues.
+      try {
+        fetch(logUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': logAuth },
+          body: body,
+          keepalive: true
+        }).catch(function() {});
+      } catch (e) {
+        fetch(logUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': logAuth },
+          body: body
+        }).catch(function() {});
+      }
+    }
+
+    window.onerror = function(message, source, lineno, colno, error) {
+      reportCrash('runtime_error', message, error && error.stack ? error.stack : (source + ':' + lineno + ':' + colno), crashPhase);
+    };
+
+    window.onunhandledrejection = function(event) {
+      var reason = event.reason || {};
+      reportCrash('unhandled_rejection', reason.message || String(reason), reason.stack || '', crashPhase);
+    };
+
+    // =========================================================================
     // Detect Unity build files
     //
     // Unity WebGL builds produce files named after the build target.
@@ -193,6 +284,7 @@
         // Detect build name from loader filename: "BuildName.loader.js" → "BuildName"
         var loaderFile = loaderUrl.split('/').pop();
         var buildName = loaderFile.replace('.loader.js', '');
+        crashPhase = 'compiling';
 
         var config = {
           dataUrl: buildUrl + '/' + buildName + '.data.unityweb',
@@ -212,10 +304,12 @@
             loadingText.textContent = 'Loading...';
           } else if (progress < 0.9) {
             loadingText.textContent = 'Compiling...';
+            crashPhase = 'compiling';
           } else {
             loadingText.textContent = 'Almost ready...';
           }
         }).then(function(instance) {
+          crashPhase = 'running';
           loadingOverlay.classList.add('hidden');
           canvas.focus();
           console.log('Unity instance started');
@@ -224,9 +318,11 @@
           loadingBar.style.width = '100%';
           loadingBar.style.background = '#ef4444';
           console.error('Unity load error:', err);
+          reportCrash('load_error', err.message, err.stack || '', crashPhase);
         });
       };
       script.onerror = function() {
+        reportCrash('load_error', 'Failed to load Unity loader script: ' + loaderUrl, '', 'loading');
         showError(
           'Failed to load Unity build.<br><br>' +
           'Looking for: <code>' + loaderUrl + '</code><br><br>' +

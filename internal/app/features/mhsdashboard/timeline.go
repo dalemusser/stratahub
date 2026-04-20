@@ -1,6 +1,8 @@
 package mhsdashboard
 
 import (
+	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"strings"
 	"time"
@@ -33,6 +35,28 @@ func buildTimeline(
 	for _, e := range events {
 		localTime := e.ServerTimestamp.In(loc)
 
+		// Build full log record for JSON download
+		fullRecord := map[string]interface{}{
+			"_id":             e.ID.Hex(),
+			"eventType":       e.EventType,
+			"sceneName":       e.SceneName,
+			"serverTimestamp":  e.ServerTimestamp,
+			"data":            e.Data,
+		}
+		if e.EventKey != "" {
+			fullRecord["eventKey"] = e.EventKey
+		}
+		if e.Version != "" {
+			fullRecord["version"] = e.Version
+		}
+		if e.Device != nil {
+			fullRecord["device"] = e.Device
+		}
+		dataJSON := ""
+		if jsonBytes, err := json.MarshalIndent(fullRecord, "", "  "); err == nil {
+			dataJSON = base64.StdEncoding.EncodeToString(jsonBytes)
+		}
+
 		entry := TimelineEntry{
 			ID:              e.ID.Hex(),
 			EventType:       e.EventType,
@@ -44,6 +68,7 @@ func buildTimeline(
 			DataSummary:     summarizeData(e.EventType, e.Data),
 			Unit:            rules.SceneToUnit[e.SceneName],
 			Category:        classifyEvent(e.EventType),
+			DataJSON:        dataJSON,
 		}
 
 		// Date separator: set DateStr when date changes
@@ -141,6 +166,12 @@ func classifyEvent(eventType string) string {
 	case "Topographic Map Event", "TopographicMapEvent", "WaterChamberEvent",
 		"soilMachine", "TerasGardenBox", "Soil Key Puzzle":
 		return "gameplay"
+	case "InputEvent":
+		return "input"
+	case "ObjectInterEvent":
+		return "interaction"
+	case "crash":
+		return "crash"
 	case "EndOfUnit":
 		return "system"
 	default:
@@ -182,6 +213,43 @@ func summarizeData(eventType string, data map[string]interface{}) string {
 			parts = append(parts, fmt.Sprintf("→ %v", v))
 		}
 		return strings.Join(parts, " ")
+
+	case "InputEvent":
+		parts := make([]string, 0, 3)
+		if v, ok := data["actionType"]; ok {
+			parts = append(parts, fmt.Sprintf("%v", v))
+		}
+		if v, ok := data["key"]; ok {
+			parts = append(parts, fmt.Sprintf("key:%v", v))
+		}
+		if v, ok := data["Value"]; ok {
+			parts = append(parts, fmt.Sprintf("%v", v))
+		}
+		return strings.Join(parts, " ")
+
+	case "ObjectInterEvent":
+		parts := make([]string, 0, 2)
+		if v, ok := data["actionType"]; ok {
+			parts = append(parts, fmt.Sprintf("%v", v))
+		}
+		if v, ok := data["objectName"]; ok {
+			parts = append(parts, fmt.Sprintf("%v", v))
+		}
+		return strings.Join(parts, " ")
+
+	case "crash":
+		parts := make([]string, 0, 2)
+		if v, ok := data["type"]; ok {
+			parts = append(parts, fmt.Sprintf("%v", v))
+		}
+		if v, ok := data["message"]; ok {
+			msg := fmt.Sprintf("%v", v)
+			if len(msg) > 80 {
+				msg = msg[:80] + "..."
+			}
+			parts = append(parts, msg)
+		}
+		return strings.Join(parts, ": ")
 
 	case "EndOfUnit":
 		if v, ok := data["Unit"]; ok {

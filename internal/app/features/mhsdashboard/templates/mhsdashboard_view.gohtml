@@ -700,8 +700,8 @@
         <button id="theme-info-btn" type="button" class="mhs-theme-info-btn" title="Theme information">?</button>
       </div>
     </div>
-    <!-- Right: Refresh controls -->
-    <div class="flex items-center gap-2">
+    <!-- Right: Refresh controls (hidden on debug/maps tabs) -->
+    <div id="mhs-refresh-controls" class="flex items-center gap-2">
       <button id="mhs-refresh-btn"
               type="button"
               class="text-sm px-2 py-1 border border-[#b1d4e0] rounded hover:bg-white text-[#145374] cursor-pointer"
@@ -1075,21 +1075,21 @@
     }, 1000);
   }
 
-  function doRefresh() {
+  function doRefresh(userInitiated) {
     // Skip auto-refresh while a modal is open
-    if (deviceModalOpen || summaryModalOpen) {
+    if (!userInitiated && (deviceModalOpen || summaryModalOpen)) {
       countdown = 30;
       updateCountdown();
       return;
     }
-    // Skip auto-refresh while the debug or maps tab is active
-    if (activeTab === 'debug' || activeTab === 'maps') {
+    // Skip auto-refresh while the debug or maps tab is active (but not user-initiated changes)
+    if (!userInitiated && (activeTab === 'debug' || activeTab === 'maps')) {
       countdown = 30;
       updateCountdown();
       return;
     }
     // Skip auto-refresh while a set-progress menu is open
-    if (document.querySelector('.set-progress-menu:not(.hidden)')) {
+    if (!userInitiated && document.querySelector('.set-progress-menu:not(.hidden)')) {
       countdown = 30;
       updateCountdown();
       return;
@@ -1102,6 +1102,19 @@
     htmx.ajax('GET', url, { target: '#mhs-grid', swap: 'innerHTML' });
     countdown = 30;
     updateCountdown();
+
+    // If user changed group while on debug/maps tab, reload that tab's content
+    if (userInitiated) {
+      if (activeTab === 'debug') {
+        var debugContent = document.getElementById('mhs-debug-content');
+        if (debugContent) {
+          debugContent.dataset.loaded = '';
+          loadDebugStudents();
+        }
+      } else if (activeTab === 'maps') {
+        mapsInit();
+      }
+    }
   }
 
   // Tab switching
@@ -1140,6 +1153,12 @@
         if (buttons[key]) buttons[key].className = 'px-4 py-2 text-sm font-medium mhs-tab-inactive';
         if (legends[key]) { legends[key].classList.add('hidden'); legends[key].classList.remove('flex'); }
       }
+    }
+
+    // Hide refresh controls on debug/maps tabs (auto-refresh is skipped, countdown is confusing)
+    var refreshControls = document.getElementById('mhs-refresh-controls');
+    if (refreshControls) {
+      refreshControls.style.display = (tab === 'debug' || tab === 'maps') ? 'none' : '';
     }
 
     // Auto-load debug students when switching to debug tab
@@ -1183,7 +1202,7 @@
     el.innerHTML = '<div class="p-8 text-center text-sm text-slate-500">Loading detail for ' + name + '...</div>';
     fetch('/mhsdashboard/debug/student/' + userID + '?group=' + encodeURIComponent(group))
       .then(function(r) { return r.text(); })
-      .then(function(html) { el.innerHTML = html; })
+      .then(function(html) { el.innerHTML = html; afterDebugDetailLoad(); })
       .catch(function() {
         el.innerHTML = '<div class="p-8 text-center text-sm text-red-500">Failed to load detail.</div>';
       });
@@ -1199,26 +1218,138 @@
     if (unit) url += '&unit=' + encodeURIComponent(unit);
     fetch(url)
       .then(function(r) { return r.text(); })
-      .then(function(html) { el.innerHTML = html; })
+      .then(function(html) { el.innerHTML = html; afterDebugDetailLoad(); })
       .catch(function() {
         el.innerHTML = '<div class="p-8 text-center text-sm text-red-500">Failed to load detail.</div>';
       });
   };
 
-  window.toggleTimelinePositions = function() {
-    var show = document.getElementById('debug-show-positions');
-    var rows = document.querySelectorAll('.debug-cat-position');
-    rows.forEach(function(r) { r.style.display = (show && show.checked) ? '' : 'none'; });
+  window.toggleTimelineFilter = function() {
+    var showPositions = document.getElementById('debug-show-positions');
+    var showInput = document.getElementById('debug-show-input');
+    var checkboxContainer = document.getElementById('debug-checkbox-container');
+    var typeSelect = document.getElementById('debug-event-type-filter');
+    var selectedType = typeSelect ? typeSelect.value : 'all';
+    var isAll = selectedType === 'all';
+
+    // Show/hide checkboxes based on whether "All" is selected
+    if (checkboxContainer) {
+      checkboxContainer.style.display = isAll ? '' : 'none';
+    }
+
+    document.querySelectorAll('.debug-timeline-row:not(.debug-date-separator)').forEach(function(r) {
+      var eventType = r.getAttribute('data-event-type') || '';
+      var isPosition = r.classList.contains('debug-cat-position');
+      var isInput = r.classList.contains('debug-cat-input');
+
+      if (isAll) {
+        // All mode: use class toggling for position/input (CSS controls visibility)
+        r.style.display = '';
+        if (isPosition) {
+          r.classList.toggle('debug-hidden', !showPositions || !showPositions.checked);
+        }
+        if (isInput) {
+          r.classList.toggle('debug-hidden', !showInput || !showInput.checked);
+        }
+      } else {
+        // Specific type: show only matching, override CSS classes
+        r.classList.remove('debug-hidden');
+        r.style.display = (eventType === selectedType) ? '' : 'none';
+      }
+    });
   };
 
-  window.toggleTimelineFilter = function() {
-    var showDialogue = document.getElementById('debug-show-dialogue');
-    var showQuest = document.getElementById('debug-show-quest');
-    document.querySelectorAll('.debug-cat-dialogue').forEach(function(r) {
-      r.style.display = (showDialogue && showDialogue.checked) ? '' : 'none';
+  // Decode base64-encoded JSON from data attribute
+  function decodeEventJSON(btn) {
+    var b64 = btn.getAttribute('data-json');
+    try { return atob(b64); } catch (e) { return b64; }
+  }
+
+  // View a single event's full JSON in a modal
+  window.viewEventJSON = function(btn) {
+    var json = decodeEventJSON(btn);
+    var eventType = btn.getAttribute('data-type') || 'event';
+    var modal = document.getElementById('debug-event-modal');
+    var title = document.getElementById('debug-event-modal-title');
+    var body = document.getElementById('debug-event-modal-body');
+    if (!modal || !body) return;
+    if (title) title.textContent = eventType;
+    try {
+      body.textContent = JSON.stringify(JSON.parse(json), null, 2);
+    } catch (e) {
+      body.textContent = json;
+    }
+    modal.classList.remove('hidden');
+  };
+
+  // Download a single event's full JSON
+  window.downloadEventJSON = function(btn) {
+    var json = decodeEventJSON(btn);
+    var eventType = btn.getAttribute('data-type') || 'event';
+    var id = btn.getAttribute('data-id') || 'unknown';
+    var blob = new Blob([json], { type: 'application/json' });
+    var a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = eventType + '-' + id + '.json';
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  // Called after debug detail HTML is loaded — populates filters and restores sort order
+  function afterDebugDetailLoad() {
+    if (window.populateEventTypeFilter) populateEventTypeFilter();
+    // Restore sort order if it was reversed before the reload
+    if (timelineSortReversed) {
+      var tbody = document.getElementById('debug-timeline-tbody');
+      if (tbody) {
+        var rows = [];
+        while (tbody.firstChild) { rows.push(tbody.removeChild(tbody.firstChild)); }
+        var frag = document.createDocumentFragment();
+        for (var i = rows.length - 1; i >= 0; i--) { frag.appendChild(rows[i]); }
+        tbody.appendChild(frag);
+      }
+    }
+    // Update button text to match current state
+    var btn = document.getElementById('debug-sort-toggle');
+    if (btn) {
+      btn.textContent = timelineSortReversed ? 'Newest first \u2191' : 'Oldest first \u2193';
+    }
+  }
+
+  // Sort toggle for timeline
+  var timelineSortReversed = false;
+  window.toggleTimelineSort = function() {
+    timelineSortReversed = !timelineSortReversed;
+    var btn = document.getElementById('debug-sort-toggle');
+    if (btn) {
+      btn.textContent = timelineSortReversed ? 'Newest first \u2191' : 'Oldest first \u2193';
+    }
+    var tbody = document.getElementById('debug-timeline-tbody');
+    if (!tbody) return;
+    // Detach all rows, reverse, reattach in one batch via DocumentFragment
+    var frag = document.createDocumentFragment();
+    var rows = [];
+    while (tbody.firstChild) { rows.push(tbody.removeChild(tbody.firstChild)); }
+    for (var i = rows.length - 1; i >= 0; i--) { frag.appendChild(rows[i]); }
+    tbody.appendChild(frag);
+  };
+
+  // Populate the event type dropdown from actual timeline data
+  window.populateEventTypeFilter = function() {
+    var select = document.getElementById('debug-event-type-filter');
+    if (!select) return;
+    var types = {};
+    document.querySelectorAll('.debug-timeline-row[data-event-type]').forEach(function(r) {
+      var t = r.getAttribute('data-event-type');
+      if (t) types[t] = (types[t] || 0) + 1;
     });
-    document.querySelectorAll('.debug-cat-quest').forEach(function(r) {
-      r.style.display = (showQuest && showQuest.checked) ? '' : 'none';
+    var sorted = Object.keys(types).sort();
+    select.innerHTML = '<option value="all">All event types</option>';
+    sorted.forEach(function(t) {
+      var opt = document.createElement('option');
+      opt.value = t;
+      opt.textContent = t + ' (' + types[t] + ')';
+      select.appendChild(opt);
     });
   };
 
@@ -1619,7 +1750,7 @@
   }
 
   if (refreshBtn) {
-    refreshBtn.addEventListener('click', doRefresh);
+    refreshBtn.addEventListener('click', function() { doRefresh(true); });
   }
 
   // Theme switching
@@ -1887,7 +2018,7 @@
     });
     opt.classList.add('bg-[#e8f4f8]');
 
-    doRefresh();
+    doRefresh(true);
   }
 
   // Org dropdown (admin/coordinator only)
