@@ -1020,6 +1020,104 @@
       }
     })();
     </script>
+
+    <!--
+      =========================================================================
+      EXPERIMENTAL: iPad two-finger look shim
+      =========================================================================
+      Prototype only. Lets existing WebGL builds respond to two-finger
+      trackpad drag on iPad without rebuilding the game. Intended for UX
+      validation in classroom iPads before the in-Unity fix
+      (stratahub/docs/iPad-support/implementation-guide.md) ships.
+
+      Behavior:
+        - No-op on everything except iPad (detected via UA + maxTouchPoints).
+        - On iPad, listens for wheel events on the Unity canvas (two-finger
+          trackpad drags), and dispatches synthetic pointermove/mousemove
+          events carrying the deltas so Unity's input layer sees continuous
+          "mouse" movement that isn't bounded by the screen edge.
+
+      This relies on Unity's WebGL input layer consuming synthetic events
+      dispatched via addEventListener. That is true today but is an
+      undocumented contract — DELETE THIS BLOCK once the in-Unity fix lands.
+
+      If look goes the wrong direction, flip INVERT_X / INVERT_Y below.
+      If speed feels off, adjust MULTIPLIER_X / MULTIPLIER_Y.
+      =========================================================================
+    -->
+    <script>
+    (function () {
+      'use strict';
+
+      var MULTIPLIER_X = 1.0;
+      var MULTIPLIER_Y = 1.0;
+      var INVERT_X = true;
+      var INVERT_Y = true;
+
+      var ua = navigator.userAgent || '';
+      var platform = navigator.platform || '';
+      var touchPoints = navigator.maxTouchPoints || 0;
+      var isIPad = /iPad/.test(ua) || (platform === 'MacIntel' && touchPoints > 1);
+      if (!isIPad) {
+        console.log('[iPad look shim] Not iPad — shim inactive.');
+        return;
+      }
+
+      function attach() {
+        var canvas = document.getElementById('unity-canvas') || document.querySelector('canvas');
+        if (!canvas) { setTimeout(attach, 100); return; }
+
+        // Virtual cursor position; starts at canvas center and drifts freely.
+        var rect = canvas.getBoundingClientRect();
+        var vx = rect.left + rect.width  / 2;
+        var vy = rect.top  + rect.height / 2;
+
+        canvas.addEventListener('wheel', function (e) {
+          var dx = (INVERT_X ? -e.deltaX : e.deltaX) * MULTIPLIER_X;
+          var dy = (INVERT_Y ? -e.deltaY : e.deltaY) * MULTIPLIER_Y;
+
+          vx += dx;
+          vy += dy;
+
+          // Dispatch both pointermove and mousemove so we hit whichever path
+          // Unity's WebGL input layer is listening on.
+          try {
+            var pe = new PointerEvent('pointermove', {
+              bubbles: true, cancelable: true, view: window,
+              pointerId: 1, pointerType: 'mouse', isPrimary: true,
+              clientX: vx, clientY: vy, screenX: vx, screenY: vy,
+              movementX: dx, movementY: dy,
+              button: -1, buttons: 0
+            });
+            canvas.dispatchEvent(pe);
+          } catch (_) { /* older Safari — MouseEvent below is enough */ }
+
+          var me = new MouseEvent('mousemove', {
+            bubbles: true, cancelable: true, view: window,
+            clientX: vx, clientY: vy, screenX: vx, screenY: vy,
+            movementX: dx, movementY: dy,
+            button: 0, buttons: 0
+          });
+          try {
+            if (me.movementX !== dx) Object.defineProperty(me, 'movementX', { value: dx });
+            if (me.movementY !== dy) Object.defineProperty(me, 'movementY', { value: dy });
+          } catch (_) {}
+          canvas.dispatchEvent(me);
+
+          // Prevent the page from scrolling under the canvas.
+          if (e.cancelable) e.preventDefault();
+        }, { passive: false });
+
+        console.log('[iPad look shim] Attached to canvas — two-finger drag should now look.');
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', attach);
+      } else {
+        attach();
+      }
+    })();
+    </script>
   </body>
 </html>
 {{ end }}
