@@ -73,7 +73,16 @@ The Look action is a `Value` / `Vector2` Input System action. Every look consume
 
 No script knows or cares which one fired. Tutorials trigger. Cameras rotate. Everything works.
 
-This is why the fix requires no code changes — neither to the two parallel player controllers (`MHS.PhysicSystem.Player.PlayerController` and `MHS.Ken.CharacterControllerAdapter_Player`), nor to the drone/camera controllers, nor to any tutorial. The Input System abstraction absorbs the platform difference.
+This is why the fix requires no code changes — not to `MHS.Ken.CharacterControllerAdapter_Player` (the live player script, attached to the shared `Player_VSM` prefab that every gameplay unit instantiates), nor to the drone/camera controllers, nor to any tutorial. The Input System abstraction absorbs the platform difference.
+
+### Note on the two player-controller classes
+
+MHS has two player-controller script files in the codebase, which can be confusing at first glance:
+
+- `MHS.Ken.CharacterControllerAdapter_Player` — the **live** player controller. Attached to `Assets/Prefabs/_Core/Player/Player_VSM.prefab`, which is referenced by every gameplay unit's scene. This is the one that actually runs.
+- `MHS.PhysicSystem.Player.PlayerController` — **dead code**. Exists in the source tree at `Assets/Scripts/Player/PlayerController.cs` but is referenced by zero prefabs and zero scenes. Not instantiated by anything; never runs.
+
+The dead script is presumably an earlier implementation that was superseded by the Ken adapter and never deleted. Since Plan B touches no code regardless, this is not a blocker — just worth knowing so nobody wastes time editing the dead class (as I did during an earlier experiment).
 
 ## Platform coverage
 
@@ -105,9 +114,9 @@ The `ScaleVector2(x=0.1, y=0.1)` processor on the new `<Mouse>/scroll` binding s
 
 Several look-handling scripts multiply the Look-action output by a `ScriptableVariable<float>` before applying it to the camera:
 
-- `MHS.Ken.CharacterControllerAdapter_Player.CameraRotation` uses `_mouseSensitivity`
-- `MHS.RotateCameraTarget.OnLook` uses `_mouseSensitivity`
-- `MHS.PhysicSystem.Player.PlayerController.CameraRotation` and `MHS.CameraSystems.CameraManager` do *not* currently read this variable; only the first two do.
+- `MHS.Ken.CharacterControllerAdapter_Player.CameraRotation` (the live player controller) uses `_mouseSensitivity`.
+- `MHS.RotateCameraTarget.OnLook` uses `_mouseSensitivity`.
+- `MHS.CameraSystems.CameraManager` does *not* currently read this variable (it applies the Look-action value directly to the drone camera target).
 
 The variable is defined in:
 
