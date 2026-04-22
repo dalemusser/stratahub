@@ -32,15 +32,24 @@ rotation code instead of the broken pointer delta. Desktop is untouched.
 
 ## Change summary
 
-Two new files, three edited files.
+Two new files, four edited files.
 
 | Change | Path |
 |---|---|
 | **New** | `Assets/Plugins/WebGL/iPadInput.jslib` |
 | **New** | `Assets/Scripts/Managers/IPadLookInput.cs` |
 | **Edit** | `Assets/Scripts/Player/PlayerController.cs` |
+| **Edit** | `Assets/Scripts/Player/CharacterControllerAdapter_Player.cs` |
 | **Edit** | `Assets/Scripts/Camera/CameraManager.cs` |
 | **Edit** | `Assets/Scripts/Camera/RotateCameraTarget.cs` |
+
+**Important:** MHS has two parallel player scripts —
+`MHS.PhysicSystem.Player.PlayerController` (older, used in some units) and
+`MHS.Ken.CharacterControllerAdapter_Player` (used in Unit 1 Dev and likely
+newer units). Both must be patched; patching only one means iPad look will
+silently fail to activate in whichever scenes use the unpatched adapter.
+When adding a new unit, check which player script its scene uses and verify
+it has the iPad-look branches.
 
 ## Step 1 — Add the jslib
 
@@ -75,15 +84,23 @@ Assets/Scripts/Managers/IPadLookInput.cs
 
 What it does:
 
-- Static class `MHS.InputSystem.IPadLookInput`.
-- `[RuntimeInitializeOnLoadMethod(BeforeSceneLoad)]` calls `iPadInput_Init()`
-  once at game start. `IsActive` is `true` only on iPad WebGL builds.
+- Static class `MHS.InputSystem.IPadLookInput`, marked `[Preserve]` so IL2CPP
+  won't strip it.
+- Initializes lazily on the first `IsActive` read. Because `PlayerController`
+  calls `IPadLookInput.IsActive` every `LateUpdate`, init is guaranteed to
+  run even if IL2CPP managed-code stripping trims `[RuntimeInitializeOnLoadMethod]`
+  entry points (which has been observed on WebGL IL2CPP builds).
+- `IsActive` is `true` only on iPad WebGL builds.
 - `DrainLookDelta()` returns a `Vector2` scaled and sign-corrected to match
   the desktop `Look` action's output shape (`ScaleVector2(0.05)` +
   `InvertVector2` on Y). Returns `Vector2.zero` in the Editor and on non-iPad
   browsers.
 - Tunables exposed as `public static` fields: `SensitivityX`, `SensitivityY`,
   `InvertX`, `InvertY`. Adjust in code after device testing (see Tuning below).
+- Emits diagnostic logs on WebGL builds (`IPadLookInput: EnsureInitialized …`
+  and the return value from `iPadInput_Init`) so you can tell from the Safari
+  Web Inspector console whether init ran, what the JS detection returned, and
+  whether the round-trip succeeded.
 
 ## Step 3 — Edit `PlayerController.cs`
 

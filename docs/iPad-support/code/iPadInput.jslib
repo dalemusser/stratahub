@@ -22,7 +22,9 @@ mergeInto(LibraryManager.library, {
 
   iPadInput_Init__deps: ['$iPadInputState'],
   iPadInput_Init: function() {
+    console.log('iPadInput.jslib: iPadInput_Init called');
     if (iPadInputState.initialized) {
+      console.log('iPadInput.jslib: already initialized, isIPad=' + iPadInputState.isIPad);
       return iPadInputState.isIPad ? 1 : 0;
     }
     iPadInputState.initialized = true;
@@ -34,12 +36,14 @@ mergeInto(LibraryManager.library, {
     var touchPoints = (typeof navigator.maxTouchPoints === 'number') ? navigator.maxTouchPoints : 0;
     var isIPad = /iPad/.test(ua) || (platform === 'MacIntel' && touchPoints > 1);
     iPadInputState.isIPad = isIPad;
+    console.log('iPadInput.jslib: detection — platform=' + platform + ', touchPoints=' + touchPoints + ', isIPad=' + isIPad);
     if (!isIPad) return 0;
 
     var target = (typeof Module !== 'undefined' && Module && Module.canvas)
       ? Module.canvas
       : document.querySelector('canvas');
     if (!target) target = window;
+    console.log('iPadInput.jslib: attaching wheel listener to ' + (target === window ? 'window' : (target.tagName || 'element')));
 
     target.addEventListener('wheel', function(e) {
       iPadInputState.deltaX += e.deltaX || 0;

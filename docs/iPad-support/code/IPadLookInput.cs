@@ -1,5 +1,6 @@
 using System.Runtime.InteropServices;
 using UnityEngine;
+using UnityEngine.Scripting;
 
 namespace MHS.InputSystem
 {
@@ -12,7 +13,14 @@ namespace MHS.InputSystem
     ///
     /// Desktop and Editor return IsActive = false; callers fall through to the
     /// normal Input System path.
+    ///
+    /// Initialization is lazy on the first IsActive read rather than via
+    /// [RuntimeInitializeOnLoadMethod], because IL2CPP's managed-code stripper
+    /// on WebGL has been known to trim static classes whose only entry point is
+    /// a runtime-init method, even with [Preserve] in place. Lazy init from a
+    /// MonoBehaviour-referenced property is strip-proof.
     /// </summary>
+    [Preserve]
     public static class IPadLookInput
     {
 #if UNITY_WEBGL && !UNITY_EDITOR
@@ -21,7 +29,8 @@ namespace MHS.InputSystem
         [DllImport("__Internal")] private static extern float iPadInput_DrainDeltaY();
 #endif
 
-        public static bool IsActive { get; private set; }
+        private static bool _initialized;
+        private static bool _isActive;
 
         // Matches the ScaleVector2(0.05) processor on the desktop Look binding.
         public static float SensitivityX = 0.05f;
@@ -33,23 +42,33 @@ namespace MHS.InputSystem
         public static bool InvertX = true;
         public static bool InvertY = true;
 
-        [RuntimeInitializeOnLoadMethod(RuntimeInitializeLoadType.BeforeSceneLoad)]
-        private static void Init()
+        public static bool IsActive
         {
+            get
+            {
+                if (!_initialized) EnsureInitialized();
+                return _isActive;
+            }
+        }
+
+        private static void EnsureInitialized()
+        {
+            _initialized = true;
 #if UNITY_WEBGL && !UNITY_EDITOR
             try
             {
-                IsActive = iPadInput_Init() == 1;
-                if (IsActive)
-                    Debug.Log("IPadLookInput: iPad detected — using two-finger trackpad wheel events for look");
+                Debug.Log("IPadLookInput: EnsureInitialized — calling iPadInput_Init()");
+                int result = iPadInput_Init();
+                _isActive = result == 1;
+                Debug.Log("IPadLookInput: iPadInput_Init() returned " + result + ", IsActive=" + _isActive);
             }
             catch (System.Exception e)
             {
-                IsActive = false;
+                _isActive = false;
                 Debug.LogWarning("IPadLookInput: init failed: " + e.Message);
             }
 #else
-            IsActive = false;
+            _isActive = false;
 #endif
         }
 
