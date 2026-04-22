@@ -20,14 +20,28 @@ In `Assets/Settings/Input/Controls.inputactions`, add a `<Mouse>/scroll` binding
 
 ### In the Unity Input Actions editor (recommended)
 
-1. Open `Assets/Settings/Input/Controls.inputactions`.
-2. In the `Player` action map, select the `Look` action.
-3. Add a new binding to it. Set:
-   - **Path:** `<Mouse>/scroll`
-   - **Control Scheme:** Keyboard&Mouse (same as the existing `<Pointer>/delta` binding)
-   - **Processors:** `Invert Vector 2` (Invert X = false, Invert Y = true), then `Scale Vector 2` (X = 0.1, Y = 0.1)
-4. Repeat steps 2–3 for the `Look` action in the `Drone` action map.
-5. Save the asset. If the project has a generated `Controls.cs` wrapper, Unity will regenerate it automatically (no schema change — just a new binding on an existing action).
+1. In the Project window, double-click `Assets/Settings/Input/Controls.inputactions`. The Input Actions editor window opens.
+2. In the **Action Maps** pane (left), select **Player**. In the **Actions** pane (middle), expand the **Look** action — you should see its existing `Delta [Pointer]` and `Right Stick [Gamepad]` bindings.
+3. Click the **+** button on the `Look` row and choose **Add Binding**.
+4. Select the new binding, then fill in the **Binding Properties** panel on the right:
+   - **Path:** `<Mouse>/scroll` (displays in the Actions list as `Scroll [Mouse]`).
+   - **Use in control scheme:** check only `KeyboardMouse` — matches the existing `Delta [Pointer]` binding. Leave `Touch`, `Gamepad`, and `MKB` unchecked.
+   - **Interactions:** none.
+   - **Processors:** click **+** twice to add the two processors below, in this order:
+     - `Invert Vector 2` — **Invert X** unchecked, **Invert Y** checked.
+     - `Scale Vector 2` — **X** = `0.1`, **Y** = `0.1`.
+5. Repeat steps 2–4 for the **Drone** action map's **Look** action.
+6. Click **Save Asset** at the top of the window. (If the project has auto-save enabled, this happens automatically.) If a generated `Controls.cs` wrapper exists, Unity will regenerate it on save — no schema change, just an added binding on an existing action.
+
+**Reference screenshots of the final state** — use these to verify your configuration matches the intended state when you're done.
+
+`Player.Look` with the new `Scroll [Mouse]` binding selected:
+
+![Player.Look scroll binding in the Input Actions editor](player-scrollwheel-input-action.png)
+
+`Drone.Look` with the same binding selected:
+
+![Drone.Look scroll binding in the Input Actions editor](drone-scrollwheel-input-action.png)
 
 ### As raw JSON (reference)
 
@@ -151,14 +165,19 @@ If a future iPadOS Safari version implements the Pointer Lock API, desktop-style
 
 No other cleanup required.
 
+## Reference index.html for Unity WebGL builds
+
+`index.html` in this folder is a clean reference launcher for the game's WebGL build — the `dev-handoff041526/index.html` template with the experimental iPad shim removed. Once the scroll-wheel binding in `Controls.inputactions` ships in an official build, this is the file devs should ship with that build; the in-game input-action change replaces the need for the shim entirely.
+
 ## Related: temporary host-page shim
 
 While this input-asset change is being rolled out by the game dev team, a temporary host-page JavaScript shim provides equivalent functionality to existing WebGL builds without requiring a Unity rebuild. It lives in:
 
-- `stratahub/docs/iPad-support/index.html` — reference standalone launcher.
+- `stratahub/docs/iPad-support/index.html` — reference standalone launcher (older, with the shim still in place).
+- `stratahub/docs/dev-handoff041526/index.html` — currently also has the shim embedded for ongoing test builds.
 - `stratahub/internal/app/features/missionhydrosci/templates/missionhydrosci_play.gohtml` — deployed via stratahub's Mission HydroSci play route.
 
-The shim listens for `wheel` events and dispatches synthetic `pointermove`/`mousemove` events on the canvas, which Unity's input plugin consumes as though the cursor were really moving. It is a stopgap only — once this scroll-wheel binding is in an official build, both shim locations should be deleted. Each shim block is surrounded by an `EXPERIMENTAL` comment explaining how to remove it.
+The shim listens for `wheel` events and dispatches synthetic `pointermove`/`mousemove` events on the canvas, which Unity's input plugin consumes as though the cursor were really moving. It is a stopgap only — once this scroll-wheel binding is in an official build, all three shim locations should be deleted (or, for `dev-handoff041526/index.html`, replaced with the clean `index.html` in this folder). Each shim block is surrounded by an `EXPERIMENTAL` comment explaining how to remove it.
 
 ## Change history
 
