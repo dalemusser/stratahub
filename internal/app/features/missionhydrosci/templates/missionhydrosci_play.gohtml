@@ -1023,7 +1023,16 @@
 
     <!--
       =========================================================================
-      EXPERIMENTAL: iPad two-finger look shim
+      DISABLED: iPad two-finger look shim
+      =========================================================================
+      Commented out 2026-04-27. The Unity build now has native scroll wheel
+      support via the input system. This shim would cause double input if
+      both are active. Uncomment this block to restore the shim for older
+      builds that don't have native scroll wheel support.
+      =========================================================================
+
+      =========================================================================
+      EXPERIMENTAL: iPad two-finger look shim (ORIGINAL COMMENT BELOW)
       =========================================================================
       Prototype only. Lets existing WebGL builds respond to two-finger
       trackpad drag on iPad without rebuilding the game. Intended for UX
@@ -1045,6 +1054,7 @@
       If speed feels off, adjust MULTIPLIER_X / MULTIPLIER_Y.
       =========================================================================
     -->
+    <!-- SHIM DISABLED — uncomment to restore
     <script>
     (function () {
       'use strict';
@@ -1090,7 +1100,7 @@
               button: -1, buttons: 0
             });
             canvas.dispatchEvent(pe);
-          } catch (_) { /* older Safari — MouseEvent below is enough */ }
+          } catch (_) {}
 
           var me = new MouseEvent('mousemove', {
             bubbles: true, cancelable: true, view: window,
@@ -1118,6 +1128,7 @@
       }
     })();
     </script>
+    END SHIM DISABLED -->
   </body>
 </html>
 {{ end }}
