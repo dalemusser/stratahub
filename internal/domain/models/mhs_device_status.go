@@ -17,7 +17,6 @@ type MHSDeviceStatus struct {
 	ID                   primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	WorkspaceID          primitive.ObjectID `bson:"workspace_id" json:"workspace_id"`
 	UserID               primitive.ObjectID `bson:"user_id" json:"user_id"`
-	LoginID              string             `bson:"login_id" json:"login_id"`
 	DeviceID             string             `bson:"device_id" json:"device_id"`
 	DeviceType           string             `bson:"device_type" json:"device_type"`
 	DeviceDetails        map[string]string  `bson:"device_details,omitempty" json:"device_details,omitempty"`

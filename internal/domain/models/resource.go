@@ -26,6 +26,11 @@ type Resource struct {
 	LaunchURL     string `bson:"launch_url,omitempty" json:"launch_url,omitempty"`
 	ShowInLibrary bool   `bson:"show_in_library" json:"show_in_library"`
 
+	// URLIdentityMode selects which identity parameters are appended to LaunchURL
+	// when a member opens this resource. One of the models.URLIdentity* values;
+	// empty is treated as "none". See docs/resource-identification/.
+	URLIdentityMode string `bson:"url_identity_mode,omitempty" json:"url_identity_mode,omitempty"`
+
 	// File storage fields - set when content is an uploaded file
 	FilePath string `bson:"file_path,omitempty" json:"file_path,omitempty"` // Storage path (local or S3 key)
 	FileName string `bson:"file_name,omitempty" json:"file_name,omitempty"` // Original filename

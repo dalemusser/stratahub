@@ -269,11 +269,11 @@
     <!-- MHSBridge config: identity, services, and navigation injected server-side -->
     <script>
     (function() {
-      // New MHSBridge config — provides identity, service endpoints, and navigation
-      // to new game builds via window.__mhsBridgeConfig.
+      // MHSBridge config — provides identity, service endpoints, and navigation
+      // to the Unity game build via window.__mhsBridgeConfig.
       window.__mhsBridgeConfig = {
         identity: {
-          user_id: '{{ .UserLoginID }}',
+          user_id: '{{ .UserIDHex }}',
           name: '{{ .UserName }}'
         },
         services: {
@@ -286,79 +286,7 @@
         navigation: {}
       };
 
-      // Legacy identity bridge (backward compat with old builds that intercept /api/user).
-      // Remove this section once all deployed builds use the new MHSBridge.
-      var __mhsUser = {
-        isAuthenticated: {{ if .UserLoginID }}true{{ else }}false{{ end }},
-        name: '{{ .UserName }}',
-        email: '{{ .UserLoginID }}',
-        login_id: '{{ .UserLoginID }}'
-      };
-      var __mhsUserJSON = JSON.stringify(__mhsUser);
-
-      function isUserApiRequest(url) {
-        try {
-          var parsed = new URL(url, window.location.origin);
-          return parsed.pathname === '/api/user';
-        } catch (e) {
-          return false;
-        }
-      }
-
-      // Intercept XMLHttpRequest
-      var _XHROpen = XMLHttpRequest.prototype.open;
-      var _XHRSend = XMLHttpRequest.prototype.send;
-
-      XMLHttpRequest.prototype.open = function(method, url) {
-        this.__mhsIntercepted = isUserApiRequest(url);
-        if (!this.__mhsIntercepted) {
-          return _XHROpen.apply(this, arguments);
-        }
-        // Store but don't actually open
-        this.__mhsMethod = method;
-        this.__mhsUrl = url;
-      };
-
-      XMLHttpRequest.prototype.send = function() {
-        if (!this.__mhsIntercepted) {
-          return _XHRSend.apply(this, arguments);
-        }
-        // Simulate a successful response
-        var self = this;
-        Object.defineProperty(self, 'readyState', { get: function() { return 4; }, configurable: true });
-        Object.defineProperty(self, 'status', { get: function() { return 200; }, configurable: true });
-        Object.defineProperty(self, 'statusText', { get: function() { return 'OK'; }, configurable: true });
-        Object.defineProperty(self, 'responseText', { get: function() { return __mhsUserJSON; }, configurable: true });
-        Object.defineProperty(self, 'response', { get: function() { return __mhsUserJSON; }, configurable: true });
-        self.getResponseHeader = function(name) {
-          if (name.toLowerCase() === 'content-type') return 'application/json';
-          return null;
-        };
-        self.getAllResponseHeaders = function() { return 'content-type: application/json\r\n'; };
-        setTimeout(function() {
-          if (typeof self.onreadystatechange === 'function') self.onreadystatechange();
-          if (typeof self.onload === 'function') self.onload();
-          self.dispatchEvent(new Event('readystatechange'));
-          self.dispatchEvent(new Event('load'));
-          self.dispatchEvent(new Event('loadend'));
-        }, 0);
-      };
-
-      // Intercept fetch
-      var _fetch = window.fetch;
-      window.fetch = function(input, init) {
-        var url = (typeof input === 'string') ? input : (input instanceof Request ? input.url : String(input));
-        if (isUserApiRequest(url)) {
-          return Promise.resolve(new Response(__mhsUserJSON, {
-            status: 200,
-            statusText: 'OK',
-            headers: { 'Content-Type': 'application/json' }
-          }));
-        }
-        return _fetch.apply(this, arguments);
-      };
-
-      console.log('MHS identity bridge active:', __mhsUser.login_id || '(not authenticated)');
+      console.log('MHSBridge config loaded for user_id:', window.__mhsBridgeConfig.identity.user_id || '(none)');
     })();
     </script>
 
@@ -634,7 +562,7 @@
 
         var payload = {
           game: 'mhs',
-          playerId: '{{ .UserLoginID }}',
+          user_id: '{{ .UserIDHex }}',
           eventType: 'crash',
           version: unitVersion,
           data: {
@@ -764,7 +692,7 @@
           // Tell MHSBridge this is PWA mode — game will use mhsUnitComplete callback.
           // Pass identity JSON for new builds; old builds ignore the parameter.
           instance.SendMessage('MHSBridge', 'OnPWAReady', JSON.stringify({
-            user_id: '{{ .UserLoginID }}',
+            user_id: '{{ .UserIDHex }}',
             name: '{{ .UserName }}'
           }));
         }).catch(function(err) {

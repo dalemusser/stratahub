@@ -1,0 +1,34 @@
+URL Identity Parameters Example and Test Case
+
+https://dev.adroit.games
+Member: acole@students.example.org
+Group (group): Dale's Fun Science
+Organization (org): Hillsdale Middle School
+Workspace (ws): dev
+
+ws=dev
+org=Hillsdale Middle School
+group=Dale's Fun Science
+user=Adrian Cole
+login_id=acole@students.example.org
+id=acole@students.example.org
+ws_id=695f5a3fa323f290a63b3fce
+org_id=68041da03916f91f24b1ec78
+group_id=68049e383adb985c4a637183
+user_id=68f138c495cdf54a392b20aa
+
+Resource: Learn Addition
+De-identified hex IDs:
+https://cdn.adroit.games/games/web/learn_addition.html?group_id=68049e383adb985c4a637183&org_id=68041da03916f91f24b1ec78&user_id=68f138c495cdf54a392b20aa&ws_id=695f5a3fa323f290a63b3fce
+
+Resource: Learn Fractions
+Human-readable:
+https://cdn.adroit.games/games/web/learn_fractions.html?group=Dale%27s+Fun+Science&login_id=acole%40students.example.org&org=Hillsdale+Middle+School&user=Adrian+Cole&ws=dev
+
+Resource: Learn Subtraction
+Both hex + human:
+https://cdn.adroit.games/games/web/learn_subtraction.html?group=Dale%27s+Fun+Science&group_id=68049e383adb985c4a637183&login_id=acole%40students.example.org&org=Hillsdale+Middle+School&org_id=68041da03916f91f24b1ec78&user=Adrian+Cole&user_id=68f138c495cdf54a392b20aa&ws=dev&ws_id=695f5a3fa323f290a63b3fce
+
+Resource: Learn Topographic Maps
+Legacy: 
+https://cdn.adroit.games/games/web/learn_topographic_maps.html?group=Dale%27s+Fun+Science&id=acole%40students.example.org&org=Hillsdale+Middle+School

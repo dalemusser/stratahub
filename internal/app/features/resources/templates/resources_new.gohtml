@@ -86,6 +86,20 @@
   </div>
 
   <div>
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">URL Identity Parameters</label>
+    <select id="url_identity_mode" name="url_identity_mode" onchange="updateIdentityWarning()"
+            class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm">
+      {{ range .URLIdentityModeOptions }}
+        <option value="{{ .ID }}" {{ if eq $.URLIdentityMode .ID }}selected{{ end }} data-pii="{{ if .PII }}1{{ else }}0{{ end }}">{{ .Label }}</option>
+      {{ end }}
+    </select>
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Identity parameters appended to the Launch URL when a member opens this resource. Applies to URL resources only.</p>
+    <div id="url_identity_pii_warning" class="hidden mt-2 p-2 border border-amber-300 bg-amber-50 dark:bg-amber-900/30 dark:border-amber-700 text-amber-800 dark:text-amber-200 rounded text-xs">
+      ⚠ This mode includes personally identifiable information (student name and/or login) in the resource URL. Use only where justified and approved (IRB / FERPA / COPPA).
+    </div>
+  </div>
+
+  <div>
     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Instructions</label>
     <input type="hidden" name="default_instructions" id="default_instructions" value="{{ .DefaultInstructions }}">
     <div class="tiptap-container">
@@ -225,6 +239,20 @@ function toggleContentInputs() {
     fileInput.classList.remove('bg-gray-100');
   }
 }
+
+// Show/hide the PII warning based on the selected URL identity mode.
+function updateIdentityWarning() {
+  var sel = document.getElementById('url_identity_mode');
+  var warn = document.getElementById('url_identity_pii_warning');
+  if (!sel || !warn) return;
+  var opt = sel.options[sel.selectedIndex];
+  if (opt && opt.getAttribute('data-pii') === '1') {
+    warn.classList.remove('hidden');
+  } else {
+    warn.classList.add('hidden');
+  }
+}
+document.addEventListener('DOMContentLoaded', updateIdentityWarning);
 </script>
 
 <div class="mt-4 text-xs text-gray-600 dark:text-gray-400 space-y-1 max-w-2xl">

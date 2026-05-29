@@ -68,45 +68,44 @@ func (h *Handler) ServeDebugStudents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	playerIDs := make([]string, 0, len(members))
+	userIDHexes := make([]string, 0, len(members))
 	for _, m := range members {
-		if m.LoginID != nil && *m.LoginID != "" {
-			playerIDs = append(playerIDs, *m.LoginID)
-		}
+		userIDHexes = append(userIDHexes, m.ID.Hex())
 	}
 
-	gradesMap, err := h.loadProgressGrades(ctx, playerIDs)
+	gradesMap, err := h.loadProgressGrades(ctx, userIDHexes)
 	if err != nil {
 		h.Log.Error("failed to load grades for debug", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	// Build student rows with anomaly counts
+	// Build student rows with anomaly counts.
+	// LoginID is kept on the row for leader-facing display; the grade lookup
+	// and log query are keyed by user_id hex.
 	rows := make([]DebugStudentRow, 0, len(members))
 	for _, m := range members {
 		loginID := ""
 		if m.LoginID != nil {
 			loginID = *m.LoginID
 		}
+		userIDHex := m.ID.Hex()
 		row := DebugStudentRow{
-			ID:      m.ID.Hex(),
+			ID:      userIDHex,
 			Name:    m.FullName,
 			LoginID: loginID,
 		}
 
-		if loginID != "" {
-			if doc, ok := gradesMap[loginID]; ok && doc.Grades != nil {
-				row.PencilCount, row.EmptyCount = detectAnomaliesFromGrades(doc.Grades, progressCfg)
-			}
+		if doc, ok := gradesMap[userIDHex]; ok && doc.Grades != nil {
+			row.PencilCount, row.EmptyCount = detectAnomaliesFromGrades(doc.Grades, progressCfg)
 		}
 		row.TotalAnomalies = row.PencilCount + row.EmptyCount + row.DuplicateCount
 
 		// Get event count if log store is available
-		if h.LogStore != nil && loginID != "" {
-			count, err := h.LogStore.CountForPlayer(ctx, "mhs", loginID)
+		if h.LogStore != nil {
+			count, err := h.LogStore.CountForUser(ctx, "mhs", userIDHex)
 			if err != nil {
-				h.Log.Warn("failed to count events", zap.String("player", loginID), zap.Error(err))
+				h.Log.Warn("failed to count events", zap.String("user_id", userIDHex), zap.Error(err))
 			} else {
 				row.TotalEvents = count
 			}
@@ -161,14 +160,14 @@ func (h *Handler) ServeDebugDetail(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Resolve login ID
+	// Resolve login ID (for leader-facing display only).
 	loginID := ""
 	if user.LoginID != nil {
 		loginID = *user.LoginID
 	}
 
-	// Load grades
-	gradesMap, err := h.loadProgressGrades(ctx, []string{loginID})
+	// Load grades by user_id hex.
+	gradesMap, err := h.loadProgressGrades(ctx, []string{userIDHex})
 	if err != nil {
 		h.Log.Error("failed to load grades", zap.Error(err))
 		w.WriteHeader(http.StatusInternalServerError)
@@ -176,18 +175,18 @@ func (h *Handler) ServeDebugDetail(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var grades map[string][]ProgressGradeItem
-	if doc, ok := gradesMap[loginID]; ok {
+	if doc, ok := gradesMap[userIDHex]; ok {
 		grades = doc.Grades
 	}
 
-	// Load log events
+	// Load log events by user_id hex.
 	selectedUnit := r.URL.Query().Get("unit")
 	var events []logEntryWrapper
-	if h.LogStore != nil && loginID != "" {
+	if h.LogStore != nil {
 		if selectedUnit != "" {
 			scenes := rules.ScenesForUnit(selectedUnit)
 			if len(scenes) > 0 {
-				raw, err := h.LogStore.ListForPlayerByScenes(ctx, "mhs", loginID, scenes)
+				raw, err := h.LogStore.ListForUserByScenes(ctx, "mhs", userIDHex, scenes)
 				if err != nil {
 					h.Log.Error("failed to load events", zap.Error(err))
 				} else {
@@ -195,7 +194,7 @@ func (h *Handler) ServeDebugDetail(w http.ResponseWriter, r *http.Request) {
 				}
 			}
 		} else {
-			raw, err := h.LogStore.ListForPlayer(ctx, "mhs", loginID)
+			raw, err := h.LogStore.ListForUser(ctx, "mhs", userIDHex)
 			if err != nil {
 				h.Log.Error("failed to load events", zap.Error(err))
 			} else {
@@ -276,16 +275,7 @@ func (h *Handler) ServeMapPositions(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	loginID := ""
-	if user.LoginID != nil {
-		loginID = *user.LoginID
-	}
-	if loginID == "" {
-		http.Error(w, "user has no login ID", http.StatusBadRequest)
-		return
-	}
-
-	entries, err := h.LogStore.ListForPlayerByScenes(ctx, "mhs", loginID, []string{sceneName})
+	entries, err := h.LogStore.ListForUserByScenes(ctx, "mhs", userIDHex, []string{sceneName})
 	if err != nil {
 		http.Error(w, "failed to load events", http.StatusInternalServerError)
 		return

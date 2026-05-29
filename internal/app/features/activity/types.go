@@ -210,6 +210,7 @@ type orgOption struct {
 type sessionExportRow struct {
 	UserID       string    `json:"user_id"`
 	UserName     string    `json:"user_name"`
+	LoginID      string    `json:"login_id"`
 	Email        string    `json:"email"`
 	Organization string    `json:"organization"`
 	Group        string    `json:"group"`
@@ -224,6 +225,8 @@ type sessionExportRow struct {
 type activityExportRow struct {
 	UserID       string                 `json:"user_id"`
 	UserName     string                 `json:"user_name"`
+	LoginID      string                 `json:"login_id"`
+	Email        string                 `json:"email"`
 	SessionID    string                 `json:"session_id"`
 	Timestamp    time.Time              `json:"timestamp"`
 	EventType    string                 `json:"event_type"`

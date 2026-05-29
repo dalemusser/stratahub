@@ -85,6 +85,13 @@ func Startup(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, 
 		}
 	}
 
+	// Bootstrap MHS development sentinel user.
+	// See docs/mhs-dev-sentinel-user.md.
+	if err := ensureMHSDevSentinel(ctx, deps, ws.ID, logger); err != nil {
+		logger.Error("failed to bootstrap mhs dev sentinel user", zap.Error(err))
+		return err
+	}
+
 	// Ensure indexes for email verification store
 	emailVerifyStore := emailverify.New(deps.StrataHubMongoDatabase, appCfg.EmailVerifyExpiry)
 	if err := emailVerifyStore.EnsureIndexes(ctx); err != nil {
@@ -211,6 +218,82 @@ func ensureSuperAdmin(ctx context.Context, deps DBDeps, loginID string, logger *
 
 func ptrString(s string) *string {
 	return &s
+}
+
+// MHSDevSentinelUserIDHex is the hex form of the well-known ObjectID that
+// Mission HydroSci's MHSBridge sends as user_id from Unity Editor builds and
+// localhost browser launches when no real stratahub login is available.
+//
+// The matching host-page code lives in
+//   mhs-updates/build-automation-update-051226/MHS-Bridge-index.html
+// and the matching game-side default is in MHSBridge.cs.
+const MHSDevSentinelUserIDHex = "000000000000000000000001"
+
+// ensureMHSDevSentinel ensures the development-mode stratahub.users document
+// exists for the MHSBridge sentinel ID.
+//
+// Why this exists: Mission HydroSci's editor and localhost paths fall back to
+// user_id="000000000000000000000001" when there is no logged-in stratahub
+// session. Stratalog and stratasave accept any 24-char hex (they don't validate
+// against stratahub.users), but reverse joins from log/save data back to a
+// stratahub user (mhsgrader, member reports, support tooling) all expect to
+// find a real row. Without this seed, those joins return empty for any
+// data captured during dev play.
+//
+// The seed is idempotent: if a document with this _id already exists, it is
+// left alone. Real-user records are unaffected because their _id is generated
+// at signup and will never collide with the sentinel.
+//
+// Production / classroom users are unaffected — they get their own ObjectID at
+// login and the sentinel never sees their traffic.
+func ensureMHSDevSentinel(ctx context.Context, deps DBDeps, workspaceID primitive.ObjectID, logger *zap.Logger) error {
+	db := deps.StrataHubMongoDatabase
+	coll := db.Collection("users")
+
+	sentinelID, err := primitive.ObjectIDFromHex(MHSDevSentinelUserIDHex)
+	if err != nil {
+		// Unreachable: the constant is a valid 24-char hex string.
+		return err
+	}
+
+	// Already present? Leave it alone.
+	var existing models.User
+	err = coll.FindOne(ctx, bson.M{"_id": sentinelID}).Decode(&existing)
+	if err == nil {
+		logger.Debug("mhs dev sentinel user already present",
+			zap.String("user_id", MHSDevSentinelUserIDHex))
+		return nil
+	}
+	if err != mongo.ErrNoDocuments {
+		return err
+	}
+
+	now := time.Now().UTC()
+	loginID := "mhs-developer-sentinel"
+	fullName := "MHS Developer Sentinel"
+	user := models.User{
+		ID:          sentinelID,
+		WorkspaceID: &workspaceID,
+		FullName:    fullName,
+		FullNameCI:  text.Fold(fullName),
+		LoginID:     &loginID,
+		LoginIDCI:   ptrString(text.Fold(loginID)),
+		AuthMethod:  "trust",
+		Role:        "member",
+		Status:      "active",
+		CreatedAt:   now,
+		UpdatedAt:   now,
+	}
+
+	if _, err := coll.InsertOne(ctx, user); err != nil {
+		return err
+	}
+
+	logger.Info("created mhs dev sentinel user",
+		zap.String("user_id", MHSDevSentinelUserIDHex),
+		zap.String("login_id", loginID),
+		zap.String("workspace_id", workspaceID.Hex()))
+	return nil
 }
 
 // migrateDataToWorkspace assigns existing documents without workspace_id to the default workspace.

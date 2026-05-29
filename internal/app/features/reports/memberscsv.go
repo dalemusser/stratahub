@@ -109,6 +109,7 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 			"email":           1,
 			"status":          1,
 			"organization_id": 1,
+			"workspace_id":    1,
 		}))
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "find users for CSV failed", err, "A database error occurred.", "/")
@@ -117,24 +118,26 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 	defer uCur.Close(ctx)
 
 	type userInfo struct {
-		FullName string
-		LoginID  string
-		Email    string
-		Status   string
-		OrgID    primitive.ObjectID
+		FullName    string
+		LoginID     string
+		Email       string
+		Status      string
+		OrgID       primitive.ObjectID
+		WorkspaceID primitive.ObjectID
 	}
 
 	userByID := make(map[primitive.ObjectID]userInfo)
 	var userIDs []primitive.ObjectID
 	for uCur.Next(ctx) {
 		var row struct {
-			ID         primitive.ObjectID  `bson:"_id"`
-			FullName   string              `bson:"full_name"`
-			FullNameCI string              `bson:"full_name_ci"`
-			LoginID    *string             `bson:"login_id"`
-			Email      *string             `bson:"email"`
-			Status     string              `bson:"status"`
-			OrgID      *primitive.ObjectID `bson:"organization_id"`
+			ID          primitive.ObjectID  `bson:"_id"`
+			FullName    string              `bson:"full_name"`
+			FullNameCI  string              `bson:"full_name_ci"`
+			LoginID     *string             `bson:"login_id"`
+			Email       *string             `bson:"email"`
+			Status      string              `bson:"status"`
+			OrgID       *primitive.ObjectID `bson:"organization_id"`
+			WorkspaceID *primitive.ObjectID `bson:"workspace_id"`
 		}
 		if err := uCur.Decode(&row); err != nil {
 			h.ErrLog.LogServerError(w, r, "database error decoding user row", err, "A database error occurred.", "/")
@@ -152,12 +155,17 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 		if row.Email != nil {
 			email = *row.Email
 		}
+		wsID := primitive.NilObjectID
+		if row.WorkspaceID != nil {
+			wsID = *row.WorkspaceID
+		}
 		userByID[row.ID] = userInfo{
-			FullName: row.FullName,
-			LoginID:  loginID,
-			Email:    email,
-			Status:   row.Status,
-			OrgID:    *row.OrgID,
+			FullName:    row.FullName,
+			LoginID:     loginID,
+			Email:       email,
+			Status:      row.Status,
+			OrgID:       *row.OrgID,
+			WorkspaceID: wsID,
 		}
 		userIDs = append(userIDs, row.ID)
 	}
@@ -179,6 +187,40 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "find organizations for CSV failed", err, "A database error occurred.", "/")
 		return
+	}
+
+	// Preload workspace subdomains (batch). The report is workspace-scoped, so
+	// this is typically a single workspace, but resolving per-member keeps the
+	// columns correct if the scope ever spans workspaces.
+	wsIDSet := make(map[primitive.ObjectID]struct{})
+	for _, ui := range userByID {
+		if ui.WorkspaceID != primitive.NilObjectID {
+			wsIDSet[ui.WorkspaceID] = struct{}{}
+		}
+	}
+	wsSubByID := make(map[primitive.ObjectID]string)
+	if len(wsIDSet) > 0 {
+		wsIDs := make([]primitive.ObjectID, 0, len(wsIDSet))
+		for id := range wsIDSet {
+			wsIDs = append(wsIDs, id)
+		}
+		wcur, err := db.Collection("workspaces").Find(ctx, bson.M{"_id": bson.M{"$in": wsIDs}}, options.Find().SetProjection(bson.M{"subdomain": 1}))
+		if err != nil {
+			h.ErrLog.LogServerError(w, r, "find workspaces for CSV failed", err, "A database error occurred.", "/")
+			return
+		}
+		defer wcur.Close(ctx)
+		for wcur.Next(ctx) {
+			var wrow struct {
+				ID        primitive.ObjectID `bson:"_id"`
+				Subdomain string             `bson:"subdomain"`
+			}
+			if err := wcur.Decode(&wrow); err != nil {
+				h.Log.Warn("decode workspace row for CSV", zap.Error(err))
+				continue
+			}
+			wsSubByID[wrow.ID] = wrow.Subdomain
+		}
 	}
 
 	// Preload group names
@@ -330,7 +372,7 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 	cw.UseCRLF = true
 	defer cw.Flush()
 
-	if err := cw.Write([]string{"full_name", "login_id", "email", "organization", "group", "leaders", "status"}); err != nil {
+	if err := cw.Write([]string{"workspace", "workspace_id", "user_id", "full_name", "login_id", "email", "organization", "organization_id", "group", "group_id", "leaders", "status"}); err != nil {
 		h.Log.Error("CSV write failed (header)", zap.Error(err), zap.String("user", userName))
 		return
 	}
@@ -356,13 +398,22 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 		org := orgName[ui.OrgID]
 		groupName := groupNames[m.GroupID]
 		leaders := leadersByGroup[m.GroupID]
+		wsIDHex := ""
+		if ui.WorkspaceID != primitive.NilObjectID {
+			wsIDHex = ui.WorkspaceID.Hex()
+		}
 
 		if writeErr = cw.Write([]string{
+			wsSubByID[ui.WorkspaceID],
+			wsIDHex,
+			m.UserID.Hex(),
 			sanitizeCSVField(ui.FullName),
 			ui.LoginID,
 			ui.Email,
 			sanitizeCSVField(org),
+			ui.OrgID.Hex(),
 			sanitizeCSVField(groupName),
+			m.GroupID.Hex(),
 			sanitizeCSVField(leaders),
 			ui.Status,
 		}); writeErr != nil {
@@ -380,11 +431,20 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 				continue
 			}
 			org := orgName[ui.OrgID]
+			wsIDHex := ""
+			if ui.WorkspaceID != primitive.NilObjectID {
+				wsIDHex = ui.WorkspaceID.Hex()
+			}
 			if writeErr = cw.Write([]string{
+				wsSubByID[ui.WorkspaceID],
+				wsIDHex,
+				id.Hex(),
 				sanitizeCSVField(ui.FullName),
 				ui.LoginID,
 				ui.Email,
 				sanitizeCSVField(org),
+				ui.OrgID.Hex(),
+				"",
 				"",
 				"",
 				ui.Status,
@@ -419,7 +479,7 @@ func writeEmptyCSV(w http.ResponseWriter, r *http.Request) {
 	defer cw.Flush()
 
 	// Error intentionally not checked - headers only, client likely disconnected
-	cw.Write([]string{"full_name", "login_id", "email", "organization", "group", "leaders", "status"})
+	cw.Write([]string{"workspace", "workspace_id", "user_id", "full_name", "login_id", "email", "organization", "organization_id", "group", "group_id", "leaders", "status"})
 }
 
 // csvFilenameFromQuery returns a sanitized CSV filename based on the

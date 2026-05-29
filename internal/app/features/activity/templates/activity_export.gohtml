@@ -97,6 +97,7 @@
       </p>
       <div class="flex gap-2">
         <a href="/activity/export/sessions.csv?org={{ .SelectedOrg }}&group={{ .SelectedGroup }}&start={{ .StartDate }}&end={{ .EndDate }}"
+           download
            class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
@@ -104,6 +105,7 @@
           CSV
         </a>
         <a href="/activity/export/sessions.json?org={{ .SelectedOrg }}&group={{ .SelectedGroup }}&start={{ .StartDate }}&end={{ .EndDate }}"
+           download
            class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
@@ -121,6 +123,7 @@
       </p>
       <div class="flex gap-2">
         <a href="/activity/export/events.csv?org={{ .SelectedOrg }}&group={{ .SelectedGroup }}&start={{ .StartDate }}&end={{ .EndDate }}"
+           download
            class="inline-flex items-center px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 text-sm">
           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
@@ -128,6 +131,7 @@
           CSV
         </a>
         <a href="/activity/export/events.json?org={{ .SelectedOrg }}&group={{ .SelectedGroup }}&start={{ .StartDate }}&end={{ .EndDate }}"
+           download
            class="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm">
           <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path>
@@ -149,8 +153,9 @@
       <h4 class="font-medium text-gray-900 dark:text-gray-100 mb-2">Sessions Export Fields</h4>
       <table class="w-full text-sm">
         <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-          <tr><td class="py-1 text-gray-500 dark:text-gray-400">user_id</td><td class="py-1 text-gray-700 dark:text-gray-300">Unique user identifier</td></tr>
+          <tr><td class="py-1 text-gray-500 dark:text-gray-400">user_id</td><td class="py-1 text-gray-700 dark:text-gray-300">24-character hex user identifier (join key for log/save/grade data)</td></tr>
           <tr><td class="py-1 text-gray-500 dark:text-gray-400">user_name</td><td class="py-1 text-gray-700 dark:text-gray-300">User's full name</td></tr>
+          <tr><td class="py-1 text-gray-500 dark:text-gray-400">login_id</td><td class="py-1 text-gray-700 dark:text-gray-300">User's login ID</td></tr>
           <tr><td class="py-1 text-gray-500 dark:text-gray-400">email</td><td class="py-1 text-gray-700 dark:text-gray-300">User's email address</td></tr>
           <tr><td class="py-1 text-gray-500 dark:text-gray-400">organization</td><td class="py-1 text-gray-700 dark:text-gray-300">Organization name</td></tr>
           <tr><td class="py-1 text-gray-500 dark:text-gray-400">group</td><td class="py-1 text-gray-700 dark:text-gray-300">Primary group name</td></tr>
@@ -168,8 +173,10 @@
       <h4 class="font-medium text-gray-900 dark:text-gray-100 mb-2">Activity Events Fields</h4>
       <table class="w-full text-sm">
         <tbody class="divide-y divide-gray-200 dark:divide-gray-700">
-          <tr><td class="py-1 text-gray-500 dark:text-gray-400">user_id</td><td class="py-1 text-gray-700 dark:text-gray-300">Unique user identifier</td></tr>
+          <tr><td class="py-1 text-gray-500 dark:text-gray-400">user_id</td><td class="py-1 text-gray-700 dark:text-gray-300">24-character hex user identifier (join key for log/save/grade data)</td></tr>
           <tr><td class="py-1 text-gray-500 dark:text-gray-400">user_name</td><td class="py-1 text-gray-700 dark:text-gray-300">User's full name</td></tr>
+          <tr><td class="py-1 text-gray-500 dark:text-gray-400">login_id</td><td class="py-1 text-gray-700 dark:text-gray-300">User's login ID</td></tr>
+          <tr><td class="py-1 text-gray-500 dark:text-gray-400">email</td><td class="py-1 text-gray-700 dark:text-gray-300">User's email address</td></tr>
           <tr><td class="py-1 text-gray-500 dark:text-gray-400">session_id</td><td class="py-1 text-gray-700 dark:text-gray-300">Associated session ID</td></tr>
           <tr><td class="py-1 text-gray-500 dark:text-gray-400">timestamp</td><td class="py-1 text-gray-700 dark:text-gray-300">Event timestamp (ISO 8601)</td></tr>
           <tr><td class="py-1 text-gray-500 dark:text-gray-400">event_type</td><td class="py-1 text-gray-700 dark:text-gray-300">resource_launch, resource_view, or page_view</td></tr>

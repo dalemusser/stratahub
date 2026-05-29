@@ -65,14 +65,15 @@ func (h *AdminHandler) ServeList(w http.ResponseWriter, r *http.Request) {
 
 	// Add projection
 	find.SetProjection(bson.M{
-		"_id":             1,
-		"title":           1,
-		"title_ci":        1,
-		"subject":         1,
-		"type":            1,
-		"status":          1,
-		"show_in_library": 1,
-		"description":     1,
+		"_id":               1,
+		"title":             1,
+		"title_ci":          1,
+		"subject":           1,
+		"type":              1,
+		"status":            1,
+		"show_in_library":   1,
+		"description":       1,
+		"url_identity_mode": 1,
 	})
 
 	// Apply cursor conditions (handle $or clause specially)
@@ -107,14 +108,15 @@ func (h *AdminHandler) ServeList(w http.ResponseWriter, r *http.Request) {
 	items := make([]listItem, 0, len(rows))
 	for _, rsrc := range rows {
 		items = append(items, listItem{
-			ID:            rsrc.ID,
-			Title:         rsrc.Title,
-			TitleCI:       rsrc.TitleCI,
-			Subject:       rsrc.Subject,
-			Type:          rsrc.Type,
-			Status:        rsrc.Status,
-			ShowInLibrary: rsrc.ShowInLibrary,
-			Description:   rsrc.Description,
+			ID:              rsrc.ID,
+			Title:           rsrc.Title,
+			TitleCI:         rsrc.TitleCI,
+			Subject:         rsrc.Subject,
+			Type:            rsrc.Type,
+			Status:          rsrc.Status,
+			ShowInLibrary:   rsrc.ShowInLibrary,
+			Description:     rsrc.Description,
+			URLIdentityMode: rsrc.URLIdentityMode,
 		})
 	}
 

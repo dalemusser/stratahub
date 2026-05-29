@@ -23,7 +23,7 @@ type UnitsData struct {
 	CDNBaseURL     string
 	CurrentUnit    string   // e.g., "unit3" or "complete"
 	CompletedUnits []string // e.g., ["unit1", "unit2"]
-	UserLoginID    string   // For building the play URL with ?id=
+	UserIDHex      string   // Hex of users._id; injected into Unity identity bridge
 	IsComplete     bool     // True when all units are done
 	NextUnitID     string   // Unit after CurrentUnit, empty if last/complete
 	MHSMemberAuth          string // "trust", "keyword", "staffauth" — controls member auth modal
@@ -42,7 +42,7 @@ type PlayData struct {
 	UnitVersion     string
 	CDNBaseURL      string
 	UserName        string // Injected into page for Unity identity bridge
-	UserLoginID     string // Injected into page for Unity identity bridge
+	UserIDHex       string // Hex of users._id; injected into Unity identity bridge
 	NextUnitID      string // Next unit after this one, empty if last
 	NextUnitVersion string // Version of the next unit
 	DataFile        string // Build file name for data (e.g., "unit1.data" or "unit2.data.unityweb")

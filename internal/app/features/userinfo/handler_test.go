@@ -54,11 +54,14 @@ func TestServeUserInfo_Unauthenticated(t *testing.T) {
 	if name, ok := response["name"].(string); !ok || name != "" {
 		t.Errorf("name: got %q, want empty string", response["name"])
 	}
-	if email, ok := response["email"].(string); !ok || email != "" {
-		t.Errorf("email: got %q, want empty string", response["email"])
+	if userID, ok := response["user_id"].(string); !ok || userID != "" {
+		t.Errorf("user_id: got %q, want empty string", response["user_id"])
 	}
-	if loginID, ok := response["login_id"].(string); !ok || loginID != "" {
-		t.Errorf("login_id: got %q, want empty string", response["login_id"])
+	if _, exists := response["email"]; exists {
+		t.Errorf("email key should not be present in response, got %v", response["email"])
+	}
+	if _, exists := response["login_id"]; exists {
+		t.Errorf("login_id key should not be present in response, got %v", response["login_id"])
 	}
 }
 
@@ -96,11 +99,14 @@ func TestServeUserInfo_Authenticated(t *testing.T) {
 	if name, ok := response["name"].(string); !ok || name != "Test User" {
 		t.Errorf("name: got %q, want %q", response["name"], "Test User")
 	}
-	if email, ok := response["email"].(string); !ok || email != "test@example.com" {
-		t.Errorf("email: got %q, want %q", response["email"], "test@example.com")
+	if gotUserID, ok := response["user_id"].(string); !ok || gotUserID != userID.Hex() {
+		t.Errorf("user_id: got %q, want %q", response["user_id"], userID.Hex())
 	}
-	if loginID, ok := response["login_id"].(string); !ok || loginID != "test@example.com" {
-		t.Errorf("login_id: got %q, want %q", response["login_id"], "test@example.com")
+	if _, exists := response["email"]; exists {
+		t.Errorf("email key should not be present in response, got %v", response["email"])
+	}
+	if _, exists := response["login_id"]; exists {
+		t.Errorf("login_id key should not be present in response, got %v", response["login_id"])
 	}
 }
 

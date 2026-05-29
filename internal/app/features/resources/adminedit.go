@@ -75,6 +75,7 @@ func (h *AdminHandler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 		FileName:            res.FileName,
 		FileSize:            res.FileSize,
 		DefaultInstructions: res.DefaultInstructions,
+		URLIdentityMode:     res.URLIdentityMode,
 		DeleteReturn:        deleteReturn,
 		SubmitReturn:        submitReturn,
 	}
@@ -121,6 +122,7 @@ func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	showInLibrary := r.FormValue("show_in_library") != ""
+	urlIdentityMode := strings.TrimSpace(r.FormValue("url_identity_mode"))
 	// Sanitize HTML content from rich text editor
 	defaultInstructions := htmlsanitize.Sanitize(strings.TrimSpace(r.FormValue("default_instructions")))
 
@@ -168,6 +170,7 @@ func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 			FileName:            existing.FileName,
 			FileSize:            existing.FileSize,
 			DefaultInstructions: defaultInstructions,
+			URLIdentityMode:     urlIdentityMode,
 			DeleteReturn:        delReturn,
 			SubmitReturn:        urlutil.SafeReturn(r.FormValue("return"), "", "/resources"),
 		}
@@ -184,6 +187,12 @@ func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	// Validate resource type
 	if !inputval.IsValidResourceType(typeValue) {
 		reRender("Type is invalid.")
+		return
+	}
+
+	// Validate URL identity mode
+	if !inputval.IsValidURLIdentityMode(urlIdentityMode) {
+		reRender("URL identity mode is invalid.")
 		return
 	}
 
@@ -257,6 +266,7 @@ func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		Status:              status,
 		ShowInLibrary:       showInLibrary,
 		DefaultInstructions: defaultInstructions,
+		URLIdentityMode:     urlIdentityMode,
 	}
 
 	if hasNewFile {

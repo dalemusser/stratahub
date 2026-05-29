@@ -42,11 +42,11 @@ func (h *Handler) ServePlay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get current user for identity bridge and progress gate
-	var userName, userLoginID string
+	var userName, userIDHex string
 	user, authenticated := auth.CurrentUser(r)
 	if authenticated {
 		userName = user.Name
-		userLoginID = user.LoginID
+		userIDHex = user.ID
 
 		// Progress gate: members can only access their current or completed units.
 		// Non-members (admin, coordinator, leader) can access any unit for observation/testing.
@@ -54,7 +54,7 @@ func (h *Handler) ServePlay(w http.ResponseWriter, r *http.Request) {
 			wsID := workspace.IDFromRequest(r)
 			userOID, err := primitive.ObjectIDFromHex(user.ID)
 			if err == nil {
-				progress, err := h.ProgressStore.GetOrCreate(r.Context(), wsID, userOID, user.LoginID)
+				progress, err := h.ProgressStore.GetOrCreate(r.Context(), wsID, userOID)
 				if err != nil {
 					h.Log.Error("failed to check progress for unit gate", zap.Error(err))
 					http.Error(w, "internal error", http.StatusInternalServerError)
@@ -92,7 +92,7 @@ func (h *Handler) ServePlay(w http.ResponseWriter, r *http.Request) {
 		UnitVersion:     unitVersion,
 		CDNBaseURL:      h.CDNBaseURL,
 		UserName:        userName,
-		UserLoginID:     userLoginID,
+		UserIDHex:       userIDHex,
 		NextUnitID:      nextUnitID,
 		NextUnitVersion: nextUnitVersion,
 		DataFile:        dataFile,

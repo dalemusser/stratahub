@@ -54,6 +54,7 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	typeValue := strings.TrimSpace(r.FormValue("type"))
 	status := strings.TrimSpace(r.FormValue("status"))
 	showInLibrary := r.FormValue("show_in_library") != ""
+	urlIdentityMode := strings.TrimSpace(r.FormValue("url_identity_mode"))
 	// Sanitize HTML content from rich text editor
 	defaultInstructions := htmlsanitize.Sanitize(strings.TrimSpace(r.FormValue("default_instructions")))
 
@@ -81,6 +82,7 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 			Status:              status,
 			ShowInLibrary:       showInLibrary,
 			DefaultInstructions: defaultInstructions,
+			URLIdentityMode:     urlIdentityMode,
 		}
 		h.renderNewForm(w, r, vm, msg)
 	}
@@ -95,6 +97,12 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	// Validate resource type
 	if !inputval.IsValidResourceType(typeValue) {
 		reRender("Type is invalid.")
+		return
+	}
+
+	// Validate URL identity mode
+	if !inputval.IsValidURLIdentityMode(urlIdentityMode) {
+		reRender("URL identity mode is invalid.")
 		return
 	}
 
@@ -160,6 +168,7 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		FileName:            fileName,
 		FileSize:            fileSize,
 		DefaultInstructions: defaultInstructions,
+		URLIdentityMode:     urlIdentityMode,
 	}
 	if ok {
 		res.CreatedByID = &actorID

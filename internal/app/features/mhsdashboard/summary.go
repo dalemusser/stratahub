@@ -59,20 +59,18 @@ func (h *Handler) ServeSummary(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
 	defer cancel()
 
-	// Look up the student's name and login_id from the users collection by _id
-	studentName, loginID, err := h.lookupUser(ctx, userOID)
+	// Look up the student's name from the users collection by _id (used in the
+	// HTTP response so the leader sees who the summary is for). The grade
+	// lookup uses user_id directly — no PII crosses into mhsgrader.
+	studentName, err := h.lookupUserName(ctx, userOID)
 	if err != nil {
 		h.Log.Warn("failed to look up user", zap.String("userID", userIDHex), zap.Error(err))
 		writeJSONError(w, http.StatusNotFound, "Student not found.")
 		return
 	}
-	if loginID == "" {
-		writeJSONError(w, http.StatusBadRequest, "Student has no login ID configured.")
-		return
-	}
 
-	// Load the student's full grade history using login_id
-	gradeDoc, err := h.loadPlayerGrades(ctx, loginID)
+	// Load the student's full grade history by user_id.
+	gradeDoc, err := h.loadPlayerGrades(ctx, userIDHex)
 	if err != nil {
 		h.Log.Error("failed to load grades for summary", zap.String("userID", userIDHex), zap.Error(err))
 		writeJSONError(w, http.StatusInternalServerError, "Failed to load student data.")
@@ -117,32 +115,30 @@ func (h *Handler) ServeSummary(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(resp)
 }
 
-// lookupUser finds the student's full name and login_id from the users collection by _id.
-func (h *Handler) lookupUser(ctx context.Context, userID primitive.ObjectID) (fullName, loginID string, err error) {
+// lookupUserName returns the student's full name from the users collection by _id.
+// Used only for the leader-facing response payload; never sent to mhsgrader.
+func (h *Handler) lookupUserName(ctx context.Context, userID primitive.ObjectID) (string, error) {
 	var result struct {
-		FullName string  `bson:"full_name"`
-		LoginID  *string `bson:"login_id"`
+		FullName string `bson:"full_name"`
 	}
-	err = h.DB.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&result)
+	err := h.DB.Collection("users").FindOne(ctx, bson.M{"_id": userID}).Decode(&result)
 	if err != nil {
-		return "", "", err
+		return "", err
 	}
-	if result.LoginID != nil {
-		loginID = *result.LoginID
-	}
-	return result.FullName, loginID, nil
+	return result.FullName, nil
 }
 
 // loadPlayerGrades fetches grades for a single player from the mhsgrader database.
-func (h *Handler) loadPlayerGrades(ctx context.Context, playerID string) (*ProgressGradeDoc, error) {
+// userIDHex is the 24-char hex string of stratahub.users._id.
+func (h *Handler) loadPlayerGrades(ctx context.Context, userIDHex string) (*ProgressGradeDoc, error) {
 	if h.GradesDB == nil {
 		return nil, fmt.Errorf("mhsgrader database not configured")
 	}
 
 	var doc ProgressGradeDoc
 	err := h.GradesDB.Collection("progress_point_grades").FindOne(ctx, bson.M{
-		"game":     "mhs",
-		"playerId": playerID,
+		"game":    "mhs",
+		"user_id": userIDHex,
 	}).Decode(&doc)
 
 	if err != nil {

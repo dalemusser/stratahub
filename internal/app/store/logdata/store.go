@@ -15,7 +15,7 @@ import (
 type LogEntry struct {
 	ID              primitive.ObjectID     `bson:"_id"`
 	Game            string                 `bson:"game"`
-	PlayerID        string                 `bson:"playerId"`
+	UserID          string                 `bson:"user_id"`
 	EventType       string                 `bson:"eventType"`
 	EventKey        string                 `bson:"eventKey,omitempty"`
 	SceneName       string                 `bson:"sceneName,omitempty"`
@@ -35,11 +35,12 @@ func New(db *mongo.Database) *Store {
 	return &Store{c: db.Collection("logdata")}
 }
 
-// ListForPlayer returns all log entries for a player in a game, ordered by _id ascending.
-func (s *Store) ListForPlayer(ctx context.Context, game, playerID string) ([]LogEntry, error) {
+// ListForUser returns all log entries for a user in a game, ordered by _id ascending.
+// userID is the 24-char hex string of stratahub.users._id.
+func (s *Store) ListForUser(ctx context.Context, game, userID string) ([]LogEntry, error) {
 	filter := bson.M{
-		"game":     game,
-		"playerId": playerID,
+		"game":    game,
+		"user_id": userID,
 	}
 	opts := options.Find().SetSort(bson.D{{Key: "_id", Value: 1}})
 
@@ -56,11 +57,12 @@ func (s *Store) ListForPlayer(ctx context.Context, game, playerID string) ([]Log
 	return entries, nil
 }
 
-// ListForPlayerByScenes returns log entries for a player filtered by scene names.
-func (s *Store) ListForPlayerByScenes(ctx context.Context, game, playerID string, sceneNames []string) ([]LogEntry, error) {
+// ListForUserByScenes returns log entries for a user filtered by scene names.
+// userID is the 24-char hex string of stratahub.users._id.
+func (s *Store) ListForUserByScenes(ctx context.Context, game, userID string, sceneNames []string) ([]LogEntry, error) {
 	filter := bson.M{
 		"game":      game,
-		"playerId":  playerID,
+		"user_id":   userID,
 		"sceneName": bson.M{"$in": sceneNames},
 	}
 	opts := options.Find().SetSort(bson.D{{Key: "_id", Value: 1}})
@@ -78,11 +80,12 @@ func (s *Store) ListForPlayerByScenes(ctx context.Context, game, playerID string
 	return entries, nil
 }
 
-// CountForPlayer returns the total number of log entries for a player in a game.
-func (s *Store) CountForPlayer(ctx context.Context, game, playerID string) (int64, error) {
+// CountForUser returns the total number of log entries for a user in a game.
+// userID is the 24-char hex string of stratahub.users._id.
+func (s *Store) CountForUser(ctx context.Context, game, userID string) (int64, error) {
 	filter := bson.M{
-		"game":     game,
-		"playerId": playerID,
+		"game":    game,
+		"user_id": userID,
 	}
 	return s.c.CountDocuments(ctx, filter)
 }

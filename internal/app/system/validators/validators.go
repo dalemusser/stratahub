@@ -277,6 +277,7 @@ func resourcesSchema() bson.M {
 				"show_in_library":      bson.M{"bsonType": "bool"},
 				"description":          bson.M{"bsonType": "string"},
 				"default_instructions": bson.M{"bsonType": "string"},
+				"url_identity_mode":    bson.M{"bsonType": "string"},
 			},
 		},
 	}

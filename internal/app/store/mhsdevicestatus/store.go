@@ -42,7 +42,6 @@ func (s *Store) Upsert(ctx context.Context, status models.MHSDeviceStatus) error
 		"$set": bson.M{
 			"workspace_id":  status.WorkspaceID,
 			"user_id":       status.UserID,
-			"login_id":      status.LoginID,
 			"device_id":     status.DeviceID,
 			"device_type":    status.DeviceType,
 			"device_details": status.DeviceDetails,

@@ -47,7 +47,7 @@ func unitsUpTo(n int) []string {
 
 // GetOrCreate finds the progress record for (workspace, user).
 // If none exists, it inserts a default record starting at unit1.
-func (s *Store) GetOrCreate(ctx context.Context, workspaceID, userID primitive.ObjectID, loginID string) (models.MHSUserProgress, error) {
+func (s *Store) GetOrCreate(ctx context.Context, workspaceID, userID primitive.ObjectID) (models.MHSUserProgress, error) {
 	now := time.Now().UTC()
 	filter := bson.M{"workspace_id": workspaceID, "user_id": userID}
 
@@ -56,7 +56,6 @@ func (s *Store) GetOrCreate(ctx context.Context, workspaceID, userID primitive.O
 			"_id":             primitive.NewObjectID(),
 			"workspace_id":    workspaceID,
 			"user_id":         userID,
-			"login_id":        loginID,
 			"current_unit":    "unit1",
 			"completed_units": []string{},
 			"created_at":      now,

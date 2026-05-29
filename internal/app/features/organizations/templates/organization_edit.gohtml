@@ -24,6 +24,8 @@
       <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
       <input type="hidden" name="return" value="{{ .BackURL }}">
 
+      {{ template "object_id_field" .ID }}
+
       <div>
         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Organization Name</label>
         <input name="name" type="text" value="{{ .Name }}" required

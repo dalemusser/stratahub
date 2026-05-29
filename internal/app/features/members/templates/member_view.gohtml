@@ -13,6 +13,8 @@
 </div>
 
 <div class="bg-white dark:bg-gray-800 rounded shadow p-4 max-w-xl space-y-4">
+  {{ template "object_id_field" .ID }}
+
   <div>
     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>
     <input type="text" value="{{ .FullName }}" class="w-full border p-2 rounded bg-gray-100 dark:bg-gray-700 text-sm" readonly />

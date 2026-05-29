@@ -33,6 +33,20 @@ This is the index of all documentation for StrataHub.
 
 - [Migration](migration.md) - Database migration scripts for MongoDB
 
+## Mission HydroSci Integration
+
+- [MHS Developer Sentinel User](mhs-dev-sentinel-user.md) - Well-known `stratahub.users` record seeded at startup so MHS editor/localhost play sessions round-trip cleanly through stratalog, stratasave, and mhsgrader
+
+## Resource URL Identification
+
+How StrataHub appends member/group/org/workspace identity to a resource's launch URL, configurable per resource.
+
+- [Admin & Coordinator Guide](resource-identification/admin-coordinator-guide.md) - Choosing a URL identity scheme when creating/editing Resources
+- [Data Recipient Guide](resource-identification/data-consumer-guide.md) - For consumers receiving the parameters: what each scheme sends and how it's encoded
+- [Members Report — Resolving Identity from Hex IDs](resource-identification/members-report.md) - The authorized crosswalk that maps de-identified hex IDs back to names, orgs, groups, and logins
+- [Parameter Vocabulary](resource-identification/vocabulary.md) - The permanent contract: definition of every parameter
+- [Plan](resource-identification/plan.md) - Design and rollout of the identification modes
+
 ## Deployment
 
 - [Systemd Configuration](systemd_info.md) - Running StrataHub as a systemd service on Ubuntu Linux

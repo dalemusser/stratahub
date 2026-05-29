@@ -117,6 +117,14 @@ func getValidator() *validate.Validator {
 			}
 			return false
 		}, "objectid")
+
+		// urlidentitymode: validates against models.URLIdentityModes (empty = none)
+		customValidator.RegisterRuleFunc("urlidentitymode", func(value any) bool {
+			if s, ok := value.(string); ok {
+				return IsValidURLIdentityMode(s)
+			}
+			return false
+		}, "urlidentitymode")
 	})
 	return customValidator
 }
@@ -235,6 +243,8 @@ func formatMessage(label, rule, param string) string {
 		return label + " must be a valid URL starting with http:// or https://."
 	case "objectid":
 		return label + " is not a valid ID."
+	case "urlidentitymode":
+		return label + " must be a valid identity mode."
 	default:
 		return label + " is invalid."
 	}
@@ -289,6 +299,20 @@ func IsValidAuthMethod(method string) bool {
 func IsValidResourceType(t string) bool {
 	for _, id := range models.ResourceTypes {
 		if t == id {
+			return true
+		}
+	}
+	return false
+}
+
+// IsValidURLIdentityMode checks if the given mode is a valid resource URL
+// identity mode. Empty is valid and means "none".
+func IsValidURLIdentityMode(m string) bool {
+	if m == "" {
+		return true
+	}
+	for _, mode := range models.URLIdentityModes {
+		if m == mode {
 			return true
 		}
 	}

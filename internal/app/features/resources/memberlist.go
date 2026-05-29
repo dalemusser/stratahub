@@ -12,13 +12,13 @@ import (
 	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/features/resources/resourceurl"
 	"github.com/dalemusser/stratahub/internal/app/policy/resourcepolicy"
 	"github.com/dalemusser/stratahub/internal/app/store/queries/memberresources"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/timezones"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/templates"
-	"github.com/dalemusser/waffle/pantry/urlutil"
 )
 
 func (h *MemberHandler) ServeListResources(w http.ResponseWriter, r *http.Request) {
@@ -61,6 +61,7 @@ func (h *MemberHandler) ServeListResources(w http.ResponseWriter, r *http.Reques
 	}
 
 	nowLocal := time.Now().In(loc)
+	wsSub, wsID := resolveWorkspaceIdentity(ctx, db, member.WorkspaceID)
 	var items []resourceListItem
 	for _, row := range results {
 		if row.VisibleFrom == nil || row.VisibleFrom.IsZero() {
@@ -80,11 +81,10 @@ func (h *MemberHandler) ServeListResources(w http.ResponseWriter, r *http.Reques
 			availableUntil = end.Format("2006-01-02 15:04")
 		}
 
-		launchURL := urlutil.AddOrSetQueryParams(row.Resource.LaunchURL, map[string]string{
-			"id":    member.LoginID,
-			"group": row.GroupName,
-			"org":   orgName,
-		})
+		// Build launch URL with the identity parameters selected by the resource's
+		// URLIdentityMode (default "none" = no params). See docs/resource-identification/.
+		idCtx := buildMemberIdentityContext(member, wsSub, wsID, orgName, row.GroupName, row.GroupID)
+		launchURL := resourceurl.BuildLaunchURL(row.Resource.LaunchURL, row.Resource.URLIdentityMode, idCtx)
 
 		items = append(items, resourceListItem{
 			ID:             row.Resource.ID.Hex(),

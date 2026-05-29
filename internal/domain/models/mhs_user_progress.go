@@ -17,7 +17,6 @@ type MHSUserProgress struct {
 	ID             primitive.ObjectID `bson:"_id,omitempty" json:"id"`
 	WorkspaceID    primitive.ObjectID `bson:"workspace_id" json:"workspace_id"`
 	UserID         primitive.ObjectID `bson:"user_id" json:"user_id"`
-	LoginID        string             `bson:"login_id" json:"login_id"`
 	CurrentUnit    string             `bson:"current_unit" json:"current_unit"`
 	CompletedUnits []string           `bson:"completed_units" json:"completed_units"`
 

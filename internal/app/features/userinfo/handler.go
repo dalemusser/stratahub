@@ -24,13 +24,12 @@ func NewHandler() *Handler {
 //
 // Response format:
 //
-//	{ "isAuthenticated": bool, "name": "...", "user_id": "...", "email": "...", "login_id": "..." }
+//	{ "isAuthenticated": bool, "name": "...", "user_id": "..." }
 //
-// Three identity fields are provided for transition support:
-//   - "user_id"  — canonical identity field; currently carries login_id,
-//     will carry the user's MongoDB ObjectID in a future phase.
-//   - "login_id" — the human-readable login string.
-//   - "email"    — legacy alias for login_id (backwards compat with older games).
+// user_id is the 24-character hex string of the user's MongoDB ObjectID.
+// It is the only identity field — login_id and email are intentionally not
+// exposed here so that downstream services (stratalog, stratasave, mhsgrader)
+// receive a non-identifiable identifier.
 func (h *Handler) ServeUserInfo(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -40,8 +39,6 @@ func (h *Handler) ServeUserInfo(w http.ResponseWriter, r *http.Request) {
 			"isAuthenticated": false,
 			"name":            "",
 			"user_id":         "",
-			"email":           "",
-			"login_id":        "",
 		})
 		return
 	}
@@ -49,8 +46,6 @@ func (h *Handler) ServeUserInfo(w http.ResponseWriter, r *http.Request) {
 	_ = json.NewEncoder(w).Encode(map[string]any{
 		"isAuthenticated": true,
 		"name":            user.Name,
-		"user_id":         user.LoginID, // Phase 1: login_id; Phase 2: user.ID.Hex()
-		"email":           user.LoginID, // Legacy compat
-		"login_id":        user.LoginID,
+		"user_id":         user.ID,
 	})
 }

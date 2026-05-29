@@ -113,6 +113,10 @@ func (s *Store) Update(ctx context.Context, id primitive.ObjectID, mut models.Re
 	}
 	set["show_in_library"] = mut.ShowInLibrary
 	set["default_instructions"] = mut.DefaultInstructions
+	// Only set when non-empty so callers that don't manage this field don't clobber it.
+	if strings.TrimSpace(mut.URLIdentityMode) != "" {
+		set["url_identity_mode"] = mut.URLIdentityMode
+	}
 	now := time.Now().UTC()
 	mut.UpdatedAt = &now
 	set["updated_at"] = mut.UpdatedAt

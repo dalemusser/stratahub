@@ -26,12 +26,15 @@ type MemberInfo struct {
 	ID             primitive.ObjectID
 	LoginID        string
 	Email          string
+	FullName       string
 	OrganizationID *primitive.ObjectID
+	WorkspaceID    *primitive.ObjectID
 }
 
 // ResourceAssignment contains the assignment details when a member has access
 // to a resource through a group.
 type ResourceAssignment struct {
+	GroupID      primitive.ObjectID
 	GroupName    string
 	VisibleFrom  *time.Time
 	VisibleUntil *time.Time
@@ -52,7 +55,9 @@ func VerifyMemberAccess(ctx context.Context, db *mongo.Database, r *http.Request
 		ID             primitive.ObjectID  `bson:"_id"`
 		LoginID        *string             `bson:"login_id"`
 		Email          *string             `bson:"email"`
+		FullName       string              `bson:"full_name"`
 		OrganizationID *primitive.ObjectID `bson:"organization_id"`
+		WorkspaceID    *primitive.ObjectID `bson:"workspace_id"`
 	}
 
 	err := db.Collection("users").FindOne(ctx, bson.M{
@@ -80,7 +85,9 @@ func VerifyMemberAccess(ctx context.Context, db *mongo.Database, r *http.Request
 		ID:             result.ID,
 		LoginID:        loginID,
 		Email:          email,
+		FullName:       result.FullName,
 		OrganizationID: result.OrganizationID,
+		WorkspaceID:    result.WorkspaceID,
 	}, nil
 }
 
@@ -119,6 +126,7 @@ func CanViewResource(ctx context.Context, db *mongo.Database, memberID, resource
 		bson.D{{Key: "$unwind", Value: "$g"}},
 		// Project the fields we need
 		bson.D{{Key: "$project", Value: bson.M{
+			"group_id":      "$group_id",
 			"group_name":    "$g.name",
 			"visible_from":  "$asg.visible_from",
 			"visible_until": "$asg.visible_until",
@@ -140,16 +148,18 @@ func CanViewResource(ctx context.Context, db *mongo.Database, memberID, resource
 	}
 
 	var row struct {
-		GroupName    string     `bson:"group_name"`
-		VisibleFrom  *time.Time `bson:"visible_from"`
-		VisibleUntil *time.Time `bson:"visible_until"`
-		Instructions string     `bson:"instructions"`
+		GroupID      primitive.ObjectID `bson:"group_id"`
+		GroupName    string             `bson:"group_name"`
+		VisibleFrom  *time.Time         `bson:"visible_from"`
+		VisibleUntil *time.Time         `bson:"visible_until"`
+		Instructions string             `bson:"instructions"`
 	}
 	if err := cur.Decode(&row); err != nil {
 		return nil, err
 	}
 
 	return &ResourceAssignment{
+		GroupID:      row.GroupID,
 		GroupName:    row.GroupName,
 		VisibleFrom:  row.VisibleFrom,
 		VisibleUntil: row.VisibleUntil,

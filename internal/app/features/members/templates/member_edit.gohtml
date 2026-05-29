@@ -29,6 +29,8 @@
   <input type="hidden" name="return" value="{{ .BackURL }}">
   <input type="hidden" name="orgID" value="{{ .OrgID }}">
 
+  {{ template "object_id_field" .ID }}
+
   <!-- Full name -->
   <div>
     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Full Name</label>

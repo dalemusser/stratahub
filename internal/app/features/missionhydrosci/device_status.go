@@ -58,7 +58,6 @@ func (h *Handler) HandleDeviceStatus(w http.ResponseWriter, r *http.Request) {
 	status := models.MHSDeviceStatus{
 		WorkspaceID:   wsID,
 		UserID:        userID,
-		LoginID:       user.LoginID,
 		DeviceID:      req.DeviceID,
 		DeviceType:    req.DeviceType,
 		DeviceDetails: req.DeviceDetails,

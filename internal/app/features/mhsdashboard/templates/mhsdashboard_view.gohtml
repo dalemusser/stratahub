@@ -241,7 +241,10 @@
     width: 12px;
     height: 12px;
   }
-  .mhs-device-stale { opacity: 0.4; }
+  /* Stale devices (last_seen > 7d ago) are flagged by the amber-colored
+     date in the Last Seen column. Avoid dimming the whole row — when many
+     devices are stale (e.g., during breaks, between deployments), 40%
+     opacity made the entire table hard to read. */
   /* Tab styles */
   .mhs-tab-active {
     border-bottom: 2px solid #2e8bc0;
@@ -1103,7 +1106,10 @@
     countdown = 30;
     updateCountdown();
 
-    // If user changed group while on debug/maps tab, reload that tab's content
+    // If user changed group while on debug tab, reload it directly. The maps
+    // tab is reloaded from the htmx:afterSettle handler instead, because the
+    // maps-student-select DOM is inside #mhs-grid and would get clobbered by
+    // the swap if we populated it here (race).
     if (userInitiated) {
       if (activeTab === 'debug') {
         var debugContent = document.getElementById('mhs-debug-content');
@@ -1111,8 +1117,6 @@
           debugContent.dataset.loaded = '';
           loadDebugStudents();
         }
-      } else if (activeTab === 'maps') {
-        mapsInit();
       }
     }
   }
@@ -1418,13 +1422,17 @@
   if (debugEl) debugObserver.observe(debugEl, { childList: true, subtree: true });
 
   // --- Maps tab ---
-  var mapsInitialized = false;
   var mapsPositions = [];
   var mapsBounds = null;
 
+  // mapsInit reloads the student dropdown + scene list every time the Maps
+  // tab becomes active. We don't gate with an "initialized" flag because the
+  // tab's DOM gets clobbered by both grid swaps (org/group changes, handled
+  // in htmx:afterSettle) and tab-switch hide/show — switching away to another
+  // tab and back leaves the dropdown in its empty initial state from the
+  // template, so it has to be repopulated each time we enter the tab.
+  // Fetches are cheap.
   window.mapsInit = function() {
-    if (mapsInitialized) return;
-    mapsInitialized = true;
     mapsLoadMembers();
     mapsLoadScenes();
   };
@@ -1842,6 +1850,22 @@
       // Restore selected analytics metric after grid refresh
       if (activeMetric !== 'active_time') {
         applyAnalyticsMetric();
+      }
+      // The maps tab's DOM is inside #mhs-grid and gets clobbered by the
+      // swap. Repopulate the student dropdown for the now-current group
+      // and clear any stale position rendering from a previously-selected
+      // student that no longer exists in this group.
+      if (activeTab === 'maps') {
+        mapsLoadMembers();
+        mapsLoadScenes();
+        mapsPositions = [];
+        mapsBounds = null;
+        var mc = document.getElementById('maps-canvas');
+        if (mc) mapsClearCanvas(mc);
+        var me = document.getElementById('maps-empty');
+        if (me) { me.textContent = 'Select a student and scene to view position data.'; me.classList.remove('hidden'); }
+        var ms = document.getElementById('maps-status');
+        if (ms) ms.textContent = '';
       }
     }
   });

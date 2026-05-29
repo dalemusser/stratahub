@@ -52,20 +52,22 @@ func (h *AdminHandler) ServeView(w http.ResponseWriter, r *http.Request) {
 	canEdit := authz.CanManageResources(r)
 
 	data := viewData{
-		BaseVM:              viewdata.NewBaseVM(r, h.DB, "View Resource", "/resources"),
-		ID:                  res.ID.Hex(),
-		ResourceTitle:       res.Title,
-		Subject:             res.Subject,
-		Description:         res.Description,
-		LaunchURL:           res.LaunchURL,
-		Type:                res.Type,
-		Status:              res.Status,
-		ShowInLibrary:       res.ShowInLibrary,
-		HasFile:             res.HasFile(),
-		FileName:            res.FileName,
-		FileSize:            res.FileSize,
-		DefaultInstructions: htmlsanitize.PrepareForDisplay(res.DefaultInstructions),
-		CanEdit:             canEdit,
+		BaseVM:               viewdata.NewBaseVM(r, h.DB, "View Resource", "/resources"),
+		ID:                   res.ID.Hex(),
+		ResourceTitle:        res.Title,
+		Subject:              res.Subject,
+		Description:          res.Description,
+		LaunchURL:            res.LaunchURL,
+		Type:                 res.Type,
+		Status:               res.Status,
+		ShowInLibrary:        res.ShowInLibrary,
+		URLIdentityMode:      res.URLIdentityMode,
+		URLIdentityModeLabel: urlIdentityModeLabel(res.URLIdentityMode),
+		HasFile:              res.HasFile(),
+		FileName:             res.FileName,
+		FileSize:             res.FileSize,
+		DefaultInstructions:  htmlsanitize.PrepareForDisplay(res.DefaultInstructions),
+		CanEdit:              canEdit,
 	}
 
 	templates.Render(w, r, "resource_view", data)

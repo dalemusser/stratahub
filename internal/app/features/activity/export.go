@@ -125,7 +125,7 @@ func (h *Handler) ServeSessionsCSV(w http.ResponseWriter, r *http.Request) {
 	defer cw.Flush()
 
 	// Header
-	if err := cw.Write([]string{"user_id", "user_name", "email", "organization", "group", "login_at", "logout_at", "end_reason", "duration_secs", "ip"}); err != nil {
+	if err := cw.Write([]string{"user_id", "user_name", "login_id", "email", "organization", "group", "login_at", "logout_at", "end_reason", "duration_secs", "ip"}); err != nil {
 		h.Log.Error("CSV write failed (header)", zap.Error(err))
 		return
 	}
@@ -135,6 +135,7 @@ func (h *Handler) ServeSessionsCSV(w http.ResponseWriter, r *http.Request) {
 		if err := cw.Write([]string{
 			row.UserID,
 			sanitizeCSVField(row.UserName),
+			row.LoginID,
 			row.Email,
 			sanitizeCSVField(row.Organization),
 			sanitizeCSVField(row.Group),
@@ -224,7 +225,7 @@ func (h *Handler) ServeEventsCSV(w http.ResponseWriter, r *http.Request) {
 	defer cw.Flush()
 
 	// Header
-	if err := cw.Write([]string{"user_id", "user_name", "session_id", "timestamp", "event_type", "resource_name", "details"}); err != nil {
+	if err := cw.Write([]string{"user_id", "user_name", "login_id", "email", "session_id", "timestamp", "event_type", "resource_name", "details"}); err != nil {
 		h.Log.Error("CSV write failed (header)", zap.Error(err))
 		return
 	}
@@ -240,6 +241,8 @@ func (h *Handler) ServeEventsCSV(w http.ResponseWriter, r *http.Request) {
 		if err := cw.Write([]string{
 			row.UserID,
 			sanitizeCSVField(row.UserName),
+			row.LoginID,
+			row.Email,
 			row.SessionID,
 			row.Timestamp.Format(time.RFC3339),
 			row.EventType,
@@ -491,6 +494,7 @@ func (h *Handler) fetchSessionExportRows(ctx context.Context, scopeFilter bson.M
 		rows = append(rows, sessionExportRow{
 			UserID:       s.UserID.Hex(),
 			UserName:     ui.FullName,
+			LoginID:      ui.LoginID,
 			Email:        ui.Email,
 			Organization: orgNames[s.OrgID],
 			Group:        userGroups[s.UserID],
@@ -573,6 +577,8 @@ func (h *Handler) fetchEventExportRows(ctx context.Context, scopeFilter bson.M, 
 		rows = append(rows, activityExportRow{
 			UserID:       e.UserID.Hex(),
 			UserName:     ui.FullName,
+			LoginID:      ui.LoginID,
+			Email:        ui.Email,
 			SessionID:    e.SessionID.Hex(),
 			Timestamp:    e.Timestamp,
 			EventType:    e.EventType,
@@ -676,10 +682,11 @@ func (h *Handler) getUserIDsInGroup(ctx context.Context, groupID primitive.Objec
 
 type userInfoCache struct {
 	FullName string
+	LoginID  string
 	Email    string
 }
 
-// fetchUserInfo batch fetches user names and emails.
+// fetchUserInfo batch fetches user names, login IDs, and emails.
 func (h *Handler) fetchUserInfo(ctx context.Context, userIDs map[primitive.ObjectID]struct{}) map[primitive.ObjectID]userInfoCache {
 	result := make(map[primitive.ObjectID]userInfoCache)
 	if len(userIDs) == 0 {
@@ -692,7 +699,7 @@ func (h *Handler) fetchUserInfo(ctx context.Context, userIDs map[primitive.Objec
 	}
 
 	cur, err := h.DB.Collection("users").Find(ctx, bson.M{"_id": bson.M{"$in": ids}}, options.Find().
-		SetProjection(bson.M{"full_name": 1, "email": 1}))
+		SetProjection(bson.M{"full_name": 1, "login_id": 1, "email": 1}))
 	if err != nil {
 		h.Log.Warn("fetch user info failed", zap.Error(err))
 		return result
@@ -703,16 +710,21 @@ func (h *Handler) fetchUserInfo(ctx context.Context, userIDs map[primitive.Objec
 		var u struct {
 			ID       primitive.ObjectID `bson:"_id"`
 			FullName string             `bson:"full_name"`
+			LoginID  *string            `bson:"login_id"`
 			Email    *string            `bson:"email"`
 		}
 		if err := cur.Decode(&u); err != nil {
 			continue
 		}
+		loginID := ""
+		if u.LoginID != nil {
+			loginID = *u.LoginID
+		}
 		email := ""
 		if u.Email != nil {
 			email = *u.Email
 		}
-		result[u.ID] = userInfoCache{FullName: u.FullName, Email: email}
+		result[u.ID] = userInfoCache{FullName: u.FullName, LoginID: loginID, Email: email}
 	}
 
 	return result

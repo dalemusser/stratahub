@@ -82,6 +82,20 @@
     </div>
   </div>
 
+  <!-- Identity scheme key (explains the Identity column badges) -->
+  <div class="mb-2 text-xs text-gray-600 dark:text-gray-400 leading-6">
+    <span class="font-medium">Identity key:</span>
+    <span class="inline-block px-2 py-0.5 rounded font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300">None</span> no identity in URL
+    <span class="mx-2 text-gray-400 dark:text-gray-500">|</span>
+    <span class="inline-block px-2 py-0.5 rounded font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">Hex</span> de-identified hex IDs
+    <span class="mx-2 text-gray-400 dark:text-gray-500">|</span>
+    <span class="inline-block px-2 py-0.5 rounded font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">Human</span> names + login (PII)
+    <span class="mx-2 text-gray-400 dark:text-gray-500">|</span>
+    <span class="inline-block px-2 py-0.5 rounded font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">Both</span> hex + human (PII)
+    <span class="mx-2 text-gray-400 dark:text-gray-500">|</span>
+    <span class="inline-block px-2 py-0.5 rounded font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">Legacy</span> id=login, org, group (PII)
+  </div>
+
   <div class="overflow-auto" style="max-height: calc(100vh - 16rem); min-height: 10rem;">
     <table class="min-w-full table-fixed text-sm text-left text-gray-700 dark:text-gray-300">
       <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs sticky top-0 z-10">
@@ -90,6 +104,7 @@
           <th class="px-2 py-2 w-[10%]">Subject</th>
           <th class="px-2 py-2">Type</th>
           <th class="px-2 py-2">Status</th>
+          <th class="px-2 py-2">Identity</th>
           <th class="px-2 py-2">Show</th>
           <th class="px-2 py-2">Description</th>
           <th class="px-2 py-2 text-right">Actions</th>
@@ -102,6 +117,19 @@
           <td class="px-2 py-2 align-middle">{{ .Subject }}</td>
           <td class="px-2 py-2 align-middle">{{ .Type }}</td>
           <td class="px-2 py-2 align-middle">{{ .Status }}</td>
+          <td class="px-2 py-2 align-middle">
+            {{ if eq .URLIdentityMode "hex" }}
+              <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300" title="De-identified hex IDs">Hex</span>
+            {{ else if eq .URLIdentityMode "human" }}
+              <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" title="Human-readable names + login (PII)">Human</span>
+            {{ else if eq .URLIdentityMode "both" }}
+              <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" title="Hex + human-readable (PII)">Both</span>
+            {{ else if eq .URLIdentityMode "legacy" }}
+              <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" title="Legacy: id=login_id, org, group (deprecated, PII)">Legacy</span>
+            {{ else }}
+              <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300" title="No identity in the URL">None</span>
+            {{ end }}
+          </td>
           <td class="px-2 py-2 align-middle">{{ if .ShowInLibrary }}Yes{{ else }}No{{ end }}</td>
           <td class="px-2 py-2 align-middle break-all">{{ .Description }}</td>
           <td class="px-2 py-2 text-right">

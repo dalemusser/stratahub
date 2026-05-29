@@ -596,7 +596,7 @@ func (h *Handler) buildHeaders(cfg *ProgressConfig) ([]UnitHeader, []PointHeader
 // ProgressGradeDoc represents a document from the progress_point_grades collection.
 type ProgressGradeDoc struct {
 	Game        string                         `bson:"game"`
-	PlayerID    string                         `bson:"playerId"`
+	UserID      string                         `bson:"user_id"`
 	Grades      map[string][]ProgressGradeItem `bson:"grades"`
 	CurrentUnit string                         `bson:"currentUnit,omitempty"`
 	LastUpdated time.Time                      `bson:"lastUpdated"`
@@ -647,21 +647,22 @@ var reasonCodeToMessage = map[string]string{
 	"HIT_YELLOW_NODE":          "Student made an incorrect selection when evaluating evidence.",
 }
 
-// loadProgressGrades fetches progress grades from the mhsgrader database for the given player IDs.
-func (h *Handler) loadProgressGrades(ctx context.Context, playerIDs []string) (map[string]*ProgressGradeDoc, error) {
+// loadProgressGrades fetches progress grades from the mhsgrader database for
+// the given user IDs (hex strings of stratahub.users._id). Returned map is
+// keyed by user_id hex.
+func (h *Handler) loadProgressGrades(ctx context.Context, userIDs []string) (map[string]*ProgressGradeDoc, error) {
 	if h.GradesDB == nil {
 		h.Log.Warn("mhsgrader database not configured, returning empty grades")
 		return make(map[string]*ProgressGradeDoc), nil
 	}
 
 	h.Log.Debug("loading progress grades",
-		zap.Int("playerCount", len(playerIDs)),
-		zap.Strings("playerIDs", playerIDs),
+		zap.Int("userCount", len(userIDs)),
 	)
 
 	filter := bson.M{
-		"game":     "mhs",
-		"playerId": bson.M{"$in": playerIDs},
+		"game":    "mhs",
+		"user_id": bson.M{"$in": userIDs},
 	}
 
 	cur, err := h.GradesDB.Collection("progress_point_grades").Find(ctx, filter)
@@ -677,7 +678,7 @@ func (h *Handler) loadProgressGrades(ctx context.Context, playerIDs []string) (m
 			h.Log.Warn("failed to decode progress grade document", zap.Error(err))
 			continue
 		}
-		grades[doc.PlayerID] = &doc
+		grades[doc.UserID] = &doc
 	}
 
 	h.Log.Debug("loaded progress grades",
@@ -740,17 +741,15 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 	totalPoints := cfg.TotalProgressPoints()
 	result := make([]MemberRow, len(members))
 
-	// Collect player IDs (login IDs) for batch lookup
-	// The playerId in mhsgrader matches the login_id in stratahub
-	playerIDs := make([]string, 0, len(members))
+	// Collect user_id hex strings for batch grade lookup.
+	// progress_point_grades is keyed by user_id (hex of stratahub.users._id).
+	userIDHexes := make([]string, 0, len(members))
 	for _, member := range members {
-		if member.LoginID != nil && *member.LoginID != "" {
-			playerIDs = append(playerIDs, *member.LoginID)
-		}
+		userIDHexes = append(userIDHexes, member.ID.Hex())
 	}
 
 	// Load grades from mhsgrader database
-	grades, err := h.loadProgressGrades(ctx, playerIDs)
+	grades, err := h.loadProgressGrades(ctx, userIDHexes)
 	if err != nil {
 		h.Log.Error("failed to load progress grades", zap.Error(err))
 		// Continue with empty grades rather than failing
@@ -771,10 +770,7 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 
 	for i, member := range members {
 		cells := make([]CellData, totalPoints)
-		var gradeDoc *ProgressGradeDoc
-		if member.LoginID != nil {
-			gradeDoc = grades[*member.LoginID]
-		}
+		gradeDoc := grades[member.ID.Hex()]
 
 		// Read current unit from grader (if available)
 		var currentUnit string

@@ -22,14 +22,15 @@ import (
 
 // listItem is a summary row for display in the admin resources list.
 type listItem struct {
-	ID            primitive.ObjectID
-	Title         string
-	TitleCI       string // case-insensitive title for cursor building
-	Subject       string
-	Type          string
-	Status        string
-	ShowInLibrary bool
-	Description   string
+	ID              primitive.ObjectID
+	Title           string
+	TitleCI         string // case-insensitive title for cursor building
+	Subject         string
+	Type            string
+	Status          string
+	ShowInLibrary   bool
+	Description     string
+	URLIdentityMode string
 }
 
 // listData provides template data for the admin resources list.
@@ -65,7 +66,7 @@ type manageModalData struct {
 	ShowInLibrary bool
 	Description   string
 	BackURL       string
-	CanEdit       bool   // True for admin; false for coordinator (view-only)
+	CanEdit       bool // True for admin; false for coordinator (view-only)
 	CSRFToken     string
 }
 
@@ -73,6 +74,15 @@ type manageModalData struct {
 type ResourceTypeOption struct {
 	ID    string
 	Label string
+}
+
+// URLIdentityModeOption is used to populate the URL identity-mode select menu.
+// PII is true when the mode emits a personally identifiable field (the user's
+// name and/or login), which drives the form's PII warning.
+type URLIdentityModeOption struct {
+	ID    string
+	Label string
+	PII   bool
 }
 
 // resourceFormVM is the unified form view-model used by the New and Edit
@@ -106,21 +116,27 @@ type resourceFormVM struct {
 
 	// Populated with models.ResourceTypes as ID + label
 	TypeOptions []ResourceTypeOption
+
+	// URL identity mode selection + options for the select menu
+	URLIdentityMode        string
+	URLIdentityModeOptions []URLIdentityModeOption
 }
 
 // viewData is the view-only model for the admin resource detail page.
 type viewData struct {
 	viewdata.BaseVM
 
-	ID                  string
-	ResourceTitle       string
-	Subject             string
-	Description         string
-	LaunchURL           string
-	Type                string
-	Status              string
-	ShowInLibrary       bool
-	DefaultInstructions template.HTML // HTML content, sanitized for safe rendering
+	ID                   string
+	ResourceTitle        string
+	Subject              string
+	Description          string
+	LaunchURL            string
+	Type                 string
+	Status               string
+	ShowInLibrary        bool
+	URLIdentityMode      string        // raw mode value (for conditional styling)
+	URLIdentityModeLabel string        // human-readable label for display
+	DefaultInstructions  template.HTML // HTML content, sanitized for safe rendering
 
 	// File fields
 	HasFile  bool
@@ -128,7 +144,7 @@ type viewData struct {
 	FileSize int64
 
 	// Permission flags
-	CanEdit bool // True for admin; false for coordinator (view-only)
+	CanEdit bool // True for admin/superadmin and coordinators with manage-resources permission
 }
 
 // ========================= MEMBER VIEW MODELS ===============================
@@ -173,7 +189,7 @@ type viewResourceData struct {
 	Description         string
 	DefaultInstructions template.HTML // HTML content, sanitized for safe rendering
 	DisplayURL          string        // Original URL for display (without tracking params)
-	LaunchURL           string        // URL with tracking params (group, id, org) for the Open button
+	LaunchURL           string        // URL with tracking params (group, user_id, org) for the Open button
 	HasFile             bool
 	FileName            string
 	Status              string

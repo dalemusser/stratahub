@@ -11,6 +11,7 @@ import (
 	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/features/resources/resourceurl"
 	"github.com/dalemusser/stratahub/internal/app/policy/resourcepolicy"
 	resourcestore "github.com/dalemusser/stratahub/internal/app/store/resources"
 	"github.com/dalemusser/stratahub/internal/app/system/htmlsanitize"
@@ -19,7 +20,6 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/waffle/pantry/storage"
 	"github.com/dalemusser/waffle/pantry/templates"
-	"github.com/dalemusser/waffle/pantry/urlutil"
 
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -108,8 +108,10 @@ func (h *MemberHandler) ServeViewResource(w http.ResponseWriter, r *http.Request
 
 	groupName := ""
 	instructions := ""
+	var groupID primitive.ObjectID
 	var visibleFrom, visibleUntil *time.Time
 	if assignment != nil {
+		groupID = assignment.GroupID
 		groupName = assignment.GroupName
 		visibleFrom = assignment.VisibleFrom
 		visibleUntil = assignment.VisibleUntil
@@ -120,12 +122,11 @@ func (h *MemberHandler) ServeViewResource(w http.ResponseWriter, r *http.Request
 		instructions = res.DefaultInstructions
 	}
 
-	// Build launch URL with id (login_id), group (name), org (name)
-	launch := urlutil.AddOrSetQueryParams(res.LaunchURL, map[string]string{
-		"id":    member.LoginID,
-		"group": groupName,
-		"org":   orgName,
-	})
+	// Build launch URL with the identity parameters selected by the resource's
+	// URLIdentityMode (default "none" = no params). See docs/resource-identification/.
+	wsSub, wsID := resolveWorkspaceIdentity(ctx, db, member.WorkspaceID)
+	idCtx := buildMemberIdentityContext(member, wsSub, wsID, orgName, groupName, groupID)
+	launch := resourceurl.BuildLaunchURL(res.LaunchURL, res.URLIdentityMode, idCtx)
 
 	canOpen := false
 	availableUntil := ""
@@ -181,7 +182,7 @@ func (h *MemberHandler) ServeViewResource(w http.ResponseWriter, r *http.Request
 	data := viewResourceData{
 		common: common{
 			BaseVM: viewdata.NewBaseVM(r, h.DB, "View Resource", "/member/resources"),
-			UserID: member.LoginID,
+			UserID: member.ID.Hex(),
 		},
 		ResourceID:          res.ID.Hex(),
 		ResourceTitle:       res.Title,
@@ -338,14 +339,13 @@ func (h *MemberHandler) HandleDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// If resource has a URL, redirect to it (with member info in query params)
+	// If resource has a URL, redirect to it with the identity parameters selected
+	// by the resource's URLIdentityMode. See docs/resource-identification/.
 	if res.LaunchURL != "" {
 		orgName, _, _ := resolveMemberOrgLocation(ctx, db, member.OrganizationID)
-		launch := urlutil.AddOrSetQueryParams(res.LaunchURL, map[string]string{
-			"id":    member.LoginID,
-			"group": assignment.GroupName,
-			"org":   orgName,
-		})
+		wsSub, wsID := resolveWorkspaceIdentity(ctx, db, member.WorkspaceID)
+		idCtx := buildMemberIdentityContext(member, wsSub, wsID, orgName, assignment.GroupName, assignment.GroupID)
+		launch := resourceurl.BuildLaunchURL(res.LaunchURL, res.URLIdentityMode, idCtx)
 		http.Redirect(w, r, launch, http.StatusSeeOther)
 		return
 	}
@@ -447,18 +447,17 @@ func (h *MemberHandler) HandleLaunch(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Build launch URL with id (login_id), group (name), org (name)
-	launch := urlutil.AddOrSetQueryParams(res.LaunchURL, map[string]string{
-		"id":    member.LoginID,
-		"group": assignment.GroupName,
-		"org":   orgName,
-	})
+	// Build launch URL with the identity parameters selected by the resource's
+	// URLIdentityMode (default "none" = no params). See docs/resource-identification/.
+	wsSub, wsID := resolveWorkspaceIdentity(ctx, db, member.WorkspaceID)
+	idCtx := buildMemberIdentityContext(member, wsSub, wsID, orgName, assignment.GroupName, assignment.GroupID)
+	launch := resourceurl.BuildLaunchURL(res.LaunchURL, res.URLIdentityMode, idCtx)
 
 	h.Log.Info("resource launch redirect",
 		zap.String("resource_id", resourceID),
 		zap.String("original_url", res.LaunchURL),
 		zap.String("redirect_url", launch),
-		zap.String("member_login_id", member.LoginID),
+		zap.String("member_user_id", member.ID.Hex()),
 		zap.String("group_name", assignment.GroupName),
 		zap.String("org_name", orgName))
 

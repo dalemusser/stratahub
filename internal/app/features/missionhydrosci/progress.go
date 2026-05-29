@@ -44,7 +44,7 @@ func (h *Handler) ServeProgress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	progress, err := h.ProgressStore.GetOrCreate(r.Context(), wsID, userID, user.LoginID)
+	progress, err := h.ProgressStore.GetOrCreate(r.Context(), wsID, userID)
 	if err != nil {
 		h.Log.Error("failed to get progress", zap.Error(err))
 		http.Error(w, "internal error", http.StatusInternalServerError)

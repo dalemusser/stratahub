@@ -1,0 +1,32 @@
+{{/*
+  object_id_field.gohtml — Shared partial that displays an entity's
+  MongoDB ObjectID as a read-only, monospaced, copy-able value.
+
+  Call with the ID string as the data argument, e.g.:
+    {{ template "object_id_field" .ID }}
+    {{ template "object_id_field" .GroupID }}
+
+  Inside the partial, the data (.) is the ID string itself.
+
+  Purpose: post-de-identification, the ObjectID is the canonical join key
+  that connects identifiable data in StrataHub to de-identified data in
+  stratalog / stratasave / mhsgrader / activity_events. StrataHub users
+  (admins, leaders) who legitimately work with identifiable data need a
+  way to find the ID to correlate the two.
+*/}}
+{{ define "object_id_field" }}
+<div class="rounded border border-gray-300 dark:border-gray-600 bg-gray-100 dark:bg-gray-900/60 px-3 py-3">
+  <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Object ID</label>
+  <div class="flex items-center gap-2">
+    <code class="flex-1 font-mono text-xs px-2 py-2 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-200 select-all">{{ . }}</code>
+    <button type="button"
+            class="text-xs px-3 py-2 border border-gray-300 dark:border-gray-600 rounded text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 no-loader"
+            onclick="navigator.clipboard.writeText('{{ . }}').then(function(){var b=event.target;b.textContent='Copied';setTimeout(function(){b.textContent='Copy'},1500)});">
+      Copy
+    </button>
+  </div>
+  <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+    Canonical 24-character identifier. Use this as the join key against de-identified data.
+  </p>
+</div>
+{{ end }}

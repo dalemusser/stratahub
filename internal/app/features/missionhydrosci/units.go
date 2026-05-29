@@ -17,15 +17,15 @@ func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
 	manifest, _ := h.resolveManifest(r)
 
 	// Load user progress
-	var currentUnit, userLoginID string
+	var currentUnit, userIDHex string
 	var completedUnits []string
 	var isComplete bool
 	wsID := workspace.IDFromRequest(r)
 
 	if user, ok := auth.CurrentUser(r); ok {
-		userLoginID = user.LoginID
+		userIDHex = user.ID
 		if userID, err := primitive.ObjectIDFromHex(user.ID); err == nil {
-			progress, err := h.ProgressStore.GetOrCreate(r.Context(), wsID, userID, user.LoginID)
+			progress, err := h.ProgressStore.GetOrCreate(r.Context(), wsID, userID)
 			if err == nil {
 				currentUnit = progress.CurrentUnit
 				completedUnits = progress.CompletedUnits
@@ -96,7 +96,7 @@ func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
 		CDNBaseURL:             h.CDNBaseURL,
 		CurrentUnit:            currentUnit,
 		CompletedUnits:         completedUnits,
-		UserLoginID:            userLoginID,
+		UserIDHex:              userIDHex,
 		IsComplete:             isComplete,
 		NextUnitID:             nextUnitID,
 		MHSMemberAuth:          mhsMemberAuth,

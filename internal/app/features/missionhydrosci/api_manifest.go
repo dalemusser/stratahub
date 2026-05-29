@@ -42,7 +42,7 @@ func (h *Handler) resolveCollection(r *http.Request) resolvedCollection {
 			wsID := workspace.IDFromRequest(r)
 
 			// 1. Per-user override
-			progress, err := h.ProgressStore.GetOrCreate(ctx, wsID, userOID, user.LoginID)
+			progress, err := h.ProgressStore.GetOrCreate(ctx, wsID, userOID)
 			if err == nil && progress.CollectionOverrideID != nil && !progress.CollectionOverrideID.IsZero() {
 				coll, err := h.CollectionStore.GetByID(ctx, *progress.CollectionOverrideID)
 				if err == nil {

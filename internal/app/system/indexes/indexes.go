@@ -969,15 +969,6 @@ func ensureMHSUserProgress(ctx context.Context, db *mongo.Database) error {
 				SetUnique(true).
 				SetName("uniq_mhsprogress_workspace_user"),
 		},
-		// Lookup by login_id (API queries)
-		{
-			Keys: bson.D{
-				{Key: "workspace_id", Value: 1},
-				{Key: "login_id", Value: 1},
-			},
-			Options: options.Index().
-				SetName("idx_mhsprogress_workspace_loginid"),
-		},
 	})
 }
 
