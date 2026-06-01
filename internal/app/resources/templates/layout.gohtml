@@ -32,9 +32,8 @@
       }
     </script>
     <script>
-      // Initialize dark mode before page renders to prevent flash
+      // Initialize theme before page renders to prevent flash.
       (function() {
-        // Check for theme preference cookie (set on login)
         var cookies = document.cookie.split(';');
         var themePref = null;
         for (var i = 0; i < cookies.length; i++) {
@@ -45,22 +44,38 @@
           }
         }
 
-        // If we have a preference cookie, apply it and clear the cookie
+        // Mirror one-shot cookie into localStorage as tri-state (light/dark/system), then clear it.
         if (themePref) {
-          if (themePref === 'system') {
-            localStorage.removeItem('theme');
-          } else {
-            localStorage.setItem('theme', themePref);
-          }
-          // Clear the cookie
+          localStorage.setItem('theme', themePref);
           document.cookie = 'theme_pref=; path=/; max-age=0';
         }
 
-        // Apply theme: check localStorage first, then system preference
+        // Apply theme. Anything other than "light"/"dark" (system, absent, legacy) follows OS.
         var theme = localStorage.getItem('theme');
-        if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        var isDark = (theme === 'dark') ||
+                     (theme !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        if (isDark) {
           document.documentElement.classList.add('dark');
         }
+      })();
+
+      // Live-update for System mode: react to OS scheme changes without reload.
+      (function() {
+        var mq = window.matchMedia('(prefers-color-scheme: dark)');
+        function applySystem(matches) {
+          var t = localStorage.getItem('theme');
+          if (t === 'light' || t === 'dark') return; // forced choice — don't override
+          document.documentElement.classList.toggle('dark', matches);
+        }
+        if (mq.addEventListener) {
+          mq.addEventListener('change', function(e) { applySystem(e.matches); });
+        } else if (mq.addListener) {
+          mq.addListener(function(e) { applySystem(e.matches); }); // legacy Safari
+        }
+        // bfcache restore: OS scheme may have changed while page was frozen.
+        window.addEventListener('pageshow', function(e) {
+          if (e.persisted) applySystem(mq.matches);
+        });
       })();
     </script>
     <style>

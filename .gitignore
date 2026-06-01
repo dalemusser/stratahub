@@ -54,3 +54,14 @@ __pycache__/
 
 # User uploads (runtime data, not source)
 uploads/
+
+# playwright-cli session profiles — hold the logged-in session
+.playwright/profile/
+.playwright/profile-*/
+
+# credentials
+.playwright/secrets.env
+
+# playwright-cli scratch (per-command snapshots)
+.playwright-cli/
+
