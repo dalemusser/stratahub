@@ -37,4 +37,12 @@ Short tours of what each role sees once signed in:
 - **[The Analyst View](analyst-view.md)** — what an analyst sees: the read-only
   dashboard and the Members Report CSV export.
 
+## Developer documentation
+
+Technical references for developers working with Strata Hub and the systems around
+it (not a Strata Hub role):
+
+- **[Developer documentation](developers/README.md)** — starting with how users,
+  groups, organizations, and workspaces are identified by hex Object IDs.
+
 More guides will be added here as Strata Hub grows.
