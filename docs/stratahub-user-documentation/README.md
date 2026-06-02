@@ -17,6 +17,14 @@ Comprehensive, feature-by-feature documentation for each role:
 
 - **[Administrator Guide](admin/README.md)** — full reference for the admin role,
   one page per menu feature.
+- **[Leader Guide](leader/README.md)** — full reference for the leader role, one page
+  per menu feature.
+- **[Member Guide](member/README.md)** — full reference for the member role, one page
+  per menu feature.
+- **[Coordinator Guide](coordinator/README.md)** — full reference for the coordinator
+  role (an organization-scoped administrator), one page per menu feature.
+- **[Analyst Guide](analyst/README.md)** — full reference for the analyst role
+  (workspace-wide, read-only reporting), one page per menu feature.
 
 ## Role overviews
 

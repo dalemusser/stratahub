@@ -68,16 +68,18 @@ Created by the admin via **System Users** (not the Leaders/Members screens), for
 | Name | Email | Role |
 |---|---|---|
 | Avery Sinclair | avery.sinclair@example.edu | analyst |
+| Marisol Reyes | marisol.reyes@example.edu | coordinator (assigned to Riverbend Middle School) |
 
 ---
 
 ## Accounts to log into for role-view captures
 
-Three demo accounts are logged into for the leader, member, and analyst perspectives. Set their passwords when creating them and record them in `.playwright/secrets.env`:
+Four demo accounts are logged into for the leader, member, analyst, and coordinator perspectives. Set their passwords when creating them and record them in `.playwright/secrets.env`:
 
 - **Leader view:** Marcus Webb — `marcus.webb@example.edu`
 - **Member view:** Aisha Rahman — `aisha.rahman@example.edu`
 - **Analyst view:** Avery Sinclair — `avery.sinclair@example.edu`
+- **Coordinator view:** Marisol Reyes — `marisol.reyes@example.edu`
 
 The other accounts are roster entries only (created by the admin, never logged into), so any throwaway password is fine; they don't need to be memorable.
 
@@ -90,6 +92,8 @@ MEMBER_EMAIL=aisha.rahman@example.edu
 MEMBER_PASSWORD=
 ANALYST_EMAIL=avery.sinclair@example.edu
 ANALYST_PASSWORD=
+COORDINATOR_EMAIL=marisol.reyes@example.edu
+COORDINATOR_PASSWORD=
 ```
 
 Remember to set each created account's **Theme → System** right after creation, or its light/dark capture won't flip.
