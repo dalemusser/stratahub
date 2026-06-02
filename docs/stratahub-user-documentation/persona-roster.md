@@ -61,14 +61,23 @@ Suggested assignment, so the screens aren't identical: assign all four to **Sect
 - Watershed Field Guide (PDF)
 - Water Cycle Diagram (image)
 
+## System users
+
+Created by the admin via **System Users** (not the Leaders/Members screens), for the analyst role-view capture:
+
+| Name | Email | Role |
+|---|---|---|
+| Avery Sinclair | avery.sinclair@example.edu | analyst |
+
 ---
 
 ## Accounts to log into for role-view captures
 
-Only two demo accounts need to be logged into (for the leader and member perspectives). Set their passwords when creating them and record them in `.playwright/secrets.env`:
+Three demo accounts are logged into for the leader, member, and analyst perspectives. Set their passwords when creating them and record them in `.playwright/secrets.env`:
 
 - **Leader view:** Marcus Webb — `marcus.webb@example.edu`
 - **Member view:** Aisha Rahman — `aisha.rahman@example.edu`
+- **Analyst view:** Avery Sinclair — `avery.sinclair@example.edu`
 
 The other accounts are roster entries only (created by the admin, never logged into), so any throwaway password is fine; they don't need to be memorable.
 
@@ -79,6 +88,8 @@ LEADER_EMAIL=marcus.webb@example.edu
 LEADER_PASSWORD=
 MEMBER_EMAIL=aisha.rahman@example.edu
 MEMBER_PASSWORD=
+ANALYST_EMAIL=avery.sinclair@example.edu
+ANALYST_PASSWORD=
 ```
 
 Remember to set each created account's **Theme → System** right after creation, or its light/dark capture won't flip.

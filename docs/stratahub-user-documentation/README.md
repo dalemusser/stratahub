@@ -14,5 +14,7 @@ step-by-step walkthrough with screenshots that match your light or dark theme.
   in: their groups, their members, and the materials assigned to them.
 - **[The Member View](member-view.md)** — what a member (student) sees after signing
   in: the resources assigned to them and how to open them.
+- **[The Analyst View](analyst-view.md)** — what an analyst sees: the read-only
+  dashboard and the Members Report CSV export.
 
 More guides will be added here as Strata Hub grows.
