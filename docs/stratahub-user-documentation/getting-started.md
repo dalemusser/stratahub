@@ -185,9 +185,15 @@ In this example, Section A and Section B each end up with four members.
 
 ## 6. Create resources and materials
 
-**Resources** are the learning content members open from their dashboard —
-links, documents, videos, and so on. **Materials** are supporting files (such as
-guides and diagrams) you keep alongside them.
+**Resources** and **Materials** are the same kind of item: each is either an
+uploaded file or a link. They differ only in **who they're for**:
+
+- A **Resource** is assigned to **members** — the content students open and work
+  with.
+- A **Material** is assigned to **leaders** — the content teachers have access to.
+
+The two are independent — assigning a resource has no effect on materials, and the
+same content can exist as both if you want members and leaders to each have a copy.
 
 ### Create the resources
 
@@ -240,6 +246,30 @@ moves into **Assigned Resources** for that group.
 Assign whichever resources each group needs. In this example all four resources go
 to Section A, and the first two go to Section B — so the two sections see different
 content.
+
+### Assign materials to leaders
+
+Materials are assigned to leaders rather than groups. Open **Materials**, select
+**Manage** on a material, then choose **Assign**. Pick the **Organization** on the
+left, then on the right choose **All** to grant every leader in that organization
+access, or pick an individual leader. (Assigning to the organization also covers any
+leaders you add later.) Select **Assign**, confirm the visibility window on the next
+screen — leave **Visible From** as-is and **Visible Until** blank for no end date —
+and select **Assign Material**.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/material-assign-dark.png">
+  <img alt="Assign Material screen with all leaders of Riverbend Middle School selected" src="images/material-assign-light.png">
+</picture>
+
+You can review every material assignment in one place from the **All Assignments**
+link on the Materials screen. Here both materials are available to all of
+Riverbend Middle School's leaders.
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/material-assignments-dark.png">
+  <img alt="All Material Assignments list showing both materials assigned to the organization's leaders" src="images/material-assignments-light.png">
+</picture>
 
 ---
 
