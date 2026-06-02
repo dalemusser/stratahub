@@ -65,3 +65,6 @@ uploads/
 # playwright-cli scratch (per-command snapshots)
 .playwright-cli/
 
+docs/stratahub-user-documentation/images/*.yml
+docs/stratahub-user-documentation/images/*.log
+
