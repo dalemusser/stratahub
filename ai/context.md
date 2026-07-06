@@ -1,151 +1,244 @@
 # StrataHub Development Context
 
-This document provides all necessary context for an AI assistant to continue development on the StrataHub and Waffle projects.
+This document provides all necessary context for an AI assistant to continue development on the StrataHub application.
 
 ## Project Overview
 
-**StrataHub** is a web application for managing organizations, groups, leaders, and members. It's built using the **Waffle** framework, a custom Go web framework developed by Dale Musser.
+**StrataHub** is a modular Go web application for managing organizations, groups, users, resources, and materials across multiple workspaces. It supports role-based access control (Admin, Analyst, Coordinator, Leader, Member) and integrates with multiple authentication methods.
 
 - **Repository**: `github.com/dalemusser/stratahub`
-- **Framework**: `github.com/dalemusser/waffle` (v0.1.24)
-- **Database**: MongoDB
+- **Framework**: `github.com/dalemusser/waffle` (v0.1.36) — custom Go web framework by Dale Musser
+- **Database**: MongoDB (6.0+) with AWS DocumentDB compatibility
 - **Go Version**: 1.24.1
+- **Frontend**: HTMX, Tailwind CSS (standalone CLI, no npm)
 
 ## Project Structure
 
 ```
 stratahub/
-├── cmd/stratahub/         # Main entry point
+├── cmd/stratahub/              # Application entry point
 ├── internal/
 │   ├── app/
-│   │   ├── bootstrap/     # Application initialization (routes, config, deps)
-│   │   ├── features/      # Feature modules (handlers + templates)
-│   │   ├── resources/     # Static assets and shared templates
-│   │   ├── store/         # Data access layer (MongoDB stores)
-│   │   ├── system/        # Shared utilities (auth, viewdata, paging, etc.)
-│   │   └── policy/        # Business logic policies
-│   └── domain/
-│       └── models/        # Domain entities
-├── static/                # Static files served at /static/*
-└── ai/                    # AI context documents
+│   │   ├── bootstrap/          # Startup initialization, routes, config
+│   │   ├── features/           # 34 feature modules (handlers + templates)
+│   │   ├── resources/          # Embedded assets and shared templates
+│   │   ├── store/              # MongoDB data access layer (27 collections)
+│   │   ├── system/             # Shared utilities (auth, validation, etc.)
+│   │   ├── policy/             # Business logic and authorization
+│   │   └── loginactions/       # Login-related workflows
+│   └── domain/models/          # 25 domain entities
+├── static/                     # Static files served at /static/*
+├── tests/e2e/                  # Playwright browser tests (Python)
+├── docs/                       # Project documentation and guides
+├── csvsamples/                 # Sample CSV files for data import
+├── scripts/                    # Utility scripts
+└── ai/                         # AI context documents
 ```
 
 ## Key Directories and Files
 
 ### Bootstrap (`internal/app/bootstrap/`)
 
+Handles application initialization and lifecycle:
+
 | File | Purpose |
 |------|---------|
-| `appconfig.go` | Application configuration struct |
-| `config.go` | Config loading from env vars (STRATAHUB_* prefix) |
-| `db.go` | Database and storage initialization |
-| `dbdeps.go` | Dependency container (MongoDB client, FileStorage) |
-| `routes.go` | HTTP router setup, route mounting |
-| `startup.go` | Application startup hooks |
+| `appconfig.go` | Configuration struct with all env vars |
+| `config.go` | Config loading from TOML, env vars (STRATAHUB_* prefix) |
+| `db.go` | MongoDB client and database initialization |
+| `dbdeps.go` | Dependency container (DB client, file storage, logger) |
+| `routes.go` | Chi HTTP router setup and route mounting |
+| `startup.go` | Application startup hooks (schema init, etc.) |
 | `shutdown.go` | Graceful shutdown logic |
-| `hooks.go` | Lifecycle hook definitions |
+| `hooks.go` | Lifecycle hook definitions for waffle |
 
 ### Features (`internal/app/features/`)
 
-Each feature is a self-contained module with:
-- `handler.go` - HTTP handlers
-- `routes.go` - Chi router setup
-- `types.go` - View models and form types
-- `templates/` - Go HTML templates
+34 feature modules organized as self-contained units. Each feature typically includes:
+- `handler.go` — HTTP handlers
+- `routes.go` — Chi router setup with middleware
+- `types.go` — View models and form input types
+- `templates/` — Go HTML templates
+
+**Core Features:**
 
 | Feature | Purpose |
 |---------|---------|
-| dashboard | Role-based dashboard views |
-| organizations | Organization CRUD |
-| groups | Group management + member/resource assignment |
-| leaders | Leader user management |
-| members | Member user management |
-| systemusers | Admin user management |
-| resources | Resources (admin) + member resource views |
-| materials | Materials (admin) + leader material views |
-| reports | Reporting (members report) |
-| settings | Site settings (name, logo, footer) |
-| login | Authentication |
-| logout | Session termination |
-| pages | Dynamic content pages (about, contact, terms, privacy) |
-| home | Landing page |
-| health | Health check endpoint |
-| errors | Error page handlers |
+| **dashboard** | Role-based dashboard views for each user type |
+| **organizations** | Organization CRUD (admin only) |
+| **groups** | Group management with member/resource assignment |
+| **leaders** | Leader user management (admin + coordinator) |
+| **members** | Member user management (admin + leader + coordinator) |
+| **systemusers** | Admin and analyst user management |
+| **resources** | Resource management (admin + coordinator) + member resource views |
+| **materials** | Material management (admin + coordinator) + leader/member views |
+| **reports** | Reporting features (members report, activity logs) |
+| **settings** | Site settings (name, logo, footer) |
+| **workspaces** | Multi-workspace management (admin feature) |
+
+**Authentication & Navigation:**
+
+| Feature | Purpose |
+|---------|---------|
+| **login** | Authentication entry point (OAuth2 + password auth) |
+| **logout** | Session termination |
+| **authgoogle** | Google OAuth2 provider integration |
+| **userinfo** | User profile/preferences page |
+| **profile** | User profile management |
+
+**Content & Pages:**
+
+| Feature | Purpose |
+|---------|---------|
+| **home** | Landing page |
+| **about** | About page (configurable content) |
+| **contact** | Contact/support page |
+| **terms** | Terms of service page |
+| **pages** | Dynamic content pages (CRUD) |
+
+**Mission HydroSci Features:**
+
+| Feature | Purpose |
+|---------|---------|
+| **mhsdashboard** | MHS-specific dashboard views |
+| **mhsbuilds** | Build/activity tracking for MHS platform |
+| **missionhydrosci** | MHS-specific configuration and management |
+| **gameconfig** | Game/activity configuration (MHS) |
+| **uploadcsv** | CSV import for MHS data |
+
+**Utility & System:**
+
+| Feature | Purpose |
+|---------|---------|
+| **health** | Health check endpoint (`/health`) |
+| **errors** | Error page handlers and logging |
+| **activity** | Activity logging and tracking |
+| **announcements** | Announcement management |
+| **auditlog** | Audit trail logging |
+| **heartbeat** | Application heartbeat/monitoring |
+| **status** | Status indicators |
 
 ### Store Layer (`internal/app/store/`)
 
-MongoDB data access with consistent patterns:
+MongoDB data access with consistent patterns. Each store package handles one collection:
 
-| Package | Collection |
-|---------|------------|
-| `users/` | users |
-| `organizations/` | organizations |
-| `groups/` | groups |
-| `memberships/` | group_memberships |
-| `resources/` | resources |
-| `resourceassign/` | group_resource_assignments |
-| `materials/` | materials |
-| `materialassign/` | material_assignments |
-| `settings/` | site_settings |
-| `pages/` | pages |
-| `logins/` | login_history |
-| `metrics/` | metrics |
+| Collection | Package | Purpose |
+|-----------|---------|---------|
+| **users** | `users/` | User accounts (admin, analyst, coordinator, leader, member) |
+| **workspaces** | `workspaces/` | Workspace isolation containers |
+| **organizations** | `organizations/` | Organizations within workspaces |
+| **groups** | `groups/` | Groups for member organization |
+| **group_memberships** | `memberships/` | User-Group relationships |
+| **resources** | `resources/` | Resources assigned to groups |
+| **group_resource_assignments** | `resourceassign/` | Resource-Group assignments |
+| **materials** | `materials/` | Materials (documents, media) |
+| **material_assignments** | `materialassign/` | Material-Org/Leader assignments |
+| **coordinator_assignments** | `coordinatorassign/` | Coordinator org assignments |
+| **site_settings** | `settings/` | Site-wide settings (name, logo, footer) |
+| **global_settings** | `globalsettings/` | Global system settings |
+| **pages** | `pages/` | Dynamic content pages |
+| **login_history** | `logins/` | Login audit trail |
+| **sessions** | `sessions/` | Session management |
+| **activity** | `activity/` | Activity logging |
+| **announcements** | `announcement/` | Site announcements |
+| **audit** | `audit/` | Audit trail |
+| **email_verification** | `emailverify/` | Email verification tokens |
+| **oauth_state** | `oauthstate/` | OAuth2 state tokens |
+| **metrics** | `metrics/` | Application metrics |
+| **log_data** | `logdata/` | Structured logging data |
+| **mhs_builds** | `mhsbuilds/` | MHS build tracking |
+| **mhs_collections** | `mhscollections/` | MHS collections data |
+| **mhs_device_status** | `mhsdevicestatus/` | MHS device tracking |
+| **mhs_user_progress** | `mhsuserprogress/` | MHS user progress tracking |
+| **group_app_settings** | `groupapps/` | Group-level app settings |
+
+**Store Pattern:**
+```go
+// Consistent structure across all stores
+type Store struct {
+    coll *mongo.Collection
+}
+
+func New(db *mongo.Database) *Store {
+    return &Store{coll: db.Collection("collection_name")}
+}
+
+// Methods return typed structs, not raw maps
+func (s *Store) GetByID(ctx context.Context, id primitive.ObjectID) (Model, error) {
+    var item Model
+    err := s.coll.FindOne(ctx, bson.M{"_id": id}).Decode(&item)
+    if err == mongo.ErrNoDocuments {
+        return item, ErrNotFound
+    }
+    return item, err
+}
+```
 
 ### Domain Models (`internal/domain/models/`)
 
+25 domain entities representing core business objects:
+
 | Model | Description |
 |-------|-------------|
-| `user.go` | User entity (admin, analyst, leader, member roles) |
-| `organization.go` | Organization entity |
-| `group.go` | Group entity |
-| `groupmembership.go` | User-Group relationship |
-| `resource.go` | Resource entity (assigned to groups) |
-| `groupresourceassignment.go` | Resource-Group assignment |
-| `material.go` | Material entity (assigned to orgs/leaders) |
-| `materialassignment.go` | Material assignment |
-| `sitesettings.go` | Site-wide settings |
-| `page.go` | Dynamic content page |
-| `resourcetypes.go` | Resource type constants |
-| `materialtypes.go` | Material type constants |
+| **user.go** | User entity (roles: admin, analyst, coordinator, leader, member) with auth fields (LoginID, AuthReturnID, Email) |
+| **workspace.go** | Workspace container for multi-tenancy |
+| **organization.go** | Organization within a workspace |
+| **group.go** | Group for organizing members |
+| **groupmembership.go** | User-Group relationship with visibility windows |
+| **resource.go** | Resource entity (assigned to groups) with URLIdentityMode |
+| **groupresourceassignment.go** | Resource-Group assignment with visibility windows |
+| **material.go** | Material entity (documents, media, links) with file storage |
+| **materialassignment.go** | Material assignment to organizations/leaders |
+| **coordinatorassignment.go** | Coordinator assignment to organizations |
+| **sitesettings.go** | Site-wide settings (name, logo, footer HTML) |
+| **globalsettings.go** | Global system settings |
+| **page.go** | Dynamic content page (about, contact, terms, etc.) |
+| **resourcetypes.go** | Resource type constants and validators |
+| **materialtypes.go** | Material type constants (document, video, link, etc.) |
+| **resourceurlmodes.go** | URLIdentityMode for resource identification (none/hex/human/both/legacy) |
+| **loginhistory.go** | Login audit entry |
+| **app.go** | Application configuration model |
+| **mhs_build.go** | MHS build tracking data |
+| **mhs_collection.go** | MHS collection data |
+| **mhs_device_status.go** | MHS device status tracking |
+| **mhs_user_progress.go** | MHS user progress data |
+| **groupappsetting.go** | Group-level application settings |
+| **authmethods.go** | Authentication method constants |
 
 ### System Utilities (`internal/app/system/`)
 
+Shared packages for common functionality. **Always use these before implementing custom logic:**
+
 | Package | Purpose |
 |---------|---------|
-| `auth/` | Session management, authentication middleware |
-| `authz/` | Authorization helpers, role extraction |
-| `viewdata/` | Base view model, site settings loading |
-| `paging/` | Pagination utilities |
-| `search/` | Search query parsing |
-| `indexes/` | MongoDB index management |
-| `inputval/` | Input validation |
-| `formutil/` | Form parsing utilities |
-| `normalize/` | String normalization (case-insensitive search) |
-| `htmlsanitize/` | HTML sanitization |
-| `timeouts/` | Standard timeout durations |
-| `txn/` | Transaction wrapper with DocumentDB fallback |
-| `status/` | Status constants (active, disabled) |
+| **auth/** | Session management, authentication middleware, session cookies |
+| **authz/** | Authorization helpers, role extraction from request context |
+| **viewdata/** | Base view model, site settings loading for templates |
+| **paging/** | Pagination utilities for list views |
+| **search/** | Search query parsing and normalization |
+| **indexes/** | MongoDB index creation and management on startup |
+| **inputval/** | Input validation with struct tags (email, URL, ObjectID, etc.) |
+| **formutil/** | Form parsing and field extraction utilities |
+| **normalize/** | String normalization (lowercase, trim, case-insensitive folding) |
+| **htmlsanitize/** | HTML sanitization for user-provided content |
+| **timeouts/** | Standard timeout durations (Short, Medium, Long) |
+| **txn/** | Transaction wrapper (MongoDB + DocumentDB fallback) |
+| **status/** | Status constants (active, disabled) |
 
-**Important**: When implementing new features, always check these shared utilities first. Do not duplicate functionality that already exists here. For example:
-- Use `viewdata.LoadBase()` for view models, not custom site settings loading
-- Use `paging` for pagination, not custom page calculation
-- Use `normalize` for case-insensitive fields, not custom string manipulation
-- Use `timeouts.Short()` / `timeouts.Long()` for context timeouts
-- Use `htmlsanitize` for user-provided HTML content
+**Critical**: When implementing features, always check these utilities first. Duplicating functionality adds technical debt and inconsistency.
 
 ### Aggregation Query Packages (`internal/app/store/queries/`)
 
-Complex cross-collection queries are in dedicated packages:
+Complex cross-collection queries in dedicated packages:
 
-| Package | Purpose |
-|---------|---------|
-| `memberresources/` | Member → group_memberships → group_resource_assignments → resources |
-| `groupmembers/` | Group members with user data, leaders sorted first |
-| `leadermaterials/` | Leader → material_assignments → materials |
+| Package | Purpose | Example |
+|---------|---------|---------|
+| **memberresources/** | Member → group_memberships → group_resource_assignments → resources | List resources available to a member |
+| **groupmembers/** | Group members with user data, leaders sorted first | List group members with user info |
+| **leadermaterials/** | Leader → material_assignments → materials | List materials assigned to a leader |
 
 **Pattern:**
 ```go
-// Returns typed structs, not raw maps
 results, err := memberresources.ListForMember(ctx, db, memberID)
 for _, res := range results {
     fmt.Println(res.Resource.Title, res.GroupName)
@@ -154,7 +247,7 @@ for _, res := range results {
 
 ### Input Validation (`internal/app/system/inputval/`)
 
-Struct-based validation with tags:
+Struct-based validation using tags:
 
 ```go
 type ItemInput struct {
@@ -165,23 +258,22 @@ type ItemInput struct {
     OrgID  string `validate:"required,objectid" label:"Organization"`
 }
 
-// Validate and check
 result := inputval.Validate(input)
 if result.HasErrors() {
     return result.First()  // First error message
-    // or result.All()     // All errors joined
 }
 ```
 
 **Custom validators:**
-- `authmethod` - internal, google, classlink, clever, microsoft
-- `resourcetype` - valid resource/material types
-- `httpurl` - valid HTTP/HTTPS URL
-- `objectid` - valid MongoDB ObjectID
+- `authmethod` — internal, google, classlink, clever, microsoft
+- `resourcetype` — valid resource types
+- `httpurl` — valid HTTP/HTTPS URL
+- `objectid` — valid MongoDB ObjectID
+- `email` — valid email format
 
 ### Normalization (`internal/app/system/normalize/`)
 
-Always normalize user input:
+Always normalize user input for consistency:
 
 ```go
 email := normalize.Email(r.FormValue("email"))     // lowercase + trim
@@ -190,7 +282,7 @@ role := normalize.Role(r.FormValue("role"))        // lowercase + trim
 status := normalize.Status(r.FormValue("status"))  // lowercase + trim
 ```
 
-For case-insensitive storage, use waffle's `text.Fold()`:
+For case-insensitive storage (searching/sorting), use waffle's `text.Fold()`:
 ```go
 import "github.com/dalemusser/waffle/pantry/text"
 
@@ -214,6 +306,7 @@ if !ok {
 // Convenience predicates
 if authz.IsAdmin(r) { /* ... */ }
 if authz.IsLeader(r) { /* ... */ }
+if authz.IsCoordinator(r) { /* ... */ }
 
 // Get user's organization ID
 orgID := authz.UserOrgID(r)  // Returns primitive.NilObjectID if not set
@@ -233,6 +326,96 @@ if status.IsValid(input.Status) { /* ... */ }
 defaultStatus := status.Default()  // Returns "active"
 ```
 
+## User Roles
+
+StrataHub supports **6 roles** with hierarchical access levels:
+
+### Super Admin
+Full system access with ability to create and manage workspaces (extremely limited access).
+
+**Unique capabilities:**
+- Create/manage workspaces
+- Global system settings
+
+**Scope:** Global
+
+### Admin
+Full system access within a workspace with ability to manage all entities.
+
+**Menu Access:**
+- Dashboard
+- Members Report
+- Organizations (CRUD all)
+- Groups (CRUD all)
+- Leaders (CRUD all)
+- Members (CRUD all)
+- System Users (manage admins, analysts)
+- Coordinators (manage coordinator assignments)
+- Resources (CRUD + assign to groups)
+- Materials (CRUD + assign to orgs/leaders)
+- Site Settings (name, logo, footer)
+- Workspace Settings
+
+**Scope:** Workspace-scoped — can see and manage everything within their workspace
+
+### Analyst
+Read-only access to reports and dashboards for data analysis.
+
+**Menu Access:**
+- Dashboard
+- Members Report
+
+**Scope:** Workspace read-only — can view reports across all organizations in workspace
+
+### Coordinator
+Mid-level access for managing specific organizations and resources/materials.
+
+**Menu Access:**
+- Dashboard (org-scoped)
+- Organizations (assigned orgs only)
+- Groups (assigned org scoped)
+- Leaders (assigned org scoped)
+- Members (assigned org scoped)
+- Resources (manage assigned orgs)
+- Materials (manage assigned orgs)
+- My Materials (view assigned materials)
+
+**Permissions:** Can have per-org assignments with optional "manage materials" and "manage resources" permissions
+
+**Scope:** Organization-scoped — can only manage assigned organizations
+
+### Leader
+Manages members and groups within their organization.
+
+**Menu Access:**
+- Dashboard
+- Groups (view/manage org-scoped)
+- Members (view/manage org-scoped)
+- My Materials (view materials assigned to them)
+
+**Scope:** Organization-scoped — can only see/manage within their own organization
+
+### Member
+End user who accesses resources assigned to their groups.
+
+**Menu Access:**
+- Dashboard
+- Resources (view resources assigned via group membership)
+
+**Scope:** Personal — sees only resources assigned to groups they belong to
+
+### Visitor (Not Logged In)
+Unauthenticated user with access to public pages only.
+
+**Menu Access:**
+- About, Contact, Terms, Privacy
+- Login
+
+**Role Hierarchy:**
+```
+Super Admin > Admin > Analyst/Coordinator > Leader > Member > Visitor
+```
+
 ## Waffle Framework
 
 Waffle is Dale's custom Go web framework providing:
@@ -244,116 +427,39 @@ Waffle is Dale's custom Go web framework providing:
 | `storage/` | File storage abstraction (local, S3, GCS, Azure) |
 | `templates/` | Template engine with hot-reload |
 | `fileserver/` | Static file serving with compression |
-| `session/` | Session management |
-| `mongo/` | MongoDB utilities |
+| `session/` | Session management with signing/verification |
+| `mongo/` | MongoDB utilities and helpers |
 | `search/` | Search helpers |
-| `pagination/` | Pagination |
-
-### Storage Interface
-
-```go
-type Store interface {
-    Put(ctx, path string, r io.Reader, opts *PutOptions) error
-    Get(ctx, path string) (io.ReadCloser, error)
-    Delete(ctx, path string) error
-    Exists(ctx, path string) (bool, error)
-    URL(path string) string
-    PresignedURL(ctx, path string, opts *PresignOptions) (string, error)
-    // ... more methods
-}
-```
+| `pagination/` | Pagination utilities |
+| `text/` | Text manipulation (folding, normalization) |
 
 ## Configuration
 
 Environment variables use `STRATAHUB_` prefix:
 
-| Variable | Description |
-|----------|-------------|
-| `STRATAHUB_MONGO_URI` | MongoDB connection string |
-| `STRATAHUB_MONGO_DATABASE` | Database name |
-| `STRATAHUB_SESSION_KEY` | Session signing key (32+ chars) |
-| `STRATAHUB_SESSION_NAME` | Session cookie name |
-| `STRATAHUB_SESSION_DOMAIN` | Cookie domain |
-| `STRATAHUB_STORAGE_TYPE` | "local" or "s3" |
-| `STRATAHUB_STORAGE_LOCAL_PATH` | Local file storage path |
-| `STRATAHUB_STORAGE_LOCAL_URL` | URL prefix for local files |
-| `STRATAHUB_STORAGE_S3_*` | S3/CloudFront settings |
+| Variable | Description | Example |
+|----------|-------------|---------|
+| `STRATAHUB_MONGO_URI` | MongoDB connection string | `mongodb://localhost:27017` |
+| `STRATAHUB_MONGO_DATABASE` | Database name | `stratahub` |
+| `STRATAHUB_SESSION_KEY` | Session signing key (32+ chars) | Auto-generated in dev |
+| `STRATAHUB_SESSION_NAME` | Session cookie name | `stratahub_session` |
+| `STRATAHUB_SESSION_DOMAIN` | Cookie domain (for cross-domain) | `.example.com` |
+| `STRATAHUB_STORAGE_TYPE` | "local" or "s3" | `local` |
+| `STRATAHUB_STORAGE_LOCAL_PATH` | Local file storage path | `./uploads/` |
+| `STRATAHUB_STORAGE_LOCAL_URL` | URL prefix for local files | `/files` |
+| `STRATAHUB_STORAGE_S3_*` | S3/CloudFront settings | Various |
+| `STRATAHUB_HTTP_PORT` | HTTP port | `8080` |
+| `STRATAHUB_USE_HTTPS` | Enable HTTPS | `false` |
 
-## User Roles
-
-StrataHub has five roles with hierarchical access levels:
-
-### Admin
-Full system access with ability to manage all entities across all organizations.
-
-**Menu Access:**
-- Dashboard
-- Members Report
-- Organizations (CRUD all)
-- Groups (CRUD all)
-- Leaders (CRUD all)
-- Members (CRUD all)
-- System Users (manage admins, analysts)
-- Resources (CRUD + assign to groups)
-- Materials (CRUD + assign to orgs/leaders)
-- Site Settings (name, logo, footer)
-
-**Scope:** Global - can see and manage everything
-
-### Analyst
-Read-only access to reports and dashboards for data analysis.
-
-**Menu Access:**
-- Dashboard
-- Members Report
-
-**Scope:** Global read-only - can view reports across all organizations
-
-### Leader
-Manages members and groups within their organization.
-
-**Menu Access:**
-- Dashboard
-- Groups (view/manage org-scoped)
-- Members (view/manage org-scoped)
-- My Materials (view materials assigned to them)
-
-**Scope:** Organization-scoped - can only see/manage within their own organization
-
-### Member
-End user who accesses resources assigned to their groups.
-
-**Menu Access:**
-- Dashboard
-- Resources (view resources assigned via group membership)
-
-**Scope:** Personal - sees only resources assigned to groups they belong to
-
-### Visitor (Not Logged In)
-Unauthenticated user with access to public pages only.
-
-**Menu Access:**
-- About, Contact, Terms, Privacy
-- Login
-
-**Role Hierarchy:**
-```
-Admin > Analyst > Leader > Member > Visitor
-```
-
-**Authorization Notes:**
-- Leaders can only manage members/groups in their organization
-- Members access resources through group memberships with optional visibility windows
-- Admins bypass all organization scoping
-- Policy functions in `internal/app/policy/` handle fine-grained authorization
+For development, use `make run` which loads environment from `.env` or sets sensible defaults.
 
 ## Session Middleware Chain
 
 Authentication middleware is applied in order:
 
-1. **`LoadSessionUser`** (global) - Injects user into context if authenticated
-2. **`RequireSignedIn`** - Enforces user in context, redirects to `/login`
-3. **`RequireRole(roles...)`** - Enforces specific role(s), redirects to `/forbidden`
+1. **`LoadSessionUser`** (global) — Injects user into context if authenticated
+2. **`RequireSignedIn`** — Enforces user in context, redirects to `/login`
+3. **`RequireRole(roles...)`** — Enforces specific role(s), redirects to `/forbidden`
 
 ```go
 // In routes.go
@@ -371,6 +477,7 @@ r.Route("/admin-feature", func(r chi.Router) {
 - Fresh user fetch on every request (catches role changes, disabled accounts)
 - Cookie-based with SameSite handling (Lax in dev, None in prod)
 - Session error classification: expired, tampered, corrupted, backend failure
+- Support for multiple auth methods (Google OAuth2, password, external tokens)
 
 ## View Model Pattern
 
@@ -384,6 +491,7 @@ type BaseVM struct {
     IsLoggedIn bool
     Role       string
     UserName   string
+    WorkspaceID string // Added for multi-workspace support
 }
 
 // Usage in handlers:
@@ -419,14 +527,15 @@ internal/app/features/{feature}/templates/
 
 ### Layout Features
 
-- **Dark Mode**: Toggle with localStorage persistence
+- **Dark Mode**: Toggle with localStorage persistence, class-based strategy
 - **Collapsible Sidebar**: Remembers state in localStorage
 - **Global Loading Spinner**: Shows during navigation/HTMX requests
-- **Footer HTML**: Configurable in site settings
+- **Footer HTML**: Configurable in site settings (rich text with TipTap)
+- **Responsive Design**: Mobile-first with Tailwind
 
 ### Menu Structure
 
-Menu templates are role-based (`menu_admin`, `menu_analyst`, `menu_leader`, `menu_member`, `menu_visitor`) with shared components (`menu_common`, `menu_footer`).
+Menu templates are role-based (`menu_admin`, `menu_analyst`, `menu_coordinator`, `menu_leader`, `menu_member`, `menu_visitor`) with shared components (`menu_common`, `menu_footer`).
 
 ## Styling with Tailwind CSS
 
@@ -479,7 +588,7 @@ The `input.css` includes base styles for:
 
 ### Template Dark Mode Requirements
 
-**Important**: All templates must support both light and dark modes. Always include `dark:` variants for colors, backgrounds, borders, and text:
+**Important**: All templates must support both light and dark modes. Always include `dark:` variants:
 
 ```html
 <div class="bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 border-gray-200 dark:border-gray-700">
@@ -509,8 +618,8 @@ The `input.css` includes base styles for:
 
 ## Frontend Libraries
 
-- **HTMX** for dynamic updates
-- **TipTap** for rich text editing
+- **HTMX** — Dynamic updates without full page reloads
+- **TipTap** — Rich text editing for HTML content
 - Bundled in `internal/app/resources/assets/js/`
 
 ## Embedded Assets & Templates
@@ -529,10 +638,7 @@ var AssetsFS embed.FS  // CSS, JS, images
 
 **Initialization (in bootstrap):**
 ```go
-// Load shared templates
 appresources.LoadSharedTemplates()
-
-// Serve embedded assets at /assets/*
 r.Handle("/assets/*", appresources.AssetsHandler("/assets"))
 ```
 
@@ -541,29 +647,6 @@ r.Handle("/assets/*", appresources.AssetsHandler("/assets"))
 - Shared templates in `internal/app/resources/templates/`
 - All registered with waffle's template engine at startup
 - Use `templates.Render(w, r, "template_name", data)` to render
-
-## Recent Work Completed
-
-### Materials Feature (Complete)
-- Domain models, stores, indexes
-- Admin CRUD with file upload support
-- Two-pane assignment picker (orgs + leaders)
-- Leader view with material list
-- File storage abstraction (local + S3/CloudFront)
-
-### Site Settings Feature (Complete)
-- Site name customization
-- Logo upload/replacement
-- Footer HTML with TipTap editor
-
-### Dark Mode (Complete)
-- All templates updated with dark mode support
-- Toggle in menu footer
-- localStorage persistence
-
-### BaseVM Updates (Complete)
-- All features updated to include SiteName, LogoURL, FooterHTML
-- Consistent view model pattern across all features
 
 ## File Serving
 
@@ -602,7 +685,7 @@ func NewHandler(db *mongo.Database, storage storage.Store,
 ```go
 func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
     r := chi.NewRouter()
-    r.Use(sm.RequireAuth)
+    r.Use(sm.RequireSignedIn)
     r.Use(sm.RequireRole("admin"))
 
     r.Get("/", h.ServeList)
@@ -639,16 +722,14 @@ func (s *Store) GetByID(ctx context.Context, id primitive.ObjectID) (models.Item
 
 ### Policy Layer (`internal/app/policy/`)
 
-Authorization and business rules are separated from handlers. Each policy package handles a specific domain.
+Authorization and business rules are separated from handlers.
 
 **Pattern:**
 - All authorization functions return `(bool, error)` to distinguish "not authorized" from "database error"
 - Functions take `*http.Request` as first param for user context extraction
-- Role hierarchy: Admin > Analyst > Leader > Member > Guest
-- Leaders are scoped to their organization; admins see all
+- Role hierarchy: Super Admin > Admin > Analyst/Coordinator > Leader > Member > Guest
 
 ```go
-// Example: Check if user can manage a member
 func CanManageMember(r *http.Request, db *mongo.Database, memberID primitive.ObjectID) (bool, error) {
     role, _, userID, ok := authz.UserCtx(r)
     if !ok {
@@ -656,6 +737,10 @@ func CanManageMember(r *http.Request, db *mongo.Database, memberID primitive.Obj
     }
     if role == "admin" {
         return true, nil
+    }
+    if role == "coordinator" {
+        // Check if coordinator is assigned to member's org
+        return checkCoordinatorAssignment(r.Context(), db, userID, memberID)
     }
     if role == "leader" {
         // Check if member is in leader's organization
@@ -667,13 +752,10 @@ func CanManageMember(r *http.Request, db *mongo.Database, memberID primitive.Obj
 
 ### Error Handling Pattern
 
-Use `ErrorLogger` from `internal/app/features/errors/` for consistent error handling:
+Use `ErrorLogger` from `internal/app/features/errors/`:
 
 ```go
-// In handler
 h.ErrLog.LogServerError(w, r, "Failed to load items", err, "/items")
-
-// For HTMX requests
 h.ErrLog.HTMXServerError(w, r, "Failed to save")
 
 // Available methods:
@@ -693,14 +775,12 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
     ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
     defer cancel()
 
-    // Define renderWithError for re-rendering form with error
     renderWithError := func(msg string) {
         data := FormData{/* pre-fill form fields */}
         data.Error = msg
         templates.Render(w, r, "item_new", data)
     }
 
-    // Parse and validate input
     input := ItemInput{
         Name: strings.TrimSpace(r.FormValue("name")),
     }
@@ -710,7 +790,6 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
         return
     }
 
-    // Create via store
     store := itemstore.New(h.DB)
     if _, err := store.Create(ctx, item); err != nil {
         if err == itemstore.ErrDuplicate {
@@ -727,13 +806,12 @@ func (h *Handler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 
 ### Transaction Support
 
-Use `txn.Run()` for multi-document operations. It gracefully falls back for DocumentDB/standalone MongoDB:
+Use `txn.Run()` for multi-document operations:
 
 ```go
 import "github.com/dalemusser/stratahub/internal/app/system/txn"
 
 err := txn.Run(ctx, h.DB, h.Log, func(sessCtx mongo.SessionContext) error {
-    // All operations here are in a transaction (if supported)
     if err := store1.Delete(sessCtx, id1); err != nil {
         return err
     }
@@ -752,7 +830,6 @@ Check for HTMX requests and render partials:
 func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
     // ... fetch data ...
 
-    // Check if HTMX request targeting specific element
     if r.Header.Get("HX-Request") == "true" {
         target := r.Header.Get("HX-Target")
         if target == "items-table" {
@@ -761,7 +838,6 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
         }
     }
 
-    // Full page render
     templates.Render(w, r, "items_list", data)
 }
 ```
@@ -772,18 +848,14 @@ StrataHub has two types of tests: Go unit tests and Playwright browser tests.
 
 ### Go Unit Tests
 
-Unit tests are located alongside the code in `*_test.go` files.
+Unit tests in `*_test.go` files alongside code:
 
-**Location examples:**
-- `internal/app/store/users/userstore_test.go`
-- `internal/app/system/auth/auth_test.go`
-- `internal/app/features/groups/handler_test.go`
-
-**Running unit tests:**
 ```bash
 go test ./...                           # All tests
 go test ./internal/app/store/users/...  # Specific package
 go test -v ./...                        # Verbose output
+make test-safe                          # Sequential (avoid MongoDB contention)
+make test-cover                         # With coverage report
 ```
 
 **Requirements:**
@@ -792,251 +864,156 @@ go test -v ./...                        # Verbose output
 
 ### Browser Tests (Playwright + Python)
 
-End-to-end tests using Python Playwright to verify complete user journeys.
+End-to-end tests in `tests/e2e/`:
 
-**Location:** `tests/e2e/`
+```bash
+make test-e2e-setup  # First time only
+make run             # In one terminal
+make test-e2e        # In another terminal
+make test-e2e-headed # With visible browser
+```
 
-**Files:**
+**Key files:**
 | File | Description |
 |------|-------------|
-| `conftest.py` | Shared fixtures and helper functions |
-| `test_admin_journey.py` | Admin user complete workflow |
-| `test_leader_journey.py` | Leader user workflow |
-| `test_member_journey.py` | Member user workflow |
-| `test_analyst_journey.py` | Analyst user workflow |
-| `requirements.txt` | Python dependencies |
-| `README.md` | Detailed test documentation |
-
-**Setup:**
-```bash
-cd tests/e2e
-python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-playwright install chromium
-```
-
-**Running browser tests:**
-```bash
-# Start the app first
-make run  # In another terminal
-
-# Run tests
-cd tests/e2e
-source venv/bin/activate
-pytest                              # All tests
-pytest --headed                     # With visible browser
-pytest test_admin_journey.py        # Specific file
-pytest -v --headed --slowmo=500     # Debug mode
-```
-
-**Test Order:**
-Tests run sequentially as user journeys:
-1. **Admin Journey** - Creates orgs, leaders, members, groups, resources
-2. **Analyst Journey** - Tests analyst-specific access
-3. **Leader Journey** - Tests leader-scoped features
-4. **Member Journey** - Tests member resource access
-
-**Key Fixtures (from conftest.py):**
-- `admin_page` - Page logged in as admin
-- `shared_page` - Single page shared across all tests
-- `session_data` - Data shared between test modules
-- `test_data` - Data container for passing IDs between tests
-
-**Helper Functions:**
-| Function | Purpose |
-|----------|---------|
-| `login_as(page, email)` | Log in with email |
-| `logout(page)` | Log out current user |
-| `fill_form(page, data)` | Fill form fields from dict |
-| `submit_form(page)` | Submit current form |
-| `wait_for_htmx(page)` | Wait for HTMX requests to complete |
-| `close_modal(page)` | Close modal dialog |
-| `find_row_with_text(page, text)` | Find table row containing text |
-| `click_row_action(page, row, action)` | Click action button in row |
-| `search_and_find(page, text)` | Use search box and verify result |
-
-**Adding New Browser Tests:**
-```python
-from playwright.sync_api import Page, expect
-from conftest import login_as, fill_form, submit_form, wait_for_htmx
-
-def test_new_feature(admin_page: Page):
-    admin_page.goto("/new-feature")
-    wait_for_htmx(admin_page)
-
-    fill_form(admin_page, {
-        "field1": "value1",
-        "field2": "value2",
-    })
-
-    submit_form(admin_page)
-
-    expect(admin_page.locator("body")).to_contain_text("Success")
-```
-
-### Testing Conventions
-
-1. **New features should have both unit tests and browser tests**
-2. **Browser tests follow the "journey" pattern** - test complete user workflows, not isolated actions
-3. **Use existing fixtures and helpers** from conftest.py
-4. **Wait for HTMX** after any action that triggers an HTMX request
-5. **Test all user roles** that can access the feature
-
-## Build and Run
-
-```bash
-# Build
-go build -o stratahub ./cmd/stratahub
-
-# Run (development)
-STRATAHUB_MONGO_URI=mongodb://localhost:27017 \
-STRATAHUB_MONGO_DATABASE=stratahub \
-STRATAHUB_SESSION_KEY=dev-key-for-testing-only-32chars \
-./stratahub
-
-# Or with make
-make run
-```
-
-## Makefile Commands
-
-The Makefile provides all common development tasks:
-
-### Build & Run
-| Command | Description |
-|---------|-------------|
-| `make build` | Build the application to `bin/stratahub` |
-| `make run` | Run the application with `go run` |
-
-### Testing
-| Command | Description |
-|---------|-------------|
-| `make test` | Run all tests |
-| `make test-v` | Run all tests with verbose output |
-| `make test-cover` | Run tests with coverage report (generates `coverage.html`) |
-| `make test-store` | Run only store tests (requires MongoDB) |
-| `make test-handlers` | Run handler tests (requires MongoDB) |
-| `make test-auth` | Run auth middleware tests |
-| `make test-safe` | Run all tests sequentially (avoids MongoDB contention) |
-| `make test-fresh` | Run tests without cache |
-
-### E2E Browser Tests
-| Command | Description |
-|---------|-------------|
-| `make test-e2e-setup` | Set up E2E test environment (run once) |
-| `make test-e2e` | Run Playwright E2E tests (requires app running) |
-| `make test-e2e-headed` | Run E2E tests with visible browser |
-| `make test-e2e-slow` | Run E2E tests with visible browser in slow motion |
-
-### Tailwind CSS
-| Command | Description |
-|---------|-------------|
-| `make css` | Build Tailwind CSS |
-| `make css-watch` | Watch and rebuild Tailwind CSS on changes |
-| `make css-prod` | Build minified Tailwind CSS for production |
-
-### Maintenance
-| Command | Description |
-|---------|-------------|
-| `make clean` | Remove build artifacts |
-| `make tidy` | Tidy go.mod dependencies |
-| `make verify` | Verify dependencies |
-| `make fmt` | Format code with `go fmt` |
-| `make vet` | Run `go vet` |
-| `make help` | Show all available targets |
-
-## Known Considerations
-
-1. **Session Key**: Must be 32+ characters in production
-2. **File Storage**: Local storage requires write permissions to storage path
-3. **MongoDB**: Indexes are created on startup via EnsureSchema
-4. **Templates**: In dev mode, templates hot-reload; in prod, they're cached
+| `conftest.py` | Shared fixtures and helpers |
+| `test_admin_journey.py` | Admin workflow |
+| `test_leader_journey.py` | Leader workflow |
+| `test_member_journey.py` | Member workflow |
 
 ## Database Compatibility
 
-**Important**: All database code must support both MongoDB and AWS DocumentDB.
+**Critical**: All database code must support both MongoDB and AWS DocumentDB.
 
-DocumentDB is MongoDB-compatible but has limitations. When writing database queries and aggregations:
+DocumentDB is MongoDB-compatible but has limitations:
+- Avoid unsupported aggregation stages
+- Test on both systems
+- Use only well-supported stages: `$match`, `$lookup`, `$project`, `$sort`, `$limit`, `$skip`, `$group`, `$unwind`
+- Avoid `$facet`, `$graphLookup`, schema validation
 
-1. **Avoid unsupported features** - DocumentDB doesn't support all MongoDB features (e.g., some aggregation stages, certain index types)
-2. **Test on both** - Code that works on MongoDB may fail on DocumentDB
-3. **Use compatible aggregation stages** - Stick to well-supported stages like `$match`, `$lookup`, `$project`, `$sort`, `$limit`, `$skip`, `$group`, `$unwind`
-4. **Avoid MongoDB-specific features** like `$facet` with complex nested pipelines, `$graphLookup`, or schema validation
-5. **Check DocumentDB documentation** when using advanced features to ensure compatibility
+## How to Run Locally
 
-## Lessons Learned
+```bash
+# Build
+make build
 
-These are hard-won insights from development that will save time and prevent errors:
+# Run (with sensible defaults)
+make run
 
-### 1. BaseVM Fields Are Required in All Handlers
-Every handler that renders a template using the layout **must** include all BaseVM fields (SiteName, LogoURL, FooterHTML, IsLoggedIn, Role, UserName). If you add a new field to BaseVM, you must update every handler. Missing fields cause template errors like `can't evaluate field LogoURL`.
+# Run with custom MongoDB
+STRATAHUB_MONGO_URI=mongodb://localhost:27017 \
+STRATAHUB_MONGO_DATABASE=stratahub \
+./bin/stratahub
 
-### 2. File Serving Requires Route Configuration
-When adding file upload features, remember to add a route to serve the files. Without this, uploaded files return 404:
-```go
-// In routes.go - easy to forget!
-if appCfg.StorageType == "local" || appCfg.StorageType == "" {
-    r.Handle(appCfg.StorageLocalURL+"/*",
-        fileserver.Handler(appCfg.StorageLocalURL, appCfg.StorageLocalPath))
-}
+# Watch CSS in development
+make css-watch
 ```
 
-### 3. Download Links Need Special Handling
-Links with the `download` attribute don't navigate away from the page, so the global loading spinner will spin forever. The layout.gohtml excludes these with `!link.hasAttribute('download')`. Keep this in mind for any new loader/spinner logic.
+## Related Repos
 
-### 4. Flexbox for Centering, Not Just text-center
-When centering elements like logos and titles together, use flexbox:
-```html
-<div class="flex flex-col items-center">
-  <img src="..." class="h-10 w-auto">
-  <h1>Title</h1>
-</div>
+- **waffle** (`github.com/dalemusser/waffle`) — Custom Go web framework
+- **waffle/pantry** — Reusable packages (storage, templates, sessions, etc.)
+- **mhscurriculum** — Source curriculum docs for MHS
+- **mhsgrading** — Grading system integrated with StrataHub
+
+## Recent Work Completed
+
+### Multi-Workspace & Coordinator Support
+- Workspaces for multi-tenancy
+- Coordinator role with org-scoped assignments
+- Coordinator-specific permissions (manage materials/resources)
+
+### De-identification & User ID Cutover
+- Migration from login_id to user_id (ObjectID hex)
+- Resource URL identification modes (none/hex/human/both/legacy)
+- Members Report CSV with proper identity crosswalk
+
+### Activity Logging & Audit Trails
+- Activity logging for user actions
+- Audit logging for admin operations
+- Email verification for auth
+
+### Materials Feature
+- Domain models, stores, indexes
+- Admin CRUD with file upload
+- Assignment picker (orgs + leaders)
+- Leader view with material list
+
+### Site Settings
+- Site name customization
+- Logo upload/replacement
+- Footer HTML with TipTap editor
+
+### Dark Mode
+- All templates updated with dark mode support
+- Toggle in menu footer
+- localStorage persistence
+
+## Notes for Claude
+
+1. **Always read CLAUDE.md first** — It contains project-specific instructions that override defaults.
+
+2. **Check existing patterns** — Before implementing features, look at similar ones in `internal/app/features/`.
+
+3. **Workspaces are now a thing** — Most queries should filter by workspace_id. Super admins have workspace_id=nil.
+
+4. **Use shared utilities** — Don't duplicate validation, auth, or formatting logic. These exist in `internal/app/system/`.
+
+5. **BaseVM must be complete** — All handlers rendering templates must include all BaseVM fields, including WorkspaceID.
+
+6. **Dark mode is required** — Test both light and dark modes as you develop. The toggle is in menu footer.
+
+7. **DocumentDB compatibility** — Always consider MongoDB DocumentDB limitations when writing queries.
+
+8. **Test on both MongoDB and DocumentDB** — Aggregations may work on MongoDB but fail on DocumentDB.
+
+9. **HTMX is standard** — Use HTMX for partial updates. Full page reloads should be rare.
+
+10. **File replacement UX** — When replacing files (logo, material), show current file + upload field + remove checkbox.
+
+11. **Cascade deletes** — Document and implement cascade deletes for referential integrity.
+
+12. **User roles expanded** — We now have 6 roles: Super Admin, Admin, Analyst, Coordinator, Leader, Member. Coordinator is new.
+
+## Makefile Commands
+
+```bash
+# Build & Run
+make build          # Build to bin/stratahub
+make run            # Run with go run
+
+# Testing
+make test           # All tests
+make test-v         # Verbose
+make test-cover     # With coverage (generates coverage.html)
+make test-safe      # Sequential (avoids MongoDB contention)
+make test-e2e-setup # Setup E2E environment
+make test-e2e       # Run E2E tests
+make test-e2e-headed # E2E with visible browser
+
+# CSS
+make css            # Build Tailwind CSS
+make css-watch      # Watch for changes
+make css-prod       # Minified for production
+
+# Maintenance
+make clean          # Remove build artifacts
+make fmt            # Format code
+make vet            # Run go vet
+make tidy           # Tidy go.mod
+make verify         # Verify dependencies
+make help           # Show all targets
 ```
-Using just `text-center` or `mx-auto` often doesn't align elements properly.
-
-### 5. File Replacement UX
-When a file (like a logo) already exists, always show both:
-- The current file with view/download options
-- An upload field to replace it
-- A checkbox to remove it entirely
-
-Don't require users to remove before replacing.
-
-### 6. Case-Insensitive Search Fields
-For searchable text fields, always store a normalized version (lowercase, diacritics stripped) in a `*_ci` field:
-```go
-Title   string `bson:"title"`
-TitleCI string `bson:"title_ci"` // Use normalize.ForSearch()
-```
-Search and sort on the `_ci` field, display the original.
-
-### 7. Test Dark Mode During Development
-Don't wait until the end to add dark mode. Test both modes as you develop templates. The toggle is in the menu footer.
-
-### 8. Check Existing Patterns Before Implementing
-Before implementing something new, look at how similar features do it:
-- New CRUD feature? Look at `groups` or `resources`
-- New assignment feature? Look at `materials` assignment
-- New two-pane picker? Look at `groups` member assignment
-
-## Pending/Future Work
-
-From the Materials implementation plan, cascade deletes are implemented but should be verified:
-- Organization delete → deletes material assignments
-- Leader delete → deletes material assignments
-- Material delete → deletes file + all assignments
 
 ## Quick Reference
 
 ### Important Files to Read First
 
-1. `internal/app/bootstrap/routes.go` - See all routes
-2. `internal/app/bootstrap/appconfig.go` - Configuration structure
-3. `internal/app/system/viewdata/viewdata.go` - View model pattern
-4. `internal/app/resources/templates/layout.gohtml` - Base layout
-5. `internal/app/resources/templates/menu.gohtml` - Navigation
-6. `internal/domain/models/` - All domain entities
+1. `internal/app/bootstrap/routes.go` — See all routes
+2. `internal/app/bootstrap/appconfig.go` — Configuration
+3. `internal/app/system/viewdata/viewdata.go` — View model pattern
+4. `internal/app/resources/templates/layout.gohtml` — Base layout
+5. `internal/app/resources/templates/menu.gohtml` — Navigation
 
 ### Adding a New Feature
 
@@ -1046,10 +1023,16 @@ From the Materials implementation plan, cascade deletes are implemented but shou
 4. Add indexes in `internal/app/system/indexes/indexes.go`
 5. Create handler, routes, types, templates
 6. Mount routes in `bootstrap/routes.go`
-7. Add navigation links in `menu.gohtml`
+7. Add navigation in `menu.gohtml`
+8. Add role middleware (`RequireRole(...)`)
+9. Add policy authorization functions
+10. Write unit tests and browser tests
 
-### Debugging
+### Debugging Tips
 
 - Logs use `zap.Logger`
 - Template errors show in response
-- Check MongoDB indexes with `db.collection.getIndexes()`
+- Check MongoDB indexes: `db.collection.getIndexes()`
+- HTMX requests show in browser Network tab with `HX-Request: true` header
+- Session issues: Check session cookie in browser DevTools
+- Dark mode toggle: Bottom of menu (press Shift-D or click toggle)
