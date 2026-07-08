@@ -2,7 +2,7 @@
 // This file is concatenated with sw-cache.js and sw-background-fetch.js
 // by the Go handler before being served at /sw.js.
 
-const SW_VERSION = '1.0.5';
+const SW_VERSION = '1.0.7';
 
 // ---- Install ----
 self.addEventListener('install', function(event) {
@@ -62,9 +62,11 @@ self.addEventListener('fetch', function(event) {
     return;
   }
 
-  // App shell assets — cache-first
+  // Hash-versioned app shell assets — exact-match cache-first. The ?v=<hash>
+  // in the request is part of the cache key, so a new deploy's hash misses
+  // the cache and fetches fresh on the FIRST load after a deploy.
   if (path === '/assets/css/tailwind.css' || path === '/assets/js/mhs-delivery.js') {
-    event.respondWith(cacheFirst(event.request, APP_SHELL_CACHE));
+    event.respondWith(versionedAssetFirst(event.request));
     return;
   }
 
@@ -91,6 +93,40 @@ async function serveMHSContent(request, path) {
 
   // Not in cache — let it fall through to the Go handler (302 redirect to CDN)
   return fetch(request);
+}
+
+/**
+ * Exact-match cache-first for hash-versioned assets (?v=<hash>).
+ * - Same hash as cached: served instantly from cache.
+ * - New hash (fresh HTML after a deploy): cache miss, fetched from network,
+ *   stale versions of the same asset pruned, new version cached.
+ * - Offline with no exact match: any cached version beats nothing.
+ */
+async function versionedAssetFirst(request) {
+  var cache = await caches.open(APP_SHELL_CACHE);
+
+  var exact = await cache.match(request);
+  if (exact) {
+    return exact;
+  }
+
+  try {
+    var response = await fetch(request);
+    if (response.ok) {
+      var stale = await cache.keys(request, { ignoreSearch: true });
+      for (var i = 0; i < stale.length; i++) {
+        await cache.delete(stale[i]);
+      }
+      await cache.put(request, response.clone());
+    }
+    return response;
+  } catch (err) {
+    var fallback = await cache.match(request, { ignoreSearch: true });
+    if (fallback) {
+      return fallback;
+    }
+    throw err;
+  }
 }
 
 /**
@@ -164,16 +200,28 @@ self.addEventListener('message', function(event) {
         data.title
       )
     );
+  } else if (data.action === 'cancelFallbacks') {
+    // Stop in-flight sequential fallback downloads before a cache purge —
+    // empty unitId/version cancels all of them. purge=false (a retry-style
+    // cancel) keeps the partial cache for resume; absent (older pages)
+    // defaults to purging, the original behavior.
+    cancelActiveFallbacks(data.unitId, data.version, data.purge);
+  } else if (data.action === 'getActiveFallbacks') {
+    // Reply with in-flight fallback download keys so a freshly-loaded page
+    // can adopt the loops it lost track of across a reload.
+    if (event.ports && event.ports[0]) {
+      event.ports[0].postMessage({ activeFallbacks: listActiveFallbacks() });
+    }
   } else if (data.action === 'deleteUnit') {
     event.waitUntil(
       caches.delete(unitCacheName(data.unitId, data.version)).then(function() {
-        broadcastStatus(data.unitId, 'not_cached', {});
+        broadcastStatus(data.unitId, 'not_cached', { version: data.version });
       })
     );
   } else if (data.action === 'checkStatus') {
     event.waitUntil(
       checkUnitCacheStatus(data.unitId, data.version, data.files).then(function(status) {
-        broadcastStatus(data.unitId, status, {});
+        broadcastStatus(data.unitId, status, { version: data.version });
       })
     );
   } else if (data.action === 'getVersion') {

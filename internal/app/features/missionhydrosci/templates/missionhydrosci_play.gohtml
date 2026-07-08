@@ -416,23 +416,65 @@
         var barText = document.getElementById('overlay-download-text');
         if (bar) bar.style.display = 'block';
 
+        // Unity is already torn down by the time this overlay runs, so any
+        // status the chain below doesn't resolve strands the student on a
+        // frozen overlay with no exit. Every terminal state must navigate;
+        // the play page's cache-miss path falls through to a CDN redirect,
+        // so navigating is the correct degraded behavior when the download
+        // didn't complete.
+        var downloadStarted = false;   // gates 'not_cached'/'partial' — init fires them before the download begins
+        var stallRedirectTimer = null; // one-shot exit for a 'stalled' that never recovers
+        var redirecting = false;
+
+        function clearStallRedirect() {
+          if (stallRedirectTimer) {
+            clearTimeout(stallRedirectTimer);
+            stallRedirectTimer = null;
+          }
+        }
+
+        function redirectSoon(message) {
+          if (redirecting) return;
+          redirecting = true;
+          clearStallRedirect();
+          if (msg) msg.textContent = message;
+          setTimeout(function() { navigateToNext(nextUnit); }, 1500);
+        }
+
         mgr.onStatus(function(uid, status, detail) {
           if (uid !== nextUnit) return;
           if (status === 'downloading') {
+            downloadStarted = true;
+            clearStallRedirect();
             var pct = detail.percent || 0;
             if (msg) msg.textContent = 'Downloading next unit... ' + pct + '%';
             if (barFill) barFill.style.width = pct + '%';
             if (barText) barText.textContent = pct + '%';
           } else if (status === 'cached') {
+            clearStallRedirect();
             if (msg) msg.textContent = 'Ready!';
             if (barFill) barFill.style.width = '100%';
             // Cleanup completed unit then navigate
             mgr.autoCleanup([nextUnit]).then(function() {
               navigateToNext(nextUnit);
             });
+          } else if (status === 'stalled') {
+            // The download may still be running — inform, don't abort. But a
+            // dead download never emits another status ('stalled' fires only
+            // once), so arm a one-shot exit: if nothing progresses within
+            // 30s, treat it like the error path and navigate.
+            if (msg) msg.textContent = 'Download stalled — still trying...';
+            if (!stallRedirectTimer) {
+              stallRedirectTimer = setTimeout(function() {
+                redirectSoon('Download stalled. Redirecting...');
+              }, 30000);
+            }
           } else if (status === 'error') {
-            if (msg) msg.textContent = 'Download failed. Redirecting...';
-            setTimeout(function() { navigateToNext(nextUnit); }, 1500);
+            redirectSoon('Download failed. Redirecting...');
+          } else if ((status === 'not_cached' || status === 'partial') && downloadStarted) {
+            // A canceled fallback loop or a cross-tab delete surfaced
+            // mid-download; tracking is cleared, no further status will come.
+            redirectSoon('Download interrupted. Redirecting...');
           }
         });
 
@@ -524,6 +566,16 @@
       var contentUrl = '/missionhydrosci/content/' + unitId + '/v' + unitVersion;
       var buildUrl = contentUrl + '/Build';
       var loaderUrl = buildUrl + '/' + unitId + '.loader.js';
+
+      // Register this play session so the units page's stale-cache prune
+      // won't delete this unit's cache out from under the running game —
+      // a content deploy can bump the version mid-session, making this
+      // cache "stale" while the game is still reading it. The heartbeat
+      // protocol (key, TTL, visibility re-arm) lives in mhs-delivery.js.
+      var mhsStopPlayHeartbeat = MHSDeliveryManager.startPlayHeartbeat(unitId, unitVersion);
+      window.addEventListener('pagehide', function() {
+        mhsStopPlayHeartbeat();
+      });
 
       var canvas = document.getElementById('unity-canvas');
       var loadingBar = document.getElementById('loading-bar');

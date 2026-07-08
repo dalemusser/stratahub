@@ -232,12 +232,38 @@
           </button>
         </div>
         <!-- Clear All Downloads -->
-        <button
-          onclick="mhsClearAllDownloads()"
-          class="w-full px-3 py-2 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700"
-        >
-          Clear All Downloads
-        </button>
+        <div class="flex items-center gap-2">
+          <button
+            onclick="mhsClearAllDownloads()"
+            class="flex-1 px-3 py-2 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Clear All Downloads
+          </button>
+          <button
+            type="button"
+            onclick="mhsShowActionHelp('clear-all')"
+            aria-label="What does Clear All Downloads do?"
+            class="w-5 h-5 shrink-0 flex items-center justify-center rounded-full border border-gray-300 dark:border-gray-500 text-gray-500 dark:text-gray-400 text-[11px] font-semibold hover:bg-gray-100 dark:hover:bg-gray-700"
+          >?</button>
+        </div>
+        <!-- Reset all MHS data (all versions + app shell + local MHS data) -->
+        <div class="flex items-center gap-2">
+          <button
+            onclick="mhsResetAllData()"
+            class="flex-1 px-3 py-2 text-xs font-medium border border-red-600 dark:border-red-500 text-red-600 dark:text-red-400 rounded hover:bg-red-50 dark:hover:bg-red-900/30"
+          >
+            Reset All MHS Data
+          </button>
+          <button
+            type="button"
+            onclick="mhsShowActionHelp('reset-all')"
+            aria-label="What does Reset All MHS Data do?"
+            class="w-5 h-5 shrink-0 flex items-center justify-center rounded-full border border-gray-300 dark:border-gray-500 text-gray-500 dark:text-gray-400 text-[11px] font-semibold hover:bg-gray-100 dark:hover:bg-gray-700"
+          >?</button>
+        </div>
+        <p class="text-[11px] text-gray-400 dark:text-gray-500 text-center">
+          Your progress and saved game are stored online and are not affected by either action.
+        </p>
       </div>
     </div>
   </details>
@@ -266,7 +292,7 @@
       <div class="flex gap-2">
         <button onclick="mhsRequestCollectionPicker()" class="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700">Change</button>
         {{ if .CollectionOverride }}
-        <form method="POST" action="/missionhydrosci/api/collection-override/clear" class="inline">
+        <form id="clear-override-form" method="POST" action="/missionhydrosci/api/collection-override/clear" class="inline">
           <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}" />
           <button type="submit" class="px-3 py-1 text-xs border dark:border-gray-600 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Use default</button>
         </form>
@@ -278,6 +304,28 @@
     </div>
   </details>
 </div>
+
+  <!-- Help modal (shared by the "?" buttons in Manage downloads) -->
+  <div id="mhs-help-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center">
+    <div class="absolute inset-0 bg-black/40" onclick="mhsCloseActionHelp()"></div>
+    <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-300 dark:border-gray-600 max-w-md w-full p-4 space-y-3 mx-4">
+      <h2 id="mhs-help-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100"></h2>
+      <div id="mhs-help-clear-all" class="hidden text-sm text-gray-600 dark:text-gray-300 space-y-2">
+        <p>Removes all downloaded game files from this device &mdash; every unit and every version, not just the current collection.</p>
+        <p>Use this to free up storage space. The app still opens offline, and units download again when you need them.</p>
+        <p class="text-gray-500 dark:text-gray-400">Your progress and saved game are stored online and are not affected.</p>
+      </div>
+      <div id="mhs-help-reset-all" class="hidden text-sm text-gray-600 dark:text-gray-300 space-y-2">
+        <p>Removes everything Clear All Downloads removes, <em>plus</em> the app&rsquo;s cached pages and the Mission HydroSci data stored locally on this device.</p>
+        <p>Use this for troubleshooting &mdash; for example, when a download is stuck or the app is behaving strangely.</p>
+        <p>You will need an internet connection the next time you open Mission HydroSci.</p>
+        <p class="text-gray-500 dark:text-gray-400">Your progress and saved game are stored online and are not affected.</p>
+      </div>
+      <div class="flex justify-end pt-2 border-t border-gray-200 dark:border-gray-700">
+        <button type="button" class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" onclick="mhsCloseActionHelp()">Close</button>
+      </div>
+    </div>
+  </div>
 
   <!-- Collection picker modal -->
   <div id="collection-picker-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center">
@@ -305,6 +353,9 @@
 
   // Track cache status for pipeline decisions
   var cacheStatus = {};
+
+  // Throttle for storage/button refresh during downloads (see onStatus tail)
+  var lastStorageRefresh = 0;
 
   // Track manually downloaded units so autoCleanup preserves them
   var MANUAL_DL_KEY = 'mhs-manual-downloads';
@@ -477,7 +528,8 @@
     contentPrefix: '/missionhydrosci/content/',
     channelName: 'missionhydrosci-delivery',
     unitCachePrefix: 'missionhydrosci-unit-',
-    fetchIdPrefix: 'missionhydrosci-'
+    fetchIdPrefix: 'missionhydrosci-',
+    appShellCachePrefix: 'missionhydrosci-app-shell-'
   });
 
   // Status callback: update UI for each unit
@@ -524,6 +576,12 @@
           statusEl.textContent = 'Downloading ' + pct + '%';
           statusEl.className = 'text-xs text-blue-600 dark:text-blue-400 ml-2';
           if (downloadBtn) { downloadBtn.classList.remove('hidden'); downloadBtn.disabled = true; downloadBtn.textContent = 'Downloading...'; }
+          if (clearBtn) clearBtn.classList.add('hidden');
+          break;
+        case 'stalled':
+          statusEl.textContent = 'Download stalled';
+          statusEl.className = 'text-xs text-amber-600 dark:text-amber-400 ml-2';
+          if (downloadBtn) { downloadBtn.classList.remove('hidden'); downloadBtn.disabled = false; downloadBtn.textContent = 'Retry'; }
           if (clearBtn) clearBtn.classList.add('hidden');
           break;
         case 'error':
@@ -597,6 +655,14 @@
             if (mainDownloadBtn) mainDownloadBtn.classList.add('hidden');
             if (mainPlayBtn) mainPlayBtn.classList.add('hidden');
             break;
+          case 'stalled':
+            mainStatus.textContent = 'Download stalled — check your connection, or Retry to start over.';
+            mainStatus.className = 'text-sm text-amber-600 dark:text-amber-400 mt-1';
+            // Keep the progress bar visible — the download is still running
+            if (mainProgressWrap) mainProgressWrap.classList.remove('hidden');
+            if (mainDownloadBtn) { mainDownloadBtn.classList.remove('hidden'); mainDownloadBtn.disabled = false; mainDownloadBtn.textContent = 'Retry'; }
+            if (mainPlayBtn) mainPlayBtn.classList.add('hidden');
+            break;
           case 'error':
             mainStatus.textContent = detail.error || 'Download failed';
             mainStatus.className = 'text-sm text-red-600 dark:text-red-400 mt-1';
@@ -632,6 +698,10 @@
             }
             nextStatusEl.className = 'text-center text-xs text-gray-400 dark:text-gray-500 mt-3';
             break;
+          case 'stalled':
+            nextStatusEl.textContent = (unitTitles[nextUnit] || 'Next unit') + ' download stalled';
+            nextStatusEl.className = 'text-center text-xs text-amber-600 dark:text-amber-400 mt-3';
+            break;
           case 'error':
             nextStatusEl.textContent = (unitTitles[nextUnit] || 'Next unit') + ' download failed';
             nextStatusEl.className = 'text-center text-xs text-red-500 dark:text-red-400 mt-3';
@@ -659,9 +729,33 @@
       runPipeline();
     }
 
+    // Self-heal: if a pipeline-managed unit lands on 'not_cached'/'partial'
+    // (a Background Fetch canceled from the browser's download tray, a
+    // stale fetch cleared by the poller's backstop), restart the pipeline —
+    // its only other re-entry is 'cached', so without this the unit sits at
+    // "Downloading..." with nothing actually running. downloadUnit dedupes,
+    // so a redundant trigger is harmless.
+    if ((status === 'not_cached' || status === 'partial') &&
+        (unitId === currentUnit || unitId === nextUnit) && !isReloading) {
+      runPipeline();
+    }
+
+    // Storage usage and button gating only change meaningfully when files
+    // land in the cache, but 'downloading' events arrive up to once a second
+    // — and each refresh costs two navigator.storage.estimate() calls plus
+    // DOM writes. Refresh eagerly on real transitions, at most every 10s
+    // while downloading. Every refresh stamps the throttle so an eager
+    // refresh isn't immediately followed by a redundant throttled one.
+    if (status !== 'downloading' || Date.now() - lastStorageRefresh > 10000) {
+      refreshStorageUI();
+    }
+  });
+
+  function refreshStorageUI() {
+    lastStorageRefresh = Date.now();
     updateStorageInfo();
     updateDownloadButtonVisibility();
-  });
+  }
 
   // Hide download buttons for units that would exceed available storage.
   // Walks units in manifest order so earlier units claim space first.
@@ -681,8 +775,10 @@
         var btn = document.getElementById('download-btn-' + unit.id);
         var cs = cacheStatus[unit.id];
 
-        // Already cached or downloading — space is already committed
-        if (cs === 'cached' || cs === 'downloading') continue;
+        // Already cached, downloading, or stalled — space is already
+        // committed (a stalled download's partial bytes count against usage,
+        // and hiding its Retry button would leave the user with no action)
+        if (cs === 'cached' || cs === 'downloading' || cs === 'stalled') continue;
 
         var size = unit.totalSize || 0;
         if (btn && size > available) {
@@ -748,6 +844,27 @@
     updateDownloadButtonVisibility();
   });
 
+  // After a deploy, the updated service worker takes control mid-load
+  // (skipWaiting + clients.claim), but this page may have been served stale
+  // app-shell assets by the OLD worker. Reload once so the page runs assets
+  // matched to the new worker — users must never need to reload manually.
+  // Guards: only pages that were already controlled at load time (first-ever
+  // visits skip this), one reload per controller change, and a 10s
+  // sessionStorage backstop against reload loops.
+  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+    var swReloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+      if (swReloaded) return;
+      swReloaded = true;
+      var last = 0;
+      try { last = parseInt(sessionStorage.getItem('mhs-sw-reloaded') || '0', 10); } catch (e) {}
+      if (Date.now() - last < 10000) return;
+      try { sessionStorage.setItem('mhs-sw-reloaded', String(Date.now())); } catch (e) {}
+      isReloading = true;
+      window.location.reload();
+    });
+  }
+
   // Replay offline progress queue
   replayProgressQueue();
 
@@ -755,6 +872,20 @@
   window.mhsDownload = function(unitId) {
     if (unitId !== currentUnit && unitId !== nextUnit) {
       addManualDownload(unitId);
+    }
+    if (cacheStatus[unitId] === 'stalled') {
+      // Retry of a stalled download: abort the stuck fetch and start over.
+      // Disable the buttons now — retryDownload awaits before 'downloading'
+      // re-disables them, and a double click must not race two retries
+      // (retryDownload also guards re-entrancy itself).
+      var retryBtn = document.getElementById('download-btn-' + unitId);
+      if (retryBtn) retryBtn.disabled = true;
+      if (unitId === currentUnit) {
+        var mainRetryBtn = document.getElementById('download-btn');
+        if (mainRetryBtn) mainRetryBtn.disabled = true;
+      }
+      manager.retryDownload(unitId);
+      return;
     }
     manager.downloadUnit(unitId);
   };
@@ -1022,11 +1153,15 @@
 
   // --- Clear All Downloads ---
   function doClearAllDownloads() {
+    // The purge fires 'not_cached' for every unit; the pipeline must not
+    // react and start re-downloads mid-purge — the reload restarts it clean.
+    isReloading = true;
     manager.deleteAllUnits().then(function() {
       localStorage.removeItem(MANUAL_DL_KEY);
       manualDownloads = [];
       window.location.reload();
     }).catch(function(err) {
+      isReloading = false; // no reload is coming — let the pipeline run again
       alert('Failed to clear downloads: ' + err.message);
     });
   }
@@ -1041,6 +1176,59 @@
     } else {
       if (!confirm('Remove all downloaded unit files from this device?')) return;
       doClearAllDownloads();
+    }
+  };
+
+  // --- Help modal for the Manage-downloads actions ---
+  // Named "ActionHelp" to avoid colliding with mhsOpenHelp/mhsCloseHelp,
+  // which belong to the PWA install help modal (#help-modal) further down.
+  var ACTION_HELP_TITLES = {
+    'clear-all': 'Clear All Downloads',
+    'reset-all': 'Reset All MHS Data'
+  };
+
+  window.mhsShowActionHelp = function(topic) {
+    var modal = document.getElementById('mhs-help-modal');
+    var title = document.getElementById('mhs-help-title');
+    if (!modal || !ACTION_HELP_TITLES[topic]) return;
+    title.textContent = ACTION_HELP_TITLES[topic];
+    document.getElementById('mhs-help-clear-all').classList.toggle('hidden', topic !== 'clear-all');
+    document.getElementById('mhs-help-reset-all').classList.toggle('hidden', topic !== 'reset-all');
+    modal.classList.remove('hidden');
+  };
+
+  window.mhsCloseActionHelp = function() {
+    var modal = document.getElementById('mhs-help-modal');
+    if (modal) modal.classList.add('hidden');
+  };
+
+  // --- Reset all MHS data ---
+  var RESET_ALL_DESC = 'Removes all downloaded Mission HydroSci files and local data from this device. ' +
+    'Your progress and saved game are stored online and are not affected.';
+
+  function doResetAllData() {
+    // Suppress pipeline reactions to the purge's status churn (see doClearAllDownloads)
+    isReloading = true;
+    // mhs-device-id is intentionally kept so device telemetry stays continuous
+    manager.purgeAllMHSData([MANUAL_DL_KEY, 'mhs-progress-queue', 'missionhydrosci-progress-changed', MHSDeliveryManager.ACTIVE_PLAY_KEY]).then(function() {
+      manualDownloads = [];
+      window.location.reload();
+    }).catch(function(err) {
+      isReloading = false; // no reload is coming — let the pipeline run again
+      alert('Failed to reset MHS data: ' + err.message);
+    });
+  }
+
+  window.mhsResetAllData = function() {
+    if (isMember && memberAuthMode !== 'trust') {
+      showAuthModal(
+        'Reset all MHS data',
+        RESET_ALL_DESC,
+        function() { doResetAllData(); }
+      );
+    } else {
+      if (!confirm(RESET_ALL_DESC + ' Continue?')) return;
+      doResetAllData();
     }
   };
 
@@ -1251,24 +1439,60 @@
         mhsCloseAuthModal();
       } else if (!helpModal.classList.contains('hidden')) {
         mhsCloseHelp();
+      } else if (!document.getElementById('mhs-help-modal').classList.contains('hidden')) {
+        mhsCloseActionHelp();
       } else if (!document.getElementById('collection-picker-modal').classList.contains('hidden')) {
         mhsCloseCollectionPicker();
       }
     }
   });
 
-  // Collection picker with auth gate for members
+  // Collection picker with auth gate for members. The auth proof is kept and
+  // sent with the override POST — the server enforces member auth on
+  // /api/collection-override, so the modal alone is not the gate.
+  var collectionAuthData = null;
+
   window.mhsRequestCollectionPicker = function() {
     if (isMember && memberAuthMode !== 'trust') {
       showAuthModal(
         'Change collection',
         'Authorization required to change the active collection.',
-        function() { mhsOpenCollectionPicker(); }
+        function(authData) {
+          collectionAuthData = authData || null;
+          mhsOpenCollectionPicker();
+        }
       );
     } else {
+      collectionAuthData = null;
       mhsOpenCollectionPicker();
     }
   };
+
+  // "Use default" (clear override) is also a version switch — gate it for
+  // members and attach the auth proof for server-side enforcement.
+  var clearOverrideForm = document.getElementById('clear-override-form');
+  if (clearOverrideForm && isMember && memberAuthMode !== 'trust') {
+    clearOverrideForm.addEventListener('submit', function(e) {
+      e.preventDefault();
+      showAuthModal(
+        'Use default collection',
+        'Authorization required to change the active collection.',
+        function(authData) {
+          function addHidden(name, value) {
+            var input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = name;
+            input.value = value;
+            clearOverrideForm.appendChild(input);
+          }
+          if (authData && authData.auth_token) addHidden('auth_token', authData.auth_token);
+          if (authData && authData.keyword) addHidden('keyword', authData.keyword);
+          // Programmatic submit skips this listener, so no re-entry guard needed
+          clearOverrideForm.submit();
+        }
+      );
+    });
+  }
 
   // Collection picker
   var activeCollectionID = '{{ .ActiveCollectionID }}';
@@ -1312,6 +1536,9 @@
   window.mhsSelectCollection = function(id) {
     var form = new FormData();
     form.append('collection_id', id);
+    // Carry the member-auth proof through — the server enforces it
+    if (collectionAuthData && collectionAuthData.auth_token) form.append('auth_token', collectionAuthData.auth_token);
+    if (collectionAuthData && collectionAuthData.keyword) form.append('keyword', collectionAuthData.keyword);
     fetch('/missionhydrosci/api/collection-override', {
       method: 'POST',
       headers: { 'X-CSRF-Token': '{{ .CSRFToken }}' },
@@ -1320,6 +1547,10 @@
       if (r.ok) {
         // Reload with hash to keep Manage version open and signal success
         window.location.href = '/missionhydrosci/units?vc=1#manage-version';
+      } else if (r.status === 403) {
+        // Staff-auth tokens are single-use; a second pick needs a fresh one
+        mhsCloseCollectionPicker();
+        alert('Authorization required or expired. Please choose "Change" again to re-authorize.');
       } else {
         alert('Failed to set collection. Please try again.');
       }

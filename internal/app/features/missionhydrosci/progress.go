@@ -93,32 +93,11 @@ func (h *Handler) HandleSetToUnit(w http.ResponseWriter, r *http.Request) {
 
 	wsID := workspace.IDFromRequest(r)
 
-	// Server-side authorization for members
-	if user.Role == "member" {
-		settings, err := h.SettingsStore.Get(r.Context(), wsID)
-		if err != nil {
-			h.Log.Error("failed to load settings for set-unit auth", zap.Error(err))
-			http.Error(w, "internal error", http.StatusInternalServerError)
-			return
-		}
-		authMode := settings.GetMHSMemberAuth()
-		switch authMode {
-		case "staffauth":
-			if req.AuthToken == "" {
-				http.Error(w, "authorization token required", http.StatusForbidden)
-				return
-			}
-			if _, err := h.StaffAuthVerifier.Store.ValidateAndConsumeToken(r.Context(), req.AuthToken); err != nil {
-				http.Error(w, "invalid or expired authorization token", http.StatusForbidden)
-				return
-			}
-		case "keyword":
-			if req.Keyword == "" || req.Keyword != settings.MHSMemberAuthKeyword {
-				http.Error(w, "invalid keyword", http.StatusForbidden)
-				return
-			}
-			// "trust": no additional check needed
-		}
+	// Server-side authorization for members (credentials come from the JSON
+	// body here; the shared core also serves the form-based endpoints)
+	if status, msg := h.checkMemberAuth(r, user.Role, req.AuthToken, req.Keyword); status != 0 {
+		http.Error(w, msg, status)
+		return
 	}
 
 	userID, err := primitive.ObjectIDFromHex(user.ID)

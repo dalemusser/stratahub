@@ -21,6 +21,12 @@ func (h *Handler) ServeServiceWorker(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-cache")
 	w.Header().Set("Service-Worker-Allowed", "/")
 
+	// Inject the current asset content hashes as real constants. The SW uses
+	// them to precache versioned asset URLs (exact-match cache keys), and any
+	// asset change alters the SW bytes so browsers install the update.
+	fmt.Fprintf(w, "const MHS_ASSET_VERSIONS = { tailwind: %q, mhsDelivery: %q };\n\n",
+		appresources.TailwindVersion(), appresources.MHSDeliveryVersion())
+
 	files := []string{
 		"static/sw-cache.js",
 		"static/sw-background-fetch.js",
@@ -38,7 +44,4 @@ func (h *Handler) ServeServiceWorker(w http.ResponseWriter, r *http.Request) {
 		f.Close()
 		w.Write([]byte("\n"))
 	}
-
-	// Append content hashes so browser detects SW change when cached assets change
-	fmt.Fprintf(w, "\n// app-shell-hash: %s %s\n", appresources.MHSDeliveryVersion(), appresources.TailwindVersion())
 }

@@ -118,6 +118,55 @@ func (h *Handler) resolveEffectiveCollectionInfo(r *http.Request) collectionInfo
 	}
 }
 
+// checkMemberAuth enforces the workspace's MHS member auth method for a
+// member, given credentials extracted by the caller (form values or a JSON
+// body). It returns (0, "") when the request is authorized; otherwise an
+// HTTP status and message for the caller to write. Non-members always pass.
+// The client auth modal alone can be bypassed with a direct POST, so every
+// gated member action must run this server-side.
+func (h *Handler) checkMemberAuth(r *http.Request, role, authToken, keyword string) (int, string) {
+	if role != "member" {
+		return 0, ""
+	}
+
+	wsID := workspace.IDFromRequest(r)
+	settings, err := h.SettingsStore.Get(r.Context(), wsID)
+	if err != nil {
+		h.Log.Error("failed to load settings for member auth", zap.Error(err))
+		return http.StatusInternalServerError, "internal error"
+	}
+
+	switch settings.GetMHSMemberAuth() {
+	case "staffauth":
+		if authToken == "" {
+			return http.StatusForbidden, "authorization token required"
+		}
+		if _, err := h.StaffAuthVerifier.Store.ValidateAndConsumeToken(r.Context(), authToken); err != nil {
+			return http.StatusForbidden, "invalid or expired authorization token"
+		}
+	case "keyword":
+		if keyword == "" || keyword != settings.MHSMemberAuthKeyword {
+			return http.StatusForbidden, "invalid keyword"
+		}
+		// "trust": no additional check needed
+	}
+	return 0, ""
+}
+
+// requireMemberAuth enforces the workspace's MHS member auth method for a
+// member request, using the auth_token / keyword form values as proof.
+// Returns false after writing an error response when not authorized.
+func (h *Handler) requireMemberAuth(w http.ResponseWriter, r *http.Request, user *auth.SessionUser) bool {
+	if user.Role != "member" {
+		return true
+	}
+	if status, msg := h.checkMemberAuth(r, user.Role, r.FormValue("auth_token"), r.FormValue("keyword")); status != 0 {
+		http.Error(w, msg, status)
+		return false
+	}
+	return true
+}
+
 // HandleSetCollectionOverride sets or clears the per-user collection override.
 // For members, requires the workspace's MHS member auth method.
 // For admins/coordinators, no extra auth needed.
@@ -133,6 +182,10 @@ func (h *Handler) HandleSetCollectionOverride(w http.ResponseWriter, r *http.Req
 			http.Error(w, "bad request", http.StatusBadRequest)
 			return
 		}
+	}
+
+	if !h.requireMemberAuth(w, r, user) {
+		return
 	}
 
 	collIDStr := r.FormValue("collection_id")
@@ -182,10 +235,16 @@ func (h *Handler) HandleSetCollectionOverride(w http.ResponseWriter, r *http.Req
 }
 
 // HandleClearCollectionOverride clears the per-user collection override.
+// Reverting to the default collection is also a version switch, so members
+// need the same authorization as setting an override.
 func (h *Handler) HandleClearCollectionOverride(w http.ResponseWriter, r *http.Request) {
 	user, ok := auth.CurrentUser(r)
 	if !ok {
 		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+
+	if !h.requireMemberAuth(w, r, user) {
 		return
 	}
 
