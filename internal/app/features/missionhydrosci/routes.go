@@ -24,6 +24,12 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 		pr.Get("/api/progress", h.ServeProgress)
 		pr.Post("/api/progress/complete", h.HandleCompleteUnit)
 		pr.Post("/api/progress/set-unit", h.HandleSetToUnit)
+
+		// Delete online saved game data (state / settings) via stratasave.
+		// Same member-auth rules as set-unit; used to clear save data before a
+		// unit launches without going through the running game.
+		pr.Post("/api/save-data/state/delete", h.HandleDeleteSavedState)
+		pr.Post("/api/save-data/settings/delete", h.HandleDeleteSavedSettings)
 		pr.Post("/api/device-status", h.HandleDeviceStatus)
 		pr.Post("/api/auth/start", h.HandleStaffAuthStart)
 		pr.Post("/api/auth/verify", h.HandleStaffAuthVerify)

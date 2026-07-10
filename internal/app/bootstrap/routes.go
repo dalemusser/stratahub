@@ -21,12 +21,12 @@ import (
 	leadersfeature "github.com/dalemusser/stratahub/internal/app/features/leaders"
 	loginfeature "github.com/dalemusser/stratahub/internal/app/features/login"
 	logoutfeature "github.com/dalemusser/stratahub/internal/app/features/logout"
-	profilefeature "github.com/dalemusser/stratahub/internal/app/features/profile"
 	materialsfeature "github.com/dalemusser/stratahub/internal/app/features/materials"
 	membersfeature "github.com/dalemusser/stratahub/internal/app/features/members"
 	mhsbuildsfeature "github.com/dalemusser/stratahub/internal/app/features/mhsbuilds"
 	mhsdashboardfeature "github.com/dalemusser/stratahub/internal/app/features/mhsdashboard"
 	missionhydroscifeature "github.com/dalemusser/stratahub/internal/app/features/missionhydrosci"
+	profilefeature "github.com/dalemusser/stratahub/internal/app/features/profile"
 	"github.com/dalemusser/stratahub/internal/app/store/emailverify"
 	"github.com/dalemusser/stratahub/internal/app/system/staffauth"
 
@@ -49,8 +49,8 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/store/sessions"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	workspacestore "github.com/dalemusser/stratahub/internal/app/store/workspaces"
-	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/auditlog"
+	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/maintenance"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
@@ -291,13 +291,15 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	missionHydroSciHandler := missionhydroscifeature.NewHandler(
 		deps.StrataHubMongoDatabase, errLog, appCfg.MHSCDNBaseURL,
 		missionhydroscifeature.GameServices{
-			LogSubmitURL:    appCfg.GameMHSLogSubmitURL,
-			LogAuth:         appCfg.GameMHSLogAuth,
-			StateSaveURL:    appCfg.GameMHSStateSaveURL,
-			StateLoadURL:    appCfg.GameMHSStateLoadURL,
-			SettingsSaveURL: appCfg.GameMHSSettingsSaveURL,
-			SettingsLoadURL: appCfg.GameMHSSettingsLoadURL,
-			SaveAuth:        appCfg.GameMHSSaveAuth,
+			LogSubmitURL:      appCfg.GameMHSLogSubmitURL,
+			LogAuth:           appCfg.GameMHSLogAuth,
+			StateSaveURL:      appCfg.GameMHSStateSaveURL,
+			StateLoadURL:      appCfg.GameMHSStateLoadURL,
+			StateDeleteURL:    appCfg.GameMHSStateDeleteURL,
+			SettingsSaveURL:   appCfg.GameMHSSettingsSaveURL,
+			SettingsLoadURL:   appCfg.GameMHSSettingsLoadURL,
+			SettingsDeleteURL: appCfg.GameMHSSettingsDeleteURL,
+			SaveAuth:          appCfg.GameMHSSaveAuth,
 		},
 		sessionMgr,
 		logger,
@@ -588,7 +590,6 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 
 		// Mission HydroSci (experimental copy of MHS delivery for admin/coordinator development)
 		wsr.Mount("/missionhydrosci", missionhydroscifeature.Routes(missionHydroSciHandler, sessionMgr))
-
 
 		// Announcements management (admin only)
 		announcementsHandler := announcementsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)

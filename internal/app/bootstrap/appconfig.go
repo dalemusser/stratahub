@@ -59,10 +59,10 @@ type AppConfig struct {
 	StorageLocalURL  string // URL prefix for serving local files (e.g., "/files/materials")
 
 	// S3/CloudFront configuration (only used if StorageType is "s3")
-	StorageS3Region string // AWS region
-	StorageS3Bucket string // S3 bucket name
-	StorageS3Prefix string // Key prefix (e.g., "materials/")
-	StorageS3ACL    string // Default ACL for uploaded objects (e.g., "public-read", "private")
+	StorageS3Region    string // AWS region
+	StorageS3Bucket    string // S3 bucket name
+	StorageS3Prefix    string // Key prefix (e.g., "materials/")
+	StorageS3ACL       string // Default ACL for uploaded objects (e.g., "public-read", "private")
 	StorageCFURL       string // CloudFront distribution URL
 	StorageCFKeyPairID string // CloudFront key pair ID
 	StorageCFKeyPath   string // Path to CloudFront private key file
@@ -116,13 +116,15 @@ type AppConfig struct {
 	// Used by /api/game-config to provide service credentials to games.
 	// URLs include the full path (e.g., "https://log.adroit.games/api/log/submit")
 	// so games can POST directly without constructing paths.
-	GameMHSLogSubmitURL  string // Log submit endpoint for MHS
-	GameMHSLogAuth       string // Log service auth header for MHS (e.g., "Bearer <api-key>")
-	GameMHSStateSaveURL  string // State save endpoint for MHS
-	GameMHSStateLoadURL  string // State load endpoint for MHS
-	GameMHSSettingsSaveURL string // Settings save endpoint for MHS
-	GameMHSSettingsLoadURL string // Settings load endpoint for MHS
-	GameMHSSaveAuth      string // Save service auth header for MHS (e.g., "Bearer <api-key>")
+	GameMHSLogSubmitURL      string // Log submit endpoint for MHS
+	GameMHSLogAuth           string // Log service auth header for MHS (e.g., "Bearer <api-key>")
+	GameMHSStateSaveURL      string // State save endpoint for MHS
+	GameMHSStateLoadURL      string // State load endpoint for MHS
+	GameMHSStateDeleteURL    string // State delete endpoint for MHS
+	GameMHSSettingsSaveURL   string // Settings save endpoint for MHS
+	GameMHSSettingsLoadURL   string // Settings load endpoint for MHS
+	GameMHSSettingsDeleteURL string // Settings delete endpoint for MHS
+	GameMHSSaveAuth          string // Save service auth header for MHS (e.g., "Bearer <api-key>")
 
 	// Claude API configuration (for AI-powered student performance summaries)
 	ClaudeAPIKey string // Anthropic API key (e.g., "sk-ant-...")

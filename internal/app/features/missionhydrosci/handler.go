@@ -17,13 +17,15 @@ import (
 // GameServices holds all game service endpoint URLs and auth headers.
 // Each URL is a full endpoint (e.g., "https://log.adroit.games/api/log/submit").
 type GameServices struct {
-	LogSubmitURL    string
-	LogAuth         string
-	StateSaveURL    string
-	StateLoadURL    string
-	SettingsSaveURL string
-	SettingsLoadURL string
-	SaveAuth        string
+	LogSubmitURL      string
+	LogAuth           string
+	StateSaveURL      string
+	StateLoadURL      string
+	StateDeleteURL    string
+	SettingsSaveURL   string
+	SettingsLoadURL   string
+	SettingsDeleteURL string
+	SaveAuth          string
 }
 
 // Handler is the dependency container for the Mission HydroSci (experimental) feature.

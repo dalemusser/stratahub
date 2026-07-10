@@ -98,8 +98,10 @@ var appConfigKeys = []config.AppKey{
 	{Name: "game_mhs_log_auth", Default: "", Desc: "Log service auth header for MHS game (e.g., Bearer <api-key>)"},
 	{Name: "game_mhs_state_save_url", Default: "", Desc: "State save endpoint (e.g., https://save.adroit.games/api/state/save)"},
 	{Name: "game_mhs_state_load_url", Default: "", Desc: "State load endpoint (e.g., https://save.adroit.games/api/state/load)"},
+	{Name: "game_mhs_state_delete_url", Default: "", Desc: "State delete endpoint (e.g., https://save.adroit.games/api/state/delete)"},
 	{Name: "game_mhs_settings_save_url", Default: "", Desc: "Settings save endpoint (e.g., https://save.adroit.games/api/settings/save)"},
 	{Name: "game_mhs_settings_load_url", Default: "", Desc: "Settings load endpoint (e.g., https://save.adroit.games/api/settings/load)"},
+	{Name: "game_mhs_settings_delete_url", Default: "", Desc: "Settings delete endpoint (e.g., https://save.adroit.games/api/settings/delete)"},
 	{Name: "game_mhs_save_auth", Default: "", Desc: "Save service auth header for MHS game (e.g., Bearer <api-key>)"},
 
 	// Claude API configuration
@@ -136,10 +138,10 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 		MongoMinPoolSize:  uint64(appValues.Int("mongo_min_pool_size")),
 		MHSGraderDatabase: appValues.String("mhsgrader_database"),
 		StratalogDatabase: appValues.String("stratalog_database"),
-		SessionKey:    appValues.String("session_key"),
-		SessionName:   appValues.String("session_name"),
-		SessionDomain: appValues.String("session_domain"),
-		SessionMaxAge: appValues.Duration("session_max_age", 24*time.Hour),
+		SessionKey:        appValues.String("session_key"),
+		SessionName:       appValues.String("session_name"),
+		SessionDomain:     appValues.String("session_domain"),
+		SessionMaxAge:     appValues.Duration("session_max_age", 24*time.Hour),
 
 		// Idle logout
 		IdleLogoutEnabled: appValues.Bool("idle_logout_enabled"),
@@ -207,13 +209,15 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 		MHSS3SecretAccessKey: appValues.String("mhs_s3_secret_access_key"),
 
 		// Game service endpoints
-		GameMHSLogSubmitURL:    appValues.String("game_mhs_log_submit_url"),
-		GameMHSLogAuth:         appValues.String("game_mhs_log_auth"),
-		GameMHSStateSaveURL:    appValues.String("game_mhs_state_save_url"),
-		GameMHSStateLoadURL:    appValues.String("game_mhs_state_load_url"),
-		GameMHSSettingsSaveURL: appValues.String("game_mhs_settings_save_url"),
-		GameMHSSettingsLoadURL: appValues.String("game_mhs_settings_load_url"),
-		GameMHSSaveAuth:        appValues.String("game_mhs_save_auth"),
+		GameMHSLogSubmitURL:      appValues.String("game_mhs_log_submit_url"),
+		GameMHSLogAuth:           appValues.String("game_mhs_log_auth"),
+		GameMHSStateSaveURL:      appValues.String("game_mhs_state_save_url"),
+		GameMHSStateLoadURL:      appValues.String("game_mhs_state_load_url"),
+		GameMHSStateDeleteURL:    appValues.String("game_mhs_state_delete_url"),
+		GameMHSSettingsSaveURL:   appValues.String("game_mhs_settings_save_url"),
+		GameMHSSettingsLoadURL:   appValues.String("game_mhs_settings_load_url"),
+		GameMHSSettingsDeleteURL: appValues.String("game_mhs_settings_delete_url"),
+		GameMHSSaveAuth:          appValues.String("game_mhs_save_auth"),
 
 		// Claude API
 		ClaudeAPIKey: appValues.String("claude_api_key"),

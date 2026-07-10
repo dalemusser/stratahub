@@ -265,6 +265,43 @@
           Your progress and saved game are stored online and are not affected by either action.
         </p>
       </div>
+      <!-- Saved game data (online, stored in the save service) -->
+      <div class="mt-3 border border-amber-300 dark:border-amber-700 rounded-lg p-3 space-y-3">
+        <p class="text-xs font-medium text-gray-700 dark:text-gray-300 text-center">Saved game data (online)</p>
+        <!-- Delete Saved State -->
+        <div class="flex items-center gap-2">
+          <button
+            onclick="mhsDeleteSavedState()"
+            class="flex-1 px-3 py-2 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Delete Saved State
+          </button>
+          <button
+            type="button"
+            onclick="mhsShowActionHelp('delete-state')"
+            aria-label="What does Delete Saved State do?"
+            class="w-5 h-5 shrink-0 flex items-center justify-center rounded-full border border-gray-300 dark:border-gray-500 text-gray-500 dark:text-gray-400 text-[11px] font-semibold hover:bg-gray-100 dark:hover:bg-gray-700"
+          >?</button>
+        </div>
+        <!-- Delete Saved Settings -->
+        <div class="flex items-center gap-2">
+          <button
+            onclick="mhsDeleteSavedSettings()"
+            class="flex-1 px-3 py-2 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700"
+          >
+            Delete Saved Settings
+          </button>
+          <button
+            type="button"
+            onclick="mhsShowActionHelp('delete-settings')"
+            aria-label="What does Delete Saved Settings do?"
+            class="w-5 h-5 shrink-0 flex items-center justify-center rounded-full border border-gray-300 dark:border-gray-500 text-gray-500 dark:text-gray-400 text-[11px] font-semibold hover:bg-gray-100 dark:hover:bg-gray-700"
+          >?</button>
+        </div>
+        <p class="text-[11px] text-amber-600 dark:text-amber-400 text-center">
+          This permanently deletes the online saved game data. It cannot be undone.
+        </p>
+      </div>
     </div>
   </details>
 
@@ -320,6 +357,16 @@
         <p>Use this for troubleshooting &mdash; for example, when a download is stuck or the app is behaving strangely.</p>
         <p>You will need an internet connection the next time you open Mission HydroSci.</p>
         <p class="text-gray-500 dark:text-gray-400">Your progress and saved game are stored online and are not affected.</p>
+      </div>
+      <div id="mhs-help-delete-state" class="hidden text-sm text-gray-600 dark:text-gray-300 space-y-2">
+        <p>Permanently deletes the saved game <strong>state</strong> (the in-progress saved game) from the online save service.</p>
+        <p>The next time a unit launches, the game starts with no saved state. This does not change your progress/current unit, downloaded files, or saved settings.</p>
+        <p class="text-amber-600 dark:text-amber-400">This affects online data and cannot be undone.</p>
+      </div>
+      <div id="mhs-help-delete-settings" class="hidden text-sm text-gray-600 dark:text-gray-300 space-y-2">
+        <p>Permanently deletes the saved game <strong>settings</strong> (audio, controls, and other preferences) from the online save service.</p>
+        <p>The next time a unit launches, the game uses default settings. This does not change your progress, downloaded files, or saved state.</p>
+        <p class="text-amber-600 dark:text-amber-400">This affects online data and cannot be undone.</p>
       </div>
       <div class="flex justify-end pt-2 border-t border-gray-200 dark:border-gray-700">
         <button type="button" class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" onclick="mhsCloseActionHelp()">Close</button>
@@ -1179,12 +1226,57 @@
     }
   };
 
+  // --- Delete saved game data (online, via the save service) ---
+  // Unlike Clear/Reset (local device only), these delete the player's saved
+  // state/settings from the online save service so the data is gone before the
+  // next unit launches. StrataHub calls the save-service delete API server-side.
+  function doDeleteSaveData(target, label, authData) {
+    var body = {};
+    if (authData && authData.auth_token) body.auth_token = authData.auth_token;
+    if (authData && authData.keyword) body.keyword = authData.keyword;
+
+    fetch('/missionhydrosci/api/save-data/' + target + '/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      body: JSON.stringify(body)
+    })
+    .then(function(resp) {
+      if (!resp.ok) {
+        return resp.text().then(function(t) { throw new Error(t.trim() || ('HTTP ' + resp.status)); });
+      }
+      return resp.json();
+    })
+    .then(function(data) {
+      var n = data.deleted || 0;
+      alert('Deleted saved ' + label + '. (' + n + ' record' + (n === 1 ? '' : 's') + ' removed.)');
+    })
+    .catch(function(err) {
+      alert('Failed to delete saved ' + label + ': ' + err.message);
+    });
+  }
+
+  function mhsDeleteSaveData(target, label) {
+    var title = 'Delete saved ' + label;
+    var desc = 'This permanently deletes the online saved ' + label + '. It cannot be undone.';
+    if (isMember && memberAuthMode !== 'trust') {
+      showAuthModal(title, desc, function(authData) { doDeleteSaveData(target, label, authData); });
+    } else {
+      if (!confirm(desc + ' Continue?')) return;
+      doDeleteSaveData(target, label, {});
+    }
+  }
+
+  window.mhsDeleteSavedState = function() { mhsDeleteSaveData('state', 'state'); };
+  window.mhsDeleteSavedSettings = function() { mhsDeleteSaveData('settings', 'settings'); };
+
   // --- Help modal for the Manage-downloads actions ---
   // Named "ActionHelp" to avoid colliding with mhsOpenHelp/mhsCloseHelp,
   // which belong to the PWA install help modal (#help-modal) further down.
   var ACTION_HELP_TITLES = {
     'clear-all': 'Clear All Downloads',
-    'reset-all': 'Reset All MHS Data'
+    'reset-all': 'Reset All MHS Data',
+    'delete-state': 'Delete Saved State',
+    'delete-settings': 'Delete Saved Settings'
   };
 
   window.mhsShowActionHelp = function(topic) {
@@ -1194,6 +1286,8 @@
     title.textContent = ACTION_HELP_TITLES[topic];
     document.getElementById('mhs-help-clear-all').classList.toggle('hidden', topic !== 'clear-all');
     document.getElementById('mhs-help-reset-all').classList.toggle('hidden', topic !== 'reset-all');
+    document.getElementById('mhs-help-delete-state').classList.toggle('hidden', topic !== 'delete-state');
+    document.getElementById('mhs-help-delete-settings').classList.toggle('hidden', topic !== 'delete-settings');
     modal.classList.remove('hidden');
   };
 
