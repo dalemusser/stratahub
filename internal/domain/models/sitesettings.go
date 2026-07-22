@@ -40,6 +40,12 @@ type SiteSettings struct {
 	MHSMemberAuth        string `bson:"mhs_member_auth,omitempty" json:"mhs_member_auth,omitempty"`
 	MHSMemberAuthKeyword string `bson:"mhs_member_auth_keyword,omitempty" json:"mhs_member_auth_keyword,omitempty"`
 
+	// MHSStaffUnlockMinutes is how long (in minutes) a staff unlock of the MHS
+	// manage page stays active for a member, sliding on each gated action.
+	// Only relevant when MHSMemberAuth is "keyword" or "staffauth".
+	// 0 (unset) means the default; see GetMHSStaffUnlockDuration.
+	MHSStaffUnlockMinutes int `bson:"mhs_staff_unlock_minutes,omitempty" json:"mhs_staff_unlock_minutes,omitempty"`
+
 	// MHS active collection — per-workspace selection of which unit collection members see
 	MHSActiveCollectionID *primitive.ObjectID `bson:"mhs_active_collection_id,omitempty" json:"mhs_active_collection_id,omitempty"`
 
@@ -99,6 +105,20 @@ func (s *SiteSettings) GetMHSMemberAuth() string {
 		return "staffauth"
 	}
 	return s.MHSMemberAuth
+}
+
+// DefaultMHSStaffUnlockMinutes is the staff-unlock duration used when a
+// workspace has not configured one.
+const DefaultMHSStaffUnlockMinutes = 10
+
+// GetMHSStaffUnlockDuration returns how long a staff unlock of the MHS manage
+// page stays active, sliding on each gated action. Defaults to
+// DefaultMHSStaffUnlockMinutes when unset or invalid.
+func (s *SiteSettings) GetMHSStaffUnlockDuration() time.Duration {
+	if s.MHSStaffUnlockMinutes <= 0 {
+		return DefaultMHSStaffUnlockMinutes * time.Minute
+	}
+	return time.Duration(s.MHSStaffUnlockMinutes) * time.Minute
 }
 
 // DefaultSiteName is the default site name used when settings don't exist.

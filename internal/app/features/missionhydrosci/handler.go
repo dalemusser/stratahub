@@ -42,6 +42,8 @@ type Handler struct {
 	BuildStore        *mhsbuilds.Store
 	SessionMgr        *auth.SessionManager
 	StaffAuthVerifier *staffauth.Verifier
+	UnlockStore       *staffauth.UnlockStore
+	authThrottle      *authThrottle // per-member backoff on failed member-auth attempts
 }
 
 // NewHandler constructs a new Handler.
@@ -58,5 +60,7 @@ func NewHandler(db *mongo.Database, errLog *uierrors.ErrorLogger, cdnBaseURL str
 		CollectionStore:   mhscollections.New(db),
 		BuildStore:        mhsbuilds.New(db),
 		SessionMgr:        sm,
+		UnlockStore:       staffauth.NewUnlockStore(db),
+		authThrottle:      newAuthThrottle(),
 	}
 }

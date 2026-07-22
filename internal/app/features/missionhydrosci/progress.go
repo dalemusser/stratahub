@@ -85,8 +85,19 @@ func (h *Handler) HandleSetToUnit(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
-	validUnits := map[string]bool{"unit1": true, "unit2": true, "unit3": true, "unit4": true, "unit5": true}
-	if !validUnits[req.Unit] {
+
+	// Validate the requested unit against this user's resolved manifest rather
+	// than a fixed unit1..unitN list. Collections are data-driven, so the unit
+	// set can change (e.g. a future unit6) — the manifest is the source of truth.
+	manifest, _ := h.resolveManifest(r)
+	validUnit := false
+	for _, u := range manifest.Units {
+		if u.ID == req.Unit {
+			validUnit = true
+			break
+		}
+	}
+	if !validUnit {
 		http.Error(w, "invalid unit", http.StatusBadRequest)
 		return
 	}

@@ -10,7 +10,6 @@ import (
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson/primitive"
-	"go.uber.org/zap"
 )
 
 // ServePlay renders the game launcher page for a specific unit.
@@ -56,8 +55,7 @@ func (h *Handler) ServePlay(w http.ResponseWriter, r *http.Request) {
 			if err == nil {
 				progress, err := h.ProgressStore.GetOrCreate(r.Context(), wsID, userOID)
 				if err != nil {
-					h.Log.Error("failed to check progress for unit gate", zap.Error(err))
-					http.Error(w, "internal error", http.StatusInternalServerError)
+					h.ErrLog.LogServerError(w, r, "load MHS progress failed (play gate)", err, "Couldn't load Mission HydroSci. Please try again.", "/missionhydrosci/units")
 					return
 				}
 

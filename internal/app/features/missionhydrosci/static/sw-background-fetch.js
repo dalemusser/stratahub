@@ -15,12 +15,81 @@ function parseFetchId(fetchId) {
   return { unitId: fetchId.replace('missionhydrosci-', ''), version: null };
 }
 
+// Fetch IDs whose progress broadcaster is attached in THIS SW lifetime. The
+// SW can be terminated and restarted mid-download — the set resets with it,
+// and the pages' periodic 'attachProgress' keepalive re-attaches.
+var attachedProgressIds = new Set();
+
 /**
- * Starts a background fetch for a unit's files.
- * Called from the SW message handler as a fallback when page-initiated fetch isn't available.
+ * Attaches a progress listener that broadcasts byte-level progress to every
+ * client. Chrome streams live byte counts only to the context that created a
+ * Background Fetch — a page context is lost on any reload or navigation,
+ * freezing its display — so the SW (the one context shared by all pages)
+ * owns creation and progress broadcasting. Idempotent per SW lifetime.
+ */
+function attachProgressBroadcast(bgFetch, unitId, version) {
+  if (attachedProgressIds.has(bgFetch.id)) return;
+  attachedProgressIds.add(bgFetch.id);
+  bgFetch.addEventListener('progress', function() {
+    var total = bgFetch.downloadTotal || 0;
+    if (total > 0) {
+      broadcastStatus(unitId, 'downloading', {
+        downloaded: bgFetch.downloaded,
+        downloadTotal: total,
+        percent: Math.round((bgFetch.downloaded / total) * 100),
+        version: version
+      });
+    }
+  });
+}
+
+/**
+ * (Re)attaches progress broadcasters to every in-flight MHS Background
+ * Fetch. Sent periodically by pages while a download is active: the message
+ * doubles as an SW keepalive so the listeners keep firing, and after an SW
+ * restart it restores the listeners the restart dropped.
+ */
+async function reattachAllProgress() {
+  if (!self.registration.backgroundFetch) return;
+  try {
+    var ids = await self.registration.backgroundFetch.getIds();
+    for (var i = 0; i < ids.length; i++) {
+      if (!ids[i].startsWith('missionhydrosci-')) continue;
+      var bgFetch = await self.registration.backgroundFetch.get(ids[i]);
+      if (!bgFetch || bgFetch.result !== '') continue;
+      var parsed = parseFetchId(ids[i]);
+      attachProgressBroadcast(bgFetch, parsed.unitId, parsed.version);
+    }
+  } catch (err) {
+    // Best effort
+  }
+}
+
+/**
+ * Starts a background fetch for a unit's files. Called from the SW message
+ * handler — pages request downloads here (rather than creating the fetch
+ * themselves) so the SW is the creating context and can broadcast live
+ * progress to every page; see attachProgressBroadcast.
  */
 async function startBackgroundFetch(unitId, version, files, cdnBaseUrl, title) {
   var fetchId = 'missionhydrosci-' + unitId + '-v' + version;
+
+  // SW-side dedupe across the two download paths. The SW is the only context
+  // shared by every page and it survives page reloads, so this is the one
+  // place the paths can be deduped reliably: if a sequential fallback loop is
+  // already downloading this unit+version, adopt it (its broadcasts already
+  // reach every page) instead of starting a concurrent Background Fetch of the
+  // same files. Without this, a page that sends 'download' while the SW is
+  // mid-fallback — or a shift-reload where the page can't see the loop via
+  // getActiveFallbacks — starts a second full download over the same link.
+  // (The reverse direction is intentionally NOT deduped: fallbackFetch must be
+  // free to run even when a Background Fetch exists, because the prefer-fallback
+  // path deliberately escapes a paused/zero-byte Background Fetch.)
+  var fallbackKey = unitId + '-v' + version;
+  var activeFallback = fallbackRuns.get(fallbackKey);
+  if (activeFallback && !activeFallback.aborter.signal.aborted) {
+    return true;
+  }
 
   var requests = files.map(function(file) {
     return new Request(cdnBaseUrl + '/' + file.path, { mode: 'cors' });
@@ -32,7 +101,17 @@ async function startBackgroundFetch(unitId, version, files, cdnBaseUrl, title) {
     // Check for an existing fetch with the same ID
     var existing = await self.registration.backgroundFetch.get(fetchId);
     if (existing && existing.result === '') {
-      // Active fetch already in progress — let it continue
+      // Active fetch already in progress — adopt it: (re)attach the progress
+      // broadcaster and rebroadcast its current state.
+      attachProgressBroadcast(existing, unitId, version);
+      if (existing.downloadTotal > 0) {
+        broadcastStatus(unitId, 'downloading', {
+          downloaded: existing.downloaded,
+          downloadTotal: existing.downloadTotal,
+          percent: Math.round((existing.downloaded / existing.downloadTotal) * 100),
+          version: version
+        });
+      }
       return true;
     }
 
@@ -43,18 +122,8 @@ async function startBackgroundFetch(unitId, version, files, cdnBaseUrl, title) {
       downloadTotal: totalSize
     });
 
-    broadcastStatus(unitId, 'downloading', { downloadTotal: totalSize });
-
-    bgFetch.addEventListener('progress', function() {
-      if (totalSize > 0) {
-        var percent = Math.round((bgFetch.downloaded / totalSize) * 100);
-        broadcastStatus(unitId, 'downloading', {
-          downloaded: bgFetch.downloaded,
-          downloadTotal: totalSize,
-          percent: percent
-        });
-      }
-    });
+    broadcastStatus(unitId, 'downloading', { downloadTotal: totalSize, downloaded: 0, percent: 0, version: version });
+    attachProgressBroadcast(bgFetch, unitId, version);
 
     return true;
   } catch (err) {
@@ -136,9 +205,9 @@ async function fetchAndCacheFile(cache, cacheKey, url, onBytes, signal) {
   if (headers.get('content-encoding')) {
     // response.body is the decoded stream — encoding headers no longer apply.
     // Note: Content-Encoding is not a CORS-safelisted response header, so for
-    // cross-origin CDN responses this branch cannot see it; the size verifiers
-    // compensate by falling back to counting stored bytes on a header/manifest
-    // size mismatch (see verifyLargestFileSize / _verifyLargestFile).
+    // cross-origin CDN responses this branch cannot see it; the page-side size
+    // verifier compensates by falling back to counting stored bytes on a
+    // header/manifest size mismatch (see mhs-delivery.js _verifyLargestFile).
     headers.delete('content-encoding');
     headers.delete('content-length');
   }
@@ -330,8 +399,16 @@ async function handleBackgroundFetchSuccess(event) {
       if (idx !== -1) {
         var relativePath = pathname.substring(idx + 1); // "unit1/v1.0.0/Build/unit1.loader.js"
         var cacheKey = '/missionhydrosci/content/' + relativePath;
-        await cache.put(cacheKey, response.clone());
+        // Put the response directly — it isn't read again, so cloning here only
+        // tees the body and buffers the whole (multi-hundred-MB) file in SW
+        // memory with no backpressure, on exactly the low-end devices the OS
+        // kills first.
+        await cache.put(cacheKey, response);
         cached++;
+      } else {
+        // Couldn't map this record to a cache key — count it as not cached so
+        // we don't later declare the unit complete with a file missing.
+        console.error('Background Fetch record has no unit marker, not cached:', record.request.url);
       }
     } catch (err) {
       console.error('Failed to cache record:', record.request.url, err);
@@ -339,6 +416,22 @@ async function handleBackgroundFetchSuccess(event) {
   }
 
   console.log('Background Fetch success:', bgFetch.id, '- cached', cached, 'of', records.length, 'files');
+
+  // Only "Ready to play" if EVERY file actually made it into the cache. A
+  // per-record cache.put can fail mid-copy (QuotaExceededError is the #1 field
+  // failure), and an unmappable record is skipped above — broadcasting 'cached'
+  // then would show "Ready to play" over an incomplete unit, and the gap would
+  // surface only later, worst case offline where the CDN-redirect fallback
+  // can't help. Report 'error' so the unit stays not-ready and can be retried.
+  if (records.length === 0 || cached !== records.length) {
+    console.error('Background Fetch incomplete cache:', cached, 'of', records.length, '— reporting error');
+    broadcastStatus(unitId, 'error', {
+      version: version,
+      error: 'Download finished but some files could not be saved (storage may be full). Try again or clear space.'
+    });
+    return;
+  }
+
   broadcastStatus(unitId, 'cached', { version: version });
 }
 

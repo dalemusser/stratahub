@@ -11,6 +11,7 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -39,6 +40,7 @@ type settingsVM struct {
 	CurrentUserMethod     string // Current user's auth method (for protection)
 	MHSMemberAuth         string // trust, keyword, staffauth
 	MHSMemberAuthKeyword  string // keyword value (only when mode is "keyword")
+	MHSStaffUnlockMinutes int    // staff unlock duration for the manage page (minutes)
 	EnableClaudeSummaries bool   // AI student summaries toggle
 	ClaudeModel           string // Selected Claude model ID
 	Error                 string
@@ -109,11 +111,21 @@ func (h *Handler) ServeSettings(w http.ResponseWriter, r *http.Request) {
 		CurrentUserMethod:     currentUserMethod,
 		MHSMemberAuth:         settings.GetMHSMemberAuth(),
 		MHSMemberAuthKeyword:  settings.MHSMemberAuthKeyword,
+		MHSStaffUnlockMinutes: displayUnlockMinutes(settings.MHSStaffUnlockMinutes),
 		EnableClaudeSummaries: settings.EnableClaudeSummaries,
 		ClaudeModel:           settings.ClaudeModel,
 	}
 
 	h.render(w, r, vm)
+}
+
+// displayUnlockMinutes substitutes the default when the setting is unset so
+// the form shows the effective value.
+func displayUnlockMinutes(minutes int) int {
+	if minutes <= 0 {
+		return models.DefaultMHSStaffUnlockMinutes
+	}
+	return minutes
 }
 
 // HandleSettings processes the settings form submission.
@@ -148,6 +160,7 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	authMethods := r.Form["auth_methods"]
 	mhsMemberAuth := strings.TrimSpace(r.FormValue("mhs_member_auth"))
 	mhsMemberAuthKeyword := strings.TrimSpace(r.FormValue("mhs_member_auth_keyword"))
+	mhsStaffUnlockStr := strings.TrimSpace(r.FormValue("mhs_staff_unlock_minutes"))
 	enableClaudeSummaries := r.FormValue("enable_claude_summaries") != ""
 	claudeModel := strings.TrimSpace(r.FormValue("claude_model"))
 
@@ -182,6 +195,17 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	default:
 		h.renderWithError(w, r, wsID, "Invalid MHS member authorization mode.")
 		return
+	}
+
+	// Validate MHS staff unlock duration (minutes). Empty keeps the default.
+	mhsStaffUnlockMinutes := 0
+	if mhsStaffUnlockStr != "" {
+		n, err := strconv.Atoi(mhsStaffUnlockStr)
+		if err != nil || n < 1 || n > 120 {
+			h.renderWithError(w, r, wsID, "Staff unlock duration must be a number of minutes between 1 and 120.")
+			return
+		}
+		mhsStaffUnlockMinutes = n
 	}
 
 	// Get current user's auth method for protection check
@@ -279,6 +303,7 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 		EnabledAuthMethods:    authMethods,
 		MHSMemberAuth:         mhsMemberAuth,
 		MHSMemberAuthKeyword:  mhsMemberAuthKeyword,
+		MHSStaffUnlockMinutes: mhsStaffUnlockMinutes,
 		EnableClaudeSummaries: enableClaudeSummaries,
 		ClaudeModel:           claudeModel,
 		UpdatedByID:           &memberID,
@@ -346,6 +371,7 @@ func (h *Handler) renderWithError(w http.ResponseWriter, r *http.Request, wsID p
 		CurrentUserMethod:     currentUserMethod,
 		MHSMemberAuth:         settings.GetMHSMemberAuth(),
 		MHSMemberAuthKeyword:  settings.MHSMemberAuthKeyword,
+		MHSStaffUnlockMinutes: displayUnlockMinutes(settings.MHSStaffUnlockMinutes),
 		EnableClaudeSummaries: settings.EnableClaudeSummaries,
 		ClaudeModel:           settings.ClaudeModel,
 		Error:                 errMsg,

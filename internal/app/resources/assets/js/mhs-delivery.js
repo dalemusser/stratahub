@@ -41,6 +41,7 @@
     this._unitCachePrefix = opts.unitCachePrefix || DEFAULT_UNIT_CACHE_PREFIX;
     this._fetchIdPrefix = opts.fetchIdPrefix || DEFAULT_FETCH_ID_PREFIX;
     this.manifest = null;
+    this.manifestLoaded = false; // true only after a fresh, successful manifest fetch
     this.swRegistration = null;
     this.channel = null;
     this.statusCallbacks = [];
@@ -49,7 +50,38 @@
     this._downloadMonitors = {}; // unitId -> intervalId for stall detection
     this._stallState = {}; // unitId -> { lastProgressAt, maxDownloaded, stalled, fallback?, successSince?, successReconciled? }
     this._retryInFlight = {}; // unitId -> true while retryDownload's awaits are pending
+    this._progressKeepalive = null; // interval handle for the SW attachProgress keepalive
   }
+
+  var PROGRESS_KEEPALIVE_MS = 20000;
+
+  /**
+   * While any download is active, periodically asks the SW to (re)attach its
+   * progress broadcasters ('attachProgress'). The message doubles as an SW
+   * keepalive: it wakes or extends the worker so its byte-progress listeners
+   * keep firing, and after an SW restart it restores the listeners the
+   * restart dropped. Stops itself when no downloads remain active.
+   */
+  MHSDeliveryManager.prototype._startProgressKeepalive = function(reg) {
+    if (this._progressKeepalive) return;
+    var self = this;
+    var swAtStart = reg && reg.active;
+    this._progressKeepalive = setInterval(function() {
+      if (Object.keys(self._activeDownloads).length === 0) {
+        clearInterval(self._progressKeepalive);
+        self._progressKeepalive = null;
+        return;
+      }
+      try {
+        var target = (self.swRegistration && self.swRegistration.active) ||
+          swAtStart ||
+          (navigator.serviceWorker && navigator.serviceWorker.controller);
+        if (target) target.postMessage({ action: 'attachProgress' });
+      } catch (err) {
+        // Best effort
+      }
+    }, PROGRESS_KEEPALIVE_MS);
+  };
 
   /**
    * Initializes the delivery manager: registers SW, fetches manifest,
@@ -222,7 +254,12 @@
    */
   MHSDeliveryManager.prototype.pruneStaleCaches = async function() {
     if (!('caches' in window)) return;
-    if (!this.manifest || !this.manifest.units) return;
+    // Prune only from a manifest we actually loaded this session. A failed
+    // fetch leaves an empty units array (or a stale one flagged not-loaded);
+    // pruning from either would wipe valid downloads. An empty manifest with
+    // no active collection is also not a mandate to delete everything.
+    if (!this.manifestLoaded) return;
+    if (!this.manifest || !this.manifest.units || this.manifest.units.length === 0) return;
 
     var valid = {};
     for (var i = 0; i < this.manifest.units.length; i++) {
@@ -326,10 +363,26 @@
   MHSDeliveryManager.prototype.refreshManifest = async function() {
     try {
       var response = await fetch(this._manifestUrl);
-      this.manifest = await response.json();
+      if (!response.ok) throw new Error('manifest HTTP ' + response.status);
+      var parsed = await response.json();
+      if (!parsed || !Array.isArray(parsed.units)) {
+        throw new Error('manifest missing units array');
+      }
+      this.manifest = parsed;
+      this.manifestLoaded = true;
     } catch (err) {
       console.error('Failed to fetch MHS content manifest:', err);
-      this.manifest = { cdnBaseUrl: '', units: [] };
+      // Do NOT let a transient failure look like "the game has no units."
+      // Reading an empty manifest as authoritative would prune every
+      // downloaded unit cache (offline data loss — the feature's core
+      // promise). Keep any manifest we already have; only fall back to an
+      // empty one when we have nothing to serve. Either way, mark the
+      // manifest NOT loaded so destructive operations (pruneStaleCaches,
+      // the reconnect abort branch) stand down until a real manifest loads.
+      if (!this.manifest) {
+        this.manifest = { cdnBaseUrl: '', units: [] };
+      }
+      this.manifestLoaded = false;
     }
   };
 
@@ -471,6 +524,49 @@
   var PROGRESS_POLL_MS = 5000;      // how often to re-obtain a fresh registration
   var STALL_THRESHOLD_MS = 150000;  // no byte progress for ~2.5 min (tab visible) => stalled
   var SUCCESS_BROADCAST_GRACE_MS = 45000; // BG fetch success but no 'cached' broadcast => reconcile
+  var FIRST_BYTE_TIMEOUT_MS = 90000; // BG fetch with ZERO bytes after 90s => switch to fallback
+  var PREFER_FALLBACK_KEY = 'mhs-prefer-fallback-until'; // localStorage: skip BG fetch until this time
+  MHSDeliveryManager.PREFER_FALLBACK_KEY = PREFER_FALLBACK_KEY; // exported so Reset can purge it
+
+  /**
+   * Remembers (for 24h) that Background Fetch doesn't work on this device —
+   * Chrome pauses background fetches indefinitely under device conditions
+   * like a metered connection or battery saver (seen on some Chromebooks).
+   * While set, downloads go straight to the SW sequential fallback, which
+   * uses regular fetches and is not subject to download-service pausing.
+   * With `set`, records the preference; without, reports whether it's active.
+   */
+  MHSDeliveryManager.prototype._preferFallback = function(set) {
+    try {
+      if (set) {
+        localStorage.setItem(PREFER_FALLBACK_KEY, String(Date.now() + 24 * 60 * 60 * 1000));
+        return true;
+      }
+      return Date.now() < parseInt(localStorage.getItem(PREFER_FALLBACK_KEY) || '0', 10);
+    } catch (err) {
+      return false;
+    }
+  };
+
+  /**
+   * Starts the SW sequential fallback download for a unit and its watchdog.
+   * Returns false when the SW isn't controlling the page (nothing posted).
+   */
+  MHSDeliveryManager.prototype._startFallbackDownload = function(unitId, unit) {
+    if (!navigator.serviceWorker || !navigator.serviceWorker.controller) return false;
+    navigator.serviceWorker.controller.postMessage({
+      action: 'fallbackDownload',
+      unitId: unit.id,
+      version: unit.version,
+      files: unit.files,
+      cdnBaseUrl: this.manifest.cdnBaseUrl,
+      title: 'Downloading ' + unit.title
+    });
+    // Watchdog: there is no registration to poll on this path, so watch the
+    // broadcast stream for silence instead.
+    this._monitorFallbackDownload(unitId, unit);
+    return true;
+  };
 
   /**
    * Reports download progress for a unit. This is the single owner of
@@ -514,6 +610,7 @@
     }
 
     var state = {
+      startedAt: Date.now(), // fixed start mark — lastProgressAt is reset by tab switches
       lastProgressAt: Date.now(),
       maxDownloaded: 0,
       stalled: false
@@ -592,6 +689,19 @@
     }
 
     if (!fresh) {
+      // No registration. The SW may have fallen back to its sequential
+      // download path (its Background Fetch failed to start) — adopt that
+      // instead of declaring the download dead.
+      try {
+        var fbKeys = await this._getActiveFallbacks();
+        if (fbKeys.indexOf(unit.id + '-v' + unit.version) !== -1) {
+          state.fallback = true; // switch to broadcast-liveness monitoring
+          this._maybeFireStalled(unitId, unit);
+          return;
+        }
+      } catch (fbErr) {
+        // Query unavailable — fall through to the disappeared handling
+      }
       // Fetch disappeared without a success/failure event — e.g. the user
       // canceled it from the browser's download UI (no backgroundfetch*
       // event fires for that). Clear tracking and report the true cache
@@ -654,6 +764,52 @@
     // Progress isn't tracked while hidden — just keep the stall timer current.
     if (document.visibilityState === 'hidden') {
       state.lastProgressAt = Date.now();
+      return;
+    }
+
+    // Chrome streams live byte counts only to the browsing context that
+    // STARTED the fetch. A page that reconnected after a reload/navigation
+    // sees a frozen snapshot instead — but completed records are visible
+    // from any context, so use their summed manifest sizes as a floor.
+    // Reconnected pages then advance at file boundaries rather than
+    // freezing at the reconnect-time value.
+    try {
+      var records = await fresh.matchAll();
+      var completedBytes = 0;
+      for (var r = 0; r < records.length; r++) {
+        var settled = await Promise.race([
+          records[r].responseReady.then(function() { return true; }, function() { return false; }),
+          new Promise(function(resolve) { setTimeout(function() { resolve(false); }, 30); })
+        ]);
+        if (!settled) continue;
+        var recUrl = records[r].request.url;
+        for (var f = 0; f < unit.files.length; f++) {
+          if (recUrl.indexOf(unit.files[f].path) !== -1) {
+            completedBytes += unit.files[f].size || 0;
+            break;
+          }
+        }
+      }
+      if (completedBytes > downloaded) downloaded = completedBytes;
+    } catch (recErr) {
+      // matchAll unavailable or transient — the byte counter alone is fine
+    }
+
+    // A Background Fetch that has delivered ZERO bytes after a generous
+    // startup window is not downloading: on some devices Chrome pauses
+    // background fetches indefinitely (metered connection, battery saver —
+    // observed on Chromebooks, where the OS shows its own "Paused
+    // Downloading…" notification). Nothing has been downloaded, so nothing
+    // is lost: abort it and switch to the SW sequential fallback, which
+    // uses regular fetches and is immune to download-service pausing.
+    if (downloaded === 0 && fresh.result === '' &&
+        Date.now() - state.startedAt > FIRST_BYTE_TIMEOUT_MS &&
+        navigator.serviceWorker && navigator.serviceWorker.controller) {
+      console.warn('Background Fetch delivered no bytes in ' +
+        Math.round(FIRST_BYTE_TIMEOUT_MS / 1000) + 's — switching to fallback download:', fetchId);
+      this._preferFallback(true);
+      try { await fresh.abort(); } catch (abortErr) { /* best effort */ }
+      this._startFallbackDownload(unitId, unit); // resets the stall monitor
       return;
     }
 
@@ -744,6 +900,22 @@
       }
       delete this._stallState[unitId];
 
+      // A retry follows a stall. On devices where Chrome pauses Background
+      // Fetches (metered connection, battery saver — seen on Chromebooks),
+      // starting another one just pauses again; the SW sequential fallback
+      // uses regular fetches and is immune to that, so retries prefer it
+      // (and remember the preference). Falls through to the normal path
+      // when the SW isn't controlling the page.
+      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+        this._preferFallback(true);
+        this._activeDownloads[unitId] = true;
+        var totalSize = unit.totalSize || unit.files.reduce(function(sum, f) { return sum + f.size; }, 0);
+        this._fireStatus(unitId, 'downloading', { percent: 0, downloaded: 0, downloadTotal: totalSize });
+        this._startFallbackDownload(unitId, unit);
+        this._startProgressKeepalive(this.swRegistration);
+        return;
+      }
+
       return await this.downloadUnit(unitId);
     } finally {
       delete this._retryInFlight[unitId];
@@ -791,14 +963,21 @@
             // Reconnect: set active tracking, attach listeners (which seeds
             // the stall state), then report progress through the shared
             // monotonic/sticky guard like every other progress source.
+            // This page's view of the byte counter may be a frozen snapshot
+            // (Chrome streams live bytes only to the creating context), so
+            // also ask the SW to (re)attach its broadcaster and keep it fed.
             this._activeDownloads[unitId] = true;
             this._attachBGFetchListeners(unitId, bgFetch, unit);
             this._reportDownloadProgress(unitId, unit, bgFetch.downloaded || 0);
+            if (reg.active) reg.active.postMessage({ action: 'attachProgress' });
+            this._startProgressKeepalive(reg);
             console.log('Reconnected to Background Fetch:', ids[i]);
-          } else {
+          } else if (this.manifestLoaded) {
             // No manifest unit at this unit+version — genuinely stale.
             // Abort it: it can only produce an unwanted old-version cache,
-            // and while in flight it blocks pruning of that cache.
+            // and while in flight it blocks pruning of that cache. Only do
+            // this against a real manifest: if the manifest failed to load,
+            // "no match" is meaningless and would abort a healthy download.
             console.log('Aborting stale Background Fetch (no manifest unit+version match):', ids[i]);
             await bgFetch.abort();
           }
@@ -884,12 +1063,33 @@
           }
 
           if (bgFetch.result === 'success') {
-            // Completed while hidden — clear tracking so checkAllCacheStatus fires 'cached'
-            delete self._activeDownloads[unitId];
-            if (self._downloadMonitors[unitId]) {
-              clearInterval(self._downloadMonitors[unitId]);
-              delete self._downloadMonitors[unitId];
-            }
+            // Completed while hidden, but the SW may STILL be copying records
+            // into the cache (a large unit on slow storage takes many seconds).
+            // Do NOT clear tracking yet: the sibling checkAllCacheStatus() runs
+            // concurrently on this same visibility change and skips units in
+            // _activeDownloads — clearing here lets it see the not-yet-complete
+            // cache, fire 'partial', and trigger a DUPLICATE download via
+            // self-heal. Only finish when the cache is actually complete;
+            // otherwise leave tracking + the monitor in place and let
+            // _pollDownloadOnce reconcile with its success grace.
+            return self._checkUnitCache(unit).then(function(cacheStatus) {
+              if (cacheStatus === 'cached') {
+                delete self._activeDownloads[unitId];
+                if (self._downloadMonitors[unitId]) {
+                  clearInterval(self._downloadMonitors[unitId]);
+                  delete self._downloadMonitors[unitId];
+                }
+                self._fireStatus(unitId, 'cached', {});
+              } else if (self._downloadMonitors[unitId]) {
+                // Still copying — start the poller's success-grace clock.
+                var stNow = self._stallState[unitId];
+                if (stNow && !stNow.successSince) stNow.successSince = Date.now();
+              } else {
+                // No monitor left to reconcile — re-arm one so the unit can't
+                // sit at "Downloading" forever.
+                self._monitorDownload(unitId, unit);
+              }
+            });
           } else if (bgFetch.result === 'failure') {
             // Failed while hidden — clear tracking and fire error
             delete self._activeDownloads[unitId];
@@ -961,54 +1161,55 @@
         if (existing && existing.result === '') {
           // Active fetch already in progress — reconnect instead of
           // aborting. Attach first (seeds the stall state), then report
-          // through the shared monotonic/sticky guard.
+          // through the shared monotonic/sticky guard. Ask the SW to
+          // (re)attach its progress broadcaster too — this page's own view
+          // of the byte counter may be a frozen snapshot (see below).
           this._attachBGFetchListeners(unitId, existing, unit);
           this._reportDownloadProgress(unitId, unit, existing.downloaded || 0);
+          if (reg.active) reg.active.postMessage({ action: 'attachProgress' });
+          this._startProgressKeepalive(reg);
           console.log('Reconnected to existing Background Fetch:', fetchId);
           return;
         }
       }
 
-      // No existing fetch — start a new Background Fetch
-      if (reg.backgroundFetch) {
-        var requests = unit.files.map(function(file) {
-          return new Request(this.manifest.cdnBaseUrl + '/' + file.path, { mode: 'cors' });
-        }.bind(this));
-
-        try {
-          var bgFetch = await reg.backgroundFetch.fetch(fetchId, requests, {
-            title: 'Downloading ' + unit.title,
-            icons: [{ sizes: '192x192', src: '/assets/mhs/icon-192.png', type: 'image/png' }],
-            // Real total makes the browser's native download indicator
-            // determinate instead of an endless spinner.
-            downloadTotal: totalSize
-          });
-
-          this._attachBGFetchListeners(unitId, bgFetch, unit);
-          console.log('Started Background Fetch:', fetchId);
-          return;
-        } catch (bgErr) {
-          console.warn('Background Fetch failed to start, falling back to SW fetch:', bgErr);
-          // Fall through to SW sequential fetch below
-        }
+      // Devices where Chrome pauses Background Fetches (metered connection,
+      // battery saver — seen on some Chromebooks) are remembered for a day:
+      // go straight to the SW sequential fallback there.
+      if (this._preferFallback() && this._startFallbackDownload(unitId, unit)) {
+        this._startProgressKeepalive(reg);
+        console.log('Using SW fallback download (Background Fetch pauses on this device):', fetchId);
+        return;
       }
 
-      // Fallback: use SW sequential fetch
-      if (navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({
-          action: 'fallbackDownload',
+      // No existing fetch — have the SERVICE WORKER start the Background
+      // Fetch. Chrome streams live byte progress only to the context that
+      // created the fetch; a page context is lost on any reload/navigation,
+      // freezing its displayed percentage. The SW is shared by every page
+      // and broadcasts progress to all of them; the keepalive below keeps
+      // it alive while the download runs.
+      if (reg.backgroundFetch && reg.active) {
+        reg.active.postMessage({
+          action: 'download',
           unitId: unit.id,
           version: unit.version,
           files: unit.files,
           cdnBaseUrl: this.manifest.cdnBaseUrl,
           title: 'Downloading ' + unit.title
         });
-        // Watchdog: there is no registration to poll on this path, so watch
-        // the broadcast stream for silence instead
-        this._monitorFallbackDownload(unitId, unit);
-      } else {
+        // Poll-based monitor for terminal states and the stall backstop;
+        // live percentages arrive via the SW's progress broadcasts.
+        this._monitorDownload(unitId, unit);
+        this._startProgressKeepalive(reg);
+        console.log('Requested SW Background Fetch:', fetchId);
+        return;
+      }
+
+      // Fallback: use SW sequential fetch
+      if (!this._startFallbackDownload(unitId, unit)) {
         throw new Error('Service worker not controlling the page. Please refresh and try again.');
       }
+      this._startProgressKeepalive(reg);
     } catch (err) {
       console.error('Download failed:', err);
       this._activeDownloads[unitId] = false;
@@ -1153,7 +1354,12 @@
   };
 
   /**
-   * Deletes cached data for all units NOT in the keepUnitIds array.
+   * Deletes cached data — and aborts stray in-flight downloads — for all
+   * units NOT in the keepUnitIds array. The download check matters on its
+   * own: Chrome persists paused Background Fetches across sessions, so a
+   * unit downloaded long ago (even one whose cache is empty) can carry a
+   * zombie "Downloading 0%" fetch that reconnect faithfully re-adopts on
+   * every page load until something aborts it.
    * @param {string[]} keepUnitIds - Unit IDs to keep cached
    */
   MHSDeliveryManager.prototype.autoCleanup = async function(keepUnitIds) {
@@ -1166,7 +1372,7 @@
       var unit = this.manifest.units[j];
       if (keepSet[unit.id]) continue;
       var status = await this._checkUnitCache(unit);
-      if (status === 'cached' || status === 'partial') {
+      if (status === 'cached' || status === 'partial' || this._activeDownloads[unit.id]) {
         await this.deleteUnit(unit.id);
       }
     }
@@ -1207,17 +1413,24 @@
 
   // Internal: fire all status callbacks
   MHSDeliveryManager.prototype._fireStatus = function(unitId, status, detail) {
-    // Fallback downloads have no registration to poll — their liveness
-    // signal is the SW's progress broadcasts. Feed the stall watchdog: any
-    // 'downloading' broadcast means the loop is alive.
+    // Feed the stall watchdog from 'downloading' broadcasts. For fallback
+    // loops any broadcast is a liveness signal (they fire at least once a
+    // second while alive). For Background Fetch downloads the SW broadcasts
+    // byte progress — strictly new bytes count as progress there, matching
+    // the poller's monotonic/sticky rules.
     if (status === 'downloading') {
-      var fbState = this._stallState[unitId];
-      if (fbState && fbState.fallback) {
-        fbState.lastProgressAt = Date.now();
-        if (detail && typeof detail.downloaded === 'number' && detail.downloaded > fbState.maxDownloaded) {
-          fbState.maxDownloaded = detail.downloaded;
+      var dlState = this._stallState[unitId];
+      if (dlState) {
+        var newBytes = detail && typeof detail.downloaded === 'number' &&
+          detail.downloaded > dlState.maxDownloaded;
+        if (newBytes) {
+          dlState.maxDownloaded = detail.downloaded;
+          dlState.lastProgressAt = Date.now();
+          dlState.stalled = false;
+        } else if (dlState.fallback) {
+          dlState.lastProgressAt = Date.now();
+          dlState.stalled = false;
         }
-        fbState.stalled = false;
       }
     }
 

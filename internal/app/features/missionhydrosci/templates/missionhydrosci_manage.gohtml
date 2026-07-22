@@ -1,0 +1,1027 @@
+{{ define "missionhydrosci_manage" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex flex-col h-full">
+  <!-- Header: standard Back button + title row, top-left (matches e.g. Add Group) -->
+  <div class="mb-4">
+    <div class="flex items-center">
+      <a href="/missionhydrosci/units"
+         class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 mr-2 no-loader"
+         title="Go back">
+        ← Back
+      </a>
+      <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Manage Mission HydroSci</h1>
+    </div>
+    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Tools for troubleshooting, testing, and data management.</p>
+  </div>
+
+  {{ if and .Gated (not .Unlocked) }}
+  <!-- ══════════════════ Staff authorization gate ══════════════════ -->
+  <section class="flex-1 min-w-0 flex flex-col">
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 flex-1">
+    <div class="max-w-lg mx-auto w-full">
+    <div class="flex items-center gap-2 mb-2">
+      <span class="text-lg">🔒</span>
+      <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">Staff authorization required</h2>
+    </div>
+    <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+      {{ if eq .MHSMemberAuth "keyword" }}
+      Enter the keyword to unlock the management tools on this device.
+      {{ else }}
+      A leader, coordinator, or admin must authorize access to the management tools on this device.
+      {{ end }}
+    </p>
+
+    <!-- Keyword step -->
+    <div id="gate-step-keyword" class="{{ if ne .MHSMemberAuth "keyword" }}hidden{{ end }}">
+      <input id="gate-keyword-input" type="password" autocomplete="off" aria-label="Keyword" placeholder="Enter keyword"
+             class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+    </div>
+
+    <!-- Staff auth step 1: login ID -->
+    <div id="gate-step-login" class="{{ if ne .MHSMemberAuth "staffauth" }}hidden{{ end }}">
+      <input id="gate-login-input" type="text" autocomplete="off" aria-label="Staff login ID" placeholder="Staff login ID"
+             class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+    </div>
+
+    <!-- Staff auth step 2: password -->
+    <div id="gate-step-password" class="hidden">
+      <p id="gate-staff-name" class="text-xs text-gray-600 dark:text-gray-400 mb-2"></p>
+      <input id="gate-password-input" type="password" autocomplete="off" aria-label="Staff password" placeholder="Enter password"
+             class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+    </div>
+
+    <!-- Staff auth step 2: email code -->
+    <div id="gate-step-email" class="hidden">
+      <p id="gate-email-name" class="text-xs text-gray-600 dark:text-gray-400 mb-2"></p>
+      <input id="gate-code-input" type="text" autocomplete="off" aria-label="Verification code" placeholder="Enter verification code" maxlength="6" inputmode="numeric"
+             class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500" />
+      <button type="button" id="gate-resend-btn" class="mt-1 text-xs text-blue-600 dark:text-blue-400 hover:underline hidden" onclick="mhsGateResend()">Resend code</button>
+    </div>
+
+    <div id="gate-error" role="alert" class="mt-2 text-xs text-red-600 dark:text-red-400 hidden"></div>
+    <div id="gate-loading" aria-live="polite" class="mt-2 text-xs text-gray-500 dark:text-gray-400 hidden">Verifying...</div>
+
+    <div class="flex justify-end gap-2 pt-4 mt-2 border-t border-gray-200 dark:border-gray-700">
+      <a href="/missionhydrosci/units" class="px-3 py-1.5 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 no-loader">Cancel</a>
+      <button type="button" id="gate-submit" class="px-3 py-1.5 bg-blue-600 text-white rounded text-sm hover:bg-blue-700" onclick="mhsGateSubmit()">
+        {{ if eq .MHSMemberAuth "keyword" }}Confirm{{ else }}Next{{ end }}
+      </button>
+    </div>
+    </div>
+  </div>
+  <!-- Bottom spacer: keeps a 16px gap below the last surface, matching the
+       px-4 side gutters. It must be a real box sized for the scrolled state:
+       Chrome drops the scroll container's own bottom padding from the
+       scrollable overflow, so only in-flow trailing space survives scrolling. -->
+  <div class="h-4 shrink-0" aria-hidden="true"></div>
+  </section>
+
+<script>
+(function() {
+  var csrfToken = '{{ .CSRFToken }}';
+  var gateMode = '{{ .MHSMemberAuth }}';   // 'keyword' or 'staffauth'
+  var gateStep = gateMode === 'keyword' ? 'keyword' : 'login';
+  var gateChallengeID = '';
+
+  function gateError(msg) {
+    var el = document.getElementById('gate-error');
+    el.textContent = msg;
+    el.classList.remove('hidden');
+    document.getElementById('gate-loading').classList.add('hidden');
+  }
+
+  function gateLoading(show) {
+    document.getElementById('gate-loading').classList.toggle('hidden', !show);
+    if (show) document.getElementById('gate-error').classList.add('hidden');
+  }
+
+  // Exchange validated credentials for a staff unlock, then reload into the page.
+  function gateUnlock(body) {
+    gateLoading(true);
+    fetch('/missionhydrosci/api/manage/unlock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      body: JSON.stringify(body)
+    }).then(function(resp) {
+      return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
+    }).then(function(result) {
+      if (!result.ok) { gateError(result.data.error || 'Authorization failed.'); return; }
+      window.location.reload();
+    }).catch(function() {
+      gateError('Authorization failed. Please try again.');
+    });
+  }
+
+  window.mhsGateSubmit = function() {
+    document.getElementById('gate-error').classList.add('hidden');
+
+    if (gateStep === 'keyword') {
+      var keyword = document.getElementById('gate-keyword-input').value;
+      if (!keyword) { gateError('Please enter the keyword.'); return; }
+      gateUnlock({ keyword: keyword });
+
+    } else if (gateStep === 'login') {
+      var loginID = document.getElementById('gate-login-input').value.trim();
+      if (!loginID) { gateError('Please enter a staff login ID.'); return; }
+      gateLoading(true);
+      fetch('/missionhydrosci/api/auth/start', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({ login_id: loginID })
+      }).then(function(resp) {
+        return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
+      }).then(function(result) {
+        gateLoading(false);
+        if (!result.ok) { gateError(result.data.error || 'Authentication failed.'); return; }
+        var data = result.data;
+        if (data.method === 'trust') {
+          gateUnlock({ auth_token: data.token });
+        } else if (data.method === 'password') {
+          gateChallengeID = data.challenge_id;
+          gateStep = 'password';
+          document.getElementById('gate-step-login').classList.add('hidden');
+          document.getElementById('gate-step-password').classList.remove('hidden');
+          document.getElementById('gate-staff-name').textContent = 'Enter password for ' + data.staff_name;
+          document.getElementById('gate-submit').textContent = 'Verify';
+          document.getElementById('gate-password-input').focus();
+        } else if (data.method === 'email') {
+          gateChallengeID = data.challenge_id;
+          gateStep = 'email';
+          document.getElementById('gate-step-login').classList.add('hidden');
+          document.getElementById('gate-step-email').classList.remove('hidden');
+          document.getElementById('gate-email-name').textContent = 'A verification code was sent to ' + data.staff_name + '\'s email.';
+          document.getElementById('gate-resend-btn').classList.remove('hidden');
+          document.getElementById('gate-submit').textContent = 'Verify';
+          document.getElementById('gate-code-input').focus();
+        }
+      }).catch(function() {
+        gateLoading(false);
+        gateError('Authentication failed. Please try again.');
+      });
+
+    } else if (gateStep === 'password' || gateStep === 'email') {
+      var inputID = gateStep === 'password' ? 'gate-password-input' : 'gate-code-input';
+      var credential = document.getElementById(inputID).value;
+      if (gateStep === 'email') credential = credential.trim();
+      if (!credential) { gateError(gateStep === 'password' ? 'Please enter the password.' : 'Please enter the verification code.'); return; }
+      gateLoading(true);
+      fetch('/missionhydrosci/api/auth/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({ challenge_id: gateChallengeID, credential: credential })
+      }).then(function(resp) {
+        return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
+      }).then(function(result) {
+        gateLoading(false);
+        if (!result.ok) { gateError(result.data.error || 'Verification failed.'); return; }
+        gateUnlock({ auth_token: result.data.token });
+      }).catch(function() {
+        gateLoading(false);
+        gateError('Verification failed. Please try again.');
+      });
+    }
+  };
+
+  window.mhsGateResend = function() {
+    if (!gateChallengeID) return;
+    var btn = document.getElementById('gate-resend-btn');
+    btn.textContent = 'Sending...';
+    btn.disabled = true;
+    fetch('/missionhydrosci/api/auth/resend', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      body: JSON.stringify({ challenge_id: gateChallengeID })
+    }).then(function(resp) {
+      btn.textContent = resp.ok ? 'Code resent' : 'Resend failed';
+      setTimeout(function() { btn.textContent = 'Resend code'; btn.disabled = false; }, 3000);
+    }).catch(function() {
+      btn.textContent = 'Resend code';
+      btn.disabled = false;
+    });
+  };
+
+  // Enter submits the visible step
+  document.addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      var t = e.target;
+      if (t && t.tagName === 'INPUT') { e.preventDefault(); mhsGateSubmit(); }
+    }
+  });
+
+  // Focus the first visible input
+  setTimeout(function() {
+    var el = document.getElementById(gateMode === 'keyword' ? 'gate-keyword-input' : 'gate-login-input');
+    if (el) el.focus();
+  }, 50);
+})();
+</script>
+
+  {{ else }}
+  <!-- ══════════════════ Manage page ══════════════════ -->
+  <section class="flex-1 min-w-0 flex flex-col">
+
+  {{ if and .Gated .Unlocked }}
+  <!-- Staff unlock banner -->
+  <div class="mb-2 bg-blue-50 dark:bg-blue-900/20 border border-blue-300 dark:border-blue-700 rounded-lg p-3 flex items-center justify-between gap-3">
+    <div class="text-sm text-blue-800 dark:text-blue-200">
+      🔓 Staff access &mdash; authorized by <strong>{{ if eq .UnlockGrantedBy "keyword" }}keyword{{ else }}{{ .UnlockGrantedBy }}{{ end }}</strong>
+      &mdash; expires in <span id="unlock-countdown" class="font-mono">--:--</span>
+    </div>
+    <button onclick="mhsLockNow()" class="px-3 py-1.5 text-xs font-medium border border-blue-400 dark:border-blue-600 text-blue-700 dark:text-blue-300 rounded hover:bg-blue-100 dark:hover:bg-blue-900/40 shrink-0">Lock now</button>
+  </div>
+  {{ end }}
+
+  <!-- ① This device: the filling surface (flex-1) per the content-area design
+       parameter (docs/ui-design-content-area.md) — the analog of the
+       Organizations table panel. -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 flex-1 mb-2">
+    <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">This device</h2>
+    <p class="text-xs text-gray-500 dark:text-gray-400 mb-3">Downloaded game files and local Mission HydroSci data on this device.</p>
+
+    <!-- Storage meter -->
+    <div id="storage-info" class="mb-3 hidden">
+      <div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 mb-1">
+        <span>Device Storage</span>
+        <span id="storage-text"></span>
+      </div>
+      <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
+        <div id="storage-bar" class="bg-blue-600 h-2 rounded-full transition-all" style="width: 0%"></div>
+      </div>
+    </div>
+
+    <!-- Progress summary -->
+    <p id="progress-summary" class="text-sm text-gray-600 dark:text-gray-400 mb-2">
+      {{ if .IsComplete }}
+      Mission complete &mdash; all {{ len .Units }} units finished.
+      {{ else }}
+      Current: <strong>{{ range .Units }}{{ if eq .Status "current" }}{{ .Title }}{{ end }}{{ end }}</strong>
+      &middot; Completed: {{ len .CompletedUnits }} of {{ len .Units }} units
+      {{ end }}
+    </p>
+
+    <!-- Units table: download state, progress, and per-unit actions.
+         "Set current" replaces the old set-progress select — the current unit
+         is chosen directly from the list. -->
+    <div class="overflow-x-auto mb-4">
+      <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+        <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs">
+          <tr class="border-b border-gray-300 dark:border-gray-600">
+            <th class="px-2 py-2">Unit</th>
+            <th class="px-2 py-2">Version</th>
+            <th class="px-2 py-2">Size</th>
+            <th class="px-2 py-2">Downloaded</th>
+            <th class="px-2 py-2">Progress</th>
+            <th class="px-2 py-2 text-right">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          {{ range .Units }}
+          <tr id="unit-card-{{ .ID }}" data-unit-status="{{ .Status }}" class="border-b border-gray-200 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-900/50">
+            <td class="px-2 py-2 align-middle font-medium text-gray-900 dark:text-gray-100">{{ .Title }}</td>
+            <td class="px-2 py-2 align-middle"><span class="font-mono text-xs">v{{ .Version }}</span></td>
+            <td class="px-2 py-2 align-middle">{{ .SizeLabel }}</td>
+            <td class="px-2 py-2 align-middle">
+              <span id="status-{{ .ID }}" class="text-xs text-gray-400 dark:text-gray-500">Checking...</span>
+            </td>
+            <td id="progress-{{ .ID }}" class="px-2 py-2 align-middle">
+              {{ if eq .Status "current" }}
+              <span class="text-xs px-2 py-0.5 rounded bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Current</span>
+              {{ else if eq .Status "completed" }}
+              <span class="text-xs text-green-600 dark:text-green-400">Completed</span>
+              {{ else }}
+              <span class="text-xs text-gray-400 dark:text-gray-500">&mdash;</span>
+              {{ end }}
+            </td>
+            <td class="px-2 py-2 align-middle text-right whitespace-nowrap">
+              <button
+                id="download-btn-{{ .ID }}"
+                data-unit-id="{{ .ID }}"
+                onclick="mhsDownload('{{ .ID }}')"
+                class="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 hidden"
+              >Download</button>
+              <button
+                id="clear-btn-{{ .ID }}"
+                data-unit-id="{{ .ID }}"
+                onclick="mhsClearCache('{{ .ID }}')"
+                class="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-100 dark:hover:bg-gray-700 hidden"
+              >Clear</button>
+              <button
+                id="setcur-{{ .ID }}"
+                onclick="mhsSetCurrent('{{ .ID }}', '{{ .Title }}')"
+                class="px-2 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700{{ if eq .Status "current" }} hidden{{ end }}"
+                title="Make this the current unit. Marks all earlier units complete."
+              >Set current</button>
+            </td>
+          </tr>
+          {{ end }}
+        </tbody>
+      </table>
+    </div>
+    <p class="text-[11px] text-gray-400 dark:text-gray-500 -mt-2 mb-4">
+      Set current: marks all earlier units complete. Does not affect downloads or saved game data.
+    </p>
+
+    <!-- Bulk local actions -->
+    <div class="space-y-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+      <div class="flex items-start gap-3">
+        <button onclick="mhsClearAllDownloads()" class="w-56 shrink-0 px-3 py-2 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700">
+          Clear all downloads
+        </button>
+        <p class="text-[11px] text-gray-400 dark:text-gray-500 pt-1">
+          Removes downloaded unit files from this device. Files re-download when needed.
+          Online progress and saves are not affected.
+        </p>
+      </div>
+      <div class="flex items-start gap-3">
+        <button onclick="mhsResetAllData()" class="w-56 shrink-0 px-3 py-2 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700">
+          Reset all MHS data
+        </button>
+        <p class="text-[11px] text-gray-400 dark:text-gray-500 pt-1">
+          Also removes cached app pages and local MHS data &mdash; use for troubleshooting.
+          Requires internet the next time Mission HydroSci opens. Online progress and saves are not affected.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ② Game version -->
+  <div id="card-version" class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-2">
+    <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">Game version</h2>
+    <div id="version-updated-msg" class="hidden mb-2 p-2 text-xs rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300">Version updated.</div>
+    {{ if .ActiveCollectionName }}
+    <div class="flex items-center justify-between mb-2">
+      <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ .ActiveCollectionName }}</span>
+      {{ if .CollectionOverride }}
+      <span class="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">Override</span>
+      {{ end }}
+    </div>
+    {{ if .ActiveCollectionDesc }}
+    <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">{{ .ActiveCollectionDesc }}</p>
+    {{ end }}
+    <div class="text-xs text-gray-500 dark:text-gray-400 space-y-0.5 mb-3">
+      {{ range .Units }}
+      <div>{{ .Title }} &mdash; <span class="font-mono">v{{ .Version }}</span>{{ if .BuildIdentifier }} &mdash; <span class="font-mono">{{ .BuildIdentifier }}</span>{{ end }}</div>
+      {{ end }}
+    </div>
+    <div class="flex gap-2">
+      <button onclick="mhsOpenCollectionPicker()" class="px-3 py-1.5 text-xs font-medium bg-indigo-600 text-white rounded hover:bg-indigo-700">Change version</button>
+      {{ if .CollectionOverride }}
+      <button onclick="mhsUseDefaultCollection()" class="px-3 py-1.5 text-xs border border-gray-300 dark:border-gray-600 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Use default</button>
+      {{ end }}
+    </div>
+    {{ else }}
+    <p class="text-sm text-gray-500 dark:text-gray-400">No collection is currently active.</p>
+    {{ end }}
+  </div>
+
+  <!-- ③ Online saved game — danger zone -->
+  <div class="bg-white dark:bg-gray-800 border border-amber-300 dark:border-amber-700 rounded-lg shadow p-4">
+    <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">Online saved game</h2>
+    <p class="text-xs text-amber-600 dark:text-amber-400 mb-3">
+      These permanently delete online data for the signed-in account. They cannot be undone.
+    </p>
+    <div class="space-y-3">
+      <div class="flex items-start gap-3">
+        <button onclick="mhsDeleteSavedState()" class="w-56 shrink-0 px-3 py-2 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700">
+          Delete saved state
+        </button>
+        <p class="text-[11px] text-gray-400 dark:text-gray-500 pt-1">
+          The in-progress saved game. The next unit launch starts with no saved game.
+          Progress, downloads, and saved settings are not affected.
+        </p>
+      </div>
+      <div class="flex items-start gap-3">
+        <button onclick="mhsDeleteSavedSettings()" class="w-56 shrink-0 px-3 py-2 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700">
+          Delete saved settings
+        </button>
+        <p class="text-[11px] text-gray-400 dark:text-gray-500 pt-1">
+          Audio, controls, and other preferences. The next unit launch uses default settings.
+          Progress, downloads, and saved state are not affected.
+        </p>
+      </div>
+    </div>
+  </div>
+  <!-- Bottom spacer: keeps a 16px gap below the last surface, matching the
+       px-4 side gutters. It must be a real box sized for the scrolled state:
+       Chrome drops the scroll container's own bottom padding from the
+       scrollable overflow, so only in-flow trailing space survives scrolling. -->
+  <div class="h-4 shrink-0" aria-hidden="true"></div>
+  </section>
+
+  <!-- Collection picker modal -->
+  <div id="collection-picker-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center">
+    <div class="absolute inset-0 bg-black/40" onclick="mhsCloseCollectionPicker()"></div>
+    <div role="dialog" aria-modal="true" aria-labelledby="collection-picker-title" class="relative bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-300 dark:border-gray-600 max-w-md w-full p-4 space-y-3 mx-4">
+      <h2 id="collection-picker-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100">Choose Collection</h2>
+      <div id="collection-picker-list" class="max-h-64 overflow-y-auto space-y-1">
+        <div class="text-sm text-gray-500 dark:text-gray-400 p-2">Loading...</div>
+      </div>
+      <div class="flex justify-start pt-2 border-t border-gray-200 dark:border-gray-700">
+        <button type="button" class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" onclick="mhsCloseCollectionPicker()">Close</button>
+      </div>
+    </div>
+  </div>
+
+<script src="/assets/js/mhs-delivery.js?v={{ mhsDeliveryVersion }}"></script>
+<script>
+(function() {
+  var csrfToken = '{{ .CSRFToken }}';
+  var currentUnit = '{{ .CurrentUnit }}';
+  var nextUnit = '{{ .NextUnitID }}';
+  var isComplete = {{ if .IsComplete }}true{{ else }}false{{ end }};
+  var gated = {{ if .Gated }}true{{ else }}false{{ end }};
+  var unlockExpiresAtMs = {{ .UnlockExpiresAtMs }};
+  var serverNowMs = {{ .ServerNowMs }};
+
+  // Convert the server's expiry into a deadline on THIS device's clock. The
+  // countdown then measures real elapsed time regardless of how far the device
+  // clock is off from the server — a skewed clock can no longer make the unlock
+  // look instantly expired and drive an infinite reload loop.
+  var unlockDeadlineMs = 0;
+  function setUnlockDeadline(expiresAtMs, nowMs) {
+    if (expiresAtMs > 0 && nowMs > 0) {
+      unlockDeadlineMs = Date.now() + (expiresAtMs - nowMs);
+    } else if (expiresAtMs > 0) {
+      unlockDeadlineMs = expiresAtMs; // fallback if no server "now" was provided
+    } else {
+      unlockDeadlineMs = 0;
+    }
+  }
+  setUnlockDeadline(unlockExpiresAtMs, serverNowMs);
+
+  // Track cache status for storage/button decisions
+  var cacheStatus = {};
+  var lastStorageRefresh = 0;
+  var lowStorage = false;
+  var pipelineRunning = false;
+  var isReloading = false;
+
+  // Manually downloaded units (shared with the launcher page, which uses the
+  // same key so its auto-cleanup preserves downloads started here)
+  var MANUAL_DL_KEY = 'mhs-manual-downloads';
+
+  function loadManualDownloads() {
+    try { return JSON.parse(localStorage.getItem(MANUAL_DL_KEY) || '[]'); }
+    catch (e) { return []; }
+  }
+  function saveManualDownloads(arr) {
+    localStorage.setItem(MANUAL_DL_KEY, JSON.stringify(arr));
+  }
+  var manualDownloads = loadManualDownloads();
+  function addManualDownload(unitId) {
+    if (manualDownloads.indexOf(unitId) === -1) {
+      manualDownloads.push(unitId);
+      saveManualDownloads(manualDownloads);
+    }
+  }
+  function removeManualDownload(unitId) {
+    manualDownloads = manualDownloads.filter(function(id) { return id !== unitId; });
+    saveManualDownloads(manualDownloads);
+  }
+  function buildKeepList() {
+    var keep = [currentUnit];
+    if (nextUnit) keep.push(nextUnit);
+    for (var k = 0; k < manualDownloads.length; k++) {
+      if (keep.indexOf(manualDownloads[k]) === -1) keep.push(manualDownloads[k]);
+    }
+    return keep;
+  }
+
+  var manager = new MHSDeliveryManager({
+    swUrl: '/sw.js',
+    swScope: '/',
+    manifestUrl: '/missionhydrosci/api/manifest',
+    contentPrefix: '/missionhydrosci/content/',
+    channelName: 'missionhydrosci-delivery',
+    unitCachePrefix: 'missionhydrosci-unit-',
+    fetchIdPrefix: 'missionhydrosci-',
+    appShellCachePrefix: 'missionhydrosci-app-shell-'
+  });
+
+  // Status callback: update the unit rows. This page runs the SAME
+  // auto-download pipeline as the launcher — downloads must keep advancing
+  // (current unit, then next) no matter which MHS page the user is on;
+  // otherwise switching here mid-download strands the queue.
+  // All rows (including completed units) show live download state — with
+  // per-row "Set current", a completed unit can become playable again, so
+  // its cache state and Download/Clear actions stay relevant.
+  manager.onStatus(function(unitId, status, detail) {
+    cacheStatus[unitId] = status;
+
+    var statusEl = document.getElementById('status-' + unitId);
+    var downloadBtn = document.getElementById('download-btn-' + unitId);
+    var clearBtn = document.getElementById('clear-btn-' + unitId);
+
+    if (statusEl) {
+      switch (status) {
+        case 'cached':
+          if (unitId === currentUnit) {
+            statusEl.textContent = 'Ready to play';
+            statusEl.className = 'text-xs text-green-600 dark:text-green-400 ml-2';
+          } else {
+            statusEl.textContent = 'Downloaded';
+            statusEl.className = 'text-xs text-blue-600 dark:text-blue-400 ml-2';
+          }
+          if (downloadBtn) downloadBtn.classList.add('hidden');
+          if (clearBtn) clearBtn.classList.remove('hidden');
+          break;
+        case 'not_cached':
+          statusEl.textContent = 'Not downloaded';
+          statusEl.className = 'text-xs text-gray-400 dark:text-gray-500 ml-2';
+          if (downloadBtn) { downloadBtn.classList.remove('hidden'); downloadBtn.disabled = false; downloadBtn.textContent = 'Download'; }
+          if (clearBtn) clearBtn.classList.add('hidden');
+          break;
+        case 'partial':
+          statusEl.textContent = 'Partial';
+          statusEl.className = 'text-xs text-yellow-600 dark:text-yellow-400 ml-2';
+          if (downloadBtn) { downloadBtn.classList.remove('hidden'); downloadBtn.disabled = false; downloadBtn.textContent = 'Re-download'; }
+          if (clearBtn) clearBtn.classList.remove('hidden');
+          break;
+        case 'downloading':
+          var pct = detail.percent || 0;
+          statusEl.textContent = 'Downloading ' + pct + '%';
+          statusEl.className = 'text-xs text-blue-600 dark:text-blue-400 ml-2';
+          if (downloadBtn) { downloadBtn.classList.remove('hidden'); downloadBtn.disabled = true; downloadBtn.textContent = 'Downloading...'; }
+          if (clearBtn) clearBtn.classList.add('hidden');
+          break;
+        case 'stalled':
+          statusEl.textContent = 'Stalled or paused';
+          statusEl.className = 'text-xs text-amber-600 dark:text-amber-400 ml-2';
+          if (downloadBtn) { downloadBtn.classList.remove('hidden'); downloadBtn.disabled = false; downloadBtn.textContent = 'Retry'; }
+          if (clearBtn) clearBtn.classList.add('hidden');
+          break;
+        case 'error':
+          statusEl.textContent = detail.error || 'Failed';
+          statusEl.className = 'text-xs text-red-600 dark:text-red-400 ml-2';
+          if (downloadBtn) { downloadBtn.classList.remove('hidden'); downloadBtn.disabled = false; downloadBtn.textContent = 'Retry'; }
+          if (clearBtn) clearBtn.classList.add('hidden');
+          break;
+      }
+    }
+
+    // Re-run pipeline when a unit becomes cached (advance to the next unit).
+    // Skip while a purge/navigation is in flight — see the launcher.
+    if (status === 'cached' && !isReloading) {
+      runPipeline();
+    }
+
+    // Self-heal: a pipeline-managed unit landing on 'not_cached'/'partial'
+    // has no other re-entry point — restart the pipeline (downloadUnit
+    // dedupes, so a redundant trigger is harmless).
+    if ((status === 'not_cached' || status === 'partial') &&
+        (unitId === currentUnit || unitId === nextUnit) && !isReloading) {
+      runPipeline();
+    }
+
+    // Throttled storage refresh (see the launcher's onStatus for rationale)
+    if (status !== 'downloading' || Date.now() - lastStorageRefresh > 10000) {
+      refreshStorageUI();
+    }
+  });
+
+  // Auto-download pipeline — identical to the launcher's: ensure the current
+  // unit is downloaded, then the next, then trim caches to current + next +
+  // manual downloads.
+  function runPipeline() {
+    if (isComplete || pipelineRunning) return;
+    pipelineRunning = true;
+
+    (async function() {
+      try {
+        var currentStatus = cacheStatus[currentUnit];
+
+        // Current unit not cached — download it
+        if (currentStatus === 'not_cached' || currentStatus === 'partial') {
+          manager.downloadUnit(currentUnit);
+        } else if (currentStatus === 'cached' && nextUnit) {
+          // Current cached — auto-download the next unit if storage allows
+          var nextStatus = cacheStatus[nextUnit];
+          if ((nextStatus === 'not_cached' || nextStatus === 'partial') && !lowStorage) {
+            manager.downloadUnit(nextUnit);
+          }
+        }
+
+        // Always trim: removes caches AND aborts stray in-flight downloads
+        // for units outside current + next + manual (e.g. a paused fetch
+        // left over from an earlier session on an already-completed unit).
+        manager.autoCleanup(buildKeepList());
+      } finally {
+        pipelineRunning = false;
+      }
+    })();
+  }
+
+  function refreshStorageUI() {
+    lastStorageRefresh = Date.now();
+    updateStorageInfo();
+    updateDownloadButtonVisibility();
+  }
+
+  // Hide download buttons for units that would exceed available storage.
+  function updateDownloadButtonVisibility() {
+    manager.getStorageEstimate().then(function(estimate) {
+      if (!estimate || !manager.manifest || !manager.manifest.units) return;
+
+      var available = estimate.quota - estimate.usage;
+      var keepList = buildKeepList();
+
+      for (var i = 0; i < manager.manifest.units.length; i++) {
+        var unit = manager.manifest.units[i];
+        var card = document.getElementById('unit-card-' + unit.id);
+        if (!card) continue;
+
+        var btn = document.getElementById('download-btn-' + unit.id);
+        var cs = cacheStatus[unit.id];
+        if (cs === 'cached' || cs === 'downloading' || cs === 'stalled') continue;
+
+        var size = unit.totalSize || 0;
+        if (btn && size > available) {
+          btn.classList.add('hidden');
+        }
+        if (keepList.indexOf(unit.id) !== -1) {
+          available -= size;
+        }
+      }
+    });
+  }
+
+  function updateStorageInfo() {
+    manager.getStorageEstimate().then(function(estimate) {
+      if (!estimate) return;
+      var storageInfo = document.getElementById('storage-info');
+      var storageText = document.getElementById('storage-text');
+      var storageBar = document.getElementById('storage-bar');
+
+      storageInfo.classList.remove('hidden');
+
+      var usedMB = Math.round(estimate.usage / (1024 * 1024));
+      var quotaMB = Math.round(estimate.quota / (1024 * 1024));
+      var pct = Math.round((estimate.usage / estimate.quota) * 100);
+
+      storageText.textContent = usedMB + ' MB / ' + quotaMB + ' MB (' + pct + '%)';
+      storageBar.style.width = pct + '%';
+
+      if (pct > 80) {
+        storageBar.className = 'bg-red-600 h-2 rounded-full transition-all';
+      } else if (pct > 60) {
+        storageBar.className = 'bg-yellow-500 h-2 rounded-full transition-all';
+      } else {
+        storageBar.className = 'bg-blue-600 h-2 rounded-full transition-all';
+      }
+
+      // Low storage: suppress next-unit auto-download at 90%+ (same as the
+      // launcher); re-run the pipeline when space frees up.
+      var wasLow = lowStorage;
+      lowStorage = pct >= 90;
+      if (wasLow && !lowStorage) {
+        runPipeline();
+      }
+    });
+  }
+
+  manager.init().then(function() {
+    runPipeline();
+    updateStorageInfo();
+    updateDownloadButtonVisibility();
+  });
+
+  // --- Staff unlock: countdown, expiry, Lock now ---
+
+  function refreshUnlockStatus() {
+    if (!gated) return;
+    fetch('/missionhydrosci/api/manage/status')
+      .then(function(r) { return r.json(); })
+      .then(function(s) {
+        if (s.unlocked && s.expires_at_ms) {
+          setUnlockDeadline(s.expires_at_ms, s.server_now_ms || 0);
+        } else if (s.gated) {
+          // Unlock is gone — back to the gate
+          window.location.reload();
+        }
+      })
+      .catch(function() {});
+  }
+
+  if (gated && unlockDeadlineMs > 0) {
+    var countdownEl = document.getElementById('unlock-countdown');
+    setInterval(function() {
+      var remaining = unlockDeadlineMs - Date.now();
+      if (remaining <= 0) {
+        window.location.reload(); // real elapsed time reached expiry — gate re-renders
+        return;
+      }
+      var totalSec = Math.floor(remaining / 1000);
+      var m = Math.floor(totalSec / 60);
+      var s = totalSec % 60;
+      if (countdownEl) countdownEl.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+    }, 1000);
+  }
+
+  window.mhsLockNow = function() {
+    fetch('/missionhydrosci/api/manage/lock', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      body: '{}'
+    }).then(function() {
+      window.location.href = '/missionhydrosci/units';
+    }).catch(function() {
+      window.location.href = '/missionhydrosci/units';
+    });
+  };
+
+  // Shared handler for gated actions that fail authorization: the unlock
+  // expired mid-visit. Reload returns to the gate.
+  function handleAuthFailure(resp) {
+    if (resp.status === 403) {
+      alert('Staff authorization has expired. The page will return to the authorization screen.');
+      window.location.reload();
+      return true;
+    }
+    return false;
+  }
+
+  // --- Per-unit download/clear ---
+
+  window.mhsDownload = function(unitId) {
+    if (unitId !== currentUnit && unitId !== nextUnit) {
+      addManualDownload(unitId);
+    }
+    if (cacheStatus[unitId] === 'stalled') {
+      var retryBtn = document.getElementById('download-btn-' + unitId);
+      if (retryBtn) retryBtn.disabled = true;
+      manager.retryDownload(unitId);
+      return;
+    }
+    manager.downloadUnit(unitId);
+  };
+
+  window.mhsClearCache = function(unitId) {
+    if (confirm('Remove downloaded files for this unit?')) {
+      removeManualDownload(unitId);
+      manager.deleteUnit(unitId).then(function() {
+        runPipeline();
+      });
+    }
+  };
+
+  // --- Bulk local actions ---
+  // These stay on this page with NO reload: the re-downloads then run in
+  // THIS page context, whose Background Fetch progress is live. (Chrome
+  // streams byte progress only to the context that started a fetch — a
+  // reload or navigation would leave the progress display frozen.) The
+  // pipeline is suppressed during the purge itself, then restarted.
+
+  window.mhsClearAllDownloads = function() {
+    if (!confirm('Remove all downloaded unit files from this device? Files re-download when needed. Online progress and saves are not affected.')) return;
+    isReloading = true; // suppress pipeline reactions to the purge's status churn
+    manager.deleteAllUnits().then(function() {
+      localStorage.removeItem(MANUAL_DL_KEY);
+      manualDownloads = [];
+      isReloading = false;
+      runPipeline(); // re-download the current unit right here, live
+      refreshStorageUI();
+    }).catch(function(err) {
+      isReloading = false;
+      alert('Failed to clear downloads: ' + err.message);
+    });
+  };
+
+  window.mhsResetAllData = function() {
+    if (!confirm('Remove all downloaded Mission HydroSci files, cached app pages, and local MHS data from this device? Online progress and saves are not affected. Continue?')) return;
+    isReloading = true; // suppress pipeline reactions to the purge's status churn
+    // mhs-device-id is intentionally kept so device telemetry stays continuous
+    manager.purgeAllMHSData([MANUAL_DL_KEY, 'mhs-progress-queue', 'missionhydrosci-progress-changed', MHSDeliveryManager.ACTIVE_PLAY_KEY, MHSDeliveryManager.PREFER_FALLBACK_KEY]).then(function() {
+      manualDownloads = [];
+      isReloading = false;
+      // purgeAllMHSData doesn't fire per-unit statuses — refresh the rows,
+      // then restart the pipeline in this live context.
+      manager.checkAllCacheStatus();
+      runPipeline();
+      refreshStorageUI();
+    }).catch(function(err) {
+      isReloading = false;
+      alert('Failed to reset MHS data: ' + err.message);
+    });
+  };
+
+  // --- Progress: set current unit (per-row action in the units table) ---
+
+  var unitOrder = [{{ range $i, $u := .Units }}{{ if $i }}, {{ end }}'{{ $u.ID }}'{{ end }}];
+  var unitTitles = { {{ range $i, $u := .Units }}{{ if $i }}, {{ end }}'{{ $u.ID }}': '{{ $u.Title }}'{{ end }} };
+
+  // Applies a progress change in place — deliberately NO page reload: a
+  // reload would replace this page's context, and Chrome streams Background
+  // Fetch byte progress only to the context that started the fetch, so any
+  // in-flight download's percentage would freeze.
+  function applyCurrentUnit(unit) {
+    currentUnit = unit;
+    var idx = unitOrder.indexOf(unit);
+    nextUnit = (idx >= 0 && idx + 1 < unitOrder.length) ? unitOrder[idx + 1] : '';
+    isComplete = false;
+
+    for (var i = 0; i < unitOrder.length; i++) {
+      var u = unitOrder[i];
+      var cell = document.getElementById('progress-' + u);
+      if (cell) {
+        if (u === unit) {
+          cell.innerHTML = '<span class="text-xs px-2 py-0.5 rounded bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">Current</span>';
+        } else if (i < idx) {
+          cell.innerHTML = '<span class="text-xs text-green-600 dark:text-green-400">Completed</span>';
+        } else {
+          cell.innerHTML = '<span class="text-xs text-gray-400 dark:text-gray-500">—</span>';
+        }
+      }
+      var btn = document.getElementById('setcur-' + u);
+      if (btn) btn.classList.toggle('hidden', u === unit);
+    }
+
+    var summary = document.getElementById('progress-summary');
+    if (summary) {
+      summary.innerHTML = 'Current: <strong></strong> · Completed: ' + Math.max(idx, 0) + ' of ' + unitOrder.length + ' units';
+      summary.querySelector('strong').textContent = unitTitles[unit] || unit;
+    }
+  }
+
+  window.mhsSetCurrent = function(unit, unitTitle) {
+    if (!confirm('Set progress to ' + unitTitle + '? This marks all earlier units as completed.')) return;
+
+    fetch('/missionhydrosci/api/progress/set-unit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      body: JSON.stringify({ unit: unit })
+    })
+    .then(function(resp) {
+      if (!resp.ok) {
+        if (handleAuthFailure(resp)) return null;
+        throw new Error('set unit failed');
+      }
+      return resp.json();
+    })
+    .then(function(data) {
+      if (!data) return;
+      refreshUnlockStatus();
+      applyCurrentUnit(unit); // in place — keeps any live download progress
+      runPipeline();          // download the new current unit if needed
+    })
+    .catch(function(err) {
+      alert('Failed to set progress: ' + err.message);
+    });
+  };
+
+  // --- Online saved game deletes ---
+
+  function doDeleteSaveData(target, label, confirmMsg) {
+    if (!confirm(confirmMsg)) return;
+    fetch('/missionhydrosci/api/save-data/' + target + '/delete', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      body: '{}'
+    })
+    .then(function(resp) {
+      if (!resp.ok) {
+        if (handleAuthFailure(resp)) return null;
+        return resp.text().then(function(t) { throw new Error(t.trim() || ('HTTP ' + resp.status)); });
+      }
+      return resp.json();
+    })
+    .then(function(data) {
+      if (!data) return;
+      refreshUnlockStatus();
+      var n = data.deleted || 0;
+      alert('Deleted saved ' + label + '. (' + n + ' record' + (n === 1 ? '' : 's') + ' removed.)');
+    })
+    .catch(function(err) {
+      alert('Failed to delete saved ' + label + ': ' + err.message);
+    });
+  }
+
+  window.mhsDeleteSavedState = function() {
+    doDeleteSaveData('state', 'state',
+      'Permanently delete the saved game state (the in-progress saved game) for this account? ' +
+      'The next unit launch will start with no saved game. This cannot be undone.');
+  };
+
+  window.mhsDeleteSavedSettings = function() {
+    doDeleteSaveData('settings', 'settings',
+      'Permanently delete the saved game settings (audio, controls, and preferences) for this account? ' +
+      'The next unit launch will use default settings. This cannot be undone.');
+  };
+
+  // --- Game version (collection override) ---
+
+  var activeCollectionID = '{{ .ActiveCollectionID }}';
+  var hasOverride = {{ if .CollectionOverride }}true{{ else }}false{{ end }};
+
+  var mhsPickerLastFocus = null;
+  function mhsPickerFocusable() {
+    return document.getElementById('collection-picker-modal')
+      .querySelectorAll('button, a[href], input, [tabindex]:not([tabindex="-1"])');
+  }
+
+  window.mhsOpenCollectionPicker = function() {
+    var modal = document.getElementById('collection-picker-modal');
+    var list = document.getElementById('collection-picker-list');
+    mhsPickerLastFocus = document.activeElement;
+    modal.classList.remove('hidden');
+    // Move focus into the dialog so keyboard/screen-reader users aren't left
+    // on the obscured page behind the backdrop.
+    var f = mhsPickerFocusable();
+    if (f.length) f[f.length - 1].focus(); // the Close button
+    list.innerHTML = '<div class="text-sm text-gray-500 dark:text-gray-400 p-2">Loading...</div>';
+
+    fetch('/missionhydrosci/api/collections')
+      .then(function(r) { return r.json(); })
+      .then(function(collections) {
+        var defaultActive = !hasOverride;
+        var html = '<button onclick="mhsSelectCollection(\'default\')" class="w-full text-left px-3 py-2 text-sm rounded ' + (defaultActive ? 'bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-300 dark:border-indigo-700' : 'hover:bg-gray-100 dark:hover:bg-gray-700') + ' text-gray-700 dark:text-gray-300">';
+        html += '<span class="font-medium">Default</span>';
+        if (defaultActive) html += ' <span class="text-xs text-indigo-600 dark:text-indigo-400">(current)</span>';
+        html += '<span class="block text-xs text-gray-500 dark:text-gray-400">Use group/workspace active collection</span>';
+        html += '</button>';
+        for (var i = 0; i < collections.length; i++) {
+          var c = collections[i];
+          var isCurrent = hasOverride && (c.id === activeCollectionID);
+          html += '<button onclick="mhsSelectCollection(\'' + c.id + '\')" class="w-full text-left px-3 py-2 text-sm rounded ' + (isCurrent ? 'bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-300 dark:border-indigo-700' : 'hover:bg-gray-100 dark:hover:bg-gray-700') + ' text-gray-700 dark:text-gray-300">';
+          html += '<span class="font-medium">' + escapeHtml(c.name) + '</span>';
+          if (isCurrent) html += ' <span class="text-xs text-indigo-600 dark:text-indigo-400">(current)</span>';
+          html += '<span class="block text-xs text-gray-500 dark:text-gray-400 font-mono">' + escapeHtml(c.units_summary) + '</span>';
+          html += '</button>';
+        }
+        list.innerHTML = html;
+      })
+      .catch(function() {
+        list.innerHTML = '<div class="text-sm text-red-500 p-2">Failed to load collections.</div>';
+      });
+  };
+
+  window.mhsCloseCollectionPicker = function() {
+    document.getElementById('collection-picker-modal').classList.add('hidden');
+    if (mhsPickerLastFocus && mhsPickerLastFocus.focus) mhsPickerLastFocus.focus();
+    mhsPickerLastFocus = null;
+  };
+
+  window.mhsSelectCollection = function(id) {
+    var form = new FormData();
+    form.append('collection_id', id);
+    fetch('/missionhydrosci/api/collection-override', {
+      method: 'POST',
+      headers: { 'X-CSRF-Token': csrfToken },
+      body: form
+    }).then(function(r) {
+      if (r.ok) {
+        window.location.href = '/missionhydrosci/manage?vc=1#card-version';
+      } else if (!handleAuthFailure(r)) {
+        alert('Failed to set version. Please try again.');
+      }
+    }).catch(function() {
+      alert('Failed to set version.');
+    });
+  };
+
+  window.mhsUseDefaultCollection = function() {
+    if (!confirm('Switch back to the default game version?')) return;
+    mhsSelectCollection('default');
+  };
+
+  function escapeHtml(s) {
+    var d = document.createElement('div');
+    d.appendChild(document.createTextNode(s));
+    return d.innerHTML;
+  }
+
+  // Escape closes the picker; Tab is trapped inside it while open.
+  document.addEventListener('keydown', function(e) {
+    if (document.getElementById('collection-picker-modal').classList.contains('hidden')) return;
+    if (e.key === 'Escape') {
+      mhsCloseCollectionPicker();
+      return;
+    }
+    if (e.key === 'Tab') {
+      var f = mhsPickerFocusable();
+      if (!f.length) return;
+      var first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus();
+      }
+    }
+  });
+
+  // Show success flash after a version change
+  if (new URLSearchParams(window.location.search).get('vc') === '1') {
+    var msg = document.getElementById('version-updated-msg');
+    if (msg) {
+      msg.classList.remove('hidden');
+      setTimeout(function() { msg.classList.add('hidden'); }, 4000);
+    }
+    history.replaceState(null, '', '/missionhydrosci/manage#card-version');
+  }
+})();
+</script>
+  {{ end }}
+</div>
+{{ end }}

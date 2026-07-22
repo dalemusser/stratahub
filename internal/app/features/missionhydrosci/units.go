@@ -17,21 +17,30 @@ func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
 	manifest, _ := h.resolveManifest(r)
 
 	// Load user progress
-	var currentUnit, userIDHex string
+	var currentUnit string
 	var completedUnits []string
 	var isComplete bool
 	wsID := workspace.IDFromRequest(r)
 
 	if user, ok := auth.CurrentUser(r); ok {
-		userIDHex = user.ID
-		if userID, err := primitive.ObjectIDFromHex(user.ID); err == nil {
-			progress, err := h.ProgressStore.GetOrCreate(r.Context(), wsID, userID)
-			if err == nil {
-				currentUnit = progress.CurrentUnit
-				completedUnits = progress.CompletedUnits
-				isComplete = progress.CurrentUnit == "complete"
-			}
+		userID, err := primitive.ObjectIDFromHex(user.ID)
+		if err != nil {
+			h.ErrLog.LogServerError(w, r, "invalid user id on MHS units page", err, "Something went wrong loading Mission HydroSci.", "/dashboard")
+			return
 		}
+		// GetOrCreate returns a record on success (defaulting a new user to
+		// unit1). A non-nil error is a real DB failure — surface it rather than
+		// rendering the page as a brand-new user on unit1, which would show a
+		// mid-course student the wrong current unit and could gate them out of
+		// their real one.
+		progress, err := h.ProgressStore.GetOrCreate(r.Context(), wsID, userID)
+		if err != nil {
+			h.ErrLog.LogServerError(w, r, "load MHS progress failed", err, "Couldn't load your Mission HydroSci progress. Please try again.", "/dashboard")
+			return
+		}
+		currentUnit = progress.CurrentUnit
+		completedUnits = progress.CompletedUnits
+		isComplete = progress.CurrentUnit == "complete"
 	}
 	if currentUnit == "" {
 		currentUnit = "unit1"
@@ -66,10 +75,6 @@ func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if completedUnits == nil {
-		completedUnits = []string{}
-	}
-
 	// Compute next unit ID
 	var nextUnitID string
 	if !isComplete {
@@ -81,30 +86,17 @@ func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Load workspace MHS member auth setting
-	mhsMemberAuth := "staffauth"
-	if settings, err := h.SettingsStore.Get(r.Context(), wsID); err == nil {
-		mhsMemberAuth = settings.GetMHSMemberAuth()
-	}
-
-	// Resolve effective collection info
+	// Resolve effective collection info for the read-only version line.
 	collInfo := h.resolveEffectiveCollectionInfo(r)
 
 	data := UnitsData{
-		BaseVM:                 viewdata.LoadBase(r, h.DB),
-		Units:                  units,
-		CDNBaseURL:             h.CDNBaseURL,
-		CurrentUnit:            currentUnit,
-		CompletedUnits:         completedUnits,
-		UserIDHex:              userIDHex,
-		IsComplete:             isComplete,
-		NextUnitID:             nextUnitID,
-		MHSMemberAuth:          mhsMemberAuth,
-		CollectionOverride:     collInfo.IsOverride,
-		CollectionOverrideName: collInfo.Name,
-		ActiveCollectionName:   collInfo.Name,
-		ActiveCollectionID:     collInfo.ID,
-		ActiveCollectionDesc:   collInfo.Description,
+		BaseVM:               viewdata.LoadBase(r, h.DB),
+		Units:                units,
+		CurrentUnit:          currentUnit,
+		IsComplete:           isComplete,
+		NextUnitID:           nextUnitID,
+		CollectionOverride:   collInfo.IsOverride,
+		ActiveCollectionName: collInfo.Name,
 	}
 	data.Title = "Mission HydroSci"
 

@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/dalemusser/stratahub/internal/app/resources"
-	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/app/store/activity"
 	"github.com/dalemusser/stratahub/internal/app/store/audit"
 	"github.com/dalemusser/stratahub/internal/app/store/emailverify"
@@ -21,6 +20,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/authutil"
 	"github.com/dalemusser/stratahub/internal/app/system/staffauth"
 	"github.com/dalemusser/stratahub/internal/app/system/tasks"
+	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/config"
 	"github.com/dalemusser/waffle/pantry/text"
@@ -127,6 +127,13 @@ func Startup(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, 
 		return err
 	}
 
+	// Ensure indexes for MHS staff unlock store (TTL-indexed)
+	staffUnlockStore := staffauth.NewUnlockStore(deps.StrataHubMongoDatabase)
+	if err := staffUnlockStore.EnsureIndexes(ctx); err != nil {
+		logger.Error("failed to ensure staff unlock indexes", zap.Error(err))
+		return err
+	}
+
 	// Start background task runner
 	oauthStateStore := oauthstate.New(deps.StrataHubMongoDatabase)
 	deps.TaskRunner = tasks.New(logger)
@@ -191,18 +198,18 @@ func ensureSuperAdmin(ctx context.Context, deps DBDeps, loginID string, logger *
 		emailPtr = &loginID
 	}
 	newUser := models.User{
-		ID:           primitive.NewObjectID(),
-		WorkspaceID:  nil, // Superadmins have no workspace_id
-		FullName:     "SuperAdmin",
-		FullNameCI:   text.Fold("SuperAdmin"),
-		Email:        emailPtr,
-		LoginID:      &loginID,
-		LoginIDCI:    ptrString(text.Fold(loginID)),
-		AuthMethod:   "email", // Default to email auth for new superadmin
-		Role:         "superadmin",
-		Status:       "active",
-		CreatedAt:    now,
-		UpdatedAt:    now,
+		ID:          primitive.NewObjectID(),
+		WorkspaceID: nil, // Superadmins have no workspace_id
+		FullName:    "SuperAdmin",
+		FullNameCI:  text.Fold("SuperAdmin"),
+		Email:       emailPtr,
+		LoginID:     &loginID,
+		LoginIDCI:   ptrString(text.Fold(loginID)),
+		AuthMethod:  "email", // Default to email auth for new superadmin
+		Role:        "superadmin",
+		Status:      "active",
+		CreatedAt:   now,
+		UpdatedAt:   now,
 	}
 
 	_, err = coll.InsertOne(ctx, newUser)
@@ -225,7 +232,9 @@ func ptrString(s string) *string {
 // localhost browser launches when no real stratahub login is available.
 //
 // The matching host-page code lives in
-//   mhs-updates/build-automation-update-051226/MHS-Bridge-index.html
+//
+//	mhs-updates/build-automation-update-051226/MHS-Bridge-index.html
+//
 // and the matching game-side default is in MHSBridge.cs.
 const MHSDevSentinelUserIDHex = "000000000000000000000001"
 

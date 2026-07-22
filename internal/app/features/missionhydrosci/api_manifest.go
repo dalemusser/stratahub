@@ -3,6 +3,7 @@ package missionhydrosci
 
 import (
 	"context"
+	"crypto/subtle"
 	"encoding/json"
 	"net/http"
 	"strings"
@@ -12,6 +13,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/store/mhsbuilds"
 	"github.com/dalemusser/stratahub/internal/app/store/mhscollections"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
+	"github.com/dalemusser/stratahub/internal/app/system/staffauth"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -124,6 +126,9 @@ func (h *Handler) resolveEffectiveCollectionInfo(r *http.Request) collectionInfo
 // HTTP status and message for the caller to write. Non-members always pass.
 // The client auth modal alone can be bypassed with a direct POST, so every
 // gated member action must run this server-side.
+//
+// An active staff unlock (see unlockKey) authorizes without credentials and
+// slides its expiry; fresh credentials grant a new unlock as a side effect.
 func (h *Handler) checkMemberAuth(r *http.Request, role, authToken, keyword string) (int, string) {
 	if role != "member" {
 		return 0, ""
@@ -136,21 +141,109 @@ func (h *Handler) checkMemberAuth(r *http.Request, role, authToken, keyword stri
 		return http.StatusInternalServerError, "internal error"
 	}
 
-	switch settings.GetMHSMemberAuth() {
+	mode := settings.GetMHSMemberAuth()
+	if mode == "trust" {
+		return 0, ""
+	}
+
+	// An active staff unlock authorizes the action; slide its expiry.
+	key, wsOID, userOID, keyOK := h.unlockKey(r)
+	if keyOK {
+		if unlock, err := h.UnlockStore.GetActive(r.Context(), key); err != nil {
+			h.Log.Error("failed to check staff unlock", zap.Error(err))
+		} else if unlock != nil {
+			if err := h.UnlockStore.Refresh(r.Context(), key, settings.GetMHSStaffUnlockDuration()); err != nil {
+				h.Log.Warn("failed to refresh staff unlock", zap.Error(err))
+			}
+			return 0, ""
+		}
+	}
+
+	// Back off a member who is repeatedly failing credential checks (idle
+	// scripting of the gate). Keyed per member+workspace so it survives a new
+	// session token. Non-attempts (empty credential) are not counted below.
+	throttleKey := userOID.Hex() + ":" + wsOID.Hex()
+	now := time.Now()
+	if wait := h.authThrottle.retryAfter(throttleKey, now); wait > 0 {
+		h.Log.Warn("throttled MHS member-auth attempt",
+			zap.String("member_user_id", userOID.Hex()),
+			zap.Duration("retry_after", wait))
+		return http.StatusTooManyRequests, "Too many attempts. Please wait a moment and try again."
+	}
+
+	grantedBy := ""
+	authFailed := false
+	switch mode {
 	case "staffauth":
 		if authToken == "" {
 			return http.StatusForbidden, "authorization token required"
 		}
-		if _, err := h.StaffAuthVerifier.Store.ValidateAndConsumeToken(r.Context(), authToken); err != nil {
-			return http.StatusForbidden, "invalid or expired authorization token"
+		ch, err := h.StaffAuthVerifier.Store.ValidateAndConsumeToken(r.Context(), authToken)
+		if err != nil {
+			authFailed = true
+			break
 		}
+		grantedBy = ch.StaffName
 	case "keyword":
-		if keyword == "" || keyword != settings.MHSMemberAuthKeyword {
+		if keyword == "" {
 			return http.StatusForbidden, "invalid keyword"
 		}
-		// "trust": no additional check needed
+		// Constant-time to avoid leaking how many leading characters matched.
+		if subtle.ConstantTimeCompare([]byte(keyword), []byte(settings.MHSMemberAuthKeyword)) != 1 {
+			authFailed = true
+			break
+		}
+		grantedBy = "keyword"
+	}
+	if authFailed {
+		h.authThrottle.fail(throttleKey, now)
+		if mode == "staffauth" {
+			return http.StatusForbidden, "invalid or expired authorization token"
+		}
+		return http.StatusForbidden, "invalid keyword"
+	}
+	h.authThrottle.success(throttleKey)
+
+	// Fresh credentials start a staff unlock so follow-up actions in this
+	// session don't re-prompt until it expires or is locked.
+	if keyOK {
+		if err := h.UnlockStore.Grant(r.Context(), key, wsOID, userOID, grantedBy, settings.GetMHSStaffUnlockDuration()); err != nil {
+			h.Log.Warn("failed to grant staff unlock", zap.Error(err))
+		} else {
+			h.Log.Info("staff unlock granted",
+				zap.String("workspace_id", wsOID.Hex()),
+				zap.String("member_user_id", userOID.Hex()),
+				zap.String("granted_by", grantedBy),
+			)
+		}
 	}
 	return 0, ""
+}
+
+// authThrottleKey returns the per-user backoff key for the current session
+// (userID:workspace), and false when there is no user context. It matches the
+// key checkMemberAuth uses so the two credential surfaces share one budget.
+func (h *Handler) authThrottleKey(r *http.Request) (string, bool) {
+	user, ok := auth.CurrentUser(r)
+	if !ok {
+		return "", false
+	}
+	return user.ID + ":" + workspace.IDFromRequest(r).Hex(), true
+}
+
+// unlockKey derives the staff-unlock lookup key for the current request's
+// member session. Returns ok=false when the user context is unavailable.
+func (h *Handler) unlockKey(r *http.Request) (key string, wsID, userID primitive.ObjectID, ok bool) {
+	user, found := auth.CurrentUser(r)
+	if !found {
+		return "", primitive.NilObjectID, primitive.NilObjectID, false
+	}
+	userID, err := primitive.ObjectIDFromHex(user.ID)
+	if err != nil {
+		return "", primitive.NilObjectID, primitive.NilObjectID, false
+	}
+	wsID = workspace.IDFromRequest(r)
+	return staffauth.UnlockKey(wsID, userID, user.SessionToken()), wsID, userID, true
 }
 
 // requireMemberAuth enforces the workspace's MHS member auth method for a

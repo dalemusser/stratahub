@@ -16,22 +16,19 @@ type UnitVM struct {
 	Status          string // "completed", "current", "future"
 }
 
-// UnitsData is the view model for the unit selector page.
+// UnitsData is the view model for the unit selector page. Since the redesign,
+// the launcher is status-only: per-unit actions, the auth modal, and version
+// switching live on the Manage page, so the fields those needed
+// (CompletedUnits, UserIDHex, MHSMemberAuth, CDNBaseURL, the override/active
+// collection detail) are no longer rendered here and were removed.
 type UnitsData struct {
 	viewdata.BaseVM
-	Units          []UnitVM
-	CDNBaseURL     string
-	CurrentUnit    string   // e.g., "unit3" or "complete"
-	CompletedUnits []string // e.g., ["unit1", "unit2"]
-	UserIDHex      string   // Hex of users._id; injected into Unity identity bridge
-	IsComplete     bool     // True when all units are done
-	NextUnitID     string   // Unit after CurrentUnit, empty if last/complete
-	MHSMemberAuth          string // "trust", "keyword", "staffauth" — controls member auth modal
-	CollectionOverride     bool   // True when a per-user override is active
-	CollectionOverrideName string // Name of the override collection
-	ActiveCollectionName   string // Name of the effective collection being used
-	ActiveCollectionID     string // ID of the effective collection (for picker highlight)
-	ActiveCollectionDesc   string // Description of the effective collection
+	Units                []UnitVM
+	CurrentUnit          string // e.g., "unit3" or "complete"
+	IsComplete           bool   // True when all units are done
+	NextUnitID           string // Unit after CurrentUnit, empty if last/complete
+	CollectionOverride   bool   // True when a per-user override is active (drives the "(override)" badge)
+	ActiveCollectionName string // Name of the effective collection being used (version line)
 }
 
 // PlayData is the view model for the game launcher page.

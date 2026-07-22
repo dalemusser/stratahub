@@ -2,7 +2,7 @@
 // This file is concatenated with sw-cache.js and sw-background-fetch.js
 // by the Go handler before being served at /sw.js.
 
-const SW_VERSION = '1.0.7';
+const SW_VERSION = '1.0.11';
 
 // ---- Install ----
 self.addEventListener('install', function(event) {
@@ -206,27 +206,16 @@ self.addEventListener('message', function(event) {
     // cancel) keeps the partial cache for resume; absent (older pages)
     // defaults to purging, the original behavior.
     cancelActiveFallbacks(data.unitId, data.version, data.purge);
+  } else if (data.action === 'attachProgress') {
+    // Periodic page keepalive while a download is active: (re)attaches the
+    // SW's progress broadcasters (idempotent) and, as a message, wakes or
+    // extends the SW so those listeners keep firing.
+    event.waitUntil(reattachAllProgress());
   } else if (data.action === 'getActiveFallbacks') {
     // Reply with in-flight fallback download keys so a freshly-loaded page
     // can adopt the loops it lost track of across a reload.
     if (event.ports && event.ports[0]) {
       event.ports[0].postMessage({ activeFallbacks: listActiveFallbacks() });
-    }
-  } else if (data.action === 'deleteUnit') {
-    event.waitUntil(
-      caches.delete(unitCacheName(data.unitId, data.version)).then(function() {
-        broadcastStatus(data.unitId, 'not_cached', { version: data.version });
-      })
-    );
-  } else if (data.action === 'checkStatus') {
-    event.waitUntil(
-      checkUnitCacheStatus(data.unitId, data.version, data.files).then(function(status) {
-        broadcastStatus(data.unitId, status, { version: data.version });
-      })
-    );
-  } else if (data.action === 'getVersion') {
-    if (event.ports && event.ports[0]) {
-      event.ports[0].postMessage({ version: SW_VERSION });
     }
   }
 });

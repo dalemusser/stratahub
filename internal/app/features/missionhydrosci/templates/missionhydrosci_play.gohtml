@@ -61,10 +61,11 @@
         color: white;
         border: none;
         border-radius: 50%;
-        width: 32px;
-        height: 32px;
-        font-size: 18px;
-        line-height: 32px;
+        /* >=44px hit target for touch (grades 6-9 on tablets). */
+        width: 44px;
+        height: 44px;
+        font-size: 20px;
+        line-height: 44px;
         text-align: center;
         cursor: pointer;
         opacity: 0.5;
@@ -74,8 +75,6 @@
       }
       #back-btn {
         left: 8px;
-        width: 36px;
-        height: 36px;
         display: none;
         align-items: center;
         justify-content: center;
@@ -165,19 +164,19 @@
     </script>
 
     <div id="unity-container">
-      <a id="back-btn" href="/missionhydrosci/units" title="Back to Units"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" style="vertical-align: middle;"><path d="M13 4 L7 10 L13 16" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
-      <button id="fullscreen-btn" onclick="toggleFullscreen()" title="Fullscreen">⛶</button>
+      <a id="back-btn" href="/missionhydrosci/units" title="Back to Mission HydroSci" aria-label="Back to Mission HydroSci"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" style="vertical-align: middle;" aria-hidden="true"><path d="M13 4 L7 10 L13 16" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      <button id="fullscreen-btn" onclick="toggleFullscreen()" title="Fullscreen" aria-label="Toggle fullscreen">⛶</button>
       <div id="loading-overlay">
         <h2>Loading {{ .UnitTitle }}...</h2>
         <div class="loading-bar-bg">
           <div id="loading-bar" class="loading-bar-fill" style="width: 0%"></div>
         </div>
-        <p id="loading-text" style="margin-top:8px; font-size:14px; opacity:0.7;">Initializing...</p>
+        <p id="loading-text" role="status" aria-live="polite" style="margin-top:8px; font-size:14px; opacity:0.7;">Initializing...</p>
       </div>
       <canvas id="unity-canvas" width="1400" height="800" tabindex="-1"></canvas>
 
       <!-- Help overlay (toggle with ? key, inside container so it's visible in fullscreen) -->
-      <div id="help-overlay" style="
+      <div id="help-overlay" role="dialog" aria-modal="true" aria-label="Game controls" style="
         display: none;
         position: fixed; top: 0; left: 0; right: 0; bottom: 0;
         background: rgba(0,0,0,0.88); z-index: 90;
@@ -258,11 +257,6 @@
           </div>
           <p id="overlay-download-text" style="font-size: 0.75rem; opacity: 0.6; margin-top: 4px; text-align: center;">0%</p>
         </div>
-        <a id="overlay-link" href="/missionhydrosci/units" style="
-          display: none; padding: 10px 24px;
-          background: #2563eb; color: white; text-decoration: none;
-          border-radius: 6px; font-size: 0.95rem;
-        ">Back to Mission HydroSci</a>
       </div>
     </div>
 
@@ -366,14 +360,19 @@
 
       function completeAndTransition(nextUnit, isFinal) {
         if (isFinal || !nextUnit) {
-          // Final unit — the game owns the end-of-game experience.
-          // Don't clean up Unity or show an overlay. The game will call
-          // MHSBridge.EndGame() when the player is ready to leave.
+          // Final unit — the game owns the end-of-game experience (its own end
+          // screen / recap) and calls MHSBridge.EndGame() -> mhsEndGame() to
+          // return to StrataHub when the player is ready. Unity is intentionally
+          // left running.
           //
-          // Backward compatibility: Older builds (before April 2026 MHSBridge update)
-          // don't have EndGame(). The player can use the back button in the upper left
-          // to return to StrataHub. The game stays running on its end-of-game screen.
-          // TODO: Remove this note once all builds use the new MHSBridge with EndGame().
+          // handleUnitComplete optimistically showed the "Loading next unit..."
+          // overlay before we knew this was the last unit — it would otherwise
+          // sit on top of the game's end screen forever (and cover the top-left
+          // back button), trapping the student. Hide it so the end screen and
+          // the back button are both reachable. This is correct for new builds
+          // (EndGame exits) and old builds alike (the player uses Back).
+          var overlay = document.getElementById('unit-complete-overlay');
+          if (overlay) overlay.classList.add('hidden');
           return;
         }
         cleanupUnity();
@@ -489,17 +488,6 @@
 
       function navigateToNext(nextUnit) {
         window.location.href = '/missionhydrosci/play/' + nextUnit;
-      }
-
-      function showGameComplete() {
-        var title = document.getElementById('overlay-title');
-        var msg = document.getElementById('overlay-message');
-        var link = document.getElementById('overlay-link');
-        var bar = document.getElementById('overlay-download-bar');
-        if (title) title.textContent = 'Mission Complete';
-        if (msg) msg.textContent = 'You have completed Mission HydroSci.';
-        if (link) link.style.display = 'inline-block';
-        if (bar) bar.style.display = 'none';
       }
 
       function queueCompletion(unitId) {
@@ -698,6 +686,14 @@
       }
 
       window.addEventListener('resize', onResize);
+      // Expose onResize for the fullscreen handlers, which live OUTSIDE this
+      // IIFE (toggleFullscreen / onFullscreenChange). Calling onResize directly
+      // from there threw a ReferenceError on every fullscreen exit — which both
+      // skipped the keyboard refocus (WASD dead until the canvas is clicked) and
+      // tripped window.onerror -> reportCrash, permanently setting
+      // crashReported = true and suppressing every real crash report after.
+      // The reference keeps this closure, so it still sees the reassigned canvas.
+      window.__mhsResize = onResize;
       onResize();
 
       // Mobile viewport
@@ -805,7 +801,7 @@
             navigator.keyboard.unlock();
           }
           // Restore JS-based sizing after exiting fullscreen
-          onResize();
+          if (window.__mhsResize) window.__mhsResize();
           setTimeout(focusCanvas, 100);
         }).catch(function() {});
       }
@@ -820,7 +816,7 @@
         btn.textContent = '\u26F6';
         btn.title = 'Fullscreen';
         btn.style.display = '';
-        onResize();
+        if (window.__mhsResize) window.__mhsResize();
       }
       // Refocus canvas after layout settles
       setTimeout(focusCanvas, 150);
@@ -916,16 +912,6 @@
       });
     }
 
-    // Also clean up links in the unit-complete overlay
-    var overlayLink = document.querySelector('#unit-complete-overlay a');
-    if (overlayLink) {
-      overlayLink.addEventListener('click', function(e) {
-        e.preventDefault();
-        cleanupUnity();
-        window.location.href = overlayLink.href;
-      });
-    }
-
     // Hide the fullscreen button when it's unnecessary or harmful:
     // 1. Standalone (PWA) mode — no browser chrome to hide, fullscreen is redundant.
     //    On ChromeOS, JS fullscreen + keyboard.lock() also disables top-row keys
@@ -985,6 +971,11 @@
         if (loadingOverlay && loadingOverlay.classList.contains('hidden') && !hintShown) {
           hintShown = true;
           observer.disconnect();
+          // The help overlay opens only via the '?' key. On a touch-only device
+          // (no fine pointer, so almost certainly no keyboard) that key is
+          // unreachable, and "Press ? for help" would be a lie — skip it there.
+          var hasFinePointer = window.matchMedia && window.matchMedia('(any-pointer: fine)').matches;
+          if (!hasFinePointer) return;
           var hint = document.createElement('div');
           hint.id = 'help-hint';
           hint.style.cssText = 'position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:80;background:rgba(0,0,0,0.7);color:white;padding:8px 20px;border-radius:20px;font-family:sans-serif;font-size:0.85rem;opacity:1;transition:opacity 1s;pointer-events:none;';

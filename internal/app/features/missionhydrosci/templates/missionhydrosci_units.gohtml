@@ -12,7 +12,7 @@
     </div>
     <div class="flex items-center gap-2">
       <button id="install-btn" onclick="mhsInstall()" class="px-3 py-1 text-sm bg-white text-blue-600 font-medium rounded hover:bg-blue-50">Install</button>
-      <button id="install-dismiss" onclick="mhsDismissInstall()" class="text-white opacity-70 hover:opacity-100 text-lg leading-none px-1">&times;</button>
+      <button id="install-dismiss" onclick="mhsDismissInstall()" aria-label="Dismiss install banner" class="text-white opacity-70 hover:opacity-100 text-lg leading-none p-2 -m-1">&times;</button>
     </div>
   </div>
 
@@ -23,7 +23,7 @@
         <span class="text-lg">💧</span>
         <span class="text-sm font-medium">Install Mission HydroSci for the best experience</span>
       </div>
-      <button id="ios-install-dismiss" onclick="mhsDismissIOSInstall()" class="text-white opacity-70 hover:opacity-100 text-lg leading-none px-1 flex-shrink-0">&times;</button>
+      <button id="ios-install-dismiss" onclick="mhsDismissIOSInstall()" aria-label="Dismiss install banner" class="text-white opacity-70 hover:opacity-100 text-lg leading-none p-2 -m-1 flex-shrink-0">&times;</button>
     </div>
     <p class="text-sm mt-2 opacity-90">Tap <svg class="inline-block w-4 h-4 align-text-bottom" viewBox="0 0 50 50" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M25 1v30M25 1l-10 10M25 1l10 10" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/><path d="M8 20v22a4 4 0 004 4h26a4 4 0 004-4V20" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/></svg> then <strong>"Add to Home Screen"</strong></p>
   </div>
@@ -31,16 +31,16 @@
   <div class="mb-4 flex items-center justify-between">
     <div class="flex items-center gap-2">
       <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">Mission HydroSci</h1>
-      <button onclick="mhsOpenHelp()" class="w-6 h-6 rounded-full border border-gray-400 dark:border-gray-500 text-gray-400 dark:text-gray-500 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-600 dark:hover:border-indigo-400 text-xs font-bold leading-none flex items-center justify-center" title="Help">?</button>
+      <button onclick="mhsOpenHelp()" aria-label="Help — how to install Mission HydroSci" class="w-8 h-8 rounded-full border border-gray-400 dark:border-gray-500 text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-600 dark:hover:border-indigo-400 text-xs font-bold leading-none flex items-center justify-center" title="Help">?</button>
     </div>
-    <div id="sw-status" class="text-xs text-gray-400 dark:text-gray-500"></div>
+    <div id="sw-status" aria-live="polite" class="text-xs text-gray-500 dark:text-gray-400"></div>
   </div>
 
   <!-- Help modal -->
   <div id="help-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center">
     <div class="absolute inset-0 bg-black/40" onclick="mhsCloseHelp()"></div>
-    <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-300 dark:border-gray-600 max-w-md w-full p-4 space-y-4 mx-4">
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Install as App</h2>
+    <div role="dialog" aria-modal="true" aria-labelledby="help-modal-title" class="relative bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-300 dark:border-gray-600 max-w-md w-full p-4 space-y-4 mx-4">
+      <h2 id="help-modal-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100">Install as App</h2>
       <div id="help-install-content" class="text-sm text-gray-700 dark:text-gray-300 space-y-3">
         <!-- Content populated by JS based on platform -->
       </div>
@@ -50,52 +50,12 @@
     </div>
   </div>
 
-  <!-- Member authorization modal (multi-mode: keyword, staff auth) -->
-  <div id="auth-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center">
-    <div class="absolute inset-0 bg-black/40" onclick="mhsCloseAuthModal()"></div>
-    <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-300 dark:border-gray-600 max-w-sm w-full p-4 space-y-3 mx-4">
-      <h2 id="auth-modal-title" class="text-sm font-semibold text-gray-900 dark:text-gray-100"></h2>
-      <p id="auth-modal-desc" class="text-xs text-gray-500 dark:text-gray-400"></p>
-
-      <!-- Keyword step -->
-      <div id="auth-step-keyword" class="hidden">
-        <input id="auth-keyword-input" type="password" autocomplete="off" placeholder="Enter keyword"
-               class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-      </div>
-
-      <!-- Staff auth step 1: login ID -->
-      <div id="auth-step-login" class="hidden">
-        <input id="auth-login-input" type="text" autocomplete="off" placeholder="Staff login ID"
-               class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-      </div>
-
-      <!-- Staff auth step 2: password -->
-      <div id="auth-step-password" class="hidden">
-        <p id="auth-staff-name" class="text-xs text-gray-600 dark:text-gray-400 mb-2"></p>
-        <input id="auth-password-input" type="password" autocomplete="off" placeholder="Enter password"
-               class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-      </div>
-
-      <!-- Staff auth step 2: email code -->
-      <div id="auth-step-email" class="hidden">
-        <p id="auth-email-name" class="text-xs text-gray-600 dark:text-gray-400 mb-2"></p>
-        <input id="auth-code-input" type="text" autocomplete="off" placeholder="Enter verification code" maxlength="6" inputmode="numeric"
-               class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500" />
-        <button type="button" id="auth-resend-btn" class="mt-1 text-xs text-blue-600 dark:text-blue-400 hover:underline hidden" onclick="mhsResendCode()">Resend code</button>
-      </div>
-
-      <div id="auth-modal-error" class="text-xs text-red-600 dark:text-red-400 hidden"></div>
-      <div id="auth-modal-loading" class="text-xs text-gray-500 dark:text-gray-400 hidden">Verifying...</div>
-
-      <div class="flex justify-end gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-        <button type="button" class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" onclick="mhsCloseAuthModal()">Cancel</button>
-        <button type="button" id="auth-modal-submit" class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700" onclick="mhsSubmitAuthModal()">Next</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Single launch card -->
-  <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 max-w-lg mx-auto w-full">
+  <section class="flex-1 min-w-0 flex flex-col">
+  <!-- Hero surface: full width per the content-area design parameter
+       (docs/ui-design-content-area.md); the launcher content itself stays
+       centered and width-constrained inside the wide surface. -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-6 mb-2">
+    <div class="max-w-lg mx-auto w-full">
     <!-- Progress dots -->
     <div class="flex items-center justify-center gap-3 mb-6">
       {{ range .Units }}
@@ -107,7 +67,7 @@
         {{ else }}
         <div id="dot-{{ .ID }}" class="w-4 h-4 rounded-full bg-gray-300 dark:bg-gray-700" title="{{ .Title }}"></div>
         {{ end }}
-        <span class="text-[10px] text-gray-400 dark:text-gray-500">{{ .ID }}</span>
+        <span class="text-[10px] text-gray-500 dark:text-gray-400">{{ .ID }}</span>
       </div>
       {{ end }}
     </div>
@@ -123,7 +83,7 @@
     {{ range .Units }}{{ if eq .Status "current" }}
     <div class="text-center mb-4">
       <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">{{ .Title }}</h2>
-      <div id="unit-status" class="text-sm text-gray-500 dark:text-gray-400 mt-1">Checking...</div>
+      <div id="unit-status" role="status" aria-live="polite" class="text-sm text-gray-500 dark:text-gray-400 mt-1">Checking...</div>
     </div>
 
     <!-- Download progress bar (hidden by default) -->
@@ -131,7 +91,7 @@
       <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
         <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all" style="width: 0%"></div>
       </div>
-      <div id="progress-text" class="text-xs text-gray-500 dark:text-gray-400 mt-1 text-center">0%</div>
+      <div id="progress-text" aria-live="polite" class="text-xs text-gray-500 dark:text-gray-400 mt-1 text-center">0%</div>
     </div>
 
     <!-- Action buttons -->
@@ -156,7 +116,7 @@
 
     <!-- Next unit status (hidden when no next unit) -->
     {{ if $.NextUnitID }}
-    <div id="next-unit-status" class="text-center text-xs text-gray-400 dark:text-gray-500 mt-3 hidden"></div>
+    <div id="next-unit-status" aria-live="polite" class="text-center text-xs text-gray-500 dark:text-gray-400 mt-3 hidden"></div>
     {{ end }}
     {{ end }}{{ end }}
 
@@ -165,11 +125,37 @@
       Low storage — auto-download of next unit paused
     </div>
     {{ end }}
+    </div>
+
+    <!-- Active game version — always visible for every role. Support's first
+         question is "what version is displayed?", so this must be on screen. -->
+    {{ if .ActiveCollectionName }}
+    <div class="mt-4 text-center text-xs text-gray-400 dark:text-gray-500">
+      Version:
+      {{ if ne .Role "member" }}<a href="/missionhydrosci/manage#card-version" class="underline decoration-dotted hover:text-gray-600 dark:hover:text-gray-300">{{ .ActiveCollectionName }}</a>{{ else }}<span>{{ .ActiveCollectionName }}</span>{{ end }}
+      {{ if .CollectionOverride }}<span class="ml-1 px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">override</span>{{ end }}
+    </div>
+    {{ end }}
   </div>
 
-  <!-- Storage quota bar -->
-  <div id="storage-info" class="mt-4 hidden max-w-lg mx-auto w-full">
-    <div class="bg-white dark:bg-gray-800 rounded shadow p-3">
+  <!-- Status surface: fills the remaining content-area height (flex-1) with
+       the standard bottom margin — see docs/ui-design-content-area.md. -->
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4 flex-1">
+    <!-- Unit list: status only ("everything visible, nothing actionable").
+         Per-unit Download/Clear actions live on the Manage page. -->
+    <div class="grid gap-2">
+      {{ range .Units }}
+      <div id="unit-card-{{ .ID }}" data-unit-status="{{ .Status }}" class="bg-gray-50 dark:bg-gray-700/50 rounded p-3">
+        <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ .Title }}</span>
+        <span class="text-xs text-gray-400 dark:text-gray-500 ml-1">v{{ .Version }}</span>
+        <span class="text-xs text-gray-500 dark:text-gray-400 ml-2">{{ .SizeLabel }}</span>
+        <span id="status-{{ .ID }}" aria-live="polite" class="text-xs text-gray-500 dark:text-gray-400 ml-2">{{ if eq .Status "completed" }}Completed{{ else }}Checking...{{ end }}</span>
+      </div>
+      {{ end }}
+    </div>
+
+    <!-- Storage quota bar (below the unit list) -->
+    <div id="storage-info" class="mt-4 hidden">
       <div class="flex items-center justify-between text-sm text-gray-600 dark:text-gray-400 mb-1">
         <span>Device Storage</span>
         <span id="storage-text"></span>
@@ -178,215 +164,20 @@
         <div id="storage-bar" class="bg-blue-600 h-2 rounded-full transition-all" style="width: 0%"></div>
       </div>
     </div>
+
+    <!-- Entry to the manage page (troubleshooting/testing tools). Discreet for
+         all roles; members in gated workspaces hit a staff-authorization gate. -->
+    <div class="mt-4 text-center">
+      <a href="/missionhydrosci/manage" class="text-sm text-gray-500 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400">&#9881; Manage downloads &amp; data</a>
+    </div>
   </div>
-
-  <!-- Collapsible storage details -->
-  <details class="mt-4 max-w-lg mx-auto w-full">
-    <summary class="text-sm text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
-      Manage downloads
-    </summary>
-    <div class="mt-2 grid gap-2">
-      {{ range .Units }}
-      <div id="unit-card-{{ .ID }}" data-unit-status="{{ .Status }}" class="bg-white dark:bg-gray-800 rounded shadow p-3 flex items-center justify-between">
-        <div>
-          <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ .Title }}</span>
-          <span class="text-xs text-gray-400 dark:text-gray-500 ml-1">v{{ .Version }}</span>
-          <span class="text-xs text-gray-500 dark:text-gray-400 ml-2">{{ .SizeLabel }}</span>
-          <span id="status-{{ .ID }}" class="text-xs text-gray-400 dark:text-gray-500 ml-2">{{ if eq .Status "completed" }}Completed{{ else }}Checking...{{ end }}</span>
-        </div>
-        <div class="flex gap-2">
-          {{ if ne .Status "completed" }}
-          <button
-            id="download-btn-{{ .ID }}"
-            data-unit-id="{{ .ID }}"
-            onclick="mhsDownload('{{ .ID }}')"
-            class="px-2 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 disabled:opacity-50 hidden"
-          >
-            Download
-          </button>
-          <button
-            id="clear-btn-{{ .ID }}"
-            data-unit-id="{{ .ID }}"
-            onclick="mhsClearCache('{{ .ID }}')"
-            class="px-2 py-1 text-xs border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-50 dark:hover:bg-gray-700 hidden"
-          >
-            Clear
-          </button>
-          {{ end }}
-        </div>
-      </div>
-      {{ end }}
-    </div>
-    <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
-      <div class="border border-gray-200 dark:border-gray-600 rounded-lg p-3 space-y-3">
-        <!-- Set to Unit -->
-        <div class="flex items-center justify-center gap-2">
-          <label class="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">Set to</label>
-          <select id="set-unit-select" class="px-2 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-300">
-            {{ range .Units }}
-            <option value="{{ .ID }}">{{ .Title }}</option>
-            {{ end }}
-          </select>
-          <button onclick="mhsSetToUnit()" class="px-3 py-1.5 text-xs font-medium bg-blue-600 text-white rounded hover:bg-blue-700">
-            Go
-          </button>
-        </div>
-        <!-- Clear All Downloads -->
-        <div class="flex items-center gap-2">
-          <button
-            onclick="mhsClearAllDownloads()"
-            class="flex-1 px-3 py-2 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700"
-          >
-            Clear All Downloads
-          </button>
-          <button
-            type="button"
-            onclick="mhsShowActionHelp('clear-all')"
-            aria-label="What does Clear All Downloads do?"
-            class="w-5 h-5 shrink-0 flex items-center justify-center rounded-full border border-gray-300 dark:border-gray-500 text-gray-500 dark:text-gray-400 text-[11px] font-semibold hover:bg-gray-100 dark:hover:bg-gray-700"
-          >?</button>
-        </div>
-        <!-- Reset all MHS data (all versions + app shell + local MHS data) -->
-        <div class="flex items-center gap-2">
-          <button
-            onclick="mhsResetAllData()"
-            class="flex-1 px-3 py-2 text-xs font-medium border border-red-600 dark:border-red-500 text-red-600 dark:text-red-400 rounded hover:bg-red-50 dark:hover:bg-red-900/30"
-          >
-            Reset All MHS Data
-          </button>
-          <button
-            type="button"
-            onclick="mhsShowActionHelp('reset-all')"
-            aria-label="What does Reset All MHS Data do?"
-            class="w-5 h-5 shrink-0 flex items-center justify-center rounded-full border border-gray-300 dark:border-gray-500 text-gray-500 dark:text-gray-400 text-[11px] font-semibold hover:bg-gray-100 dark:hover:bg-gray-700"
-          >?</button>
-        </div>
-        <p class="text-[11px] text-gray-400 dark:text-gray-500 text-center">
-          Your progress and saved game are stored online and are not affected by either action.
-        </p>
-      </div>
-      <!-- Saved game data (online, stored in the save service) -->
-      <div class="mt-3 border border-amber-300 dark:border-amber-700 rounded-lg p-3 space-y-3">
-        <p class="text-xs font-medium text-gray-700 dark:text-gray-300 text-center">Saved game data (online)</p>
-        <!-- Delete Saved State -->
-        <div class="flex items-center gap-2">
-          <button
-            onclick="mhsDeleteSavedState()"
-            class="flex-1 px-3 py-2 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700"
-          >
-            Delete Saved State
-          </button>
-          <button
-            type="button"
-            onclick="mhsShowActionHelp('delete-state')"
-            aria-label="What does Delete Saved State do?"
-            class="w-5 h-5 shrink-0 flex items-center justify-center rounded-full border border-gray-300 dark:border-gray-500 text-gray-500 dark:text-gray-400 text-[11px] font-semibold hover:bg-gray-100 dark:hover:bg-gray-700"
-          >?</button>
-        </div>
-        <!-- Delete Saved Settings -->
-        <div class="flex items-center gap-2">
-          <button
-            onclick="mhsDeleteSavedSettings()"
-            class="flex-1 px-3 py-2 text-xs font-medium bg-red-600 text-white rounded hover:bg-red-700"
-          >
-            Delete Saved Settings
-          </button>
-          <button
-            type="button"
-            onclick="mhsShowActionHelp('delete-settings')"
-            aria-label="What does Delete Saved Settings do?"
-            class="w-5 h-5 shrink-0 flex items-center justify-center rounded-full border border-gray-300 dark:border-gray-500 text-gray-500 dark:text-gray-400 text-[11px] font-semibold hover:bg-gray-100 dark:hover:bg-gray-700"
-          >?</button>
-        </div>
-        <p class="text-[11px] text-amber-600 dark:text-amber-400 text-center">
-          This permanently deletes the online saved game data. It cannot be undone.
-        </p>
-      </div>
-    </div>
-  </details>
-
-  <!-- Collapsible version details -->
-  <details id="manage-version" class="mt-4 max-w-lg mx-auto w-full">
-    <summary class="text-sm text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300">
-      Manage version
-    </summary>
-    <div id="manage-version-content" class="mt-2 bg-white dark:bg-gray-800 rounded shadow p-3">
-      {{ if .ActiveCollectionName }}
-      <div class="flex items-center justify-between mb-2">
-        <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ .ActiveCollectionName }}</span>
-        {{ if .CollectionOverride }}
-        <span class="text-xs px-2 py-0.5 rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">Override</span>
-        {{ end }}
-      </div>
-      {{ if .ActiveCollectionDesc }}
-      <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">{{ .ActiveCollectionDesc }}</p>
-      {{ end }}
-      <div class="text-xs text-gray-500 dark:text-gray-400 space-y-0.5 mb-3">
-        {{ range .Units }}
-        <div>{{ .Title }} — <span class="font-mono">v{{ .Version }}</span>{{ if .BuildIdentifier }} — <span class="font-mono">{{ .BuildIdentifier }}</span>{{ end }}</div>
-        {{ end }}
-      </div>
-      <div class="flex gap-2">
-        <button onclick="mhsRequestCollectionPicker()" class="px-3 py-1 text-xs bg-indigo-600 text-white rounded hover:bg-indigo-700">Change</button>
-        {{ if .CollectionOverride }}
-        <form id="clear-override-form" method="POST" action="/missionhydrosci/api/collection-override/clear" class="inline">
-          <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}" />
-          <button type="submit" class="px-3 py-1 text-xs border dark:border-gray-600 rounded text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700">Use default</button>
-        </form>
-        {{ end }}
-      </div>
-      {{ else }}
-      <p class="text-sm text-gray-500 dark:text-gray-400">No collection is currently active.</p>
-      {{ end }}
-    </div>
-  </details>
+  <!-- Bottom spacer: with the container's py-2, gives a 16px bottom gap
+       matching the px-4 side gutters. h-2 because this page fits the viewport
+       (the status surface is flex-1), so the container padding stays visible —
+       unlike the manage page, which scrolls and needs h-4. -->
+  <div class="h-2 shrink-0" aria-hidden="true"></div>
+  </section>
 </div>
-
-  <!-- Help modal (shared by the "?" buttons in Manage downloads) -->
-  <div id="mhs-help-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center">
-    <div class="absolute inset-0 bg-black/40" onclick="mhsCloseActionHelp()"></div>
-    <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-300 dark:border-gray-600 max-w-md w-full p-4 space-y-3 mx-4">
-      <h2 id="mhs-help-title" class="text-lg font-semibold text-gray-900 dark:text-gray-100"></h2>
-      <div id="mhs-help-clear-all" class="hidden text-sm text-gray-600 dark:text-gray-300 space-y-2">
-        <p>Removes all downloaded game files from this device &mdash; every unit and every version, not just the current collection.</p>
-        <p>Use this to free up storage space. The app still opens offline, and units download again when you need them.</p>
-        <p class="text-gray-500 dark:text-gray-400">Your progress and saved game are stored online and are not affected.</p>
-      </div>
-      <div id="mhs-help-reset-all" class="hidden text-sm text-gray-600 dark:text-gray-300 space-y-2">
-        <p>Removes everything Clear All Downloads removes, <em>plus</em> the app&rsquo;s cached pages and the Mission HydroSci data stored locally on this device.</p>
-        <p>Use this for troubleshooting &mdash; for example, when a download is stuck or the app is behaving strangely.</p>
-        <p>You will need an internet connection the next time you open Mission HydroSci.</p>
-        <p class="text-gray-500 dark:text-gray-400">Your progress and saved game are stored online and are not affected.</p>
-      </div>
-      <div id="mhs-help-delete-state" class="hidden text-sm text-gray-600 dark:text-gray-300 space-y-2">
-        <p>Permanently deletes the saved game <strong>state</strong> (the in-progress saved game) from the online save service.</p>
-        <p>The next time a unit launches, the game starts with no saved state. This does not change your progress/current unit, downloaded files, or saved settings.</p>
-        <p class="text-amber-600 dark:text-amber-400">This affects online data and cannot be undone.</p>
-      </div>
-      <div id="mhs-help-delete-settings" class="hidden text-sm text-gray-600 dark:text-gray-300 space-y-2">
-        <p>Permanently deletes the saved game <strong>settings</strong> (audio, controls, and other preferences) from the online save service.</p>
-        <p>The next time a unit launches, the game uses default settings. This does not change your progress, downloaded files, or saved state.</p>
-        <p class="text-amber-600 dark:text-amber-400">This affects online data and cannot be undone.</p>
-      </div>
-      <div class="flex justify-end pt-2 border-t border-gray-200 dark:border-gray-700">
-        <button type="button" class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" onclick="mhsCloseActionHelp()">Close</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- Collection picker modal -->
-  <div id="collection-picker-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center">
-    <div class="absolute inset-0 bg-black/40" onclick="mhsCloseCollectionPicker()"></div>
-    <div class="relative bg-white dark:bg-gray-800 rounded-xl shadow border border-gray-300 dark:border-gray-600 max-w-md w-full p-4 space-y-3 mx-4">
-      <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">Choose Collection</h2>
-      <div id="collection-picker-list" class="max-h-64 overflow-y-auto space-y-1">
-        <div class="text-sm text-gray-500 dark:text-gray-400 p-2">Loading...</div>
-      </div>
-      <div class="flex justify-start pt-2 border-t border-gray-200 dark:border-gray-700">
-        <button type="button" class="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700" onclick="mhsCloseCollectionPicker()">Close</button>
-      </div>
-    </div>
-  </div>
 
 <script src="/assets/js/mhs-delivery.js?v={{ mhsDeliveryVersion }}"></script>
 <script>
@@ -583,14 +374,14 @@
   manager.onStatus(function(unitId, status, detail) {
     cacheStatus[unitId] = status;
 
-    // Update the manage-downloads section
+    // Update this unit's status label in the read-only unit list. Per-unit
+    // Download/Clear buttons live on the Manage page, not the launcher, so this
+    // callback only updates the status text and the progress dot.
     var card = document.getElementById('unit-card-' + unitId);
     var unitStatus = card ? card.getAttribute('data-unit-status') : '';
     var statusEl = document.getElementById('status-' + unitId);
-    var downloadBtn = document.getElementById('download-btn-' + unitId);
-    var clearBtn = document.getElementById('clear-btn-' + unitId);
 
-    // Completed units keep static "Completed" label, no buttons
+    // Completed units keep their static "Completed" label
     if (unitStatus === 'completed') {
       // Don't update completed unit UI
     } else if (statusEl) {
@@ -603,39 +394,27 @@
             statusEl.textContent = 'Downloaded';
             statusEl.className = 'text-xs text-blue-600 dark:text-blue-400 ml-2';
           }
-          if (downloadBtn) downloadBtn.classList.add('hidden');
-          if (clearBtn) clearBtn.classList.remove('hidden');
           break;
         case 'not_cached':
           statusEl.textContent = 'Not downloaded';
           statusEl.className = 'text-xs text-gray-400 dark:text-gray-500 ml-2';
-          if (downloadBtn) { downloadBtn.classList.remove('hidden'); downloadBtn.disabled = false; downloadBtn.textContent = 'Download'; }
-          if (clearBtn) clearBtn.classList.add('hidden');
           break;
         case 'partial':
           statusEl.textContent = 'Partial';
           statusEl.className = 'text-xs text-yellow-600 dark:text-yellow-400 ml-2';
-          if (downloadBtn) { downloadBtn.classList.remove('hidden'); downloadBtn.disabled = false; downloadBtn.textContent = 'Re-download'; }
-          if (clearBtn) clearBtn.classList.remove('hidden');
           break;
         case 'downloading':
           var pct = detail.percent || 0;
           statusEl.textContent = 'Downloading ' + pct + '%';
           statusEl.className = 'text-xs text-blue-600 dark:text-blue-400 ml-2';
-          if (downloadBtn) { downloadBtn.classList.remove('hidden'); downloadBtn.disabled = true; downloadBtn.textContent = 'Downloading...'; }
-          if (clearBtn) clearBtn.classList.add('hidden');
           break;
         case 'stalled':
-          statusEl.textContent = 'Download stalled';
+          statusEl.textContent = 'Stalled or paused';
           statusEl.className = 'text-xs text-amber-600 dark:text-amber-400 ml-2';
-          if (downloadBtn) { downloadBtn.classList.remove('hidden'); downloadBtn.disabled = false; downloadBtn.textContent = 'Retry'; }
-          if (clearBtn) clearBtn.classList.add('hidden');
           break;
         case 'error':
           statusEl.textContent = detail.error || 'Failed';
           statusEl.className = 'text-xs text-red-600 dark:text-red-400 ml-2';
-          if (downloadBtn) { downloadBtn.classList.remove('hidden'); downloadBtn.disabled = false; downloadBtn.textContent = 'Retry'; }
-          if (clearBtn) clearBtn.classList.add('hidden');
           break;
       }
     }
@@ -703,7 +482,7 @@
             if (mainPlayBtn) mainPlayBtn.classList.add('hidden');
             break;
           case 'stalled':
-            mainStatus.textContent = 'Download stalled — check your connection, or Retry to start over.';
+            mainStatus.textContent = 'Download stalled or paused — if the browser shows a "Paused" download notification, choose Resume there; or press Retry to restart.';
             mainStatus.className = 'text-sm text-amber-600 dark:text-amber-400 mt-1';
             // Keep the progress bar visible — the download is still running
             if (mainProgressWrap) mainProgressWrap.classList.remove('hidden');
@@ -801,43 +580,6 @@
   function refreshStorageUI() {
     lastStorageRefresh = Date.now();
     updateStorageInfo();
-    updateDownloadButtonVisibility();
-  }
-
-  // Hide download buttons for units that would exceed available storage.
-  // Walks units in manifest order so earlier units claim space first.
-  function updateDownloadButtonVisibility() {
-    manager.getStorageEstimate().then(function(estimate) {
-      if (!estimate || !manager.manifest || !manager.manifest.units) return;
-
-      var available = estimate.quota - estimate.usage;
-      var keepList = buildKeepList();
-
-      for (var i = 0; i < manager.manifest.units.length; i++) {
-        var unit = manager.manifest.units[i];
-        var card = document.getElementById('unit-card-' + unit.id);
-        if (!card) continue;
-        if (card.getAttribute('data-unit-status') === 'completed') continue;
-
-        var btn = document.getElementById('download-btn-' + unit.id);
-        var cs = cacheStatus[unit.id];
-
-        // Already cached, downloading, or stalled — space is already
-        // committed (a stalled download's partial bytes count against usage,
-        // and hiding its Retry button would leave the user with no action)
-        if (cs === 'cached' || cs === 'downloading' || cs === 'stalled') continue;
-
-        var size = unit.totalSize || 0;
-        if (btn && size > available) {
-          btn.classList.add('hidden');
-        }
-
-        // Deduct space for units that are planned (auto-managed or manual)
-        if (keepList.indexOf(unit.id) !== -1) {
-          available -= size;
-        }
-      }
-    });
   }
 
   // Auto-download pipeline
@@ -852,25 +594,18 @@
         // Current unit not cached — download it
         if (currentStatus === 'not_cached' || currentStatus === 'partial') {
           manager.downloadUnit(currentUnit);
-          return;
-        }
-
-        // Current unit cached — show Launch, handle next unit
-        if (currentStatus === 'cached') {
-          // Next unit: auto-download if not low storage
-          if (nextUnit) {
-            var nextStatus = cacheStatus[nextUnit];
-            if ((nextStatus === 'not_cached' || nextStatus === 'partial') && !lowStorage) {
-              manager.downloadUnit(nextUnit);
-            }
-
-            // Auto-cleanup: keep current + next + manual downloads
-            manager.autoCleanup(buildKeepList());
-          } else {
-            // No next unit — keep current + manual downloads
-            manager.autoCleanup(buildKeepList());
+        } else if (currentStatus === 'cached' && nextUnit) {
+          // Current cached — auto-download the next unit if storage allows
+          var nextStatus = cacheStatus[nextUnit];
+          if ((nextStatus === 'not_cached' || nextStatus === 'partial') && !lowStorage) {
+            manager.downloadUnit(nextUnit);
           }
         }
+
+        // Always trim: removes caches AND aborts stray in-flight downloads
+        // for units outside current + next + manual (e.g. a paused fetch
+        // left over from an earlier session on an already-completed unit).
+        manager.autoCleanup(buildKeepList());
       } finally {
         pipelineRunning = false;
       }
@@ -888,7 +623,6 @@
 
     // Start the auto-download pipeline after init
     runPipeline();
-    updateDownloadButtonVisibility();
   });
 
   // After a deploy, the updated service worker takes control mid-load
@@ -922,11 +656,9 @@
     }
     if (cacheStatus[unitId] === 'stalled') {
       // Retry of a stalled download: abort the stuck fetch and start over.
-      // Disable the buttons now — retryDownload awaits before 'downloading'
-      // re-disables them, and a double click must not race two retries
+      // Disable the hero button now — retryDownload awaits before 'downloading'
+      // re-disables it, and a double click must not race two retries
       // (retryDownload also guards re-entrancy itself).
-      var retryBtn = document.getElementById('download-btn-' + unitId);
-      if (retryBtn) retryBtn.disabled = true;
       if (unitId === currentUnit) {
         var mainRetryBtn = document.getElementById('download-btn');
         if (mainRetryBtn) mainRetryBtn.disabled = true;
@@ -935,395 +667,6 @@
       return;
     }
     manager.downloadUnit(unitId);
-  };
-
-  window.mhsClearCache = function(unitId) {
-    if (confirm('Remove downloaded files for this unit?')) {
-      removeManualDownload(unitId);
-      manager.deleteUnit(unitId).then(function() {
-        runPipeline();
-      });
-    }
-  };
-
-  var isMember = {{ if eq .Role "member" }}true{{ else }}false{{ end }};
-  var memberAuthMode = '{{ .MHSMemberAuth }}';
-
-  // --- Authorization modal (multi-mode: keyword, staff auth) ---
-  var authModalCallback = null;  // Function to call on success, receives {auth_token, keyword}
-  var authModalStep = '';        // 'keyword', 'login', 'password', 'email'
-  var authChallengeID = '';
-  var authActionTitle = '';
-
-  function showAuthModal(title, desc, callback) {
-    authModalCallback = callback;
-    authActionTitle = title;
-    document.getElementById('auth-modal-title').textContent = title;
-    document.getElementById('auth-modal-desc').textContent = desc;
-    document.getElementById('auth-modal-error').classList.add('hidden');
-    document.getElementById('auth-modal-loading').classList.add('hidden');
-
-    // Hide all steps
-    document.getElementById('auth-step-keyword').classList.add('hidden');
-    document.getElementById('auth-step-login').classList.add('hidden');
-    document.getElementById('auth-step-password').classList.add('hidden');
-    document.getElementById('auth-step-email').classList.add('hidden');
-    document.getElementById('auth-resend-btn').classList.add('hidden');
-
-    // Clear inputs
-    document.getElementById('auth-keyword-input').value = '';
-    document.getElementById('auth-login-input').value = '';
-    document.getElementById('auth-password-input').value = '';
-    document.getElementById('auth-code-input').value = '';
-    authChallengeID = '';
-
-    if (memberAuthMode === 'keyword') {
-      authModalStep = 'keyword';
-      document.getElementById('auth-step-keyword').classList.remove('hidden');
-      document.getElementById('auth-modal-submit').textContent = 'Confirm';
-    } else {
-      // staffauth
-      authModalStep = 'login';
-      document.getElementById('auth-step-login').classList.remove('hidden');
-      document.getElementById('auth-modal-submit').textContent = 'Next';
-    }
-
-    document.getElementById('auth-modal').classList.remove('hidden');
-
-    // Focus the visible input
-    setTimeout(function() {
-      if (authModalStep === 'keyword') {
-        document.getElementById('auth-keyword-input').focus();
-      } else {
-        document.getElementById('auth-login-input').focus();
-      }
-    }, 50);
-  }
-
-  function showAuthError(msg) {
-    var el = document.getElementById('auth-modal-error');
-    el.textContent = msg;
-    el.classList.remove('hidden');
-    document.getElementById('auth-modal-loading').classList.add('hidden');
-  }
-
-  function showAuthLoading(show) {
-    if (show) {
-      document.getElementById('auth-modal-loading').classList.remove('hidden');
-      document.getElementById('auth-modal-error').classList.add('hidden');
-    } else {
-      document.getElementById('auth-modal-loading').classList.add('hidden');
-    }
-  }
-
-  window.mhsCloseAuthModal = function() {
-    document.getElementById('auth-modal').classList.add('hidden');
-    authModalCallback = null;
-    authChallengeID = '';
-  };
-
-  window.mhsSubmitAuthModal = function() {
-    document.getElementById('auth-modal-error').classList.add('hidden');
-
-    if (authModalStep === 'keyword') {
-      var keyword = document.getElementById('auth-keyword-input').value;
-      if (!keyword) { showAuthError('Please enter the keyword.'); return; }
-      showAuthLoading(true);
-      // Validate keyword server-side
-      fetch('/missionhydrosci/api/auth/keyword', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify({ keyword: keyword })
-      }).then(function(resp) {
-        return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
-      }).then(function(result) {
-        showAuthLoading(false);
-        if (!result.ok) { showAuthError(result.data.error || 'Incorrect keyword.'); return; }
-        document.getElementById('auth-modal').classList.add('hidden');
-        if (authModalCallback) authModalCallback({ keyword: keyword });
-        authModalCallback = null;
-      }).catch(function() {
-        showAuthLoading(false);
-        showAuthError('Verification failed. Please try again.');
-      });
-
-    } else if (authModalStep === 'login') {
-      var loginID = document.getElementById('auth-login-input').value.trim();
-      if (!loginID) { showAuthError('Please enter a staff login ID.'); return; }
-      showAuthLoading(true);
-      fetch('/missionhydrosci/api/auth/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify({ login_id: loginID })
-      }).then(function(resp) {
-        return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
-      }).then(function(result) {
-        showAuthLoading(false);
-        if (!result.ok) { showAuthError(result.data.error || 'Authentication failed.'); return; }
-        var data = result.data;
-        if (data.method === 'trust') {
-          // Immediate success
-          document.getElementById('auth-modal').classList.add('hidden');
-          if (authModalCallback) authModalCallback({ auth_token: data.token });
-          authModalCallback = null;
-        } else if (data.method === 'password') {
-          authChallengeID = data.challenge_id;
-          authModalStep = 'password';
-          document.getElementById('auth-step-login').classList.add('hidden');
-          document.getElementById('auth-step-password').classList.remove('hidden');
-          document.getElementById('auth-staff-name').textContent = 'Enter password for ' + data.staff_name;
-          document.getElementById('auth-modal-submit').textContent = 'Verify';
-          document.getElementById('auth-password-input').focus();
-        } else if (data.method === 'email') {
-          authChallengeID = data.challenge_id;
-          authModalStep = 'email';
-          document.getElementById('auth-step-login').classList.add('hidden');
-          document.getElementById('auth-step-email').classList.remove('hidden');
-          document.getElementById('auth-email-name').textContent = 'A verification code was sent to ' + data.staff_name + '\'s email.';
-          document.getElementById('auth-resend-btn').classList.remove('hidden');
-          document.getElementById('auth-modal-submit').textContent = 'Verify';
-          document.getElementById('auth-code-input').focus();
-        }
-      }).catch(function() {
-        showAuthLoading(false);
-        showAuthError('Authentication failed. Please try again.');
-      });
-
-    } else if (authModalStep === 'password') {
-      var password = document.getElementById('auth-password-input').value;
-      if (!password) { showAuthError('Please enter the password.'); return; }
-      showAuthLoading(true);
-      fetch('/missionhydrosci/api/auth/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify({ challenge_id: authChallengeID, credential: password })
-      }).then(function(resp) {
-        return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
-      }).then(function(result) {
-        showAuthLoading(false);
-        if (!result.ok) { showAuthError(result.data.error || 'Incorrect password.'); return; }
-        document.getElementById('auth-modal').classList.add('hidden');
-        if (authModalCallback) authModalCallback({ auth_token: result.data.token });
-        authModalCallback = null;
-      }).catch(function() {
-        showAuthLoading(false);
-        showAuthError('Verification failed. Please try again.');
-      });
-
-    } else if (authModalStep === 'email') {
-      var code = document.getElementById('auth-code-input').value.trim();
-      if (!code) { showAuthError('Please enter the verification code.'); return; }
-      showAuthLoading(true);
-      fetch('/missionhydrosci/api/auth/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-        body: JSON.stringify({ challenge_id: authChallengeID, credential: code })
-      }).then(function(resp) {
-        return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
-      }).then(function(result) {
-        showAuthLoading(false);
-        if (!result.ok) { showAuthError(result.data.error || 'Incorrect code.'); return; }
-        document.getElementById('auth-modal').classList.add('hidden');
-        if (authModalCallback) authModalCallback({ auth_token: result.data.token });
-        authModalCallback = null;
-      }).catch(function() {
-        showAuthLoading(false);
-        showAuthError('Verification failed. Please try again.');
-      });
-    }
-  };
-
-  window.mhsResendCode = function() {
-    if (!authChallengeID) return;
-    var btn = document.getElementById('auth-resend-btn');
-    btn.textContent = 'Sending...';
-    btn.disabled = true;
-    fetch('/missionhydrosci/api/auth/resend', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-      body: JSON.stringify({ challenge_id: authChallengeID })
-    }).then(function(resp) {
-      if (resp.ok) {
-        btn.textContent = 'Code resent';
-      } else {
-        btn.textContent = 'Resend failed';
-      }
-      setTimeout(function() { btn.textContent = 'Resend code'; btn.disabled = false; }, 3000);
-    }).catch(function() {
-      btn.textContent = 'Resend code';
-      btn.disabled = false;
-    });
-  };
-
-  // --- Set to Unit ---
-  function doSetToUnit(unit, authData) {
-    var body = { unit: unit };
-    if (authData && authData.auth_token) body.auth_token = authData.auth_token;
-    if (authData && authData.keyword) body.keyword = authData.keyword;
-
-    fetch('/missionhydrosci/api/progress/set-unit', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-CSRF-Token': csrfToken
-      },
-      body: JSON.stringify(body)
-    })
-    .then(function(resp) {
-      if (!resp.ok) throw new Error('set unit failed');
-      return resp.json();
-    })
-    .then(function() {
-      window.location.reload();
-    })
-    .catch(function(err) {
-      alert('Failed to set progress: ' + err.message);
-    });
-  }
-
-  window.mhsSetToUnit = function() {
-    var select = document.getElementById('set-unit-select');
-    var unit = select.value;
-    var unitTitle = select.options[select.selectedIndex].text;
-
-    if (isMember && memberAuthMode !== 'trust') {
-      showAuthModal(
-        'Set progress to ' + unitTitle,
-        'This will update your current unit and mark all prior units as completed.',
-        function(authData) { doSetToUnit(unit, authData); }
-      );
-    } else {
-      if (!confirm('Set progress to ' + unitTitle + '? This will mark all prior units as completed.')) return;
-      doSetToUnit(unit, {});
-    }
-  };
-
-  // --- Clear All Downloads ---
-  function doClearAllDownloads() {
-    // The purge fires 'not_cached' for every unit; the pipeline must not
-    // react and start re-downloads mid-purge — the reload restarts it clean.
-    isReloading = true;
-    manager.deleteAllUnits().then(function() {
-      localStorage.removeItem(MANUAL_DL_KEY);
-      manualDownloads = [];
-      window.location.reload();
-    }).catch(function(err) {
-      isReloading = false; // no reload is coming — let the pipeline run again
-      alert('Failed to clear downloads: ' + err.message);
-    });
-  }
-
-  window.mhsClearAllDownloads = function() {
-    if (isMember && memberAuthMode !== 'trust') {
-      showAuthModal(
-        'Clear all downloads',
-        'This will remove all downloaded unit files from this device.',
-        function() { doClearAllDownloads(); }
-      );
-    } else {
-      if (!confirm('Remove all downloaded unit files from this device?')) return;
-      doClearAllDownloads();
-    }
-  };
-
-  // --- Delete saved game data (online, via the save service) ---
-  // Unlike Clear/Reset (local device only), these delete the player's saved
-  // state/settings from the online save service so the data is gone before the
-  // next unit launches. StrataHub calls the save-service delete API server-side.
-  function doDeleteSaveData(target, label, authData) {
-    var body = {};
-    if (authData && authData.auth_token) body.auth_token = authData.auth_token;
-    if (authData && authData.keyword) body.keyword = authData.keyword;
-
-    fetch('/missionhydrosci/api/save-data/' + target + '/delete', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
-      body: JSON.stringify(body)
-    })
-    .then(function(resp) {
-      if (!resp.ok) {
-        return resp.text().then(function(t) { throw new Error(t.trim() || ('HTTP ' + resp.status)); });
-      }
-      return resp.json();
-    })
-    .then(function(data) {
-      var n = data.deleted || 0;
-      alert('Deleted saved ' + label + '. (' + n + ' record' + (n === 1 ? '' : 's') + ' removed.)');
-    })
-    .catch(function(err) {
-      alert('Failed to delete saved ' + label + ': ' + err.message);
-    });
-  }
-
-  function mhsDeleteSaveData(target, label) {
-    var title = 'Delete saved ' + label;
-    var desc = 'This permanently deletes the online saved ' + label + '. It cannot be undone.';
-    if (isMember && memberAuthMode !== 'trust') {
-      showAuthModal(title, desc, function(authData) { doDeleteSaveData(target, label, authData); });
-    } else {
-      if (!confirm(desc + ' Continue?')) return;
-      doDeleteSaveData(target, label, {});
-    }
-  }
-
-  window.mhsDeleteSavedState = function() { mhsDeleteSaveData('state', 'state'); };
-  window.mhsDeleteSavedSettings = function() { mhsDeleteSaveData('settings', 'settings'); };
-
-  // --- Help modal for the Manage-downloads actions ---
-  // Named "ActionHelp" to avoid colliding with mhsOpenHelp/mhsCloseHelp,
-  // which belong to the PWA install help modal (#help-modal) further down.
-  var ACTION_HELP_TITLES = {
-    'clear-all': 'Clear All Downloads',
-    'reset-all': 'Reset All MHS Data',
-    'delete-state': 'Delete Saved State',
-    'delete-settings': 'Delete Saved Settings'
-  };
-
-  window.mhsShowActionHelp = function(topic) {
-    var modal = document.getElementById('mhs-help-modal');
-    var title = document.getElementById('mhs-help-title');
-    if (!modal || !ACTION_HELP_TITLES[topic]) return;
-    title.textContent = ACTION_HELP_TITLES[topic];
-    document.getElementById('mhs-help-clear-all').classList.toggle('hidden', topic !== 'clear-all');
-    document.getElementById('mhs-help-reset-all').classList.toggle('hidden', topic !== 'reset-all');
-    document.getElementById('mhs-help-delete-state').classList.toggle('hidden', topic !== 'delete-state');
-    document.getElementById('mhs-help-delete-settings').classList.toggle('hidden', topic !== 'delete-settings');
-    modal.classList.remove('hidden');
-  };
-
-  window.mhsCloseActionHelp = function() {
-    var modal = document.getElementById('mhs-help-modal');
-    if (modal) modal.classList.add('hidden');
-  };
-
-  // --- Reset all MHS data ---
-  var RESET_ALL_DESC = 'Removes all downloaded Mission HydroSci files and local data from this device. ' +
-    'Your progress and saved game are stored online and are not affected.';
-
-  function doResetAllData() {
-    // Suppress pipeline reactions to the purge's status churn (see doClearAllDownloads)
-    isReloading = true;
-    // mhs-device-id is intentionally kept so device telemetry stays continuous
-    manager.purgeAllMHSData([MANUAL_DL_KEY, 'mhs-progress-queue', 'missionhydrosci-progress-changed', MHSDeliveryManager.ACTIVE_PLAY_KEY]).then(function() {
-      manualDownloads = [];
-      window.location.reload();
-    }).catch(function(err) {
-      isReloading = false; // no reload is coming — let the pipeline run again
-      alert('Failed to reset MHS data: ' + err.message);
-    });
-  }
-
-  window.mhsResetAllData = function() {
-    if (isMember && memberAuthMode !== 'trust') {
-      showAuthModal(
-        'Reset all MHS data',
-        RESET_ALL_DESC,
-        function() { doResetAllData(); }
-      );
-    } else {
-      if (!confirm(RESET_ALL_DESC + ' Continue?')) return;
-      doResetAllData();
-    }
   };
 
   // Storage info display
@@ -1517,166 +860,48 @@
       '<p>Look for an install option in your browser\'s menu or address bar. The app will open in its own window without browser controls.</p>';
   }
 
+  var mhsHelpLastFocus = null;
+  function mhsHelpFocusable() {
+    var modal = document.getElementById('help-modal');
+    return modal.querySelectorAll('button, a[href], input, [tabindex]:not([tabindex="-1"])');
+  }
+
   window.mhsOpenHelp = function() {
-    document.getElementById('help-modal').classList.remove('hidden');
+    var modal = document.getElementById('help-modal');
+    mhsHelpLastFocus = document.activeElement;
+    modal.classList.remove('hidden');
+    // Move focus into the dialog (the Close button) so keyboard/screen-reader
+    // users are inside it, not on the obscured page behind the backdrop.
+    var f = mhsHelpFocusable();
+    if (f.length) f[f.length - 1].focus();
   };
 
   window.mhsCloseHelp = function() {
     document.getElementById('help-modal').classList.add('hidden');
+    // Restore focus to whatever opened the dialog.
+    if (mhsHelpLastFocus && mhsHelpLastFocus.focus) mhsHelpLastFocus.focus();
+    mhsHelpLastFocus = null;
   };
 
   document.addEventListener('keydown', function(e) {
+    var helpModal = document.getElementById('help-modal');
+    if (helpModal.classList.contains('hidden')) return;
     if (e.key === 'Escape') {
-      var authModal = document.getElementById('auth-modal');
-      var helpModal = document.getElementById('help-modal');
-      if (!authModal.classList.contains('hidden')) {
-        mhsCloseAuthModal();
-      } else if (!helpModal.classList.contains('hidden')) {
-        mhsCloseHelp();
-      } else if (!document.getElementById('mhs-help-modal').classList.contains('hidden')) {
-        mhsCloseActionHelp();
-      } else if (!document.getElementById('collection-picker-modal').classList.contains('hidden')) {
-        mhsCloseCollectionPicker();
+      mhsCloseHelp();
+      return;
+    }
+    if (e.key === 'Tab') {
+      // Trap Tab within the dialog.
+      var f = mhsHelpFocusable();
+      if (!f.length) return;
+      var first = f[0], last = f[f.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus();
       }
     }
   });
-
-  // Collection picker with auth gate for members. The auth proof is kept and
-  // sent with the override POST — the server enforces member auth on
-  // /api/collection-override, so the modal alone is not the gate.
-  var collectionAuthData = null;
-
-  window.mhsRequestCollectionPicker = function() {
-    if (isMember && memberAuthMode !== 'trust') {
-      showAuthModal(
-        'Change collection',
-        'Authorization required to change the active collection.',
-        function(authData) {
-          collectionAuthData = authData || null;
-          mhsOpenCollectionPicker();
-        }
-      );
-    } else {
-      collectionAuthData = null;
-      mhsOpenCollectionPicker();
-    }
-  };
-
-  // "Use default" (clear override) is also a version switch — gate it for
-  // members and attach the auth proof for server-side enforcement.
-  var clearOverrideForm = document.getElementById('clear-override-form');
-  if (clearOverrideForm && isMember && memberAuthMode !== 'trust') {
-    clearOverrideForm.addEventListener('submit', function(e) {
-      e.preventDefault();
-      showAuthModal(
-        'Use default collection',
-        'Authorization required to change the active collection.',
-        function(authData) {
-          function addHidden(name, value) {
-            var input = document.createElement('input');
-            input.type = 'hidden';
-            input.name = name;
-            input.value = value;
-            clearOverrideForm.appendChild(input);
-          }
-          if (authData && authData.auth_token) addHidden('auth_token', authData.auth_token);
-          if (authData && authData.keyword) addHidden('keyword', authData.keyword);
-          // Programmatic submit skips this listener, so no re-entry guard needed
-          clearOverrideForm.submit();
-        }
-      );
-    });
-  }
-
-  // Collection picker
-  var activeCollectionID = '{{ .ActiveCollectionID }}';
-  var hasOverride = {{ if .CollectionOverride }}true{{ else }}false{{ end }};
-
-  window.mhsOpenCollectionPicker = function() {
-    var modal = document.getElementById('collection-picker-modal');
-    var list = document.getElementById('collection-picker-list');
-    modal.classList.remove('hidden');
-    list.innerHTML = '<div class="text-sm text-gray-500 dark:text-gray-400 p-2">Loading...</div>';
-
-    fetch('/missionhydrosci/api/collections')
-      .then(function(r) { return r.json(); })
-      .then(function(collections) {
-        var defaultActive = !hasOverride;
-        var html = '<button onclick="mhsSelectCollection(\'default\')" class="w-full text-left px-3 py-2 text-sm rounded ' + (defaultActive ? 'bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-300 dark:border-indigo-700' : 'hover:bg-gray-100 dark:hover:bg-gray-700') + ' text-gray-700 dark:text-gray-300">';
-        html += '<span class="font-medium">Default</span>';
-        if (defaultActive) html += ' <span class="text-xs text-indigo-600 dark:text-indigo-400">(current)</span>';
-        html += '<span class="block text-xs text-gray-500 dark:text-gray-400">Use group/workspace active collection</span>';
-        html += '</button>';
-        for (var i = 0; i < collections.length; i++) {
-          var c = collections[i];
-          var isCurrent = hasOverride && (c.id === activeCollectionID);
-          html += '<button onclick="mhsSelectCollection(\'' + c.id + '\')" class="w-full text-left px-3 py-2 text-sm rounded ' + (isCurrent ? 'bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-300 dark:border-indigo-700' : 'hover:bg-gray-100 dark:hover:bg-gray-700') + ' text-gray-700 dark:text-gray-300">';
-          html += '<span class="font-medium">' + escapeHtml(c.name) + '</span>';
-          if (isCurrent) html += ' <span class="text-xs text-indigo-600 dark:text-indigo-400">(current)</span>';
-          html += '<span class="block text-xs text-gray-500 dark:text-gray-400 font-mono">' + escapeHtml(c.units_summary) + '</span>';
-          html += '</button>';
-        }
-        list.innerHTML = html;
-      })
-      .catch(function() {
-        list.innerHTML = '<div class="text-sm text-red-500 p-2">Failed to load collections.</div>';
-      });
-  };
-
-  window.mhsCloseCollectionPicker = function() {
-    document.getElementById('collection-picker-modal').classList.add('hidden');
-  };
-
-  window.mhsSelectCollection = function(id) {
-    var form = new FormData();
-    form.append('collection_id', id);
-    // Carry the member-auth proof through — the server enforces it
-    if (collectionAuthData && collectionAuthData.auth_token) form.append('auth_token', collectionAuthData.auth_token);
-    if (collectionAuthData && collectionAuthData.keyword) form.append('keyword', collectionAuthData.keyword);
-    fetch('/missionhydrosci/api/collection-override', {
-      method: 'POST',
-      headers: { 'X-CSRF-Token': '{{ .CSRFToken }}' },
-      body: form
-    }).then(function(r) {
-      if (r.ok) {
-        // Reload with hash to keep Manage version open and signal success
-        window.location.href = '/missionhydrosci/units?vc=1#manage-version';
-      } else if (r.status === 403) {
-        // Staff-auth tokens are single-use; a second pick needs a fresh one
-        mhsCloseCollectionPicker();
-        alert('Authorization required or expired. Please choose "Change" again to re-authorize.');
-      } else {
-        alert('Failed to set collection. Please try again.');
-      }
-    }).catch(function() {
-      alert('Failed to set collection.');
-    });
-  };
-
-  function escapeHtml(s) {
-    var d = document.createElement('div');
-    d.appendChild(document.createTextNode(s));
-    return d.innerHTML;
-  }
-
-  // Auto-open Manage version and show success after collection change
-  if (new URLSearchParams(window.location.search).get('vc') === '1') {
-    var details = document.getElementById('manage-version');
-    if (details) {
-      details.open = true;
-      // Show brief success indicator
-      var content = document.getElementById('manage-version-content');
-      if (content) {
-        var msg = document.createElement('div');
-        msg.className = 'mb-2 p-2 text-xs rounded bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300';
-        msg.textContent = 'Collection updated.';
-        content.insertBefore(msg, content.firstChild);
-        setTimeout(function() { msg.remove(); }, 4000);
-      }
-    }
-    // Clean URL
-    history.replaceState(null, '', '/missionhydrosci/units');
-  }
 })();
 </script>
 {{ end }}

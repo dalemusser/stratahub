@@ -42,6 +42,13 @@ var (
 	ErrInvalidCredential  = errors.New("invalid credential")
 	ErrCodeExpired        = errors.New("verification code expired")
 	ErrTooManyAttempts    = errors.New("too many verification attempts")
+	// ErrUnsupportedAuthMethod is returned when a staff account's auth method
+	// cannot be verified inline (e.g. SSO). SSO providers are not implemented
+	// yet, and until they are we must NOT mint a verified token for them, or the
+	// Mission HydroSci member gate ships open the day SSO is enabled. This makes
+	// finishing SSO a deliberate act. See
+	// internal/app/features/missionhydrosci/SSO-STATUS.md.
+	ErrUnsupportedAuthMethod = errors.New("this authentication method cannot authorize inline")
 )
 
 // staffRoles are roles that qualify as "staff" for supervisor override.
@@ -180,17 +187,12 @@ func (v *Verifier) StartAuth(ctx context.Context, wsID primitive.ObjectID, login
 		}, nil
 
 	default:
-		// For SSO methods (google, microsoft, classlink, clever), fall back to
-		// simple confirmation since we can't initiate an OAuth flow inline.
-		token, err := v.Store.CreateVerifiedToken(ctx, wsID, user.ID, user.FullName)
-		if err != nil {
-			return nil, fmt.Errorf("create sso trust token: %w", err)
-		}
-		return &StartResult{
-			Method:    "trust",
-			Token:     token,
-			StaffName: user.FullName,
-		}, nil
+		// SSO methods (google, microsoft, classlink, clever) are not yet
+		// implemented (see missionhydrosci/SSO-STATUS.md). We deliberately DO
+		// NOT mint a verified token here: doing so would let anyone who knows an
+		// SSO-backed staff login ID authorize gated member actions with no
+		// credential check. Fail closed until real SSO verification exists.
+		return nil, ErrUnsupportedAuthMethod
 	}
 }
 

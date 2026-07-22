@@ -57,6 +57,12 @@ func (s *Store) Upsert(ctx context.Context, status models.MHSDeviceStatus) error
 
 	opts := options.Update().SetUpsert(true)
 	_, err := s.c.UpdateOne(ctx, filter, update, opts)
+	if mongo.IsDuplicateKeyError(err) {
+		// Two concurrent first reports for the same device raced the upsert:
+		// both missed the filter and both inserted. The loser's retry now
+		// matches the winner's document and becomes a plain update.
+		_, err = s.c.UpdateOne(ctx, filter, update, opts)
+	}
 	return err
 }
 

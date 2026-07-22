@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"github.com/dalemusser/stratahub/internal/app/store/emailverify"
 	"github.com/dalemusser/stratahub/internal/app/system/staffauth"
@@ -33,10 +34,6 @@ type staffAuthResendRequest struct {
 	ChallengeID string `json:"challenge_id"`
 }
 
-type staffAuthKeywordRequest struct {
-	Keyword string `json:"keyword"`
-}
-
 // HandleStaffAuthStart begins a staff authentication flow.
 func (h *Handler) HandleStaffAuthStart(w http.ResponseWriter, r *http.Request) {
 	var req staffAuthStartRequest
@@ -63,6 +60,8 @@ func (h *Handler) HandleStaffAuthStart(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, "This user does not belong to this workspace.", http.StatusForbidden)
 		case staffauth.ErrNoEmail:
 			jsonError(w, "This user has email authentication but no email address is available. The account may need to be fixed.", http.StatusBadRequest)
+		case staffauth.ErrUnsupportedAuthMethod:
+			jsonError(w, "This staff account signs in with a method (SSO) that can't authorize here yet. Use a staff account with a password or email code.", http.StatusBadRequest)
 		default:
 			h.Log.Error("staff auth start failed", zap.Error(err))
 			jsonError(w, "Authentication failed. Please try again.", http.StatusInternalServerError)
@@ -91,8 +90,22 @@ func (h *Handler) HandleStaffAuthVerify(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
+	// Per-member backoff on repeated credential failures (password/email code),
+	// sharing the budget with the keyword/token surface in checkMemberAuth.
+	throttleKey, hasKey := h.authThrottleKey(r)
+	now := time.Now()
+	if hasKey {
+		if wait := h.authThrottle.retryAfter(throttleKey, now); wait > 0 {
+			jsonError(w, "Too many attempts. Please wait a moment and try again.", http.StatusTooManyRequests)
+			return
+		}
+	}
+
 	result, err := h.StaffAuthVerifier.VerifyAuth(r.Context(), req.ChallengeID, req.Credential)
 	if err != nil {
+		if hasKey {
+			h.authThrottle.fail(throttleKey, now)
+		}
 		switch err {
 		case staffauth.ErrChallengeNotFound:
 			jsonError(w, "Challenge not found or expired. Please start over.", http.StatusNotFound)
@@ -109,6 +122,9 @@ func (h *Handler) HandleStaffAuthVerify(w http.ResponseWriter, r *http.Request) 
 			jsonError(w, "Verification failed. Please try again.", http.StatusInternalServerError)
 		}
 		return
+	}
+	if hasKey {
+		h.authThrottle.success(throttleKey)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -142,35 +158,6 @@ func (h *Handler) HandleStaffAuthResend(w http.ResponseWriter, r *http.Request) 
 			h.Log.Error("staff auth resend failed", zap.Error(err))
 			jsonError(w, "Failed to resend. Please try again.", http.StatusInternalServerError)
 		}
-		return
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Write([]byte(`{"ok":true}`))
-}
-
-// HandleKeywordVerify validates a keyword against the workspace setting.
-func (h *Handler) HandleKeywordVerify(w http.ResponseWriter, r *http.Request) {
-	var req staffAuthKeywordRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		jsonError(w, "invalid request body", http.StatusBadRequest)
-		return
-	}
-
-	wsID := workspace.IDFromRequest(r)
-	settings, err := h.loadSettings(r.Context(), wsID)
-	if err != nil {
-		h.Log.Error("failed to load settings for keyword verify", zap.Error(err))
-		jsonError(w, "internal error", http.StatusInternalServerError)
-		return
-	}
-
-	if settings.GetMHSMemberAuth() != "keyword" {
-		jsonError(w, "keyword mode is not active", http.StatusBadRequest)
-		return
-	}
-	if req.Keyword != settings.MHSMemberAuthKeyword {
-		jsonError(w, "Incorrect keyword.", http.StatusUnauthorized)
 		return
 	}
 

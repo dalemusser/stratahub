@@ -93,7 +93,7 @@
         <input type="radio" name="mhs_member_auth" value="staffauth"
                {{ if eq .MHSMemberAuth "staffauth" }}checked{{ end }}
                class="mr-2 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-               onchange="document.getElementById('mhs-keyword-field').classList.add('hidden')">
+               onchange="document.getElementById('mhs-keyword-field').classList.add('hidden'); document.getElementById('mhs-unlock-field').classList.remove('hidden')">
         <span class="text-sm text-gray-700 dark:text-gray-300">Staff Auth</span>
         <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(a leader/admin must authenticate on the device)</span>
       </label>
@@ -101,7 +101,7 @@
         <input type="radio" name="mhs_member_auth" value="keyword"
                {{ if eq .MHSMemberAuth "keyword" }}checked{{ end }}
                class="mr-2 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-               onchange="document.getElementById('mhs-keyword-field').classList.remove('hidden')">
+               onchange="document.getElementById('mhs-keyword-field').classList.remove('hidden'); document.getElementById('mhs-unlock-field').classList.remove('hidden')">
         <span class="text-sm text-gray-700 dark:text-gray-300">Keyword</span>
         <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(member must enter a keyword)</span>
       </label>
@@ -114,10 +114,19 @@
         <input type="radio" name="mhs_member_auth" value="trust"
                {{ if eq .MHSMemberAuth "trust" }}checked{{ end }}
                class="mr-2 border-gray-300 text-indigo-600 focus:ring-indigo-500"
-               onchange="document.getElementById('mhs-keyword-field').classList.add('hidden')">
+               onchange="document.getElementById('mhs-keyword-field').classList.add('hidden'); document.getElementById('mhs-unlock-field').classList.add('hidden')">
         <span class="text-sm text-gray-700 dark:text-gray-300">Trust</span>
         <span class="ml-2 text-xs text-gray-500 dark:text-gray-400">(member only confirms via dialog)</span>
       </label>
+      <div id="mhs-unlock-field" class="pt-2 border-t dark:border-gray-600 {{ if eq .MHSMemberAuth "trust" }}hidden{{ end }}">
+        <label class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Staff unlock duration (minutes)</label>
+        <input name="mhs_staff_unlock_minutes" type="number" min="1" max="120" value="{{ .MHSStaffUnlockMinutes }}"
+               class="w-24 border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm">
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          After staff authorize on a member's device, the Mission HydroSci manage page stays unlocked
+          this long, extending with each action. It can also be locked immediately from the page.
+        </p>
+      </div>
     </div>
   </div>
 
