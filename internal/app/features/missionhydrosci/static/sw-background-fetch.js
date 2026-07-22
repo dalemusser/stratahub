@@ -15,6 +15,33 @@ function parseFetchId(fetchId) {
   return { unitId: fetchId.replace('missionhydrosci-', ''), version: null };
 }
 
+// Classifies a caught download/cache error into a machine-readable class + a
+// student-friendly, actionable message. Used for both the UI status and the
+// server-side telemetry (see mhs-delivery.js _reportDownloadError).
+//   - quota:   out of device storage (QuotaExceededError).
+//   - network: the transfer was interrupted mid-stream — the classic
+//              "Cache.put() encountered a network error" / "Failed to fetch".
+//              Usually flaky network or security software (antivirus/VPN)
+//              inspecting downloads, NOT the user's account.
+//   - generic: anything else.
+function classifyDownloadError(err) {
+  var name = (err && err.name) || '';
+  var msg = (err && err.message) ? String(err.message) : String(err || '');
+  if (name === 'QuotaExceededError' || /quota|exceeded the quota/i.test(msg)) {
+    return {
+      cls: 'quota',
+      message: 'Not enough free space on this device to save the download. Free up space (or clear other downloads) and try again.'
+    };
+  }
+  if (name === 'TypeError' || /cache\.put|network error|failed to fetch|load failed|networkerror/i.test(msg)) {
+    return {
+      cls: 'network',
+      message: 'The download was interrupted. This is usually a network or security-software (antivirus/VPN) issue, not your account — check your connection and tap Retry. If it keeps failing, try a different network.'
+    };
+  }
+  return { cls: 'generic', message: 'The download could not be completed. Please tap Retry.' };
+}
+
 // Fetch IDs whose progress broadcaster is attached in THIS SW lifetime. The
 // SW can be terminated and restarted mid-download — the set resets with it,
 // and the pages' periodic 'attachProgress' keepalive re-attaches.
@@ -345,7 +372,14 @@ async function runFallbackFetch(fallbackKey, unitId, version, files, cdnBaseUrl,
     // where re-downloading a large unit from zero may never converge.
     // Reclamation of abandoned partials is handled by pruneStaleCaches
     // (version changes) and the explicit Clear/Reset controls.
-    broadcastStatus(unitId, 'error', { error: err.message, version: version });
+    var info = classifyDownloadError(err);
+    broadcastStatus(unitId, 'error', {
+      error: info.message,                                  // friendly, shown in UI
+      errorClass: info.cls,                                 // machine-readable, for telemetry
+      rawError: (err && err.message ? String(err.message) : String(err)).slice(0, 500),
+      path: 'fallback',
+      version: version
+    });
     return false;
   } finally {
     fallbackRuns.delete(fallbackKey);
@@ -383,6 +417,7 @@ async function handleBackgroundFetchSuccess(event) {
   var cache = await caches.open(cacheName);
   var records = await bgFetch.matchAll();
   var cached = 0;
+  var firstErr = null;
 
   for (var i = 0; i < records.length; i++) {
     var record = records[i];
@@ -412,6 +447,7 @@ async function handleBackgroundFetchSuccess(event) {
       }
     } catch (err) {
       console.error('Failed to cache record:', record.request.url, err);
+      if (!firstErr) firstErr = err; // representative error for messaging + telemetry
     }
   }
 
@@ -425,9 +461,17 @@ async function handleBackgroundFetchSuccess(event) {
   // can't help. Report 'error' so the unit stays not-ready and can be retried.
   if (records.length === 0 || cached !== records.length) {
     console.error('Background Fetch incomplete cache:', cached, 'of', records.length, '— reporting error');
+    // Attribute to the actual failure when we caught one (network interruption
+    // vs. genuinely out of space) rather than always blaming storage.
+    var info = firstErr
+      ? classifyDownloadError(firstErr)
+      : { cls: 'incomplete', message: 'The download finished but some files could not be saved. This is usually a network interruption or low device storage — please tap Retry.' };
     broadcastStatus(unitId, 'error', {
       version: version,
-      error: 'Download finished but some files could not be saved (storage may be full). Try again or clear space.'
+      error: info.message,
+      errorClass: info.cls,
+      rawError: firstErr && firstErr.message ? String(firstErr.message).slice(0, 500) : ('cached ' + cached + ' of ' + records.length),
+      path: 'bg'
     });
     return;
   }
@@ -447,7 +491,9 @@ async function handleBackgroundFetchFailure(event) {
     error: 'Download failed. Please check your connection and try again.',
     // 'download-total-exceeded' tells the client its manifest sizes are stale
     // (e.g. a same-version re-upload) so it can refresh before a retry.
-    failureReason: bgFetch.failureReason || ''
+    failureReason: bgFetch.failureReason || '',
+    errorClass: bgFetch.failureReason ? ('bgfetch-' + bgFetch.failureReason) : 'bgfetch-failed',
+    path: 'bg'
   };
   if (parsed.version) failDetail.version = parsed.version;
   broadcastStatus(parsed.unitId, 'error', failDetail);

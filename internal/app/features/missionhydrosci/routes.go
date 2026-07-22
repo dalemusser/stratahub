@@ -47,6 +47,7 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 		pr.Post("/api/save-data/state/delete", h.HandleDeleteSavedState)
 		pr.Post("/api/save-data/settings/delete", h.HandleDeleteSavedSettings)
 		pr.Post("/api/device-status", h.HandleDeviceStatus)
+		pr.Post("/api/download-error", h.HandleDownloadError)
 		pr.Post("/api/auth/start", h.HandleStaffAuthStart)
 		pr.Post("/api/auth/verify", h.HandleStaffAuthVerify)
 		pr.Post("/api/auth/resend", h.HandleStaffAuthResend)

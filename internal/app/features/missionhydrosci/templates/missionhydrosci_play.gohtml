@@ -382,7 +382,8 @@
           manifestUrl: '/missionhydrosci/api/manifest',
           contentPrefix: '/missionhydrosci/content/',
           unitCachePrefix: 'missionhydrosci-unit-',
-          fetchIdPrefix: 'missionhydrosci-'
+          fetchIdPrefix: 'missionhydrosci-',
+          csrfToken: csrfToken // enables download-error telemetry
         });
 
         mgr.refreshManifest().then(function() {

@@ -42,6 +42,9 @@
     this._fetchIdPrefix = opts.fetchIdPrefix || DEFAULT_FETCH_ID_PREFIX;
     this.manifest = null;
     this.manifestLoaded = false; // true only after a fresh, successful manifest fetch
+    this._csrfToken = opts.csrfToken || ''; // required to POST download-error telemetry
+    this._downloadErrorUrl = opts.downloadErrorUrl || '/missionhydrosci/api/download-error';
+    this._reportedErrors = {}; // dedupe telemetry: unitId|errorClass -> true (per manager lifetime)
     this.swRegistration = null;
     this.channel = null;
     this.statusCallbacks = [];
@@ -1449,6 +1452,63 @@
       } catch (err) {
         console.error('Status callback error:', err);
       }
+    }
+
+    // Server-side telemetry for download failures (diagnostics gap MHS-008):
+    // a raw cache/network error was previously only visible to the tester. All
+    // error statuses funnel through here — SW broadcasts (via
+    // _handleStatusUpdate) and page-side alike — so this is the one place to
+    // report from, covering the launcher and the manage page.
+    if (status === 'error') {
+      this._reportDownloadError(unitId, detail || {});
+    }
+  };
+
+  /**
+   * Best-effort POST of a download failure to the server so failure prevalence
+   * across devices is visible in the logs. Deduped to once per unit+errorClass
+   * per manager lifetime so a retry loop can't flood. Skips silently when no
+   * CSRF token was provided (the page didn't opt in) or on any network error.
+   */
+  MHSDeliveryManager.prototype._reportDownloadError = function(unitId, detail) {
+    if (!this._csrfToken) return;
+    var cls = detail.errorClass || 'generic';
+    var key = unitId + '|' + cls;
+    if (this._reportedErrors[key]) return;
+    this._reportedErrors[key] = true;
+
+    var deviceId = '';
+    try { deviceId = localStorage.getItem('mhs-device-id') || ''; } catch (e) {}
+
+    var self = this;
+    function post(quota, usage) {
+      var body = {
+        device_id: deviceId,
+        unit: unitId,
+        version: detail.version || '',
+        error_class: cls,
+        message: String(detail.rawError || detail.error || '').slice(0, 500),
+        path: detail.path || '',
+        storage_quota: quota || 0,
+        storage_usage: usage || 0,
+        user_agent: (navigator && navigator.userAgent) || ''
+      };
+      try {
+        fetch(self._downloadErrorUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': self._csrfToken },
+          body: JSON.stringify(body),
+          keepalive: true
+        }).catch(function() {});
+      } catch (e) { /* best effort */ }
+    }
+
+    if (navigator.storage && navigator.storage.estimate) {
+      navigator.storage.estimate()
+        .then(function(est) { post(est.quota, est.usage); })
+        .catch(function() { post(0, 0); });
+    } else {
+      post(0, 0);
     }
   };
 

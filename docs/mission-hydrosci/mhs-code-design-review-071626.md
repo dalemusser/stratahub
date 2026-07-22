@@ -10,6 +10,39 @@
 (`missionhydrosci_units.gohtml`, `_play.gohtml`, `_manage.gohtml`,
 `_offline.gohtml`), and the manage-page / staff-unlock redesign work.
 
+## Update 2026-07-22 — field issue: "Cache.put() encountered a network error"
+
+QA (Erin, Windows 11, failed in both Chrome AND Edge, worked on another machine,
+transient) hit a raw `Cache.put() encountered a network error` in the download
+status. Root cause is environmental: the CDN transfer was interrupted mid-stream
+while the fallback path streamed it into `cache.put` (`sw-background-fetch.js`
+`fetchAndCacheFile`) — almost certainly OS-level network interference
+(antivirus/VPN/TLS-inspection) or a flaky link, browser-agnostic and transient.
+Cache integrity was actually fine (retries + resume, no false "Ready" over a
+partial cache); the problems were UX and observability. Deployed (SW 1.0.12) and
+smoke-tested:
+
+- **Friendly, classified error message.** New `classifyDownloadError` maps errors
+  to network / quota / generic and the fallback path (`sw-background-fetch.js`)
+  now broadcasts an actionable message instead of the raw exception (verified:
+  Erin's exact error → network → "The download was interrupted… usually a network
+  or security-software (antivirus/VPN) issue, not your account…"; quota stays a
+  distinct "not enough space" message).
+- **BG-fetch partial message no longer blames storage only** — it now reflects
+  the actual caught error (network vs storage).
+- **Download-failure telemetry (closes MHS-008).** All error statuses funnel
+  through `mhs-delivery.js` `_fireStatus`, which now best-effort POSTs
+  `/api/download-error` (deduped once per unit+class). The server logs one
+  structured `"mhs download error"` line per event (workspace, user, device,
+  unit, error_class, path, storage quota/usage, raw message, UA) — greppable
+  prevalence so we can tell a single bad machine from a broad problem. Verified
+  end-to-end: the POST reached the server and produced the log line.
+
+Still true: if the cause is antivirus/VPN/network, no app change fully prevents
+it — this makes it non-alarming, retryable, explained, and now observable.
+Recommended next (not done): prioritize MHS-006 preflight + MHS-005 persist given
+field devices with nearly-full disks (Erin's was 94% full).
+
 ## Update 2026-07-17 (b) — P2/P3 batch: client races, Go handlers, accessibility
 
 Deployed to dev (SW_VERSION 1.0.11) and smoke-tested (0 console errors on units /

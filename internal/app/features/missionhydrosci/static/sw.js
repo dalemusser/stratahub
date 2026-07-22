@@ -2,7 +2,7 @@
 // This file is concatenated with sw-cache.js and sw-background-fetch.js
 // by the Go handler before being served at /sw.js.
 
-const SW_VERSION = '1.0.11';
+const SW_VERSION = '1.0.12';
 
 // ---- Install ----
 self.addEventListener('install', function(event) {
