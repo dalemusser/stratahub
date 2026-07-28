@@ -527,7 +527,7 @@
   var PROGRESS_POLL_MS = 5000;      // how often to re-obtain a fresh registration
   var STALL_THRESHOLD_MS = 150000;  // no byte progress for ~2.5 min (tab visible) => stalled
   var SUCCESS_BROADCAST_GRACE_MS = 45000; // BG fetch success but no 'cached' broadcast => reconcile
-  var FIRST_BYTE_TIMEOUT_MS = 90000; // BG fetch with ZERO bytes after 90s => switch to fallback
+  var FROZEN_SWITCH_MS = 60000; // BG fetch progress frozen this long (visible tab) => switch to fallback
   var PREFER_FALLBACK_KEY = 'mhs-prefer-fallback-until'; // localStorage: skip BG fetch until this time
   MHSDeliveryManager.PREFER_FALLBACK_KEY = PREFER_FALLBACK_KEY; // exported so Reset can purge it
 
@@ -846,24 +846,42 @@
     // which is the common field case. Switch to the SW sequential fallback,
     // which uses regular fetches and is immune to download-service pausing.
     //
-    // A healthy download — even a slow one on a congested school network —
-    // delivers new bytes (via the SW's live progress broadcasts or a file
-    // completing) well within the window, so `noNewBytes` is false and it is
-    // never touched. Requiring no new bytes THIS tick (not just an aged
-    // timestamp) means a download that just resumed is never aborted.
-    // The partial bytes Chrome pulled before pausing are not in our cache
+    // Guards, in order:
+    //  - noNewBytes THIS tick (not just an aged timestamp): a download that just
+    //    resumed is never aborted, and a healthy slow download — which delivers
+    //    bytes via the SW's live progress broadcasts or a completing file — is
+    //    never touched.
+    //  - VISIBLE tab only. This is essential, not cosmetic: a healthy
+    //    Background Fetch pre-downloading with the tab HIDDEN (the pre-class
+    //    case) can legitimately stop broadcasting for a while (SW idle-
+    //    terminated between keepalives), which would look "frozen". We must not
+    //    yank that onto the page-open fallback. The old zero-byte-only check
+    //    couldn't misfire here (any progress made it immune); the frozen check
+    //    can, so gate it on the page actually being in the foreground — which
+    //    is also the only time the fallback (a page-open download) is useful.
+    //  - No SW CONTROL requirement: the stalling download often started on a
+    //    page loaded uncontrolled (hard refresh, or a first load right after
+    //    clearing site data) where navigator.serviceWorker.controller stays null
+    //    — the ACER's exact failure mode. _startFallbackDownload needs only an
+    //    ACTIVE worker, so start it FIRST and abort the paused Background Fetch
+    //    only once the fallback has taken over — never stranding the unit.
+    // The partial bytes Chrome pulled before pausing aren't in our cache
     // (Background Fetch caches atomically on success), so aborting re-fetches
     // only cheap, re-downloadable bytes — far better than staying stuck.
     var noNewBytes = downloaded <= state.maxDownloaded;
     if (fresh.result === '' && noNewBytes &&
-        Date.now() - state.lastProgressAt > FIRST_BYTE_TIMEOUT_MS &&
-        navigator.serviceWorker && navigator.serviceWorker.controller) {
+        document.visibilityState === 'visible' &&
+        Date.now() - state.lastProgressAt > FROZEN_SWITCH_MS) {
       console.warn('Background Fetch progress frozen for ' +
-        Math.round(FIRST_BYTE_TIMEOUT_MS / 1000) + 's (paused) — switching to fallback download:', fetchId);
+        Math.round(FROZEN_SWITCH_MS / 1000) + 's (paused) — switching to fallback download:', fetchId);
       this._preferFallback(true);
-      try { await fresh.abort(); } catch (abortErr) { /* best effort */ }
-      await this._startFallbackDownload(unitId, unit); // resets the stall monitor
-      return;
+      var switched = await this._startFallbackDownload(unitId, unit); // resets the stall monitor
+      if (switched) {
+        try { await fresh.abort(); } catch (abortErr) { /* best effort */ }
+        return;
+      }
+      // No active worker to hand off to yet — leave the paused Background Fetch
+      // in place and try again on the next poll tick rather than stranding it.
     }
 
     // _reportDownloadProgress owns all stall-state mutation: only strictly

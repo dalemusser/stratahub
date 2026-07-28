@@ -212,6 +212,35 @@ What could **not** be verified on dev: the actual ChromeOS pausing — that need
 the ACER. The mechanisms are confirmed wired and correct; the field behavior
 needs the device.
 
+### Follow-up after ACER retest (2026-07-28)
+
+Kyle's retest confirmed B and C work (Reset keeps the fallback; hard refresh
+keeps the fallback; Retry → fallback), but the **automatic** switch (A) did
+**not** fire when the download started on the manage page after a hard refresh /
+site-data clear — it only switched when he navigated to the units page or hit
+Retry. Root cause: **I removed the `navigator.serviceWorker.controller`
+requirement in three places for Fix C but left it on the auto-switch condition
+itself.** A page loaded uncontrolled (hard refresh, or first load after clearing
+site data — the ACER's state) has `controller === null`, so the auto-switch
+couldn't fire there; navigating to units (a controlled in-app load) could.
+Classic "the fix left one gap."
+
+Fixes (all `mhs-delivery.js`, deployed 2026-07-28):
+- **Removed the controller requirement from the auto-switch** and reordered it to
+  start the fallback FIRST (via `_startFallbackDownload`, which needs only an
+  active worker) and abort the paused Background Fetch only once the fallback has
+  taken over — never stranding the unit.
+- **Added a `document.visibilityState === 'visible'` guard** to the auto-switch.
+  This is a *correctness* guard, not cosmetic: the broadened "no new bytes for N
+  seconds" detection (unlike the old zero-byte-only check) could otherwise
+  misfire on a healthy Background Fetch pre-downloading with the tab HIDDEN (the
+  pre-class case), where the SW can go quiet between keepalives and look
+  "frozen". Switching only while the page is in the foreground both prevents
+  that false positive and matches intent — the page-open fallback is only useful
+  when the page is open.
+- **Lowered the window 90s → 60s** (`FROZEN_SWITCH_MS`) so the auto-switch is
+  more responsive for a user watching a stuck download.
+
 ## Test recipe once a build is ready
 
 On the ACER (profile error still present), without Powerwash:
