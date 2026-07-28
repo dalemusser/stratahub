@@ -252,6 +252,10 @@
       </div>
     </div>
 
+    <!-- Download-mode notice: background (default) vs keep-tab-open (fallback).
+         Shown by JS only while a download is active. -->
+    <div id="download-mode-notice" class="hidden mb-3 rounded-md px-3 py-2 text-xs" aria-live="polite"></div>
+
     <!-- Progress summary -->
     <p id="progress-summary" class="text-sm text-gray-600 dark:text-gray-400 mb-2">
       {{ if .IsComplete }}
@@ -581,7 +585,25 @@
     if (status !== 'downloading' || Date.now() - lastStorageRefresh > 10000) {
       refreshStorageUI();
     }
+
+    updateDownloadModeNotice();
   });
+
+  // Mode notice while a download is active: background (default) vs the
+  // "keep this tab open" instruction on fallback devices.
+  function updateDownloadModeNotice() {
+    var el = document.getElementById('download-mode-notice');
+    if (!el) return;
+    if (!manager.hasActiveDownload()) {
+      el.classList.add('hidden');
+      return;
+    }
+    var mode = manager.getDownloadMode();
+    el.textContent = MHSDeliveryManager.DOWNLOAD_MODE_MESSAGES[mode];
+    el.className = 'mb-3 rounded-md px-3 py-2 text-xs ' + (mode === 'fallback'
+      ? 'bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200'
+      : 'bg-blue-50 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200');
+  }
 
   // Auto-download pipeline — identical to the launcher's: ensure the current
   // unit is downloaded, then the next, then trim caches to current + next +
@@ -793,8 +815,14 @@
   window.mhsResetAllData = function() {
     if (!confirm('Remove all downloaded Mission HydroSci files, cached app pages, and local MHS data from this device? Online progress and saves are not affected. Continue?')) return;
     isReloading = true; // suppress pipeline reactions to the purge's status churn
-    // mhs-device-id is intentionally kept so device telemetry stays continuous
-    manager.purgeAllMHSData([MANUAL_DL_KEY, 'mhs-progress-queue', 'missionhydrosci-progress-changed', MHSDeliveryManager.ACTIVE_PLAY_KEY, MHSDeliveryManager.PREFER_FALLBACK_KEY]).then(function() {
+    // mhs-device-id is intentionally kept so device telemetry stays continuous.
+    // mhs-prefer-fallback-until is ALSO intentionally kept: it is a device
+    // capability hint (this device's Background Fetch pauses), not user data.
+    // Purging it on Reset re-broke the exact devices the fallback exists for —
+    // they'd revert to the pausable Background Fetch on the next download. It
+    // self-expires after 24h; testers who need the Background Fetch path back
+    // sooner can clear the key manually.
+    manager.purgeAllMHSData([MANUAL_DL_KEY, 'mhs-progress-queue', 'missionhydrosci-progress-changed', MHSDeliveryManager.ACTIVE_PLAY_KEY]).then(function() {
       manualDownloads = [];
       isReloading = false;
       // purgeAllMHSData doesn't fire per-unit statuses — refresh the rows,

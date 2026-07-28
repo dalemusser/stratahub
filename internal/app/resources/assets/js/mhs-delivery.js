@@ -551,13 +551,50 @@
     }
   };
 
+  // User-facing copy for the active download mode. 'background' is the default
+  // (Background Fetch, OS-level — survives closing the tab); 'fallback' is the
+  // escalation on devices where Chrome pauses Background Fetch, where the
+  // download runs in the page's service worker and only progresses while a tab
+  // is open. Templates render these beside the download UI so students/teachers
+  // know whether they can walk away.
+  MHSDeliveryManager.DOWNLOAD_MODE_MESSAGES = {
+    background: 'Downloading in the background — you can switch tabs, use other apps, or close this page. Your units keep downloading and will be ready when you come back.',
+    fallback: 'Keep this tab open and stay on this page until the download finishes. On this device, downloads pause if the tab is closed.'
+  };
+
+  // The mode the next/current download uses: 'fallback' once this device is
+  // known to pause Background Fetch, else 'background'.
+  MHSDeliveryManager.prototype.getDownloadMode = function() {
+    return this._preferFallback() ? 'fallback' : 'background';
+  };
+
+  // True while any unit download is being tracked as active.
+  MHSDeliveryManager.prototype.hasActiveDownload = function() {
+    return Object.keys(this._activeDownloads).length > 0;
+  };
+
   /**
    * Starts the SW sequential fallback download for a unit and its watchdog.
-   * Returns false when the SW isn't controlling the page (nothing posted).
+   * Returns false when no active service worker is available (nothing posted).
    */
-  MHSDeliveryManager.prototype._startFallbackDownload = function(unitId, unit) {
-    if (!navigator.serviceWorker || !navigator.serviceWorker.controller) return false;
-    navigator.serviceWorker.controller.postMessage({
+  MHSDeliveryManager.prototype._startFallbackDownload = async function(unitId, unit) {
+    if (!navigator.serviceWorker) return false;
+    // The fallback loop runs INSIDE the service worker and reaches the page over
+    // the BroadcastChannel, so it needs an ACTIVE worker to message — not one
+    // that is CONTROLLING this page. Requiring control (the old behavior) made
+    // the fallback silently fail right after a hard refresh or on a first visit
+    // before the SW claimed the page, reverting the download to the pausable
+    // Background Fetch. Prefer the controller when present (instant), else wait
+    // briefly for an active registration and message that.
+    var target = navigator.serviceWorker.controller;
+    if (!target) {
+      try {
+        var reg = await this._waitForSW(6000);
+        target = reg && reg.active;
+      } catch (err) { /* fall through */ }
+    }
+    if (!target) return false;
+    target.postMessage({
       action: 'fallbackDownload',
       unitId: unit.id,
       version: unit.version,
@@ -798,21 +835,34 @@
       // matchAll unavailable or transient — the byte counter alone is fine
     }
 
-    // A Background Fetch that has delivered ZERO bytes after a generous
-    // startup window is not downloading: on some devices Chrome pauses
-    // background fetches indefinitely (metered connection, battery saver —
-    // observed on Chromebooks, where the OS shows its own "Paused
-    // Downloading…" notification). Nothing has been downloaded, so nothing
-    // is lost: abort it and switch to the SW sequential fallback, which
-    // uses regular fetches and is immune to download-service pausing.
-    if (downloaded === 0 && fresh.result === '' &&
-        Date.now() - state.startedAt > FIRST_BYTE_TIMEOUT_MS &&
+    // A Background Fetch whose progress has FROZEN — no new bytes for a
+    // generous window while the fetch is still unfinished — is paused, not
+    // downloading. On some devices Chrome pauses background fetches
+    // indefinitely (metered connection, battery saver, a corrupt download
+    // service — observed on Chromebooks, where the OS shows its own "Paused
+    // Downloading…" notification). This catches BOTH shapes of that failure:
+    // "zero bytes, never started" AND "a little downloaded, then stuck"
+    // (e.g. paused at 12%) — the earlier zero-only check missed the latter,
+    // which is the common field case. Switch to the SW sequential fallback,
+    // which uses regular fetches and is immune to download-service pausing.
+    //
+    // A healthy download — even a slow one on a congested school network —
+    // delivers new bytes (via the SW's live progress broadcasts or a file
+    // completing) well within the window, so `noNewBytes` is false and it is
+    // never touched. Requiring no new bytes THIS tick (not just an aged
+    // timestamp) means a download that just resumed is never aborted.
+    // The partial bytes Chrome pulled before pausing are not in our cache
+    // (Background Fetch caches atomically on success), so aborting re-fetches
+    // only cheap, re-downloadable bytes — far better than staying stuck.
+    var noNewBytes = downloaded <= state.maxDownloaded;
+    if (fresh.result === '' && noNewBytes &&
+        Date.now() - state.lastProgressAt > FIRST_BYTE_TIMEOUT_MS &&
         navigator.serviceWorker && navigator.serviceWorker.controller) {
-      console.warn('Background Fetch delivered no bytes in ' +
-        Math.round(FIRST_BYTE_TIMEOUT_MS / 1000) + 's — switching to fallback download:', fetchId);
+      console.warn('Background Fetch progress frozen for ' +
+        Math.round(FIRST_BYTE_TIMEOUT_MS / 1000) + 's (paused) — switching to fallback download:', fetchId);
       this._preferFallback(true);
       try { await fresh.abort(); } catch (abortErr) { /* best effort */ }
-      this._startFallbackDownload(unitId, unit); // resets the stall monitor
+      await this._startFallbackDownload(unitId, unit); // resets the stall monitor
       return;
     }
 
@@ -907,16 +957,19 @@
       // Fetches (metered connection, battery saver — seen on Chromebooks),
       // starting another one just pauses again; the SW sequential fallback
       // uses regular fetches and is immune to that, so retries prefer it
-      // (and remember the preference). Falls through to the normal path
-      // when the SW isn't controlling the page.
-      if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+      // (and remember the preference). _startFallbackDownload waits for an
+      // active worker, so this works even right after a hard refresh; it falls
+      // through to the normal path only if no worker becomes available.
+      if (navigator.serviceWorker) {
         this._preferFallback(true);
         this._activeDownloads[unitId] = true;
         var totalSize = unit.totalSize || unit.files.reduce(function(sum, f) { return sum + f.size; }, 0);
         this._fireStatus(unitId, 'downloading', { percent: 0, downloaded: 0, downloadTotal: totalSize });
-        this._startFallbackDownload(unitId, unit);
-        this._startProgressKeepalive(this.swRegistration);
-        return;
+        if (await this._startFallbackDownload(unitId, unit)) {
+          this._startProgressKeepalive(this.swRegistration);
+          return;
+        }
+        delete this._activeDownloads[unitId]; // couldn't start — let downloadUnit try cleanly
       }
 
       return await this.downloadUnit(unitId);
@@ -1179,7 +1232,7 @@
       // Devices where Chrome pauses Background Fetches (metered connection,
       // battery saver — seen on some Chromebooks) are remembered for a day:
       // go straight to the SW sequential fallback there.
-      if (this._preferFallback() && this._startFallbackDownload(unitId, unit)) {
+      if (this._preferFallback() && await this._startFallbackDownload(unitId, unit)) {
         this._startProgressKeepalive(reg);
         console.log('Using SW fallback download (Background Fetch pauses on this device):', fetchId);
         return;
@@ -1209,8 +1262,8 @@
       }
 
       // Fallback: use SW sequential fetch
-      if (!this._startFallbackDownload(unitId, unit)) {
-        throw new Error('Service worker not controlling the page. Please refresh and try again.');
+      if (!(await this._startFallbackDownload(unitId, unit))) {
+        throw new Error('Service worker not available. Please refresh and try again.');
       }
       this._startProgressKeepalive(reg);
     } catch (err) {

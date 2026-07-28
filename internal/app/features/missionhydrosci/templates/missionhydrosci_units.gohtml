@@ -125,6 +125,11 @@
       Low storage — auto-download of next unit paused
     </div>
     {{ end }}
+
+    <!-- Download-mode notice: tells the user whether downloads continue in the
+         background (default) or need the tab kept open (fallback devices).
+         Shown by JS only while a download is active. -->
+    <div id="download-mode-notice" class="hidden mt-4 rounded-md px-3 py-2 text-xs text-center" aria-live="polite"></div>
     </div>
 
     <!-- Active game version — always visible for every role. Support's first
@@ -576,7 +581,27 @@
     if (status !== 'downloading' || Date.now() - lastStorageRefresh > 10000) {
       refreshStorageUI();
     }
+
+    updateDownloadModeNotice();
   });
+
+  // Shows a mode notice while any download is active: the reassuring
+  // "keep going in the background" for the default Background Fetch path, or
+  // the "keep this tab open" instruction on devices switched to the fallback.
+  function updateDownloadModeNotice() {
+    var el = document.getElementById('download-mode-notice');
+    if (!el) return;
+    if (!manager.hasActiveDownload()) {
+      el.classList.add('hidden');
+      return;
+    }
+    var mode = manager.getDownloadMode();
+    el.textContent = MHSDeliveryManager.DOWNLOAD_MODE_MESSAGES[mode];
+    // Fallback ("keep tab open") reads as a caution; background is informational.
+    el.className = 'mt-4 rounded-md px-3 py-2 text-xs text-center ' + (mode === 'fallback'
+      ? 'bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200'
+      : 'bg-blue-50 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200');
+  }
 
   function refreshStorageUI() {
     lastStorageRefresh = Date.now();
