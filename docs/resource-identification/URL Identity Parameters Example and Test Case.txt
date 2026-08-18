@@ -30,5 +30,13 @@ Both hex + human:
 https://cdn.adroit.games/games/web/learn_subtraction.html?group=Dale%27s+Fun+Science&group_id=68049e383adb985c4a637183&login_id=acole%40students.example.org&org=Hillsdale+Middle+School&org_id=68041da03916f91f24b1ec78&user=Adrian+Cole&user_id=68f138c495cdf54a392b20aa&ws=dev&ws_id=695f5a3fa323f290a63b3fce
 
 Resource: Learn Topographic Maps
-Legacy: 
+Legacy:
 https://cdn.adroit.games/games/web/learn_topographic_maps.html?group=Dale%27s+Fun+Science&id=acole%40students.example.org&org=Hillsdale+Middle+School
+
+Resource: Abt Pre Survey
+ABT-identifiable:
+https://surveys.example.com/wix/p123456789012.aspx?__userid=acole%40students.example.org&group=Dale%27s+Fun+Science&org=Hillsdale+Middle+School
+
+Resource: Abt Pre Survey
+ABT-deidentified:
+https://surveys.example.com/wix/p123456789012.aspx?__userid=68f138c495cdf54a392b20aa&group=68049e383adb985c4a637183&org=68041da03916f91f24b1ec78

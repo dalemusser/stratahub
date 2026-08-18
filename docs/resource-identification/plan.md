@@ -57,6 +57,8 @@ always sending all four hex IDs, not from UI toggles).
 | `human` | `ws`, `org`, `group`, `user`, `login_id` | **High** | Human-readable display/debugging only. Never production research. |
 | `both` | `ws`, `ws_id`, `org`, `org_id`, `group`, `group_id`, `user`, `user_id`, `login_id` | **High** | Pre-research testing / debugging, when you want to eyeball readable values next to the hex. |
 | `legacy` | `org`, `group`, `id`(=**login_id**) | **High** | Frozen reproduction of the pre-2026 contract for the existing consumer. Deprecated on arrival; time-boxed. |
+| `abt-identifiable` | `__userid`(=**login_id**), `group`, `org` (names) | **High** | Abt's survey contract as specified: Abt preloads respondent IDs as logins (emails). Custom consumer mode. |
+| `abt-deidentified` | `__userid`(=user_id hex), `group`(=group_id), `org`(=org_id) | None | De-identified variant of the Abt contract: identical parameter names, hex values. Custom consumer mode. |
 
 ### Notes per mode
 
@@ -72,18 +74,27 @@ always sending all four hex IDs, not from UI toggles).
   `user_id`, the rule that `user_id`=hex holds everywhere — legacy is fully
   isolated under `id`. It exists solely so the existing consumer keeps working
   while it migrates to `hex`, and retires once no resource uses it.
+- **`abt-identifiable` / `abt-deidentified`** are **custom consumer modes**:
+  they implement the Abt survey contract verbatim (parameter names dictated by
+  Abt), and the vocabulary rules deliberately do not apply inside them — in
+  `abt-deidentified`, `group` and `org` carry hex IDs, not names. Both modes
+  emit the same three parameter names and differ only in values, so a resource
+  can be switched between them with no change on Abt's side beyond preloading
+  the matching respondent-ID list (emails vs hex user IDs, the latter available
+  from the Members Report). See `abt-survey-url-options.md`.
 
 ### PII warning
 
-Any mode that emits a **High**-PII field (`user`, `login_id`, or the legacy
-`id`) — i.e. `human`, `both`, and `legacy` — must surface a warning at
-resource-creation/edit time:
+Any mode that emits a **High**-PII field (`user`, `login_id`, the legacy `id`,
+or a custom parameter carrying the login, like the ABT `__userid` in
+`abt-identifiable`) — i.e. `human`, `both`, `legacy`, and `abt-identifiable` —
+must surface a warning at resource-creation/edit time:
 
 > This mode includes personally identifiable information (student name and/or
 > login) in the resource URL. Use only where justified and approved
 > (IRB / FERPA / COPPA).
 
-Only `none` and `hex` are PII-free. Consider additionally gating `human` and
+Only `none`, `hex`, and `abt-deidentified` are PII-free. Consider additionally gating `human` and
 `both` to the `dev` workspace, or requiring an explicit "I understand this URL
 will carry PII" acknowledgment, so they aren't selected casually on a production
 survey.

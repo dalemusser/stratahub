@@ -84,7 +84,7 @@
         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">URL Identity Parameters</label>
         <input type="text" value="{{ .URLIdentityModeLabel }}" readonly
                class="w-full border dark:border-gray-600 p-2 rounded bg-gray-50 dark:bg-gray-700 dark:text-gray-100 text-sm" />
-        {{ if or (eq .URLIdentityMode "human") (eq .URLIdentityMode "both") (eq .URLIdentityMode "legacy") }}
+        {{ if .URLIdentityModePII }}
         <p class="mt-1 text-xs text-amber-700 dark:text-amber-300">⚠ This mode includes personally identifiable information (student name and/or login) in the resource URL.</p>
         {{ end }}
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Identity parameters appended to the Launch URL when a member opens this resource (URL resources only).</p>

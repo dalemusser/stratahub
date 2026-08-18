@@ -33,6 +33,15 @@ Severity: **P1** = student-facing dead end or security hole reachable today;
 
 ### P1-1. End-of-unit transition strands the student when the manifest can't resolve the next unit — including the flagship offline case
 
+> **FIXED 2026-07-28** (deployed to dev). `completeAndTransition` now, after
+> `refreshManifest()`, navigates directly to the next unit's (SW-cached) play
+> page when `manifestLoaded` is false (offline), and to the units launcher when
+> the next unit isn't in a loaded manifest (build-excluded) — instead of falling
+> into `showDownloadProgress`. `downloadUnit`/`retryDownload` now fire an
+> `'error'` status on their manifest-null / unit-not-found early returns (was a
+> silent return — the P2-5 finding), and the overlay's `mgr.init()` chain got a
+> `.catch`. Verified on dev: both early returns now emit an `'error'` status.
+
 *Found independently by two reviewers; every link verified.*
 
 The play overlay's transition depends on a **fresh manifest fetch** by a **new

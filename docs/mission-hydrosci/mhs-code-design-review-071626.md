@@ -10,6 +10,20 @@
 (`missionhydrosci_units.gohtml`, `_play.gohtml`, `_manage.gohtml`,
 `_offline.gohtml`), and the manage-page / staff-unlock redesign work.
 
+## Update 2026-07-27/28 — ACER paused-download ("stuck at 12%") RESOLVED
+
+A retest of the profile-corrupt ACER showed downloads pausing and stalling at
+~12% with the fallback not auto-engaging. Root cause: the fallback works, but
+three defects kept the code from reaching it — the auto-switch only fired on
+*zero* bytes (device paused after ~12%); Reset purged the prefer-fallback pin;
+and the fallback required page *control* (a hard refresh strips it). All fixed
+(broadened frozen-progress auto-switch with a visible-tab guard, pin kept across
+Reset, fallback needs only an active worker), plus a download-mode notice
+(background vs "keep tab open"). Background Fetch remains the default for healthy
+devices. **Confirmed working on the ACER 2026-07-28.** Full write-up:
+`mhs-acer-paused-download-diagnosis-072726.md`; history in
+`mhs-ui-redesign-plan-070926.md`.
+
 ## Update 2026-07-22 — field issue: "Cache.put() encountered a network error"
 
 QA (Erin, Windows 11, failed in both Chrome AND Edge, worked on another machine,

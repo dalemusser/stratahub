@@ -136,6 +136,33 @@ func TestCheckMemberAuth_NonMembersAndTrustPass(t *testing.T) {
 	}
 }
 
+// SEC-1: an out-of-band member-auth mode (not trust/keyword/staffauth) — a bad
+// migration, a direct DB edit, or a future mode shipped before its handler —
+// must FAIL CLOSED, never authorize a member with no credential check or grant
+// an unlock.
+func TestCheckMemberAuth_UnknownModeFailsClosed(t *testing.T) {
+	h, _, _ := newManageTestHandler(t)
+
+	badWS := primitive.NewObjectID()
+	ctx, cancel := testutil.TestContext()
+	defer cancel()
+	if err := h.SettingsStore.Save(ctx, badWS, models.SiteSettings{SiteName: "B", MHSMemberAuth: "bogus"}); err != nil {
+		t.Fatalf("save settings: %v", err)
+	}
+	member := testutil.MemberUser(primitive.NewObjectID())
+	req := memberRequest(http.MethodPost, "/x", member, badWS, nil)
+
+	// Even with credentials supplied, an unknown mode is forbidden.
+	if status, _ := h.checkMemberAuth(req, member.Role, "sometoken", "somekeyword"); status != http.StatusForbidden {
+		t.Errorf("unknown mode: status = %d, want 403", status)
+	}
+	// And no unlock was granted.
+	key, _, _, _ := h.unlockKey(req)
+	if u, _ := h.UnlockStore.GetActive(req.Context(), key); u != nil {
+		t.Fatal("unknown mode must not create an unlock")
+	}
+}
+
 func TestManageUnlockLockStatusEndpoints(t *testing.T) {
 	h, wsID, _ := newManageTestHandler(t)
 	member := testutil.MemberUser(primitive.NewObjectID())

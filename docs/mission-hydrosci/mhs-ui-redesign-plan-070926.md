@@ -294,6 +294,31 @@ cause of the paused/zombie fetches on that one device (remedied by removing and
 recreating the ChromeOS account). The fixes above remain as defense-in-depth: any
 device whose download service misbehaves now self-heals via the fallback path.
 
+### Paused-download follow-up (2026-07-27/28, confirmed on the ACER)
+
+The 2026-07-15 defense-in-depth did NOT hold on a later retest of that same ACER
+(profile error still present): downloads paused, jumped to ~12%, and stalled —
+the auto-fallback did not engage. Full diagnosis:
+`mhs-acer-paused-download-diagnosis-072726.md`. Three defects were keeping the
+(working) fallback from being reached, all now fixed:
+
+- The auto-switch to fallback only fired on **zero** bytes; this device delivered
+  ~12% before pausing. Broadened to fire on **frozen progress** — no new bytes
+  for 60s on a visible tab (the visible-tab guard prevents false-firing on a
+  healthy Background Fetch that is pre-downloading with the tab hidden).
+- **Reset all MHS Data purged the prefer-fallback pin**, re-breaking the device
+  on every reset. The pin is now kept across Reset (it self-expires after 24h).
+- The fallback path **required the SW to be *controlling* the page**, which a
+  hard refresh / site-data clear strips; it now needs only an *active* worker.
+
+Also added a **download-mode notice** on the launcher and manage page: while a
+download runs it shows either "downloading in the background — you can leave"
+(default Background Fetch) or "keep this tab open" (fallback). Background Fetch
+remains the default for all healthy devices. **Kyle confirmed 2026-07-28: the
+fallback on the manage page works correctly.** (SW_VERSION unchanged at 1.0.12 —
+no service-worker code changed; the new `mhs-delivery.js` propagates via its
+content hash.)
+
 ## Related documents
 
 - `docs/set-unit-and-clear/` — original set-unit/clear design and auth approach

@@ -4,10 +4,13 @@
 **Device:** ACER Chromebook with a persistent ChromeOS "Profile error occurred"
 (survived account deletion). Tester: Kyle Cutler. QA account
 `adroitqateam@gmail.com`.
-**Status:** Diagnosed, then all three fixes + a download-mode indicator
-implemented, deployed to dev, and smoke-tested (2026-07-27). See "Implementation"
-at the bottom. Background Fetch remains the default path for the 99%; the changes
-only affect devices that are actually failing. **Awaiting a re-test on the ACER.**
+**Status:** RESOLVED. Diagnosed, then all three fixes + a download-mode indicator
+implemented and deployed; a first ACER retest exposed one remaining gap (the
+auto-switch still required page control), fixed in a follow-up. **Kyle confirmed
+on 2026-07-28: "The fallback on the manage page seems to be working correctly."**
+Committed (HEAD `9406908` at time of writing) and pushed. Background Fetch remains
+the default path for healthy devices; the changes only affect devices that are
+actually failing. See "Implementation" and "Follow-up after ACER retest" below.
 
 ## The symptom
 

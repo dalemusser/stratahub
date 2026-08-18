@@ -6,6 +6,7 @@ import (
 	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/features/resources/resourceurl"
 	resourcestore "github.com/dalemusser/stratahub/internal/app/store/resources"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/htmlsanitize"
@@ -63,6 +64,7 @@ func (h *AdminHandler) ServeView(w http.ResponseWriter, r *http.Request) {
 		ShowInLibrary:        res.ShowInLibrary,
 		URLIdentityMode:      res.URLIdentityMode,
 		URLIdentityModeLabel: urlIdentityModeLabel(res.URLIdentityMode),
+		URLIdentityModePII:   resourceurl.HasPII(res.URLIdentityMode),
 		HasFile:              res.HasFile(),
 		FileName:             res.FileName,
 		FileSize:             res.FileSize,

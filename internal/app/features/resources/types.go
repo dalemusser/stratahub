@@ -136,6 +136,7 @@ type viewData struct {
 	ShowInLibrary        bool
 	URLIdentityMode      string        // raw mode value (for conditional styling)
 	URLIdentityModeLabel string        // human-readable label for display
+	URLIdentityModePII   bool          // true when the mode puts PII in the URL (drives the warning)
 	DefaultInstructions  template.HTML // HTML content, sanitized for safe rendering
 
 	// File fields

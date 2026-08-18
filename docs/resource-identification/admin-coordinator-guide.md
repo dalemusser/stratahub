@@ -21,8 +21,9 @@ anything,* gets appended. This guide explains the choices and how to set them.
   None.
 - For research/data collection, use **De-identified hex IDs** — it's the
   privacy-safe, analytically-stable choice.
-- **Human-readable**, **Both**, and **Legacy** put student names and/or logins in
-  the URL (PII) — only use them when there's a specific, approved reason.
+- **Human-readable**, **Both**, **Legacy**, and **ABT-identifiable** put student
+  names and/or logins in the URL (PII) — only use them when there's a specific,
+  approved reason.
 - The setting only matters for **URL resources** (it has no effect on uploaded
   files).
 
@@ -38,8 +39,8 @@ amber warning appears reminding you that the URL will carry PII.
 You can see what each Resource currently uses in two places:
 
 - The **Resources list** has an **Identity** column showing a colored badge
-  (gray **None**, green **Hex**, red **Human/Both/Legacy**), with a key above the
-  table.
+  (gray **None**; green **Hex** and **ABT-DeID**; red **Human**, **Both**,
+  **Legacy**, and **ABT-Ident**), with a key above the table.
 - The **View Resource** page shows the selected scheme with its full description.
 
 ---
@@ -53,6 +54,8 @@ You can see what each Resource currently uses in two places:
 | **Human-readable** | `ws`, `org`, `group`, `user`, `login_id` (names + email) | **Yes** | Only when a consumer specifically needs readable names, or for debugging. |
 | **Both hex + human** | Everything from both schemes above | **Yes** | Debugging/verification, when you want to see readable values next to the IDs. |
 | **Legacy** | `id` (=login/email), `org`, `group` | **Yes** | Deprecated. Only for older consumers that haven't migrated to hex yet. |
+| **ABT-identifiable** | `__userid` (=login/email), `group`, `org` (names) | **Yes** | Abt survey resources only, when the identifiable contract is the one agreed with Abt. |
+| **ABT-deidentified** | `__userid`, `group`, `org` (all opaque 24-char IDs) | No | Abt survey resources only, when the de-identified contract is the one agreed with Abt. |
 
 ### Why "De-identified hex IDs" is the recommended choice
 
@@ -64,11 +67,24 @@ You can see what each Resource currently uses in two places:
   their key and someone later renames the group, their data silently stops
   lining up. Hex IDs don't have that problem.
 
+### The ABT schemes
+
+The two **ABT-** schemes exist for Abt survey resources only. They implement
+Abt's parameter contract exactly (`__userid`, `group`, `org`) and differ only in
+the values sent: **ABT-identifiable** sends the student's login (email) and the
+group/organization names, while **ABT-deidentified** sends opaque hex IDs for
+all three. Because the parameter names are identical, a survey resource can be
+switched between the two at any time with no change needed on Abt's side beyond
+loading the matching respondent-ID list. Use whichever contract is currently
+agreed with Abt — and note that **ABT-identifiable carries PII** (the amber
+warning applies). `abt-survey-url-options.md` (in this folder) is the
+consumer-facing description to share with Abt.
+
 ### When *not* to use the PII schemes
 
-`Human-readable`, `Both`, and `Legacy` place a student's name and/or login (email)
-directly in the URL. URLs get logged, cached, and shared more easily than you'd
-think. Only choose these when:
+`Human-readable`, `Both`, `Legacy`, and `ABT-identifiable` place a student's
+name and/or login (email) directly in the URL. URLs get logged, cached, and
+shared more easily than you'd think. Only choose these when:
 
 - a consumer has a specific, documented need for readable values, **and**
 - that use is covered by your data-handling agreements (IRB / FERPA / COPPA).
@@ -108,6 +124,16 @@ https://cdn.adroit.games/games/web/learn_addition.html
 …learn_topographic_maps.html?group=Dale%27s+Fun+Science&id=acole%40students.example.org&org=Hillsdale+Middle+School
 ```
 
+**ABT-identifiable** (on an Abt survey URL):
+```
+…surveys.example.com/wix/p123456789012.aspx?__userid=acole%40students.example.org&group=Dale%27s+Fun+Science&org=Hillsdale+Middle+School
+```
+
+**ABT-deidentified** (same parameter names, hex values):
+```
+…surveys.example.com/wix/p123456789012.aspx?__userid=68f138c495cdf54a392b20aa&group=68049e383adb985c4a637183&org=68041da03916f91f24b1ec78
+```
+
 (Spaces show up as `+` and special characters as `%..` because the values are
 URL-encoded. The full raw example lives in
 `URL Identity Parameters Example and Test Case.txt` in this folder.)
@@ -133,4 +159,5 @@ URL-encoded. The full raw example lives in
 If you're turning on identity parameters for a survey/research consumer, give
 them **`data-consumer-guide.md`** (in this folder). It explains exactly which
 parameters each scheme sends and how the values are encoded, so they can parse
-them correctly.
+them correctly. For the Abt survey resources specifically, give Abt
+**`abt-survey-url-options.md`** instead — it describes just their two schemes.

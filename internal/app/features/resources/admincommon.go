@@ -82,11 +82,13 @@ func (h *AdminHandler) renderEditForm(w http.ResponseWriter, r *http.Request, vm
 // urlIdentityModeLabels maps each identity mode to a human-readable label used
 // in the create/edit select menu and on the read-only view page.
 var urlIdentityModeLabels = map[string]string{
-	models.URLIdentityNone:   "None — no identity in the URL (default)",
-	models.URLIdentityHex:    "De-identified hex IDs — ws_id, org_id, group_id, user_id",
-	models.URLIdentityHuman:  "Human-readable — ws, org, group, user, login_id",
-	models.URLIdentityBoth:   "Both hex + human — for debugging",
-	models.URLIdentityLegacy: "Legacy — id=login_id, org, group (deprecated)",
+	models.URLIdentityNone:            "None — no identity in the URL (default)",
+	models.URLIdentityHex:             "De-identified hex IDs — ws_id, org_id, group_id, user_id",
+	models.URLIdentityHuman:           "Human-readable — ws, org, group, user, login_id (PII)",
+	models.URLIdentityBoth:            "Both hex + human — for debugging (PII)",
+	models.URLIdentityLegacy:          "Legacy — id=login_id, org, group (deprecated, PII)",
+	models.URLIdentityABTIdentifiable: "ABT-identifiable — __userid=login (email), group, org names (PII)",
+	models.URLIdentityABTDeidentified: "ABT-deidentified — __userid, group, org as hex IDs",
 }
 
 // urlIdentityModeLabel returns the human-readable label for a mode. An empty

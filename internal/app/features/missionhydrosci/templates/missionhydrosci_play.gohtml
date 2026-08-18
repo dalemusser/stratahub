@@ -387,19 +387,45 @@
         });
 
         mgr.refreshManifest().then(function() {
-          return mgr.isCached(nextUnit);
-        }).then(function(status) {
-          if (status === 'cached') {
-            // Auto-cleanup completed unit then navigate
-            mgr.autoCleanup([nextUnit]).then(function() {
-              navigateToNext(nextUnit);
-            });
-          } else {
-            // Need to download — show progress on overlay
-            showDownloadProgress(mgr, nextUnit);
+          // Unity is already torn down, so every branch from here MUST end in a
+          // navigation — a branch that just returns strands the student on the
+          // "Loading next unit..." overlay with no exit.
+          if (!mgr.manifestLoaded) {
+            // Couldn't load a fresh manifest (offline, or a server hiccup).
+            // refreshManifest swallows the error and leaves an EMPTY manifest,
+            // so isCached() below would wrongly say 'not_cached' even for a unit
+            // that IS downloaded, and downloadUnit() would no-op. Instead go
+            // straight to the next unit's play page: it is served network-first
+            // from the SW cache, so a pre-downloaded unit plays offline, and if
+            // it isn't downloaded that page surfaces the problem with its own
+            // exit rather than hanging here.
+            navigateToNext(nextUnit);
+            return;
           }
+          if (!mgr.manifest.units.find(function(u) { return u.id === nextUnit; })) {
+            // Manifest loaded, but the next unit isn't in it — e.g. its build
+            // record is missing so it was excluded, while server progress still
+            // points at it. Its play page would 404; send the student to the
+            // launcher, which always works.
+            window.location.href = '/missionhydrosci/units';
+            return;
+          }
+          return mgr.isCached(nextUnit).then(function(status) {
+            if (status === 'cached') {
+              // Auto-cleanup completed unit then navigate (navigate even if the
+              // cleanup rejects — never strand).
+              mgr.autoCleanup([nextUnit]).then(function() {
+                navigateToNext(nextUnit);
+              }, function() {
+                navigateToNext(nextUnit);
+              });
+            } else {
+              // Need to download — show progress on overlay
+              showDownloadProgress(mgr, nextUnit);
+            }
+          });
         }).catch(function() {
-          // Manifest fetch failed — just navigate and let the units page handle it
+          // Any unexpected failure — never strand; navigate.
           navigateToNext(nextUnit);
         });
       }
@@ -484,6 +510,9 @@
         mgr._channelName = 'missionhydrosci-delivery';
         mgr.init().then(function() {
           mgr.downloadUnit(nextUnit);
+        }).catch(function() {
+          // SW registration / init failed — don't strand on the overlay.
+          redirectSoon('Could not start the download. Redirecting...');
         });
       }
 

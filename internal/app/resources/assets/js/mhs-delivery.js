@@ -935,9 +935,18 @@
    * over. Used as the user-initiated escape hatch when a download is stalled.
    */
   MHSDeliveryManager.prototype.retryDownload = async function(unitId) {
-    if (!this.manifest) return;
+    // Fire a terminal status on the early returns — a silent return here leaves
+    // the units/manage Retry button disabled (mhsDownload disables it before
+    // calling) with the unit stuck showing "Stalled".
+    if (!this.manifest) {
+      this._fireStatus(unitId, 'error', { error: 'Could not load the game list. Please check your connection and try again.' });
+      return;
+    }
     var unit = this.manifest.units.find(function(u) { return u.id === unitId; });
-    if (!unit) return;
+    if (!unit) {
+      this._fireStatus(unitId, 'error', { error: 'This unit is not available in the current game version.' });
+      return;
+    }
 
     // Re-entrancy guard: cacheStatus stays 'stalled' until the awaits below
     // complete, so a double-click would route here twice and interleave —
@@ -1196,14 +1205,20 @@
    * API is unavailable or fails to start.
    */
   MHSDeliveryManager.prototype.downloadUnit = async function(unitId) {
+    // Both early returns MUST fire a terminal status. Callers (the play-page
+    // overlay, the units/manage pipelines) drive their UI off status events, so
+    // a silent return leaves them hanging — the overlay on "Downloading next
+    // unit..." forever, a units Retry button stuck disabled.
     if (!this.manifest) {
       console.error('Manifest not loaded');
+      this._fireStatus(unitId, 'error', { error: 'Could not load the game list. Please check your connection and try again.' });
       return;
     }
 
     var unit = this.manifest.units.find(function(u) { return u.id === unitId; });
     if (!unit) {
       console.error('Unit not found:', unitId);
+      this._fireStatus(unitId, 'error', { error: 'This unit is not available in the current game version.' });
       return;
     }
 

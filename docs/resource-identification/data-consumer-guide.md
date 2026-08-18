@@ -23,7 +23,9 @@ https://you.example.com/survey?group_id=68049e383adb985c4a637183&org_id=68041da0
 ```
 
 Which parameters you receive depends on the **scheme** configured for that
-resource on the StrataHub side. There are five (one of which sends nothing).
+resource on the StrataHub side. There are five standard schemes (one of which
+sends nothing), plus custom consumer schemes documented separately (see
+"Custom consumer schemes" below).
 
 ---
 
@@ -52,7 +54,7 @@ the `org_id` / `ws_id` you're sent.
 
 ---
 
-## The five schemes
+## The five standard schemes
 
 | Scheme | Parameters you will receive |
 |--------|-----------------------------|
@@ -70,6 +72,14 @@ Notes:
   `user_id` (hex) or `login_id` (email).
 - A parameter is **omitted entirely** if its value is empty on the StrataHub side
   (rather than being sent as an empty string). Always check for presence.
+
+### Custom consumer schemes
+
+A scheme can also implement a parameter contract specified by an individual
+consumer, verbatim. Such schemes are documented in a dedicated consumer-facing
+guide rather than here, and the parameter definitions above do not apply to
+them. Current custom schemes: **ABT-identifiable** and **ABT-deidentified**
+(the Abt survey contract) — see `abt-survey-url-options.md` in this folder.
 
 ---
 

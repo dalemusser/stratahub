@@ -79,6 +79,24 @@ func TestBuildLaunchURL_Modes(t *testing.T) {
 				"group": ctx.GroupName,
 			},
 		},
+		{
+			name: "abt-identifiable uses __userid=login_id with group/org names",
+			mode: models.URLIdentityABTIdentifiable,
+			wantParams: map[string]string{
+				"__userid": ctx.LoginID,
+				"group":    ctx.GroupName,
+				"org":      ctx.OrgName,
+			},
+		},
+		{
+			name: "abt-deidentified uses __userid=user_id with group/org hex IDs",
+			mode: models.URLIdentityABTDeidentified,
+			wantParams: map[string]string{
+				"__userid": ctx.UserID,
+				"group":    ctx.GroupID,
+				"org":      ctx.OrgID,
+			},
+		},
 	}
 
 	for _, tc := range tests {
@@ -149,9 +167,33 @@ func TestBuildLaunchURL_EmptyBase(t *testing.T) {
 	}
 }
 
+// The two ABT modes must emit identical parameter names so a resource can be
+// switched between them with no change on the consumer's side.
+func TestBuildLaunchURL_ABTModesShareParamNames(t *testing.T) {
+	ctx := fullCtx()
+	names := func(mode string) map[string]bool {
+		u, _ := url.Parse(BuildLaunchURL("https://x.test/p", mode, ctx))
+		got := map[string]bool{}
+		for k := range u.Query() {
+			got[k] = true
+		}
+		return got
+	}
+	ident := names(models.URLIdentityABTIdentifiable)
+	deid := names(models.URLIdentityABTDeidentified)
+	if len(ident) != len(deid) {
+		t.Fatalf("param sets differ: identifiable %v, deidentified %v", ident, deid)
+	}
+	for k := range ident {
+		if !deid[k] {
+			t.Errorf("param %q emitted by abt-identifiable but not abt-deidentified", k)
+		}
+	}
+}
+
 func TestHasPII(t *testing.T) {
-	clean := []string{models.URLIdentityNone, models.URLIdentityHex, ""}
-	pii := []string{models.URLIdentityHuman, models.URLIdentityBoth, models.URLIdentityLegacy}
+	clean := []string{models.URLIdentityNone, models.URLIdentityHex, models.URLIdentityABTDeidentified, ""}
+	pii := []string{models.URLIdentityHuman, models.URLIdentityBoth, models.URLIdentityLegacy, models.URLIdentityABTIdentifiable}
 	for _, m := range clean {
 		if HasPII(m) {
 			t.Errorf("mode %q should be PII-free", m)

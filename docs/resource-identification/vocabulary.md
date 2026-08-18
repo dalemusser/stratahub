@@ -1,6 +1,6 @@
 # Resource URL Identification — Parameter Vocabulary (Permanent Contract)
 
-_Last updated: 2026-05-28_
+_Last updated: 2026-08-17_
 
 This document defines every query parameter StrataHub may append to a resource's
 Launch URL when a member opens that resource. **These definitions are a stable
@@ -65,6 +65,27 @@ de-identification work) read the user's login from a parameter literally named
 `id`. It is emitted **only** by Legacy mode and retires when Legacy mode is
 removed. New integrations must use `user_id` (hex) or `login_id` (email), never
 `id`.
+
+### Custom consumer parameters (ABT modes only)
+
+| Param | Meaning | Example | PII class |
+|-------|---------|---------|-----------|
+| `__userid` | Abt's respondent-ID param (two leading underscores). Carries the user's login (email) in ABT-identifiable mode, or the user's hex ObjectID in ABT-deidentified mode | `jane@school.org` / `69b7b2328cac2be5f60efb09` | **High** (identifiable) / None, pseudonymous (deidentified) |
+
+The ABT modes are **custom consumer modes**: they implement the parameter
+contract specified by the consumer (Abt) verbatim, and the rules in this file
+deliberately do not apply inside them. In particular, the ABT modes emit
+`group` and `org` carrying whatever Abt's contract expects — group and
+organization *names* in ABT-identifiable, hex `group_id`/`org_id` values in
+ABT-deidentified — not this vocabulary's name-only meaning of those parameter
+names. Both ABT modes emit the same three parameter names (`__userid`,
+`group`, `org`) and differ only in values, so a resource can be switched
+between them with no change on the consumer's side. See
+`abt-survey-url-options.md` for the consumer-facing description.
+
+Like `id`, `__userid` is scoped to its modes and is not part of the permanent
+vocabulary. New non-custom integrations must use `user_id` (hex) or `login_id`
+(email).
 
 ---
 

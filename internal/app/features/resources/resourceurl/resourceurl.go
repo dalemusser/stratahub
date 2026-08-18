@@ -32,11 +32,12 @@ type IdentityContext struct {
 func Default() string { return models.DefaultURLIdentityMode }
 
 // HasPII reports whether a mode emits a high-PII field (the user's name and/or
-// login). Used to drive the creation-time PII warning. Only "none" and "hex"
-// are PII-free.
+// login). Used to drive the creation-time PII warning. Only "none", "hex", and
+// "abt-deidentified" are PII-free.
 func HasPII(mode string) bool {
 	switch mode {
-	case models.URLIdentityHuman, models.URLIdentityBoth, models.URLIdentityLegacy:
+	case models.URLIdentityHuman, models.URLIdentityBoth, models.URLIdentityLegacy,
+		models.URLIdentityABTIdentifiable:
 		return true
 	}
 	return false
@@ -87,6 +88,21 @@ func paramsForMode(mode string, ctx IdentityContext) map[string]string {
 			"id":    ctx.LoginID, // pre-2026 contract: login under the param named "id"
 			"org":   ctx.OrgName,
 			"group": ctx.GroupName,
+		}
+	// The two ABT modes implement Abt's spec verbatim: param names are dictated
+	// by Abt and identical in both modes, so a resource can switch between them
+	// with no change on Abt's side — only the values differ (readable vs hex).
+	case models.URLIdentityABTIdentifiable:
+		return map[string]string{
+			"__userid": ctx.LoginID, // Abt's respondent-ID param (two underscores)
+			"group":    ctx.GroupName,
+			"org":      ctx.OrgName,
+		}
+	case models.URLIdentityABTDeidentified:
+		return map[string]string{
+			"__userid": ctx.UserID,
+			"group":    ctx.GroupID,
+			"org":      ctx.OrgID,
 		}
 	default: // "none", "", or unrecognized
 		return nil

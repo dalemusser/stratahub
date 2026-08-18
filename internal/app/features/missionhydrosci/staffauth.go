@@ -1,7 +1,6 @@
 package missionhydrosci
 
 import (
-	"context"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -9,8 +8,6 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/store/emailverify"
 	"github.com/dalemusser/stratahub/internal/app/system/staffauth"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
-	"github.com/dalemusser/stratahub/internal/domain/models"
-	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 )
 
@@ -46,18 +43,36 @@ func (h *Handler) HandleStaffAuthStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Rate-limit start attempts per member session. Every start is an abuse
+	// vector, not just failed ones: a successful start to an email-method staff
+	// account sends a code (mail-bomb), the distinct error responses enumerate
+	// staff accounts, and each start invalidates any code a real teacher is
+	// mid-typing. Shares the backoff budget with verify/checkMemberAuth via the
+	// same key; a completed verify clears it. Keyed per member session, so a
+	// teacher legitimately authorizing on several students' devices (different
+	// sessions) is never throttled — only one member spamming start is.
+	throttleKey, hasKey := h.authThrottleKey(r)
+	now := time.Now()
+	if hasKey {
+		if wait := h.authThrottle.retryAfter(throttleKey, now); wait > 0 {
+			jsonError(w, "Too many attempts. Please wait a moment and try again.", http.StatusTooManyRequests)
+			return
+		}
+	}
+
 	wsID := workspace.IDFromRequest(r)
 	result, err := h.StaffAuthVerifier.StartAuth(r.Context(), wsID, req.LoginID)
 	if err != nil {
+		if hasKey {
+			h.authThrottle.fail(throttleKey, now)
+		}
 		switch err {
-		case staffauth.ErrUserNotFound:
-			jsonError(w, "User not found. Check the login ID and try again.", http.StatusNotFound)
-		case staffauth.ErrUserDisabled:
-			jsonError(w, "This user account is disabled.", http.StatusForbidden)
-		case staffauth.ErrUserNotStaff:
-			jsonError(w, "This user is not a leader, coordinator, or admin.", http.StatusForbidden)
-		case staffauth.ErrUserWrongWorkspace:
-			jsonError(w, "This user does not belong to this workspace.", http.StatusForbidden)
+		case staffauth.ErrUserNotFound, staffauth.ErrUserNotStaff,
+			staffauth.ErrUserWrongWorkspace, staffauth.ErrUserDisabled:
+			// Deliberately one identical response for all four: do not reveal
+			// whether the login exists, is staff, belongs to this workspace, or
+			// is disabled (staff-account enumeration).
+			jsonError(w, "That staff login can't authorize on this device. Check the login ID and try again.", http.StatusForbidden)
 		case staffauth.ErrNoEmail:
 			jsonError(w, "This user has email authentication but no email address is available. The account may need to be fixed.", http.StatusBadRequest)
 		case staffauth.ErrUnsupportedAuthMethod:
@@ -67,6 +82,13 @@ func (h *Handler) HandleStaffAuthStart(w http.ResponseWriter, r *http.Request) {
 			jsonError(w, "Authentication failed. Please try again.", http.StatusInternalServerError)
 		}
 		return
+	}
+
+	// Count the successful start too — it sent a code / created a challenge, so
+	// repeated successful starts are themselves the mail-bomb vector. A
+	// completed verify (same key) clears the budget.
+	if hasKey {
+		h.authThrottle.fail(throttleKey, now)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
@@ -163,11 +185,6 @@ func (h *Handler) HandleStaffAuthResend(w http.ResponseWriter, r *http.Request) 
 
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"ok":true}`))
-}
-
-// loadSettings loads workspace site settings.
-func (h *Handler) loadSettings(ctx context.Context, wsID primitive.ObjectID) (models.SiteSettings, error) {
-	return h.SettingsStore.Get(ctx, wsID)
 }
 
 func jsonError(w http.ResponseWriter, msg string, code int) {

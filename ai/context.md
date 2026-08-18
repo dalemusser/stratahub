@@ -195,7 +195,7 @@ func (s *Store) GetByID(ctx context.Context, id primitive.ObjectID) (Model, erro
 | **page.go** | Dynamic content page (about, contact, terms, etc.) |
 | **resourcetypes.go** | Resource type constants and validators |
 | **materialtypes.go** | Material type constants (document, video, link, etc.) |
-| **resourceurlmodes.go** | URLIdentityMode for resource identification (none/hex/human/both/legacy) |
+| **resourceurlmodes.go** | URLIdentityMode for resource identification (none/hex/human/both/legacy, plus custom abt-identifiable/abt-deidentified) |
 | **loginhistory.go** | Login audit entry |
 | **app.go** | Application configuration model |
 | **mhs_build.go** | MHS build tracking data |

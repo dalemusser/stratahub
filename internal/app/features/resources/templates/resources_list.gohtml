@@ -94,6 +94,10 @@
     <span class="inline-block px-2 py-0.5 rounded font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">Both</span> hex + human (PII)
     <span class="mx-2 text-gray-400 dark:text-gray-500">|</span>
     <span class="inline-block px-2 py-0.5 rounded font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">Legacy</span> id=login, org, group (PII)
+    <span class="mx-2 text-gray-400 dark:text-gray-500">|</span>
+    <span class="inline-block px-2 py-0.5 rounded font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300">ABT-Ident</span> __userid=login, group, org names (PII)
+    <span class="mx-2 text-gray-400 dark:text-gray-500">|</span>
+    <span class="inline-block px-2 py-0.5 rounded font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300">ABT-DeID</span> __userid, group, org as hex IDs
   </div>
 
   <div class="overflow-auto" style="max-height: calc(100vh - 16rem); min-height: 10rem;">
@@ -126,6 +130,10 @@
               <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" title="Hex + human-readable (PII)">Both</span>
             {{ else if eq .URLIdentityMode "legacy" }}
               <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" title="Legacy: id=login_id, org, group (deprecated, PII)">Legacy</span>
+            {{ else if eq .URLIdentityMode "abt-identifiable" }}
+              <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-300" title="ABT custom: __userid=login (email), group, org names (PII)">ABT-Ident</span>
+            {{ else if eq .URLIdentityMode "abt-deidentified" }}
+              <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-300" title="ABT custom: __userid, group, org as hex IDs">ABT-DeID</span>
             {{ else }}
               <span class="inline-block px-2 py-0.5 rounded text-xs font-medium bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-300" title="No identity in the URL">None</span>
             {{ end }}

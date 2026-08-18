@@ -41,6 +41,7 @@ This is the index of all documentation for StrataHub.
 
 How StrataHub appends member/group/org/workspace identity to a resource's launch URL, configurable per resource.
 
+- [ABT Survey URL Options](resource-identification/abt-survey-url-options.md) - Consumer-facing description of the two custom ABT schemes (identifiable vs de-identified) for the Abt survey links
 - [Admin & Coordinator Guide](resource-identification/admin-coordinator-guide.md) - Choosing a URL identity scheme when creating/editing Resources
 - [Data Recipient Guide](resource-identification/data-consumer-guide.md) - For consumers receiving the parameters: what each scheme sends and how it's encoded
 - [Members Report — Resolving Identity from Hex IDs](resource-identification/members-report.md) - The authorized crosswalk that maps de-identified hex IDs back to names, orgs, groups, and logins

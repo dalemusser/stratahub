@@ -194,6 +194,17 @@ func (h *Handler) checkMemberAuth(r *http.Request, role, authToken, keyword stri
 			break
 		}
 		grantedBy = "keyword"
+	default:
+		// Unknown / misconfigured member-auth mode → fail CLOSED. Without this,
+		// an unrecognized mode falls through the switch with authFailed=false
+		// and grants an unlock with NO credential check. The settings UI
+		// validates the enum, so this guards an out-of-band value: a migration,
+		// a direct DB edit, or a future mode (e.g. "sso") shipped before its
+		// handler. Mirrors the fail-closed default in
+		// system/staffauth/staffauth.go.
+		h.Log.Error("MHS member auth: unknown mode, failing closed",
+			zap.String("mode", mode), zap.String("workspace_id", wsID.Hex()))
+		return http.StatusForbidden, "Member authorization is misconfigured for this workspace. Ask an administrator."
 	}
 	if authFailed {
 		h.authThrottle.fail(throttleKey, now)
