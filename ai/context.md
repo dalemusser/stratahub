@@ -918,6 +918,17 @@ make css-watch
 
 ## Recent Work Completed
 
+### Custom ABT URL Identity Modes (2026-08, in production)
+- Two custom consumer modes for the Abt survey links: `abt-identifiable`
+  (`__userid`=login email, `group`/`org` names; PII) and `abt-deidentified`
+  (identical param names, hex values) — switchable per-resource with no
+  Abt-side changes
+- Custom modes implement the consumer's spec verbatim (vocabulary rules exempt);
+  PII labels/warnings still apply to every mode
+- Consumer-facing doc: `docs/resource-identification/abt-survey-url-options.md`;
+  real abtsurvey.com URLs are never committed (public repo — docs use
+  `surveys.example.com` placeholders)
+
 ### Multi-Workspace & Coordinator Support
 - Workspaces for multi-tenancy
 - Coordinator role with org-scoped assignments
