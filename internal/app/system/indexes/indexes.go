@@ -86,6 +86,9 @@ func EnsureAll(ctx context.Context, db *mongo.Database) error {
 	if err := ensureMHSCollections(ctx, db); err != nil {
 		problems = append(problems, "mhs_collections: "+err.Error())
 	}
+	if err := ensureMemberStatus(ctx, db); err != nil {
+		problems = append(problems, "member_status: "+err.Error())
+	}
 
 	if len(problems) > 0 {
 		return errors.New(strings.Join(problems, "; "))
@@ -1006,6 +1009,34 @@ func ensureMHSCollections(ctx context.Context, db *mongo.Database) error {
 			},
 			Options: options.Index().
 				SetName("idx_mhscollection_created"),
+		},
+	})
+}
+
+func ensureMemberStatus(ctx context.Context, db *mongo.Database) error {
+	c := db.Collection("member_status")
+	return ensureIndexSet(ctx, c, []mongo.IndexModel{
+		// One document per (workspace, user, entity); also serves the
+		// dashboard's batch lookup by user IDs and ListForUser's key ordering.
+		{
+			Keys: bson.D{
+				{Key: "workspace_id", Value: 1},
+				{Key: "user_id", Value: 1},
+				{Key: "entity_key", Value: 1},
+			},
+			Options: options.Index().
+				SetUnique(true).
+				SetName("uniq_memberstatus_workspace_user_entity"),
+		},
+		// Per-entity roll-ups within a workspace (how many completed "pre").
+		{
+			Keys: bson.D{
+				{Key: "workspace_id", Value: 1},
+				{Key: "entity_key", Value: 1},
+				{Key: "state_rank", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_memberstatus_workspace_entity_state"),
 		},
 	})
 }

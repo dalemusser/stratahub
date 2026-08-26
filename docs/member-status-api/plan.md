@@ -185,11 +185,11 @@ A survey is a `models.Resource` with `Type == "survey"` and nothing else tying i
 
 Each task is independently committable; order matters only where noted.
 
-**Task 0 — Make SiteSettings saves non-destructive (prerequisite, bug fix — first, and shipped on its own).**
+**Task 0 — Make SiteSettings saves non-destructive (prerequisite, bug fix — first, and shipped on its own).** ✅ Done: commit `ca323ce`, deployed to production 2026-08-26, verified (a Settings save no longer clears the active MHS collection).
 `settings/admin.go HandleSettings` and `workspaces/settings.go HandleSettings`: load `current` (already done for the logo), copy it, overlay only the fields the form carries, then `Save`. Tests: saving from each page preserves `mhs_active_collection_id`, Claude settings, MHS member-auth settings, and landing content. (Also fixes the apex page wiping the workspace logo via `workspacestore.Update` — same class; one-line carry-forward.) Committed and deployable independently of everything below.
 
-**Task 1 — Model, store, indexes.**
-`models/memberstatus.go`, `store/memberstatus/store.go` (+ `_test.go` against local Mongo: first-wins timestamps, no regression from completed, history cap, concurrent upsert), `indexes.go: ensureMemberStatus` wired into `EnsureAll`.
+**Task 1 — Model, store, indexes.** ✅ Done 2026-08-26 (uncommitted at time of writing).
+`models/memberstatus.go`, `store/memberstatus/store.go` (+ `_test.go` against local Mongo: first-wins timestamps, no regression from completed, history cap, concurrent upsert), `indexes.go: ensureMemberStatus` wired into `EnsureAll`. Implementation note: the state ladder is stored as `state_rank` (raised with `$max`) alongside the `state` label, which is re-synced with a rank-conditioned `$set` — no update pipelines, DocumentDB-safe. `Record` takes a `RecordInput`; `Get`, `ListForUser`, `ListByUserIDs`, `DeleteByUser` are the readers (`DeleteByUser` is provided for parity with `mhsdevicestatus` but, like it, is not yet wired into member deletion).
 
 **Task 2 — Settings: shared key.**
 `SiteSettings` fields; `settingsstore.Save` whitelist + setter; `/settings` VM/form/handler; template section (masked input, Show/Copy/Generate); audit event + logger wrapper; handler tests.
