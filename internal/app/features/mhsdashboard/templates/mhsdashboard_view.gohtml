@@ -343,6 +343,33 @@
     opacity: 1;
     visibility: visible;
   }
+  /* Surveys tab cells: pill with a glyph that carries the state (works in
+     every theme and in grayscale); color is secondary. Amber is deliberately
+     avoided — on this dashboard it means "needs review". */
+  .mhs-survey-cell {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 9999px;
+    border: 1px solid transparent;
+    font-size: 11px;
+    font-weight: 500;
+    line-height: 1.4;
+    white-space: nowrap;
+    background: transparent;
+    color: #475569;
+    cursor: pointer;
+  }
+  .mhs-survey-cell:hover { filter: brightness(0.96); }
+  .mhs-survey-cell:focus-visible { outline: 2px solid #6366f1; outline-offset: 1px; }
+  .mhs-survey-legend { cursor: default; }
+  .mhs-survey-glyph { font-size: 12px; line-height: 1; }
+  .mhs-survey-date { color: #64748b; font-weight: 400; }
+  .mhs-survey-none { color: #94a3b8; border-color: #e2e8f0; background: #f8fafc; }
+  .mhs-survey-opened { color: #0369a1; border-color: #bae6fd; background: #f0f9ff; }
+  .mhs-survey-started { color: #4338ca; border-color: #c7d2fe; background: #eef2ff; }
+  .mhs-survey-completed { color: #15803d; border-color: #bbf7d0; background: #f0fdf4; }
   .mhs-modal {
     position: fixed;
     top: 50%;
@@ -471,6 +498,15 @@
   .dark #mhs-dashboard .mhs-device-dot-none {
     background: #475569;
   }
+
+  /* Dark mode: survey cells */
+  .dark #mhs-dashboard .mhs-survey-date { color: #94a3b8; }
+  .dark #mhs-dashboard .mhs-survey-none { color: #94a3b8; border-color: #475569; background: #1f2937; }
+  .dark #mhs-dashboard .mhs-survey-opened { color: #7dd3fc; border-color: #075985; background: #082f49; }
+  .dark #mhs-dashboard .mhs-survey-started { color: #a5b4fc; border-color: #3730a3; background: #1e1b4b; }
+  .dark #mhs-dashboard .mhs-survey-completed { color: #86efac; border-color: #166534; background: #052e16; }
+  .dark #mhs-dashboard .mhs-survey-cell:hover { filter: brightness(1.15); }
+  .dark #mhs-dashboard #mhs-survey-modal-state { color: #e2e8f0; }
 
   /* Dark mode: modals */
   .dark #mhs-dashboard .mhs-modal {
@@ -732,6 +768,13 @@
             onclick="switchTab('analytics')">
       Analytics
     </button>
+    {{ if .SurveyHeaders }}
+    <button id="mhs-tab-btn-surveys" type="button"
+            class="px-4 py-2 text-sm font-medium mhs-tab-inactive"
+            onclick="switchTab('surveys')">
+      {{ .SurveyTabTitle }}
+    </button>
+    {{ end }}
     {{ if .IsAdmin }}
     <button id="mhs-tab-btn-debug" type="button"
             class="px-4 py-2 text-sm font-medium mhs-tab-inactive"
@@ -798,6 +841,25 @@
         <span class="text-slate-600">Not Downloaded</span>
       </div>
     </div>
+    <!-- Surveys Legend -->
+    {{ if .SurveyHeaders }}
+    <div id="mhs-legend-surveys" class="hidden items-center gap-4 text-xs">
+      <div class="flex items-center gap-1.5">
+        <span class="mhs-survey-cell mhs-survey-none mhs-survey-legend"><span class="mhs-survey-glyph">○</span> Not started</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="mhs-survey-cell mhs-survey-opened mhs-survey-legend"><span class="mhs-survey-glyph">◔</span> Opened</span>
+        <span class="text-slate-500">link opened in StrataHub</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="mhs-survey-cell mhs-survey-started mhs-survey-legend"><span class="mhs-survey-glyph">◐</span> Started</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="mhs-survey-cell mhs-survey-completed mhs-survey-legend"><span class="mhs-survey-glyph">✓</span> Completed</span>
+      </div>
+      <span class="text-slate-400">Click a cell for dates and details</span>
+    </div>
+    {{ end }}
     <!-- Maps Legend -->
     {{ if .IsAdmin }}
     <div id="mhs-legend-maps" class="hidden items-center gap-4 text-xs">
@@ -888,6 +950,33 @@
       <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Additional Information</h4>
       <p class="text-slate-500 text-sm italic">More details about this progress point can be added here, such as learning objectives, resources, or tips for teachers.</p>
     </div>
+  </div>
+</div>
+
+<!-- Survey Status Modal -->
+<div id="mhs-survey-modal" class="mhs-modal">
+  <div class="mhs-modal-header" style="background: linear-gradient(135deg, #4f46e5 0%, #3730a3 100%);">
+    <button id="mhs-survey-modal-close" class="mhs-modal-close" type="button" aria-label="Close">
+      <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M1 1l12 12M13 1L1 13"/>
+      </svg>
+    </button>
+    <div class="flex items-center gap-2 mb-1">
+      <span class="text-xs text-indigo-200 uppercase tracking-wide">Survey Status</span>
+    </div>
+    <h3 id="mhs-survey-modal-student" class="text-lg font-semibold pr-8"></h3>
+    <div id="mhs-survey-modal-title" class="text-sm text-indigo-100 mt-1"></div>
+  </div>
+  <div class="mhs-modal-body">
+    <div class="mb-4">
+      <div id="mhs-survey-modal-state" class="text-base font-semibold text-slate-700 mb-1"></div>
+      <p id="mhs-survey-modal-description" class="text-sm text-slate-500"></p>
+    </div>
+    <div class="pt-4 border-t border-slate-200">
+      <h4 class="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Timeline</h4>
+      <div id="mhs-survey-modal-timeline" class="space-y-2 text-sm"></div>
+    </div>
+    <p id="mhs-survey-modal-source" class="mt-4 text-xs text-slate-400"></p>
   </div>
 </div>
 
@@ -1128,6 +1217,7 @@
       progress: document.getElementById('mhs-tab-progress'),
       devices: document.getElementById('mhs-tab-devices'),
       analytics: document.getElementById('mhs-tab-analytics'),
+      surveys: document.getElementById('mhs-tab-surveys'),
       debug: document.getElementById('mhs-tab-debug'),
       maps: document.getElementById('mhs-tab-maps')
     };
@@ -1135,6 +1225,7 @@
       progress: document.getElementById('mhs-tab-btn-progress'),
       devices: document.getElementById('mhs-tab-btn-devices'),
       analytics: document.getElementById('mhs-tab-btn-analytics'),
+      surveys: document.getElementById('mhs-tab-btn-surveys'),
       debug: document.getElementById('mhs-tab-btn-debug'),
       maps: document.getElementById('mhs-tab-btn-maps')
     };
@@ -1142,6 +1233,7 @@
       progress: document.getElementById('mhs-legend-progress'),
       devices: document.getElementById('mhs-legend-devices'),
       analytics: document.getElementById('mhs-legend-analytics'),
+      surveys: document.getElementById('mhs-legend-surveys'),
       debug: document.getElementById('mhs-legend-debug'),
       maps: document.getElementById('mhs-legend-maps')
     };
@@ -1962,6 +2054,66 @@
     activeModal = reviewModal;
   }
 
+  // Survey status modal: fed entirely from the clicked cell's data-* attributes.
+  var surveyModal = document.getElementById('mhs-survey-modal');
+  var surveyModalClose = document.getElementById('mhs-survey-modal-close');
+
+  function openSurveyModal(d) {
+    if (!surveyModal) return;
+    document.getElementById('mhs-survey-modal-student').textContent = d.studentName || '';
+    document.getElementById('mhs-survey-modal-title').textContent = d.surveyTitle || '';
+    document.getElementById('mhs-survey-modal-state').textContent = (d.glyph ? d.glyph + ' ' : '') + (d.label || '');
+    document.getElementById('mhs-survey-modal-description').textContent = d.surveyDescription || '';
+
+    var timeline = document.getElementById('mhs-survey-modal-timeline');
+    timeline.textContent = '';
+    var steps = [
+      ['Opened',    d.openedAt,    'Survey link opened in StrataHub'],
+      ['Started',   d.startedAt,   'Reported by the survey provider'],
+      ['Completed', d.completedAt, 'Reported by the survey provider']
+    ];
+    var any = false;
+    steps.forEach(function (step) {
+      if (!step[1]) return;
+      any = true;
+      var row = document.createElement('div');
+      row.className = 'flex items-baseline gap-3';
+      var label = document.createElement('div');
+      label.className = 'w-20 flex-shrink-0 font-medium text-slate-700';
+      label.textContent = step[0];
+      var value = document.createElement('div');
+      value.className = 'text-slate-600';
+      value.textContent = step[1];
+      var note = document.createElement('div');
+      note.className = 'text-xs text-slate-400';
+      note.textContent = step[2];
+      value.appendChild(note);
+      row.appendChild(label);
+      row.appendChild(value);
+      timeline.appendChild(row);
+    });
+    if (!any) {
+      var empty = document.createElement('div');
+      empty.className = 'text-slate-500';
+      empty.textContent = 'No activity recorded for this survey yet.';
+      timeline.appendChild(empty);
+    }
+
+    var source = document.getElementById('mhs-survey-modal-source');
+    source.textContent = d.source === 'launch' ? 'Latest update came from the student opening the link in StrataHub.'
+                       : d.source === 'api'    ? 'Latest update came from the survey provider.'
+                       : '';
+
+    surveyModal.classList.add('active');
+    modalBackdrop.classList.add('active');
+    document.body.style.overflow = 'hidden';
+    activeModal = surveyModal;
+  }
+
+  if (surveyModalClose) {
+    surveyModalClose.addEventListener('click', closeModal);
+  }
+
   function closeModal() {
     if (activeModal) {
       activeModal.classList.remove('active');
@@ -1998,6 +2150,13 @@
         var title = pointCell.dataset.pointTitle || '';
         var description = pointCell.dataset.pointDescription || '';
         openInfoModal(id, title, description);
+        return;
+      }
+
+      // Survey cell click (Surveys tab) — legend swatches are inert
+      var surveyCell = e.target.closest('.mhs-survey-cell');
+      if (surveyCell && !surveyCell.classList.contains('mhs-survey-legend')) {
+        openSurveyModal(surveyCell.dataset);
         return;
       }
 
