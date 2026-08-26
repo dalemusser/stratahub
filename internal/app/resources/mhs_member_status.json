@@ -1,0 +1,33 @@
+{
+  "tab_title": "Surveys",
+  "items": [
+    {
+      "id": "pre",
+      "title": "Pre-Survey",
+      "short_name": "Pre",
+      "api_names": ["Pre"],
+      "description": "Survey taken before students begin Mission HydroSci."
+    },
+    {
+      "id": "mhs",
+      "title": "MHS Engagement",
+      "short_name": "MHS",
+      "api_names": ["MHS Engagement"],
+      "description": "Engagement survey about Mission HydroSci."
+    },
+    {
+      "id": "ews",
+      "title": "EWS Engagement",
+      "short_name": "EWS",
+      "api_names": ["EWS Engagement"],
+      "description": "EWS engagement survey."
+    },
+    {
+      "id": "post",
+      "title": "Post-Survey",
+      "short_name": "Post",
+      "api_names": ["Post"],
+      "description": "Survey taken after students finish Mission HydroSci."
+    }
+  ]
+}

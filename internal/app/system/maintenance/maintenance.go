@@ -79,5 +79,9 @@ func isExemptPath(path string) bool {
 	return strings.HasPrefix(path, "/assets/") ||
 		strings.HasPrefix(path, "/static/") ||
 		strings.HasPrefix(path, "/auth/") ||
-		strings.HasPrefix(path, "/login/")
+		strings.HasPrefix(path, "/login/") ||
+		// Member Status API: key-authenticated server-to-server reports from an
+		// external provider. It has no user to show a maintenance page to, and
+		// events it reports during maintenance would otherwise be lost.
+		strings.HasPrefix(path, "/api/member-status")
 }

@@ -23,6 +23,7 @@ import (
 	logoutfeature "github.com/dalemusser/stratahub/internal/app/features/logout"
 	materialsfeature "github.com/dalemusser/stratahub/internal/app/features/materials"
 	membersfeature "github.com/dalemusser/stratahub/internal/app/features/members"
+	memberstatusapifeature "github.com/dalemusser/stratahub/internal/app/features/memberstatusapi"
 	mhsbuildsfeature "github.com/dalemusser/stratahub/internal/app/features/mhsbuilds"
 	mhsdashboardfeature "github.com/dalemusser/stratahub/internal/app/features/mhsdashboard"
 	missionhydroscifeature "github.com/dalemusser/stratahub/internal/app/features/missionhydrosci"
@@ -249,6 +250,9 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		}))
 	}
 	csrfMiddleware := csrf.Protect([]byte(appCfg.CSRFKey), csrfOpts...)
+	// Key-authenticated, server-to-server API paths carry no session cookie
+	// and no CSRF token; flag them as exempt. Must run before csrf.Protect.
+	r.Use(memberstatusapifeature.CSRFExempt)
 	r.Use(csrfMiddleware)
 
 	// Apex domain protection: redirect non-superadmins to their workspace domain.
@@ -506,6 +510,18 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	}
 	gameConfigHandler := gameconfigfeature.NewHandler(gameConfigs)
 	gameconfigfeature.MountRoutes(r, gameConfigHandler)
+
+	// Member Status API: an external provider reports members' survey
+	// started/completed events. Shared-key auth in the body, no session, no
+	// CSRF (see CSRFExempt above), exempt from maintenance mode. Mounted
+	// outside the RequireWorkspace group; the handler resolves the workspace
+	// from the host and answers with JSON when it is missing.
+	memberStatusAPIHandler, err := memberstatusapifeature.NewHandler(deps.StrataHubMongoDatabase, logger)
+	if err != nil {
+		logger.Error("member status API init failed", zap.Error(err))
+		return nil, err
+	}
+	memberstatusapifeature.MountRoutes(r, memberStatusAPIHandler)
 
 	// Activity store - used by multiple features
 	activityStore := activity.New(deps.StrataHubMongoDatabase)
