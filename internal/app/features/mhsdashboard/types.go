@@ -52,16 +52,16 @@ type GroupOptionEx struct {
 
 // CellData represents a single cell in the progress grid.
 type CellData struct {
-	Value           int    // 0 = pending, 1 = flagged, 2 = passed, 3 = active
-	IsUnitStart     bool   // True if this is the first cell in a unit
-	IsInCurrentUnit bool   // True if cell belongs to the unit the student is currently in (grader data)
-	IsInMHSUnit     bool   // True if cell belongs to the unit from Mission HydroSci progress
-	CellClass       string // CSS class for the cell background
-	BorderClass     string // CSS class for the border
-	PointID         string // Progress point ID (e.g., "u1p1")
-	PointTitle      string // Progress point title
-	StudentName     string // Student name for this row
-	ReviewReason    string // Reason for flagged cells
+	Value                 int    // 0 = pending, 1 = flagged, 2 = passed, 3 = active
+	IsUnitStart           bool   // True if this is the first cell in a unit
+	IsInCurrentUnit       bool   // True if cell belongs to the unit the student is currently in (grader data)
+	IsInMHSUnit           bool   // True if cell belongs to the unit from Mission HydroSci progress
+	CellClass             string // CSS class for the cell background
+	BorderClass           string // CSS class for the border
+	PointID               string // Progress point ID (e.g., "u1p1")
+	PointTitle            string // Progress point title
+	StudentName           string // Student name for this row
+	ReviewReason          string // Reason for flagged cells
 	DurationDisplay       string // Formatted wall-clock completion time (e.g., "12:34" or "1:23:45")
 	ActiveDurationDisplay string // Formatted active time excluding gaps
 	MistakeCount          int    // Number of mistakes/negative events (-1 = no data)
@@ -97,6 +97,45 @@ type MemberRow struct {
 	// Collection info
 	HasCollectionOverride bool   // True if user has a per-user collection override
 	CollectionName        string // Name of the effective collection (override or group/workspace)
+
+	// Surveys tab: one cell per configured survey, in SurveyHeaders order.
+	// Nil when no surveys are configured.
+	Surveys []SurveyCell
+}
+
+// SurveyHeader is one tracked-survey column on the Surveys tab. Columns come
+// from the embedded member-status configuration (memberstatuscfg).
+type SurveyHeader struct {
+	ID          string
+	Title       string
+	ShortName   string
+	Description string
+}
+
+// SurveyCell is one member's status on one tracked survey, fully formatted
+// for the template (same convention as CellData: presentation decisions are
+// made in Go, the template only interpolates).
+type SurveyCell struct {
+	EntityID    string // config item id, e.g. "pre"
+	Title       string
+	ShortName   string
+	Description string
+	StudentName string
+
+	State     string // models.MemberStatusNotStarted / Opened / Started / Completed
+	Label     string // "Not started" / "Opened" / "Started" / "Completed"
+	Glyph     string // ○ ◔ ◐ ✓ — carries the meaning independent of color
+	CellClass string // mhs-survey-none / -opened / -started / -completed
+
+	ShortDate string // "Aug 25": when the current state was reached; "" if not started
+	StateAt   string // full timestamp of the current state, in the org's time zone
+	Tooltip   string // every reached state with its timestamp, for title="…"
+
+	// Formatted first-wins timestamps for the detail modal; "" when not reached.
+	OpenedAt    string
+	StartedAt   string
+	CompletedAt string
+	Source      string // writer of the most recent event: "api" or "launch"
 }
 
 // UnitHeader represents header info for a unit.
@@ -120,7 +159,7 @@ type PointHeader struct {
 type DashboardData struct {
 	viewdata.BaseVM
 
-	Groups        []GroupOption   // Leader view: flat group list
+	Groups        []GroupOption // Leader view: flat group list
 	SelectedGroup string
 	GroupName     string
 	MemberCount   int
@@ -128,14 +167,18 @@ type DashboardData struct {
 	TimezoneAbbr  string // Timezone abbreviation (e.g., "MST", "EST")
 
 	// Admin/coordinator view: org + group dropdowns
-	IsAdmin     bool             // true for admin/coordinator/superadmin
-	Orgs        []OrgOption      // Organization options
-	SelectedOrg string           // Selected org ID hex
-	GroupsEx    []GroupOptionEx   // Groups with org association + member counts
+	IsAdmin     bool            // true for admin/coordinator/superadmin
+	Orgs        []OrgOption     // Organization options
+	SelectedOrg string          // Selected org ID hex
+	GroupsEx    []GroupOptionEx // Groups with org association + member counts
 
 	UnitHeaders  []UnitHeader
 	PointHeaders []PointHeader
 	Members      []MemberRow
+
+	// Surveys tab (empty SurveyHeaders = no tab)
+	SurveyTabTitle string
+	SurveyHeaders  []SurveyHeader
 
 	SortBy  string // Sort field (currently only "name")
 	SortDir string // Sort direction: "asc" or "desc"
@@ -153,6 +196,10 @@ type GridData struct {
 	UnitHeaders  []UnitHeader
 	PointHeaders []PointHeader
 	Members      []MemberRow
+
+	// Surveys tab (empty SurveyHeaders = no tab)
+	SurveyTabTitle string
+	SurveyHeaders  []SurveyHeader
 
 	// CSRF token for refresh requests
 	CSRFToken string
@@ -215,7 +262,7 @@ type TimelineEntry struct {
 	EventType       string
 	EventKey        string
 	SceneName       string
-	ServerTimestamp  time.Time
+	ServerTimestamp time.Time
 	TimestampStr    string // pre-formatted for display
 	Data            map[string]interface{}
 	DataSummary     string // compact string representation of data

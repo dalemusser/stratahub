@@ -78,6 +78,8 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 			UnitHeaders:           unitHeaders,
 			PointHeaders:          pointHeaders,
 			Members:               nil,
+			SurveyTabTitle:        h.surveyTabTitle(),
+			SurveyHeaders:         h.surveyHeaders(),
 			EnableClaudeSummaries: enableSummaries,
 		}
 		templates.Render(w, r, "mhsdashboard_view", data)
@@ -170,13 +172,13 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get organization timezone and format the time
-	lastUpdated, tzAbbr := h.formatTimeInOrgTimezone(ctx, selectedGroupOrgID)
+	lastUpdated, tzAbbr, loc := h.formatTimeInOrgTimezone(ctx, selectedGroupOrgID)
 
 	// Load device status for all members
 	deviceMap := h.loadDeviceMap(ctx, r, members)
 
 	// Build progress rows with real grade data
-	memberRows := h.buildProgressRows(ctx, r, members, cfg, deviceMap)
+	memberRows := h.buildProgressRows(ctx, r, members, cfg, deviceMap, loc)
 
 	base := viewdata.LoadBase(r, h.DB)
 	data := DashboardData{
@@ -190,10 +192,12 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 		IsAdmin:               isAdmin,
 		Orgs:                  orgs,
 		SelectedOrg:           selectedOrg,
-		GroupsEx:               groupsEx,
+		GroupsEx:              groupsEx,
 		UnitHeaders:           unitHeaders,
 		PointHeaders:          pointHeaders,
 		Members:               memberRows,
+		SurveyTabTitle:        h.surveyTabTitle(),
+		SurveyHeaders:         h.surveyHeaders(),
 		SortBy:                sortBy,
 		SortDir:               sortDir,
 		EnableClaudeSummaries: enableSummaries,
@@ -299,12 +303,12 @@ func (h *Handler) ServeGrid(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get organization timezone and format the time
-	lastUpdated, _ := h.formatTimeInOrgTimezone(ctx, groupOrgID)
+	lastUpdated, _, loc := h.formatTimeInOrgTimezone(ctx, groupOrgID)
 
 	// Load device status for all members
 	deviceMap := h.loadDeviceMap(ctx, r, members)
 
-	memberRows := h.buildProgressRows(ctx, r, members, cfg, deviceMap)
+	memberRows := h.buildProgressRows(ctx, r, members, cfg, deviceMap, loc)
 
 	data := GridData{
 		SelectedGroup:         selectedGroup,
@@ -314,6 +318,8 @@ func (h *Handler) ServeGrid(w http.ResponseWriter, r *http.Request) {
 		UnitHeaders:           unitHeaders,
 		PointHeaders:          pointHeaders,
 		Members:               memberRows,
+		SurveyTabTitle:        h.surveyTabTitle(),
+		SurveyHeaders:         h.surveyHeaders(),
 		CSRFToken:             csrf.Token(r),
 		SortBy:                sortBy,
 		SortDir:               sortDir,
@@ -604,8 +610,8 @@ type ProgressGradeDoc struct {
 
 // ProgressGradeItem represents a single grade within the grades array.
 type ProgressGradeItem struct {
-	Attempt            int            `bson:"attempt"`                      // 1-based attempt number
-	Status             string         `bson:"status"`                       // "active", "passed", or "flagged"
+	Attempt            int            `bson:"attempt"` // 1-based attempt number
+	Status             string         `bson:"status"`  // "active", "passed", or "flagged"
 	ComputedAt         time.Time      `bson:"computedAt"`
 	RuleID             string         `bson:"ruleId"`
 	ReasonCode         string         `bson:"reasonCode,omitempty"`         // Only for flagged grades
@@ -634,7 +640,7 @@ func formatDuration(secs float64) string {
 
 // reasonCodeToMessage maps reason codes to human-readable messages.
 var reasonCodeToMessage = map[string]string{
-	"NO_TRIGGER":                "Student has not yet completed the trigger event for this activity.",
+	"NO_TRIGGER":               "Student has not yet completed the trigger event for this activity.",
 	"TOO_MANY_TARGETS":         "Student used more targets than allowed for efficient problem-solving.",
 	"TOO_MANY_TESTS":           "Student ran more tests than expected, may need guidance on efficiency.",
 	"TOO_MANY_NEGATIVES":       "Student received too many negative responses during the activity.",
@@ -737,7 +743,8 @@ func (h *Handler) loadDeviceMap(ctx context.Context, r *http.Request, members []
 }
 
 // buildProgressRows builds the progress rows for the given members using real grade data.
-func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, members []models.User, cfg *ProgressConfig, deviceMap map[string][]DeviceInfo) []MemberRow {
+// loc is the organization time zone used for any timestamps rendered into the rows.
+func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, members []models.User, cfg *ProgressConfig, deviceMap map[string][]DeviceInfo, loc *time.Location) []MemberRow {
 	totalPoints := cfg.TotalProgressPoints()
 	result := make([]MemberRow, len(members))
 
@@ -767,6 +774,9 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 		h.Log.Error("failed to load MHS user progress", zap.Error(err))
 		mhsProgress = make(map[string]models.MHSUserProgress)
 	}
+
+	// Load survey status for the Surveys tab (nil when none are configured)
+	surveyCells := h.loadSurveyCells(ctx, wsID, members, loc)
 
 	for i, member := range members {
 		cells := make([]CellData, totalPoints)
@@ -938,6 +948,7 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 			CurrentUnit:           currentUnit,
 			HasCollectionOverride: hasOverride,
 			CollectionName:        collName,
+			Surveys:               surveyCells[member.ID.Hex()],
 		}
 	}
 
@@ -1055,30 +1066,31 @@ func (h *Handler) loadActiveMemberCounts(ctx context.Context, r *http.Request, g
 // formatTimeInOrgTimezone formats the current time in the organization's timezone.
 // Returns the formatted time string and the timezone abbreviation.
 // Falls back to UTC if the organization or timezone is not found.
-func (h *Handler) formatTimeInOrgTimezone(ctx context.Context, orgID primitive.ObjectID) (string, string) {
-	now := time.Now()
+// It also returns the organization's *time.Location so callers can render
+// other timestamps (e.g. survey status) in the same zone without a second
+// lookup. The location is time.UTC when the organization has no usable zone.
+func (h *Handler) formatTimeInOrgTimezone(ctx context.Context, orgID primitive.ObjectID) (string, string, *time.Location) {
+	loc := h.orgLocation(ctx, orgID)
+	localTime := time.Now().In(loc)
+	return localTime.Format("Jan 2, 2006 3:04 PM"), localTime.Format("MST"), loc
+}
 
+// orgLocation resolves an organization's configured time zone, falling back
+// to UTC when the organization is unknown or has no valid zone.
+func (h *Handler) orgLocation(ctx context.Context, orgID primitive.ObjectID) *time.Location {
 	if orgID == primitive.NilObjectID {
-		return now.UTC().Format("Jan 2, 2006 3:04 PM"), "UTC"
+		return time.UTC
 	}
-
-	// Get organization timezone
 	var org struct {
 		TimeZone string `bson:"time_zone"`
 	}
 	err := h.DB.Collection("organizations").FindOne(ctx, bson.M{"_id": orgID}).Decode(&org)
 	if err != nil || org.TimeZone == "" {
-		return now.UTC().Format("Jan 2, 2006 3:04 PM"), "UTC"
+		return time.UTC
 	}
-
-	// Load the timezone location
 	loc, err := time.LoadLocation(org.TimeZone)
 	if err != nil {
-		return now.UTC().Format("Jan 2, 2006 3:04 PM"), "UTC"
+		return time.UTC
 	}
-
-	localTime := now.In(loc)
-	tzAbbr := localTime.Format("MST") // Gets the timezone abbreviation
-	return localTime.Format("Jan 2, 2006 3:04 PM"), tzAbbr
+	return loc
 }
-
