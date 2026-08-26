@@ -48,6 +48,14 @@ How StrataHub appends member/group/org/workspace identity to a resource's launch
 - [Parameter Vocabulary](resource-identification/vocabulary.md) - The permanent contract: definition of every parameter
 - [Plan](resource-identification/plan.md) - Design and rollout of the identification modes
 
+## Member Status API & Surveys Tab
+
+An inbound, key-authenticated endpoint the survey provider calls when a student starts or completes a survey, and the MHS Dashboard tab that shows each student's survey status (not started / opened / started / completed).
+
+- [Provider Guide](member-status-api/provider-guide.md) - The integration contract for the survey provider: endpoint, shared key, payload, survey names, semantics, error codes, examples
+- [Admin Guide](member-status-api/admin-guide.md) - Setting the shared key, linking survey resources for the "Opened" state, reading the Surveys tab, changing the survey list, troubleshooting
+- [Plan](member-status-api/plan.md) - Design, decisions, and task-by-task implementation record
+
 ## Deployment
 
 - [Systemd Configuration](systemd_info.md) - Running StrataHub as a systemd service on Ubuntu Linux

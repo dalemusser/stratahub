@@ -105,6 +105,7 @@ Handles application initialization and lifecycle:
 | **missionhydrosci** | MHS-specific configuration and management |
 | **gameconfig** | Game/activity configuration (MHS) |
 | **uploadcsv** | CSV import for MHS data |
+| **memberstatusapi** | Inbound `POST /api/member-status` (+ `/ping`): the survey provider reports a member's survey started/completed; shared key in the body, no session/CSRF; feeds the dashboard's Surveys tab (`docs/member-status-api/`) |
 
 **Utility & System:**
 
@@ -151,6 +152,7 @@ MongoDB data access with consistent patterns. Each store package handles one col
 | **mhs_device_status** | `mhsdevicestatus/` | MHS device tracking |
 | **mhs_user_progress** | `mhsuserprogress/` | MHS user progress tracking |
 | **group_app_settings** | `groupapps/` | Group-level app settings |
+| **member_status** | `memberstatus/` | Per (workspace, user, entity) survey status: opened → started → completed ladder, first-wins timestamps, capped history |
 
 **Store Pattern:**
 ```go
@@ -203,6 +205,7 @@ func (s *Store) GetByID(ctx context.Context, id primitive.ObjectID) (Model, erro
 | **mhs_device_status.go** | MHS device status tracking |
 | **mhs_user_progress.go** | MHS user progress data |
 | **groupappsetting.go** | Group-level application settings |
+| **memberstatus.go** | MemberStatus (a member's status on a tracked entity/survey) with the state ladder and rank helpers |
 | **authmethods.go** | Authentication method constants |
 
 ### System Utilities (`internal/app/system/`)
@@ -224,6 +227,7 @@ Shared packages for common functionality. **Always use these before implementing
 | **timeouts/** | Standard timeout durations (Short, Medium, Long) |
 | **txn/** | Transaction wrapper (MongoDB + DocumentDB fallback) |
 | **status/** | Status constants (active, disabled) |
+| **memberstatuscfg/** | Loads the embedded `mhs_member_status.json` (tracked surveys: ids, titles, provider names); shared by the API, the dashboard, and the resource forms |
 
 **Critical**: When implementing features, always check these utilities first. Duplicating functionality adds technical debt and inconsistency.
 
@@ -917,6 +921,23 @@ make css-watch
 - **mhsgrading** — Grading system integrated with StrataHub
 
 ## Recent Work Completed
+
+### Member Status API + Surveys Tab (2026-08)
+- Inbound `POST /api/member-status` for the survey provider (Abt): body-key
+  auth with constant-time compare and per-IP failure throttling; CSRF and
+  maintenance-mode exemptions for the path; idempotent, monotonic state
+  (opened → started → completed, first-wins timestamps)
+- Per-workspace shared key on `/settings` (masked, Generate/Copy, audited)
+- `member_status` collection + `memberstatus` store; survey list in embedded
+  `mhs_member_status.json` via `system/memberstatuscfg` (names/count/order
+  are a file edit)
+- MHS Dashboard **Surveys** tab with per-student status pills and a detail
+  modal; `Resource.TrackedEntityID` links a survey resource so a member's
+  launch records "opened"
+- Docs: `docs/member-status-api/` (provider guide, admin guide, plan)
+- Also fixed: both settings pages previously rebuilt `SiteSettings` from the
+  form and blanked fields they don't carry (e.g. the active MHS collection);
+  handlers now overlay the form onto the current document
 
 ### Custom ABT URL Identity Modes (2026-08, in production)
 - Two custom consumer modes for the Abt survey links: `abt-identifiable`

@@ -5,6 +5,7 @@
 ## Decisions
 
 1. **mhsgrader is the single data source** — The dashboard reads only from `progress_point_grades`. It does not query stratalog directly. All status computation (active, passed, flagged) is done by the grader.
+   - _Scope note:_ this applies to the Progress and Analytics tabs. The Debug tab reads stratalog for per-student timelines, and the Surveys tab reads StrataHub's own `member_status` collection (fed by the Member Status API and by survey-resource launches) — see `member-status-api/plan.md`. Grades remain the only source for progress status.
 2. **Status terminology** — Dashboard maps these statuses to visual indicators:
    - `pending` (no record) — not started (white/empty cell)
    - `active` — in-progress (pencil icon or animated indicator, not color-dependent)
