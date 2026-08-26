@@ -13,11 +13,13 @@ import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/features/resources/resourceurl"
 	"github.com/dalemusser/stratahub/internal/app/policy/resourcepolicy"
+	"github.com/dalemusser/stratahub/internal/app/store/memberstatus"
 	resourcestore "github.com/dalemusser/stratahub/internal/app/store/resources"
 	"github.com/dalemusser/stratahub/internal/app/system/htmlsanitize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/timezones"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/storage"
 	"github.com/dalemusser/waffle/pantry/templates"
 
@@ -453,6 +455,10 @@ func (h *MemberHandler) HandleLaunch(w http.ResponseWriter, r *http.Request) {
 	idCtx := buildMemberIdentityContext(member, wsSub, wsID, orgName, assignment.GroupName, assignment.GroupID)
 	launch := resourceurl.BuildLaunchURL(res.LaunchURL, res.URLIdentityMode, idCtx)
 
+	// Survey tracking: a launch of a linked survey resource marks it "opened"
+	// on the MHS Dashboard (best-effort; never blocks the redirect).
+	h.recordSurveyOpened(ctx, member.ID, member.WorkspaceID, res)
+
 	h.Log.Info("resource launch redirect",
 		zap.String("resource_id", resourceID),
 		zap.String("original_url", res.LaunchURL),
@@ -462,4 +468,38 @@ func (h *MemberHandler) HandleLaunch(w http.ResponseWriter, r *http.Request) {
 		zap.String("org_name", orgName))
 
 	http.Redirect(w, r, launch, http.StatusSeeOther)
+}
+
+// recordSurveyOpened records an "opened" status when a member launches a
+// resource linked to a tracked survey. It is best-effort: any failure is
+// logged and never blocks the launch redirect. First-wins on the timestamp,
+// so repeated launches change nothing but history.
+func (h *MemberHandler) recordSurveyOpened(ctx context.Context, userID primitive.ObjectID, workspaceID *primitive.ObjectID, res models.Resource) {
+	if res.TrackedEntityID == "" || h.MemberStatus == nil || h.SurveyConfig == nil {
+		return
+	}
+	item, ok := h.SurveyConfig.Find(res.TrackedEntityID)
+	if !ok {
+		// The survey was removed from the configuration after this resource
+		// was linked; nothing to record against.
+		return
+	}
+	if workspaceID == nil || workspaceID.IsZero() || userID.IsZero() {
+		return
+	}
+	_, err := h.MemberStatus.Record(ctx, memberstatus.RecordInput{
+		WorkspaceID: *workspaceID,
+		UserID:      userID,
+		EntityKey:   item.ID,
+		Entity:      item.Title,
+		State:       models.MemberStatusOpened,
+		Source:      models.MemberStatusSourceLaunch,
+	})
+	if err != nil {
+		h.Log.Warn("failed to record survey opened",
+			zap.Error(err),
+			zap.String("resource_id", res.ID.Hex()),
+			zap.String("entity_key", item.ID),
+			zap.String("member_id", userID.Hex()))
+	}
 }

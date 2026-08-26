@@ -76,6 +76,7 @@ func (h *AdminHandler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 		FileSize:            res.FileSize,
 		DefaultInstructions: res.DefaultInstructions,
 		URLIdentityMode:     res.URLIdentityMode,
+		TrackedEntityID:     res.TrackedEntityID,
 		DeleteReturn:        deleteReturn,
 		SubmitReturn:        submitReturn,
 	}
@@ -123,6 +124,7 @@ func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 
 	showInLibrary := r.FormValue("show_in_library") != ""
 	urlIdentityMode := strings.TrimSpace(r.FormValue("url_identity_mode"))
+	trackedEntityID := strings.TrimSpace(r.FormValue("tracked_entity_id"))
 	// Sanitize HTML content from rich text editor
 	defaultInstructions := htmlsanitize.Sanitize(strings.TrimSpace(r.FormValue("default_instructions")))
 
@@ -171,6 +173,7 @@ func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 			FileSize:            existing.FileSize,
 			DefaultInstructions: defaultInstructions,
 			URLIdentityMode:     urlIdentityMode,
+			TrackedEntityID:     trackedEntityID,
 			DeleteReturn:        delReturn,
 			SubmitReturn:        urlutil.SafeReturn(r.FormValue("return"), "", "/resources"),
 		}
@@ -193,6 +196,14 @@ func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 	// Validate URL identity mode
 	if !inputval.IsValidURLIdentityMode(urlIdentityMode) {
 		reRender("URL identity mode is invalid.")
+		return
+	}
+
+	// Validate survey tracking link. A stale id (survey removed from the
+	// configuration) is still accepted unchanged so an unrelated edit does
+	// not fail; the form shows it as "no longer configured".
+	if !isValidTrackedEntityID(trackedEntityID) && trackedEntityID != existing.TrackedEntityID {
+		reRender("Survey tracking selection is invalid.")
 		return
 	}
 
@@ -267,6 +278,7 @@ func (h *AdminHandler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		ShowInLibrary:       showInLibrary,
 		DefaultInstructions: defaultInstructions,
 		URLIdentityMode:     urlIdentityMode,
+		TrackedEntityID:     trackedEntityID,
 	}
 
 	if hasNewFile {

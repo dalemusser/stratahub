@@ -117,6 +117,8 @@ func (s *Store) Update(ctx context.Context, id primitive.ObjectID, mut models.Re
 	if strings.TrimSpace(mut.URLIdentityMode) != "" {
 		set["url_identity_mode"] = mut.URLIdentityMode
 	}
+	// Tracked entity (survey) link: always written so the edit form can clear it.
+	set["tracked_entity_id"] = strings.TrimSpace(mut.TrackedEntityID)
 	now := time.Now().UTC()
 	mut.UpdatedAt = &now
 	set["updated_at"] = mut.UpdatedAt

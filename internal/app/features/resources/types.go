@@ -120,6 +120,20 @@ type resourceFormVM struct {
 	// URL identity mode selection + options for the select menu
 	URLIdentityMode        string
 	URLIdentityModeOptions []URLIdentityModeOption
+
+	// Tracked survey link (member-status configuration item id) + options.
+	// TrackedEntityMissing is true when the stored id is no longer in the
+	// configuration, so the form can say so instead of silently dropping it.
+	TrackedEntityID      string
+	TrackedEntityOptions []TrackedEntityOption
+	TrackedEntityMissing bool
+}
+
+// TrackedEntityOption is one configured survey for the "Survey tracking"
+// select menu on the resource forms.
+type TrackedEntityOption struct {
+	ID    string
+	Label string
 }
 
 // viewData is the view-only model for the admin resource detail page.
@@ -137,6 +151,8 @@ type viewData struct {
 	URLIdentityMode      string        // raw mode value (for conditional styling)
 	URLIdentityModeLabel string        // human-readable label for display
 	URLIdentityModePII   bool          // true when the mode puts PII in the URL (drives the warning)
+	TrackedEntityID      string        // linked survey id ("" = not tracked)
+	TrackedEntityLabel   string        // human-readable label for the linked survey
 	DefaultInstructions  template.HTML // HTML content, sanitized for safe rendering
 
 	// File fields

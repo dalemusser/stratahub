@@ -65,6 +65,8 @@ func (h *AdminHandler) ServeView(w http.ResponseWriter, r *http.Request) {
 		URLIdentityMode:      res.URLIdentityMode,
 		URLIdentityModeLabel: urlIdentityModeLabel(res.URLIdentityMode),
 		URLIdentityModePII:   resourceurl.HasPII(res.URLIdentityMode),
+		TrackedEntityID:      res.TrackedEntityID,
+		TrackedEntityLabel:   trackedEntityLabel(res.TrackedEntityID),
 		HasFile:              res.HasFile(),
 		FileName:             res.FileName,
 		FileSize:             res.FileSize,

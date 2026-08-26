@@ -31,6 +31,13 @@ type Resource struct {
 	// empty is treated as "none". See docs/resource-identification/.
 	URLIdentityMode string `bson:"url_identity_mode,omitempty" json:"url_identity_mode,omitempty"`
 
+	// TrackedEntityID links this resource to one of the externally-tracked
+	// entities (surveys) in the member-status configuration, by item id
+	// (e.g. "pre"). When set, a member launching this resource records an
+	// "opened" status for that entity on the MHS Dashboard. Empty = not
+	// tracked. See docs/member-status-api/plan.md.
+	TrackedEntityID string `bson:"tracked_entity_id,omitempty" json:"tracked_entity_id,omitempty"`
+
 	// File storage fields - set when content is an uploaded file
 	FilePath string `bson:"file_path,omitempty" json:"file_path,omitempty"` // Storage path (local or S3 key)
 	FileName string `bson:"file_name,omitempty" json:"file_name,omitempty"` // Original filename

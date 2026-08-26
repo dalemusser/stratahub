@@ -156,6 +156,21 @@
   </div>
 
   <div>
+    <label for="tracked_entity_id" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Survey Tracking</label>
+    <select id="tracked_entity_id" name="tracked_entity_id"
+            class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm">
+      <option value="" {{ if eq .TrackedEntityID "" }}selected{{ end }}>None — not a tracked survey</option>
+      {{ range .TrackedEntityOptions }}
+        <option value="{{ .ID }}" {{ if eq $.TrackedEntityID .ID }}selected{{ end }}>{{ .Label }}</option>
+      {{ end }}
+      {{ if .TrackedEntityMissing }}
+        <option value="{{ .TrackedEntityID }}" selected>{{ .TrackedEntityID }} (no longer configured)</option>
+      {{ end }}
+    </select>
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">If this resource is one of the tracked surveys, choose it here. When a member opens the link, the MHS Dashboard's Surveys tab shows the survey as "Opened" until the survey provider reports it started or completed. URL resources only.</p>
+  </div>
+
+  <div>
     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Default Instructions</label>
     <input type="hidden" name="default_instructions" id="default_instructions" value="{{ .DefaultInstructions }}">
     <div class="tiptap-container">

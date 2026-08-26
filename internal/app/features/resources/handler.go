@@ -4,9 +4,11 @@ package resources
 import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/store/activity"
+	"github.com/dalemusser/stratahub/internal/app/store/memberstatus"
 	"github.com/dalemusser/stratahub/internal/app/store/sessions"
 	"github.com/dalemusser/stratahub/internal/app/system/auditlog"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
+	"github.com/dalemusser/stratahub/internal/app/system/memberstatuscfg"
 	"github.com/dalemusser/waffle/pantry/storage"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
@@ -38,6 +40,12 @@ type MemberHandler struct {
 	Activity   *activity.Store
 	Sessions   *sessions.Store
 	SessionMgr *auth.SessionManager
+
+	// Survey tracking: launching a resource linked to a tracked survey records
+	// an "opened" status for the member (see recordSurveyOpened). Either may
+	// be nil, in which case launches are not tracked.
+	MemberStatus *memberstatus.Store
+	SurveyConfig *memberstatuscfg.Config
 }
 
 // NewAdminHandler constructs an AdminHandler bound to the
@@ -55,13 +63,21 @@ func NewAdminHandler(db *mongo.Database, store storage.Store, errLog *uierrors.E
 // NewMemberHandler constructs a MemberHandler bound to the
 // given Mongo database, file storage, activity store, sessions store, session manager, and logger.
 func NewMemberHandler(db *mongo.Database, store storage.Store, errLog *uierrors.ErrorLogger, activityStore *activity.Store, sessStore *sessions.Store, sessionMgr *auth.SessionManager, logger *zap.Logger) *MemberHandler {
-	return &MemberHandler{
-		DB:         db,
-		Storage:    store,
-		Log:        logger,
-		ErrLog:     errLog,
-		Activity:   activityStore,
-		Sessions:   sessStore,
-		SessionMgr: sessionMgr,
+	h := &MemberHandler{
+		DB:           db,
+		Storage:      store,
+		Log:          logger,
+		ErrLog:       errLog,
+		Activity:     activityStore,
+		Sessions:     sessStore,
+		SessionMgr:   sessionMgr,
+		MemberStatus: memberstatus.New(db),
 	}
+	// Survey list is optional here: without it, launches simply aren't tracked.
+	if cfg, err := memberstatuscfg.Load(); err != nil {
+		logger.Error("resources: survey configuration unavailable; launches will not be tracked", zap.Error(err))
+	} else {
+		h.SurveyConfig = cfg
+	}
+	return h
 }

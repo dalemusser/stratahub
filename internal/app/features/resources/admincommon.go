@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/dalemusser/stratahub/internal/app/features/resources/resourceurl"
+	"github.com/dalemusser/stratahub/internal/app/system/memberstatuscfg"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
@@ -26,6 +27,10 @@ func (h *AdminHandler) renderNewForm(w http.ResponseWriter, r *http.Request, vm 
 	if vm.URLIdentityMode == "" {
 		vm.URLIdentityMode = models.URLIdentityNone
 	}
+
+	// Populate survey-tracking options.
+	vm.TrackedEntityOptions = trackedEntityOptions()
+	vm.TrackedEntityMissing = vm.TrackedEntityID != "" && !isValidTrackedEntityID(vm.TrackedEntityID)
 
 	// Default type, status, and visibility on initial GET.
 	if vm.Type == "" {
@@ -71,6 +76,10 @@ func (h *AdminHandler) renderEditForm(w http.ResponseWriter, r *http.Request, vm
 		vm.URLIdentityMode = models.URLIdentityNone
 	}
 
+	// Populate survey-tracking options.
+	vm.TrackedEntityOptions = trackedEntityOptions()
+	vm.TrackedEntityMissing = vm.TrackedEntityID != "" && !isValidTrackedEntityID(vm.TrackedEntityID)
+
 	if errMsg != "" {
 		vm.Error = template.HTML(errMsg)
 	}
@@ -111,4 +120,53 @@ func urlIdentityModeOptions() []URLIdentityModeOption {
 		opts = append(opts, URLIdentityModeOption{ID: id, Label: urlIdentityModeLabels[id], PII: resourceurl.HasPII(id)})
 	}
 	return opts
+}
+
+// --- Survey tracking (member-status configuration) ---
+
+// trackedEntityConfig returns the survey list, or nil when it failed to load
+// (the forms then offer only "None" and the link is not editable).
+func trackedEntityConfig() *memberstatuscfg.Config {
+	cfg, err := memberstatuscfg.Load()
+	if err != nil {
+		return nil
+	}
+	return cfg
+}
+
+// trackedEntityOptions returns the configured surveys as select options, in
+// configured order. "None" is rendered by the template, not included here.
+func trackedEntityOptions() []TrackedEntityOption {
+	cfg := trackedEntityConfig()
+	if cfg == nil {
+		return nil
+	}
+	opts := make([]TrackedEntityOption, 0, len(cfg.Items))
+	for _, item := range cfg.Items {
+		opts = append(opts, TrackedEntityOption{ID: item.ID, Label: item.Title})
+	}
+	return opts
+}
+
+// isValidTrackedEntityID reports whether id is empty (not tracked) or names a
+// configured survey.
+func isValidTrackedEntityID(id string) bool {
+	if id == "" {
+		return true
+	}
+	_, ok := trackedEntityConfig().Find(id)
+	return ok
+}
+
+// trackedEntityLabel returns the display title for a linked survey id, "Not
+// tracked" for an empty id, and a marked-up hint for an id that is no longer
+// configured.
+func trackedEntityLabel(id string) string {
+	if id == "" {
+		return "Not tracked"
+	}
+	if item, ok := trackedEntityConfig().Find(id); ok {
+		return item.Title
+	}
+	return id + " (no longer configured)"
 }

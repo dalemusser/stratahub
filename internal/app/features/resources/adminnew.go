@@ -55,6 +55,7 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	status := strings.TrimSpace(r.FormValue("status"))
 	showInLibrary := r.FormValue("show_in_library") != ""
 	urlIdentityMode := strings.TrimSpace(r.FormValue("url_identity_mode"))
+	trackedEntityID := strings.TrimSpace(r.FormValue("tracked_entity_id"))
 	// Sanitize HTML content from rich text editor
 	defaultInstructions := htmlsanitize.Sanitize(strings.TrimSpace(r.FormValue("default_instructions")))
 
@@ -83,6 +84,7 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 			ShowInLibrary:       showInLibrary,
 			DefaultInstructions: defaultInstructions,
 			URLIdentityMode:     urlIdentityMode,
+			TrackedEntityID:     trackedEntityID,
 		}
 		h.renderNewForm(w, r, vm, msg)
 	}
@@ -103,6 +105,12 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 	// Validate URL identity mode
 	if !inputval.IsValidURLIdentityMode(urlIdentityMode) {
 		reRender("URL identity mode is invalid.")
+		return
+	}
+
+	// Validate survey tracking link
+	if !isValidTrackedEntityID(trackedEntityID) {
+		reRender("Survey tracking selection is invalid.")
 		return
 	}
 
@@ -169,6 +177,7 @@ func (h *AdminHandler) HandleCreate(w http.ResponseWriter, r *http.Request) {
 		FileSize:            fileSize,
 		DefaultInstructions: defaultInstructions,
 		URLIdentityMode:     urlIdentityMode,
+		TrackedEntityID:     trackedEntityID,
 	}
 	if ok {
 		res.CreatedByID = &actorID
