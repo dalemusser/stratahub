@@ -55,23 +55,25 @@ func (s *Store) Save(ctx context.Context, workspaceID primitive.ObjectID, settin
 	filter := bson.M{"workspace_id": workspaceID}
 	update := bson.M{
 		"$set": bson.M{
-			"workspace_id":             workspaceID,
-			"site_name":                settings.SiteName,
-			"logo_path":                settings.LogoPath,
-			"logo_name":                settings.LogoName,
-			"landing_title":            settings.LandingTitle,
-			"landing_content":          settings.LandingContent,
-			"footer_html":              settings.FooterHTML,
-			"enabled_auth_methods":     settings.EnabledAuthMethods,
-			"mhs_member_auth":          settings.MHSMemberAuth,
-			"mhs_member_auth_keyword":  settings.MHSMemberAuthKeyword,
-			"mhs_staff_unlock_minutes": settings.MHSStaffUnlockMinutes,
-			"mhs_active_collection_id": settings.MHSActiveCollectionID,
-			"enable_claude_summaries":  settings.EnableClaudeSummaries,
-			"claude_model":             settings.ClaudeModel,
-			"updated_at":               settings.UpdatedAt,
-			"updated_by_id":            settings.UpdatedByID,
-			"updated_by_name":          settings.UpdatedByName,
+			"workspace_id":                 workspaceID,
+			"site_name":                    settings.SiteName,
+			"logo_path":                    settings.LogoPath,
+			"logo_name":                    settings.LogoName,
+			"landing_title":                settings.LandingTitle,
+			"landing_content":              settings.LandingContent,
+			"footer_html":                  settings.FooterHTML,
+			"enabled_auth_methods":         settings.EnabledAuthMethods,
+			"mhs_member_auth":              settings.MHSMemberAuth,
+			"mhs_member_auth_keyword":      settings.MHSMemberAuthKeyword,
+			"mhs_staff_unlock_minutes":     settings.MHSStaffUnlockMinutes,
+			"mhs_active_collection_id":     settings.MHSActiveCollectionID,
+			"enable_claude_summaries":      settings.EnableClaudeSummaries,
+			"claude_model":                 settings.ClaudeModel,
+			"member_status_api_key":        settings.MemberStatusAPIKey,
+			"member_status_api_key_set_at": settings.MemberStatusAPIKeySetAt,
+			"updated_at":                   settings.UpdatedAt,
+			"updated_by_id":                settings.UpdatedByID,
+			"updated_by_name":              settings.UpdatedByName,
 		},
 		"$setOnInsert": bson.M{
 			"_id": primitive.NewObjectID(),
@@ -80,6 +82,29 @@ func (s *Store) Save(ctx context.Context, workspaceID primitive.ObjectID, settin
 
 	opts := options.Update().SetUpsert(true)
 	_, err := s.c.UpdateOne(ctx, filter, update, opts)
+	return err
+}
+
+// SetMemberStatusAPIKey sets (or, with an empty key, clears) the workspace's
+// Member Status API shared key without touching any other setting. The
+// set-at timestamp is refreshed on set and removed on clear.
+func (s *Store) SetMemberStatusAPIKey(ctx context.Context, workspaceID primitive.ObjectID, key string) error {
+	now := time.Now().UTC()
+	set := bson.M{
+		"workspace_id":          workspaceID,
+		"member_status_api_key": key,
+		"updated_at":            now,
+	}
+	if key == "" {
+		set["member_status_api_key_set_at"] = nil
+	} else {
+		set["member_status_api_key_set_at"] = now
+	}
+	update := bson.M{
+		"$set":         set,
+		"$setOnInsert": bson.M{"_id": primitive.NewObjectID()},
+	}
+	_, err := s.c.UpdateOne(ctx, bson.M{"workspace_id": workspaceID}, update, options.Update().SetUpsert(true))
 	return err
 }
 

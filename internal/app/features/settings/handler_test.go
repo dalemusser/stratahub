@@ -5,11 +5,11 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/go-chi/chi/v5"
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/features/settings"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/testutil"
+	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 )
@@ -19,7 +19,7 @@ func newTestHandler(t *testing.T) *settings.Handler {
 	db := testutil.SetupTestDB(t)
 	logger := zap.NewNop()
 	errLog := uierrors.NewErrorLogger(logger)
-	return settings.NewHandler(db, nil, errLog, logger)
+	return settings.NewHandler(db, nil, errLog, nil, logger) // nil storage and audit logger are valid
 }
 
 func TestNewHandler(t *testing.T) {

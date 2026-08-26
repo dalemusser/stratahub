@@ -162,6 +162,75 @@
   </div>
 
   <div class="border-t dark:border-gray-700 pt-4">
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Member Status API &mdash; Shared Key</label>
+    <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+      An external provider (for example the survey system) reports when a member starts or completes
+      a survey by posting to this workspace's Member Status API, including this key in each request.
+      Leave the key empty to disable the API.
+    </p>
+    <div class="space-y-3 bg-gray-50 dark:bg-gray-700 p-3 rounded border dark:border-gray-600">
+      <div>
+        <label for="member-status-api-key" class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Shared key</label>
+        <div class="flex flex-wrap items-center gap-2">
+          <input id="member-status-api-key" name="member_status_api_key" type="password"
+                 value="{{ .MemberStatusAPIKey }}" autocomplete="off" spellcheck="false"
+                 placeholder="Not set &mdash; API disabled"
+                 class="flex-1 min-w-[16rem] max-w-md border dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 p-2 rounded text-sm font-mono">
+          <button type="button" id="msk-toggle" onclick="mskToggle()"
+                  class="px-2 py-1 text-xs rounded border dark:border-gray-500 bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-500">Show</button>
+          <button type="button" id="msk-copy" onclick="mskCopy()"
+                  class="px-2 py-1 text-xs rounded border dark:border-gray-500 bg-white dark:bg-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-500">Copy</button>
+          <button type="button" onclick="mskGenerate()"
+                  class="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">Generate</button>
+        </div>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          {{ if .MemberStatusAPIKeySetAt }}Set on {{ .MemberStatusAPIKeySetAt.Format "Jan 2, 2006 15:04 UTC" }}.{{ else }}No key is set.{{ end }}
+          Generate a new key or paste one from the provider (16&ndash;128 characters, no spaces). A change takes effect when you save.
+        </p>
+      </div>
+      <div>
+        <label class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Endpoint for the provider</label>
+        <code class="block w-full max-w-md text-xs font-mono bg-white dark:bg-gray-800 border dark:border-gray-600 text-gray-800 dark:text-gray-200 p-2 rounded">POST {{ .MemberStatusEndpoint }}</code>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          Give the provider this endpoint and the shared key. The request format is described in the
+          Member Status API provider guide.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function mskInput() { return document.getElementById('member-status-api-key'); }
+    function mskReveal() {
+      var input = mskInput(), btn = document.getElementById('msk-toggle');
+      input.type = 'text';
+      btn.textContent = 'Hide';
+    }
+    function mskToggle() {
+      var input = mskInput(), btn = document.getElementById('msk-toggle');
+      if (input.type === 'password') { mskReveal(); } else { input.type = 'password'; btn.textContent = 'Show'; }
+    }
+    function mskCopy() {
+      var input = mskInput(), btn = document.getElementById('msk-copy');
+      if (!input.value || !navigator.clipboard) { return; }
+      navigator.clipboard.writeText(input.value).then(function () {
+        var label = btn.textContent;
+        btn.textContent = 'Copied';
+        setTimeout(function () { btn.textContent = label; }, 1500);
+      });
+    }
+    function mskGenerate() {
+      var input = mskInput();
+      if (input.value && !confirm('Replace the current key? The provider must be given the new key before it can report again.')) { return; }
+      var bytes = new Uint8Array(32);
+      crypto.getRandomValues(bytes);
+      var b64 = btoa(String.fromCharCode.apply(null, bytes)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+      input.value = 'ms_' + b64;
+      mskReveal();
+    }
+  </script>
+
+  <div class="border-t dark:border-gray-700 pt-4">
     <div class="flex items-center justify-between mb-2">
       <label class="block text-sm font-medium text-gray-700 dark:text-gray-300">Landing Page</label>
       <a href="/" target="_blank" class="px-2 py-1 bg-indigo-600 text-white text-xs rounded hover:bg-indigo-700">View Landing Page</a>

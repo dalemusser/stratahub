@@ -567,7 +567,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		wsr.Mount("/reports", reportsfeature.Routes(reportsHandler, sessionMgr))
 
 		// Site Settings (admin and superadmin)
-		settingsHandler := settingsfeature.NewHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, logger)
+		settingsHandler := settingsfeature.NewHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, auditLogger, logger)
 		wsr.Route("/settings", func(sr chi.Router) {
 			sr.Use(sessionMgr.RequireRole("superadmin", "admin"))
 			settingsHandler.MountRoutes(sr)

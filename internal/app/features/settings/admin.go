@@ -43,7 +43,13 @@ type settingsVM struct {
 	MHSStaffUnlockMinutes int    // staff unlock duration for the manage page (minutes)
 	EnableClaudeSummaries bool   // AI student summaries toggle
 	ClaudeModel           string // Selected Claude model ID
-	Error                 string
+
+	// Member Status API shared key (see docs/member-status-api/plan.md)
+	MemberStatusAPIKey      string     // current key, rendered into a masked input
+	MemberStatusAPIKeySetAt *time.Time // when the current key was set; nil if none
+	MemberStatusEndpoint    string     // absolute URL the provider posts to, for display
+
+	Error string
 }
 
 // ServeSettings displays the settings form.
@@ -72,6 +78,12 @@ func (h *Handler) ServeSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	h.render(w, r, h.buildVM(ctx, r, userID, settings, ""))
+}
+
+// buildVM assembles the settings form view model from a settings document.
+// Used by both the initial render and the re-render after a validation error.
+func (h *Handler) buildVM(ctx context.Context, r *http.Request, userID primitive.ObjectID, settings models.SiteSettings, errMsg string) settingsVM {
 	// Get current user's auth method for protection
 	var currentUserMethod string
 	var user struct {
@@ -100,23 +112,62 @@ func (h *Handler) ServeSettings(w http.ResponseWriter, r *http.Request) {
 		landingTitle = models.DefaultLandingTitle
 	}
 
-	vm := settingsVM{
-		BaseVM:                viewdata.NewBaseVM(r, h.DB, "Settings", "/dashboard"),
-		HasLogo:               settings.HasLogo(),
-		LogoName:              settings.LogoName,
-		LandingTitle:          landingTitle,
-		LandingContent:        settings.LandingContent,
-		AllAuthMethods:        models.AllAuthMethods,
-		EnabledAuthMethods:    enabledMap,
-		CurrentUserMethod:     currentUserMethod,
-		MHSMemberAuth:         settings.GetMHSMemberAuth(),
-		MHSMemberAuthKeyword:  settings.MHSMemberAuthKeyword,
-		MHSStaffUnlockMinutes: displayUnlockMinutes(settings.MHSStaffUnlockMinutes),
-		EnableClaudeSummaries: settings.EnableClaudeSummaries,
-		ClaudeModel:           settings.ClaudeModel,
+	return settingsVM{
+		BaseVM:                  viewdata.NewBaseVM(r, h.DB, "Settings", "/dashboard"),
+		HasLogo:                 settings.HasLogo(),
+		LogoName:                settings.LogoName,
+		LandingTitle:            landingTitle,
+		LandingContent:          settings.LandingContent,
+		AllAuthMethods:          models.AllAuthMethods,
+		EnabledAuthMethods:      enabledMap,
+		CurrentUserMethod:       currentUserMethod,
+		MHSMemberAuth:           settings.GetMHSMemberAuth(),
+		MHSMemberAuthKeyword:    settings.MHSMemberAuthKeyword,
+		MHSStaffUnlockMinutes:   displayUnlockMinutes(settings.MHSStaffUnlockMinutes),
+		EnableClaudeSummaries:   settings.EnableClaudeSummaries,
+		ClaudeModel:             settings.ClaudeModel,
+		MemberStatusAPIKey:      settings.MemberStatusAPIKey,
+		MemberStatusAPIKeySetAt: settings.MemberStatusAPIKeySetAt,
+		MemberStatusEndpoint:    memberStatusEndpoint(r),
+		Error:                   errMsg,
 	}
+}
 
-	h.render(w, r, vm)
+// memberStatusEndpoint is the absolute URL an external provider posts member
+// status events to for the workspace serving this request. HTTPS is assumed
+// except for local development hosts.
+func memberStatusEndpoint(r *http.Request) string {
+	scheme := "https"
+	host := r.Host
+	if r.TLS == nil && r.Header.Get("X-Forwarded-Proto") != "https" &&
+		(strings.HasPrefix(host, "localhost") || strings.HasPrefix(host, "127.0.0.1")) {
+		scheme = "http"
+	}
+	return scheme + "://" + host + "/api/member-status"
+}
+
+// Member Status API key constraints. The key is a shared secret typed or
+// pasted by an admin (or generated in the browser), so the rules are about
+// rejecting obviously weak or malformed values, not about format.
+const (
+	memberStatusKeyMinLen = 16
+	memberStatusKeyMaxLen = 128
+)
+
+// validateMemberStatusKey returns a user-facing message for an unacceptable
+// key, or "" when the key is acceptable. An empty key is acceptable (it
+// disables the API).
+func validateMemberStatusKey(key string) string {
+	if key == "" {
+		return ""
+	}
+	if len(key) < memberStatusKeyMinLen || len(key) > memberStatusKeyMaxLen {
+		return fmt.Sprintf("The Member Status API key must be between %d and %d characters.", memberStatusKeyMinLen, memberStatusKeyMaxLen)
+	}
+	if strings.ContainsAny(key, " \t\r\n") {
+		return "The Member Status API key cannot contain spaces."
+	}
+	return ""
 }
 
 // displayUnlockMinutes substitutes the default when the setting is unset so
@@ -163,6 +214,7 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	mhsStaffUnlockStr := strings.TrimSpace(r.FormValue("mhs_staff_unlock_minutes"))
 	enableClaudeSummaries := r.FormValue("enable_claude_summaries") != ""
 	claudeModel := strings.TrimSpace(r.FormValue("claude_model"))
+	memberStatusAPIKey := strings.TrimSpace(r.FormValue("member_status_api_key"))
 
 	// Validation
 	if siteName == "" {
@@ -171,6 +223,10 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if len(authMethods) == 0 {
 		h.renderWithError(w, r, wsID, "At least one authentication method must be selected.")
+		return
+	}
+	if msg := validateMemberStatusKey(memberStatusAPIKey); msg != "" {
+		h.renderWithError(w, r, wsID, msg)
 		return
 	}
 
@@ -312,10 +368,28 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	settings.UpdatedByID = &memberID
 	settings.UpdatedByName = uname
 
+	// Member Status API key: the form always round-trips the current key, so
+	// only a genuine change refreshes the set-at time and is audited.
+	keyChanged := memberStatusAPIKey != current.MemberStatusAPIKey
+	settings.MemberStatusAPIKey = memberStatusAPIKey
+	if keyChanged {
+		if memberStatusAPIKey == "" {
+			settings.MemberStatusAPIKeySetAt = nil
+		} else {
+			now := time.Now().UTC()
+			settings.MemberStatusAPIKeySetAt = &now
+		}
+	}
+
 	if err := store.Save(ctx, wsID, settings); err != nil {
 		h.Log.Error("failed to save settings", zap.Error(err))
 		h.renderWithError(w, r, wsID, "Failed to save settings.")
 		return
+	}
+
+	if keyChanged {
+		role, _, actorID, _ := authz.UserCtx(r)
+		h.AuditLog.MemberStatusKeyChanged(ctx, r, actorID, role, memberStatusAPIKey == "")
 	}
 
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)
@@ -334,52 +408,7 @@ func (h *Handler) renderWithError(w http.ResponseWriter, r *http.Request, wsID p
 	store := settingsstore.New(h.DB)
 	settings, _ := store.Get(ctx, wsID)
 
-	// Get current user's auth method for protection
-	var currentUserMethod string
-	var user struct {
-		AuthMethod string `bson:"auth_method"`
-	}
-	if err := h.DB.Collection("users").FindOne(ctx, map[string]interface{}{"_id": userID}).Decode(&user); err == nil {
-		currentUserMethod = user.AuthMethod
-	}
-
-	// Build enabled auth methods map for checkbox state
-	enabledMap := make(map[string]bool)
-	if len(settings.EnabledAuthMethods) == 0 {
-		// Default: all methods enabled
-		for _, m := range models.AllAuthMethods {
-			enabledMap[m.Value] = true
-		}
-	} else {
-		for _, m := range settings.EnabledAuthMethods {
-			enabledMap[m] = true
-		}
-	}
-
-	// Use default landing title if empty so admin has something to work with
-	landingTitle := settings.LandingTitle
-	if landingTitle == "" {
-		landingTitle = models.DefaultLandingTitle
-	}
-
-	vm := settingsVM{
-		BaseVM:                viewdata.NewBaseVM(r, h.DB, "Settings", "/dashboard"),
-		HasLogo:               settings.HasLogo(),
-		LogoName:              settings.LogoName,
-		LandingTitle:          landingTitle,
-		LandingContent:        settings.LandingContent,
-		AllAuthMethods:        models.AllAuthMethods,
-		EnabledAuthMethods:    enabledMap,
-		CurrentUserMethod:     currentUserMethod,
-		MHSMemberAuth:         settings.GetMHSMemberAuth(),
-		MHSMemberAuthKeyword:  settings.MHSMemberAuthKeyword,
-		MHSStaffUnlockMinutes: displayUnlockMinutes(settings.MHSStaffUnlockMinutes),
-		EnableClaudeSummaries: settings.EnableClaudeSummaries,
-		ClaudeModel:           settings.ClaudeModel,
-		Error:                 errMsg,
-	}
-
-	h.render(w, r, vm)
+	h.render(w, r, h.buildVM(ctx, r, userID, settings, errMsg))
 }
 
 // UploadInfo contains metadata about an uploaded file.

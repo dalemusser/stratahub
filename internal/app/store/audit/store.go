@@ -69,6 +69,7 @@ const (
 	EventMaterialUnassigned           = "material_unassigned"
 	EventGroupAppEnabled              = "group_app_enabled"
 	EventGroupAppDisabled             = "group_app_disabled"
+	EventMemberStatusKeyChanged       = "member_status_key_changed" // Member Status API shared key set, rotated, or cleared
 )
 
 // Event represents an audit event.

@@ -880,3 +880,26 @@ func boolToString(b bool) string {
 func intToString(i int) string {
 	return strconv.Itoa(i)
 }
+
+// --- Member Status API Events ---
+
+// MemberStatusKeyChanged logs when an admin sets, rotates, or clears the
+// workspace's Member Status API shared key. The key itself is never logged.
+func (l *Logger) MemberStatusKeyChanged(ctx context.Context, r *http.Request, actorID primitive.ObjectID, actorRole string, cleared bool) {
+	action := "set"
+	if cleared {
+		action = "cleared"
+	}
+	l.Log(ctx, audit.Event{
+		Category:  audit.CategoryAdmin,
+		EventType: audit.EventMemberStatusKeyChanged,
+		ActorID:   &actorID,
+		IP:        ratelimit.ClientIP(r),
+		UserAgent: r.UserAgent(),
+		Success:   true,
+		Details: map[string]string{
+			"actor_role": actorRole,
+			"action":     action,
+		},
+	})
+}

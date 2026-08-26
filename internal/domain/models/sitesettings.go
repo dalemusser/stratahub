@@ -53,6 +53,14 @@ type SiteSettings struct {
 	EnableClaudeSummaries bool   `bson:"enable_claude_summaries,omitempty" json:"enable_claude_summaries,omitempty"`
 	ClaudeModel           string `bson:"claude_model,omitempty" json:"claude_model,omitempty"`
 
+	// Member Status API — shared key an external provider presents when it
+	// reports a member's status on an entity (e.g. survey started/completed).
+	// Empty means the API is disabled for this workspace. Stored in the clear
+	// so an admin can re-copy it to the provider; never serialized to JSON.
+	// See docs/member-status-api/plan.md.
+	MemberStatusAPIKey      string     `bson:"member_status_api_key,omitempty" json:"-"`
+	MemberStatusAPIKeySetAt *time.Time `bson:"member_status_api_key_set_at,omitempty" json:"-"`
+
 	// Audit fields
 	UpdatedAt     *time.Time          `bson:"updated_at,omitempty" json:"updated_at,omitempty"`
 	UpdatedByID   *primitive.ObjectID `bson:"updated_by_id,omitempty" json:"updated_by_id,omitempty"`
