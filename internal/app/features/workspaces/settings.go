@@ -168,6 +168,20 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Load the workspace up front: Update writes every mutable field, so the
+	// current record must be carried forward, and a missing workspace should
+	// fail before any settings are written.
+	wsStore := workspacestore.New(h.DB)
+	ws, err := wsStore.GetByID(ctx, wsID)
+	if err != nil {
+		if err == workspacestore.ErrNotFound {
+			http.NotFound(w, r)
+			return
+		}
+		h.ErrLog.LogServerError(w, r, "load workspace failed", err, "Failed to load workspace.", "/workspaces/"+wsID.Hex()+"/settings")
+		return
+	}
+
 	// Handle logo upload/removal
 	logoPath := current.LogoPath
 	logoName := current.LogoName
@@ -217,16 +231,18 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	// Get user info for audit
 	_, uname, memberID, _ := authz.UserCtx(r)
 
-	// Save settings
-	settings := models.SiteSettings{
-		SiteName:           siteName,
-		LogoPath:           logoPath,
-		LogoName:           logoName,
-		FooterHTML:         footerHTML,
-		EnabledAuthMethods: authMethods,
-		UpdatedByID:        &memberID,
-		UpdatedByName:      uname,
-	}
+	// Save settings. Start from the current document and overlay only the
+	// fields this form carries: Save writes every whitelisted field, so a
+	// fresh struct here would blank the landing page, MHS, and AI-summary
+	// settings that are managed on the workspace's own Settings page.
+	settings := current
+	settings.SiteName = siteName
+	settings.LogoPath = logoPath
+	settings.LogoName = logoName
+	settings.FooterHTML = footerHTML
+	settings.EnabledAuthMethods = authMethods
+	settings.UpdatedByID = &memberID
+	settings.UpdatedByName = uname
 
 	if err := store.Save(ctx, wsID, settings); err != nil {
 		h.Log.Error("failed to save settings", zap.Error(err))
@@ -234,10 +250,11 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Update workspace name and subdomain
-	wsStore := workspacestore.New(h.DB)
-	wsUpdate := models.Workspace{Name: workspaceName, Subdomain: newSubdomain}
-	if err := wsStore.Update(ctx, wsID, wsUpdate); err != nil {
+	// Update workspace name and subdomain on the record loaded above so the
+	// remaining fields (status, logo) are carried forward unchanged.
+	ws.Name = workspaceName
+	ws.Subdomain = newSubdomain
+	if err := wsStore.Update(ctx, wsID, ws); err != nil {
 		if err == workspacestore.ErrDuplicateName {
 			h.renderSettingsWithError(w, r, wsID, "A workspace with that name already exists.")
 			return

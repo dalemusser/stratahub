@@ -292,23 +292,25 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	// Get user info for audit
 	_, uname, memberID, _ := authz.UserCtx(r)
 
-	// Save settings
-	settings := models.SiteSettings{
-		SiteName:              siteName,
-		LogoPath:              logoPath,
-		LogoName:              logoName,
-		LandingTitle:          landingTitle,
-		LandingContent:        landingContent,
-		FooterHTML:            footerHTML,
-		EnabledAuthMethods:    authMethods,
-		MHSMemberAuth:         mhsMemberAuth,
-		MHSMemberAuthKeyword:  mhsMemberAuthKeyword,
-		MHSStaffUnlockMinutes: mhsStaffUnlockMinutes,
-		EnableClaudeSummaries: enableClaudeSummaries,
-		ClaudeModel:           claudeModel,
-		UpdatedByID:           &memberID,
-		UpdatedByName:         uname,
-	}
+	// Save settings. Start from the current document and overlay only the
+	// fields this form carries: Save writes every whitelisted field, so a
+	// fresh struct here would blank settings managed elsewhere (for example
+	// the active MHS collection, which is set from the MHS Builds pages).
+	settings := current
+	settings.SiteName = siteName
+	settings.LogoPath = logoPath
+	settings.LogoName = logoName
+	settings.LandingTitle = landingTitle
+	settings.LandingContent = landingContent
+	settings.FooterHTML = footerHTML
+	settings.EnabledAuthMethods = authMethods
+	settings.MHSMemberAuth = mhsMemberAuth
+	settings.MHSMemberAuthKeyword = mhsMemberAuthKeyword
+	settings.MHSStaffUnlockMinutes = mhsStaffUnlockMinutes
+	settings.EnableClaudeSummaries = enableClaudeSummaries
+	settings.ClaudeModel = claudeModel
+	settings.UpdatedByID = &memberID
+	settings.UpdatedByName = uname
 
 	if err := store.Save(ctx, wsID, settings); err != nil {
 		h.Log.Error("failed to save settings", zap.Error(err))

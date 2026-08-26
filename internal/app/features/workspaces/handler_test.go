@@ -18,7 +18,7 @@ func newTestHandler(t *testing.T) *workspaces.Handler {
 	db := testutil.SetupTestDB(t)
 	logger := zap.NewNop()
 	errLog := uierrors.NewErrorLogger(logger)
-	return workspaces.NewHandler(db, nil, errLog, nil, "example.com", logger) // nil audit logger is valid
+	return workspaces.NewHandler(db, nil, nil, errLog, nil, "example.com", logger) // nil storage, global settings, and audit logger are valid
 }
 
 func TestNewHandler(t *testing.T) {
