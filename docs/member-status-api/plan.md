@@ -226,3 +226,207 @@ Still assumed (no objection raised): `user_id` hex is the only identifier; plain
 5. **Entity strings.** The provider sends exactly `Pre`, `MHS Engagement`, `EWS Engagement`, `Post` for now; these are the `api_names` in `mhs_member_status.json`. If Abt changes a name, the change is one edit to that file (add the new name as an alias; keep the old one so earlier events still match).
 6. **States.** Abt sends both `started` and `completed` (confirmed), so all four dashboard states are live: Opened (StrataHub launch) → Started (provider) → Completed (provider).
 7. **Config package.** `internal/app/system/memberstatuscfg` is the single loader for the survey list, shared by the dashboard, the API, and the resource forms.
+
+---
+
+## 8. Survey Event Log (proposed 2026-08-26 — design only, not implemented)
+
+> **Implementation path (decided direction, 2026-08-26):** rather than a
+> one-off feature, the Survey Event Log is the **first viewer** built on the
+> shared data-viewer framework described in `docs/viewers/plan.md` (registry,
+> role scoping, filters, cursor paging, live refresh, CSV, standard
+> templates). §8.2 (data model) and §8.4 (presentation) below remain the
+> specification for what this viewer stores and shows; §8.3's placement
+> discussion is superseded by the framework's routes (`/views/survey-events`)
+> with the same per-role menu entries and cross-links. Task 8 below maps to
+> tasks V3–V4 in the viewers plan.
+
+### 8.1 Purpose
+
+A raw, chronological list of every survey-status event StrataHub received —
+what arrived, from where, what it resolved to, and whether it was accepted —
+so the provider's developer can send a test event and confirm it landed with
+the right content, and so staff can answer "did the provider report this
+student?" without reading server logs. Accessible to admin, coordinator,
+leader, and analyst (and superadmin).
+
+### 8.2 Why a new collection is a prerequisite
+
+Today the only per-event record is the `history` array inside each
+`member_status` document. It is the wrong shape for a verification log: it is
+capped at 25 entries per student/survey, holds only accepted events (a
+rejected request — unknown user, bad state — leaves no trace except a Warn
+log line), stores nothing about the request as sent, and cannot be listed
+chronologically across students without scanning every document.
+
+Add an append-only collection **`member_status_log`** — one document per
+authenticated API request (accepted *or* rejected) and per launch-hook write:
+
+```go
+type MemberStatusLogEntry struct {
+    ID          primitive.ObjectID  // doubles as the event_id returned to the provider
+    WorkspaceID primitive.ObjectID
+    ReceivedAt  time.Time           // StrataHub receipt time (UTC)
+    Source      string              // "api" | "launch"
+    RemoteIP    string
+
+    Request struct {                // exactly as sent, clipped to sane lengths; never the key
+        UserID     string           // the raw string, even if malformed
+        Entity     string
+        State      string
+        OccurredAt string
+        ResourceID string           // launch source only
+    }
+    Resolved struct {               // what StrataHub made of it (zero values when rejected early)
+        UserID         *primitive.ObjectID
+        OrganizationID *primitive.ObjectID
+        EntityKey      string
+        KnownEntity    bool
+        StateApplied   string       // normalized state written
+        ResultingState string       // the document's state after the write
+    }
+    Outcome struct {
+        HTTPStatus int
+        Error      string           // "" when accepted; else the API error code
+        Message    string
+    }
+}
+```
+
+- Indexes: `{workspace_id, received_at desc, _id desc}` (list order; matching
+  compound index for DocumentDB), `{workspace_id, resolved.user_id,
+  received_at desc}` (per-student), `{workspace_id, resolved.entity_key,
+  received_at desc}`; TTL on `received_at` at 400 days.
+- Written by the API for every request that passed authentication — so a
+  wrong or missing key is *not* logged here (it stays a server-log Warn; this
+  keeps the log meaningful and un-spammable) — and by `recordSurveyOpened`.
+- The API response gains an `event_id` field (both 200 and post-auth 4xx), so
+  the provider can match "the response said event_id X" to a log row.
+- Existing `history` entries stay as they are (the modal still uses them);
+  the log starts at deploy — nothing is backfilled.
+
+### 8.3 Placement — a standalone workspace feature
+
+**Recommendation: a new feature `memberstatuslog` at `/member-status/events`,
+titled from the config ("Survey Events"), with cross-links from the places
+staff already look.**
+
+Why not somewhere existing:
+
+| Option | Roles it reaches | Verdict |
+|--------|------------------|---------|
+| Tab on the MHS Dashboard | admin, coordinator, leader — **not analyst** | The dashboard is per-group and leader-centric; a raw cross-group log doesn't fit its model, and it excludes the one role best suited to a provider-developer account |
+| View in Activity | admin, coordinator, leader — **not analyst** | Activity is session/page-view centric; survey events are a different stream |
+| View in Audit Log | admin, coordinator | Wrong semantics (security events) and too narrow |
+| View in Reports | admin, analyst | Excludes leaders and coordinators |
+| **Standalone feature** | **exactly the four roles** | Own role gate; shape copied from Activity (role-scoped list + HTMX-filtered table + export + detail) |
+
+Menu: "Survey Events" next to MHS Dashboard for admin, coordinator, and
+leader; next to Members Report for analyst. Cross-links: the Surveys tab
+legend ("Event log →"), the survey status modal ("View events for this
+student →", pre-filtered), and the Settings page's Member Status API section
+("View event log"). The MHS Dashboard stays uncluttered; the log is one click
+from every place someone would wonder "did it arrive?".
+
+**Scoping per role** (evaluated at read time, mirroring the dashboard and
+Activity):
+
+| Role | Sees |
+|------|------|
+| superadmin, admin, analyst | every event in the workspace, including rejected unknown-user events |
+| coordinator | events whose resolved organization is one of their assigned orgs (`coordinatorassign.OrgIDsByUser`) |
+| leader | events whose resolved user is a member of one of their groups |
+
+Rejected events with no resolved user (unknown/invalid `user_id`) have no
+organization, so only admin/analyst/superadmin see them.
+
+### 8.4 Presentation
+
+**Page layout.** Header with summary chips for the current filter window
+(events, accepted, rejected, last received); filter bar; table; cursor
+paging; a detail drawer per row; CSV export; a **Live** toggle.
+
+**Table** (newest first, 50 per page):
+
+| Column | Content |
+|--------|---------|
+| Received | in the student's organization time zone (UTC in tooltip); unknown-user rows in UTC |
+| Source | pill: API / Launch |
+| Student | name (click = filter to this student); hex id in the detail |
+| Survey | resolved title; unrecognized names shown raw with an "unrecognized" badge |
+| State sent | as received (normalized display) |
+| Result | Accepted → resulting-state pill (Opened/Started/Completed); Rejected → error-code pill (`unknown_user`, `invalid_state`, …) |
+| ▸ | expands the detail |
+
+**Detail** (drawer under the row): every stored field as a definition list
+plus the stored document as copyable JSON — the "is it what I sent?" view.
+Includes `event_id`, remote IP, `occurred_at` as sent, and the resolved
+values side by side with the raw ones.
+
+**Filters** (HTMX, `keyup changed delay:300ms` / `change`, all reflected in
+the URL so a view can be bookmarked or pasted to the provider):
+
+- Time: presets (last hour / 24 h / 7 d / 30 d) or custom from–to
+- Source: any / API / Launch
+- Survey: any / each configured item / unrecognized names
+- State sent: any / started / completed / opened
+- Outcome: any / accepted / rejected / a specific error code
+- Student: name search (folded, prefix) or exact hex `user_id`
+- Organization (admin, analyst, coordinator) and Group (all roles, within scope)
+- Event id: exact lookup (from the provider's response)
+
+**Live mode.** A checkbox that polls the table every 10 s (`hx-trigger="every
+10s"`) while on the first page — for watching the provider's test sends
+arrive in real time.
+
+**Export.** CSV of the current filter within the viewer's scope (analyst
+included), same column set plus raw request fields; `docs` note that it
+contains names and hex ids like the Members Report.
+
+**Privacy note.** The page shows student names to all four roles, as the
+dashboard and Members Report already do. If the provider's developer is
+given an **analyst** login to check their own sends, they will see names —
+the Members Report already exposes the same. Recommended practice: have them
+test against a dedicated test group of fictitious students (or a separate
+test workspace), not the study roster. A "de-identified display" toggle
+(hex ids instead of names) is a small optional add if that ever isn't enough.
+
+### 8.5 Implementation tasks (Task 8)
+
+**8a — Log model, store, indexes.** `models.MemberStatusLogEntry`,
+`store/memberstatuslog` (`Append`, `List(filter, cursor, limit)`,
+`Get(id)`, `Count(filter)`), `ensureMemberStatusLog` (+ TTL), Mongo-backed
+tests incl. cursor paging and filter combinations.
+
+**8b — Writers.** API appends an entry for every authenticated request
+(accepted and rejected) and returns `event_id`; `recordSurveyOpened` appends
+a `launch` entry. Handler tests assert the entry content for each outcome.
+Provider guide: `event_id` in responses; admin guide: what is logged.
+
+**8c — Feature `memberstatuslog`.** Routes `GET /member-status/events`
+(page), `/table` (HTMX partial), `/{id}` (detail partial), `/export.csv`;
+role gate `superadmin, admin, analyst, coordinator, leader`; scoping helpers
+(reuse Activity's group/org lookups); filter parsing + URL state; cursor
+paging; Live toggle; templates with light/dark; render test executing the
+page and partial; handler tests per role (scope enforced, unknown-user rows
+hidden from leaders/coordinators).
+
+**8d — Navigation.** Menu entries for the four roles; cross-links from the
+Surveys tab legend, the survey modal, and the Settings API section.
+
+**8e — Docs.** Admin guide section ("Checking that events arrived"),
+provider guide (`event_id`, "ask your StrataHub contact to check the Survey
+Events page"), docs index, `ai/context.md`, this plan ticked.
+
+Rough effort: 8a ½ day, 8b ½ day, 8c 1 day, 8d–8e ½ day.
+
+### 8.6 Decisions to confirm before starting
+
+1. **Log rejected requests too** (recommended — it is the whole point for the
+   provider's developer) but never unauthenticated ones.
+2. **Retention:** 400-day TTL (recommended) vs. keep forever.
+3. **Provider developer access:** an analyst account against a test group /
+   test workspace (recommended), or no account and StrataHub staff check on
+   their behalf.
+4. **Names for analysts:** show (consistent with Members Report; recommended)
+   or add the de-identified toggle now.

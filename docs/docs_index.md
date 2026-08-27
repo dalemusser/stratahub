@@ -54,7 +54,13 @@ An inbound, key-authenticated endpoint the survey provider calls when a student 
 
 - [Provider Guide](member-status-api/provider-guide.md) - The integration contract for the survey provider: endpoint, shared key, payload, survey names, semantics, error codes, examples
 - [Admin Guide](member-status-api/admin-guide.md) - Setting the shared key, linking survey resources for the "Opened" state, reading the Surveys tab, changing the survey list, troubleshooting
-- [Plan](member-status-api/plan.md) - Design, decisions, and task-by-task implementation record
+- [Plan](member-status-api/plan.md) - Design, decisions, and task-by-task implementation record; §8 specifies the Survey Events log (first data viewer)
+
+## Data Viewers
+
+One framework for role-gated, scoped, filterable event/log/data lists, so each new list is a small viewer rather than a new feature.
+
+- [Viewers Framework Plan](viewers/plan.md) - Registry, viewer interface, shared scoping, filters, cursor paging, live refresh, export; Survey Events as the first viewer, Audit Log as the second; task breakdown and decisions
 
 ## Deployment
 
