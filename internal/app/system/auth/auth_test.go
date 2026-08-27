@@ -120,31 +120,74 @@ func TestRequireRole_NoUser_RedirectsToLogin(t *testing.T) {
 	}
 }
 
-func TestRequireRole_WrongRole_RedirectsToForbidden(t *testing.T) {
-	sm := newTestSessionManager(t)
-
-	handler := sm.RequireRole("admin")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.WriteHeader(http.StatusOK)
-	}))
-
-	// Create a request with a member user in context
-	req := httptest.NewRequest("GET", "/admin", nil)
-	req.Header.Set("Accept", "text/html")
-
-	// Inject a user with "member" role into context
-	req = withTestUser(req, "member")
-
-	rec := httptest.NewRecorder()
-	handler.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusSeeOther {
-		t.Errorf("expected status %d, got %d", http.StatusSeeOther, rec.Code)
+// A signed-in user with the wrong role gets 403 semantics: the forbidden page
+// is rendered inline at the current URL when a renderer is configured (as
+// bootstrap does), a plain 403 otherwise, and HTMX partial requests get a
+// 403 with HX-Refresh so the full page (and its forbidden view) reloads.
+// There is no redirect to /forbidden.
+func TestRequireRole_WrongRole_Forbidden(t *testing.T) {
+	newHandler := func(sm *auth.SessionManager) http.Handler {
+		return sm.RequireRole("admin")(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			w.WriteHeader(http.StatusOK)
+		}))
 	}
 
-	location := rec.Header().Get("Location")
-	if location != "/forbidden" {
-		t.Errorf("expected redirect to /forbidden, got %q", location)
-	}
+	t.Run("html without renderer is a plain 403", func(t *testing.T) {
+		sm := newTestSessionManager(t)
+		req := httptest.NewRequest("GET", "/admin", nil)
+		req.Header.Set("Accept", "text/html")
+		req = withTestUser(req, "member")
+		rec := httptest.NewRecorder()
+		newHandler(sm).ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("expected status %d, got %d", http.StatusForbidden, rec.Code)
+		}
+		if loc := rec.Header().Get("Location"); loc != "" {
+			t.Errorf("expected no redirect, got Location %q", loc)
+		}
+	})
+
+	t.Run("html with renderer renders inline", func(t *testing.T) {
+		sm := newTestSessionManager(t)
+		var gotMsg string
+		sm.SetForbiddenRenderer(func(w http.ResponseWriter, r *http.Request, msg string) {
+			gotMsg = msg
+			w.WriteHeader(http.StatusForbidden)
+			_, _ = w.Write([]byte("<h1>forbidden page</h1>"))
+		})
+		req := httptest.NewRequest("GET", "/admin", nil)
+		req.Header.Set("Accept", "text/html")
+		req = withTestUser(req, "member")
+		rec := httptest.NewRecorder()
+		newHandler(sm).ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("expected status %d, got %d", http.StatusForbidden, rec.Code)
+		}
+		if !strings.Contains(rec.Body.String(), "forbidden page") {
+			t.Errorf("expected the configured renderer's output, got %q", rec.Body.String())
+		}
+		if gotMsg == "" {
+			t.Error("renderer was not given a message")
+		}
+	})
+
+	t.Run("htmx gets 403 with HX-Refresh", func(t *testing.T) {
+		sm := newTestSessionManager(t)
+		req := httptest.NewRequest("GET", "/admin", nil)
+		req.Header.Set("HX-Request", "true")
+		req = withTestUser(req, "member")
+		rec := httptest.NewRecorder()
+		newHandler(sm).ServeHTTP(rec, req)
+
+		if rec.Code != http.StatusForbidden {
+			t.Errorf("expected status %d, got %d", http.StatusForbidden, rec.Code)
+		}
+		if rec.Header().Get("HX-Refresh") != "true" {
+			t.Errorf("expected HX-Refresh: true, got %q", rec.Header().Get("HX-Refresh"))
+		}
+	})
 }
 
 func TestRequireRole_WrongRole_API_Returns403(t *testing.T) {
@@ -202,8 +245,8 @@ func TestRequireRole_MultipleRoles(t *testing.T) {
 	}{
 		{"admin", http.StatusOK},
 		{"analyst", http.StatusOK},
-		{"member", http.StatusSeeOther}, // redirect to forbidden
-		{"leader", http.StatusSeeOther}, // redirect to forbidden
+		{"member", http.StatusForbidden}, // wrong role → 403 (no redirect)
+		{"leader", http.StatusForbidden}, // wrong role → 403 (no redirect)
 	}
 
 	for _, tc := range tests {

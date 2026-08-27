@@ -1,6 +1,7 @@
 package emailverify_test
 
 import (
+	"errors"
 	"testing"
 	"time"
 
@@ -457,10 +458,16 @@ func TestStore_VerifyToken_ExpiredNotReturned(t *testing.T) {
 	// Wait for expiry
 	time.Sleep(10 * time.Millisecond)
 
-	// Verify should fail because it's expired
+	// An expired-but-present token is reported as expired (the store
+	// distinguishes "expired" from "never existed" so the UI can say which),
+	// and the record is cleaned up, so a second attempt finds nothing.
 	_, err = store.VerifyToken(ctx, result.Token)
-	if err != emailverify.ErrNotFound {
-		t.Errorf("expected ErrNotFound for expired token, got %v", err)
+	if !errors.Is(err, emailverify.ErrExpired) {
+		t.Errorf("expected ErrExpired for expired token, got %v", err)
+	}
+	_, err = store.VerifyToken(ctx, result.Token)
+	if !errors.Is(err, emailverify.ErrNotFound) {
+		t.Errorf("expected ErrNotFound after the expired token was cleaned up, got %v", err)
 	}
 }
 
@@ -482,9 +489,10 @@ func TestStore_VerifyCode_ExpiredNotReturned(t *testing.T) {
 	// Wait for expiry
 	time.Sleep(10 * time.Millisecond)
 
-	// Verify should fail because it's expired
+	// An expired-but-present code is reported as expired, not as not-found,
+	// so the login flow can offer a resend rather than a generic failure.
 	_, err = store.VerifyCode(ctx, userID, result.Code)
-	if err != emailverify.ErrNotFound {
-		t.Errorf("expected ErrNotFound for expired code, got %v", err)
+	if !errors.Is(err, emailverify.ErrExpired) {
+		t.Errorf("expected ErrExpired for expired code, got %v", err)
 	}
 }
