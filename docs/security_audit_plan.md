@@ -133,29 +133,27 @@ type Config struct {
 
 ### 4. Update Audit Log UI
 
-**File:** `internal/app/features/auditlog/types.go`
+**File:** `internal/app/features/viewers/views/auditlog.go` (the Audit Log is a viewer on the data-viewers framework; see `docs/viewers/plan.md`)
 
-Re-add Security to categories:
+Add Security to the Category filter options in `Filters()` (the label already exists in `auditCategoryLabels`, and rows already render security events with the amber pill), and list the new event types under `auditEventTypes[audit.CategorySecurity]` so they appear in the Event filter:
 ```go
-func allCategories() []categoryOption {
-    return []categoryOption{
-        {Value: audit.CategoryAuth, Label: "Authentication"},
-        {Value: audit.CategoryAdmin, Label: "Administration"},
-        {Value: audit.CategorySecurity, Label: "Security"},
-    }
+{Key: afCategory, Label: "Category", Type: viewers.FilterSelect, Options: []viewers.Option{
+    {Value: audit.CategoryAuth, Label: auditCategoryLabels[audit.CategoryAuth]},
+    {Value: audit.CategoryAdmin, Label: auditCategoryLabels[audit.CategoryAdmin]},
+    {Value: audit.CategorySecurity, Label: auditCategoryLabels[audit.CategorySecurity]},
+}},
 }
 ```
 
-Add security events to `eventTypesForCategory()`:
 ```go
-securityEvents := []string{
-    audit.EventAccountLocked,
-    audit.EventAccountUnlocked,
-    // ... etc
+var auditEventTypes = map[string][]string{
+    // ...
+    audit.CategorySecurity: {
+        audit.EventAccountLocked,
+        audit.EventAccountUnlocked,
+        // ... etc
+    },
 }
-
-case audit.CategorySecurity:
-    return securityEvents
 ```
 
 ## Supporting Features Required

@@ -9,7 +9,6 @@ import (
 
 	activityfeature "github.com/dalemusser/stratahub/internal/app/features/activity"
 	announcementsfeature "github.com/dalemusser/stratahub/internal/app/features/announcements"
-	auditlogfeature "github.com/dalemusser/stratahub/internal/app/features/auditlog"
 	authgooglefeature "github.com/dalemusser/stratahub/internal/app/features/authgoogle"
 	dashboardfeature "github.com/dalemusser/stratahub/internal/app/features/dashboard"
 	errorsfeature "github.com/dalemusser/stratahub/internal/app/features/errors"
@@ -563,8 +562,12 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		wsr.Mount("/system-users", systemusersfeature.Routes(sysUsersHandler, sessionMgr))
 
 		// Audit log (admin and coordinator access)
-		auditLogHandler := auditlogfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
-		wsr.Mount("/audit", auditlogfeature.Routes(auditLogHandler, sessionMgr))
+		// The Audit Log is a viewer now (/views/audit-log); keep the old address working.
+		redirectAudit := func(w http.ResponseWriter, r *http.Request) {
+			http.Redirect(w, r, "/views/"+views.AuditLogSlug, http.StatusFound)
+		}
+		wsr.Get("/audit", redirectAudit)
+		wsr.Get("/audit/*", redirectAudit)
 
 		// Resource management (admin and member views)
 		adminResHandler := resourcesfeature.NewAdminHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, auditLogger, logger)
@@ -627,6 +630,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		} else {
 			viewerRegistry.Register(surveyEvents)
 		}
+		viewerRegistry.Register(views.NewAuditLog(deps.StrataHubMongoDatabase))
 		viewersHandler := viewersfeature.NewHandler(deps.StrataHubMongoDatabase, viewerRegistry, errLog, logger)
 		wsr.Mount("/views", viewersfeature.Routes(viewersHandler, sessionMgr))
 	})

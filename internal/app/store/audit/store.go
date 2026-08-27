@@ -24,44 +24,44 @@ const (
 
 // Auth event types
 const (
-	EventLoginSuccess                    = "login_success"
-	EventLoginFailedUserNotFound         = "login_failed_user_not_found"
-	EventLoginFailedWrongPassword        = "login_failed_wrong_password"
-	EventLoginFailedUserDisabled         = "login_failed_user_disabled"
-	EventLoginFailedAuthMethodDisabled   = "login_failed_auth_method_disabled"
-	EventLoginFailedRateLimit            = "login_failed_rate_limit"
-	EventLogout                          = "logout"
-	EventPasswordChanged                 = "password_changed"
-	EventVerificationCodeSent            = "verification_code_sent"
-	EventVerificationCodeResent          = "verification_code_resent"
-	EventVerificationCodeFailed          = "verification_code_failed"
-	EventMagicLinkUsed                   = "magic_link_used"
+	EventLoginSuccess                  = "login_success"
+	EventLoginFailedUserNotFound       = "login_failed_user_not_found"
+	EventLoginFailedWrongPassword      = "login_failed_wrong_password"
+	EventLoginFailedUserDisabled       = "login_failed_user_disabled"
+	EventLoginFailedAuthMethodDisabled = "login_failed_auth_method_disabled"
+	EventLoginFailedRateLimit          = "login_failed_rate_limit"
+	EventLogout                        = "logout"
+	EventPasswordChanged               = "password_changed"
+	EventVerificationCodeSent          = "verification_code_sent"
+	EventVerificationCodeResent        = "verification_code_resent"
+	EventVerificationCodeFailed        = "verification_code_failed"
+	EventMagicLinkUsed                 = "magic_link_used"
 )
 
 // Admin event types
 const (
-	EventUserCreated            = "user_created"
-	EventUserUpdated            = "user_updated"
-	EventUserDisabled           = "user_disabled"
-	EventUserEnabled            = "user_enabled"
-	EventUserDeleted            = "user_deleted"
-	EventGroupCreated           = "group_created"
-	EventGroupUpdated           = "group_updated"
-	EventGroupDeleted           = "group_deleted"
-	EventMemberAddedToGroup     = "member_added_to_group"
-	EventMemberRemovedFromGroup = "member_removed_from_group"
-	EventOrgCreated             = "org_created"
-	EventOrgUpdated             = "org_updated"
-	EventOrgDeleted             = "org_deleted"
-	EventResourceCreated        = "resource_created"
-	EventResourceUpdated        = "resource_updated"
-	EventResourceDeleted        = "resource_deleted"
-	EventMaterialCreated            = "material_created"
-	EventMaterialUpdated            = "material_updated"
-	EventMaterialDeleted            = "material_deleted"
-	EventResourceAssignedToGroup     = "resource_assigned_to_group"
-	EventResourceAssignmentUpdated   = "resource_assignment_updated"
-	EventResourceUnassignedFromGroup = "resource_unassigned_from_group"
+	EventUserCreated                  = "user_created"
+	EventUserUpdated                  = "user_updated"
+	EventUserDisabled                 = "user_disabled"
+	EventUserEnabled                  = "user_enabled"
+	EventUserDeleted                  = "user_deleted"
+	EventGroupCreated                 = "group_created"
+	EventGroupUpdated                 = "group_updated"
+	EventGroupDeleted                 = "group_deleted"
+	EventMemberAddedToGroup           = "member_added_to_group"
+	EventMemberRemovedFromGroup       = "member_removed_from_group"
+	EventOrgCreated                   = "org_created"
+	EventOrgUpdated                   = "org_updated"
+	EventOrgDeleted                   = "org_deleted"
+	EventResourceCreated              = "resource_created"
+	EventResourceUpdated              = "resource_updated"
+	EventResourceDeleted              = "resource_deleted"
+	EventMaterialCreated              = "material_created"
+	EventMaterialUpdated              = "material_updated"
+	EventMaterialDeleted              = "material_deleted"
+	EventResourceAssignedToGroup      = "resource_assigned_to_group"
+	EventResourceAssignmentUpdated    = "resource_assignment_updated"
+	EventResourceUnassignedFromGroup  = "resource_unassigned_from_group"
 	EventCoordinatorAssignedToOrg     = "coordinator_assigned_to_org"
 	EventCoordinatorUnassignedFromOrg = "coordinator_unassigned_from_org"
 	EventMaterialAssigned             = "material_assigned"
@@ -101,9 +101,9 @@ type Event struct {
 
 // QueryFilter defines filters for querying audit events.
 type QueryFilter struct {
-	WorkspaceID     *primitive.ObjectID   // Workspace filter
-	OrganizationID  *primitive.ObjectID   // Single org filter
-	OrganizationIDs []primitive.ObjectID  // Multiple orgs filter (for coordinators)
+	WorkspaceID     *primitive.ObjectID  // Workspace filter
+	OrganizationID  *primitive.ObjectID  // Single org filter
+	OrganizationIDs []primitive.ObjectID // Multiple orgs filter (for coordinators)
 	UserID          *primitive.ObjectID
 	Category        string
 	EventType       string
@@ -151,6 +151,17 @@ func (s *Store) EnsureIndexes(ctx context.Context) error {
 				{Key: "event_type", Value: 1},
 				{Key: "timestamp", Value: -1},
 			},
+		},
+		// Audit Log viewer: workspace listing newest first with a
+		// (timestamp, _id) cursor — the compound sort needs a matching index
+		// on DocumentDB.
+		{
+			Keys: bson.D{
+				{Key: "workspace_id", Value: 1},
+				{Key: "timestamp", Value: -1},
+				{Key: "_id", Value: -1},
+			},
+			Options: options.Index().SetName("idx_audit_ws_timestamp"),
 		},
 	}
 	_, err := s.c.Indexes().CreateMany(ctx, indexes)
@@ -310,4 +321,112 @@ func (s *Store) GetFailedLogins(ctx context.Context, since time.Time, limit int6
 		return nil, err
 	}
 	return events, nil
+}
+
+// --- Viewer queries -----------------------------------------------------------
+
+// Position is a cursor into the newest-first ordering (timestamp desc, _id desc).
+type Position struct {
+	Timestamp time.Time
+	ID        primitive.ObjectID
+}
+
+// ListQuery selects events for the Audit Log viewer. Zero values mean "any".
+type ListQuery struct {
+	WorkspaceID primitive.ObjectID
+	// Scope is the constraint from viewscope.Scope.Filter(ctx, "organization_id", "user_id");
+	// nil = unrestricted. Events with neither field set never match a restricted scope.
+	Scope bson.M
+
+	From, To  time.Time // timestamp bounds
+	Category  string
+	EventType string
+	Success   *bool
+	// PersonIDs matches events where the actor OR the affected user is one of
+	// the ids. nil = any; an empty slice matches nothing.
+	PersonIDs []primitive.ObjectID
+	IP        string
+	EventID   *primitive.ObjectID
+
+	After *Position
+	Limit int
+}
+
+func (q ListQuery) filter() bson.M {
+	f := bson.M{"workspace_id": q.WorkspaceID}
+	var and []bson.M
+	if q.Scope != nil {
+		and = append(and, q.Scope)
+	}
+	if !q.From.IsZero() || !q.To.IsZero() {
+		rng := bson.M{}
+		if !q.From.IsZero() {
+			rng["$gte"] = q.From.UTC()
+		}
+		if !q.To.IsZero() {
+			rng["$lte"] = q.To.UTC()
+		}
+		f["timestamp"] = rng
+	}
+	if q.Category != "" {
+		f["category"] = q.Category
+	}
+	if q.EventType != "" {
+		f["event_type"] = q.EventType
+	}
+	if q.Success != nil {
+		f["success"] = *q.Success
+	}
+	if q.PersonIDs != nil {
+		and = append(and, bson.M{"$or": []bson.M{
+			{"actor_id": bson.M{"$in": q.PersonIDs}},
+			{"user_id": bson.M{"$in": q.PersonIDs}},
+		}})
+	}
+	if q.IP != "" {
+		f["ip"] = q.IP
+	}
+	if q.EventID != nil {
+		f["_id"] = *q.EventID
+	}
+	if q.After != nil {
+		and = append(and, bson.M{"$or": []bson.M{
+			{"timestamp": bson.M{"$lt": q.After.Timestamp.UTC()}},
+			{"timestamp": q.After.Timestamp.UTC(), "_id": bson.M{"$lt": q.After.ID}},
+		}})
+	}
+	if len(and) > 0 {
+		f["$and"] = and
+	}
+	return f
+}
+
+// List returns up to Limit events newest first and whether more follow.
+// Limit defaults to 50.
+func (s *Store) List(ctx context.Context, q ListQuery) (events []Event, more bool, err error) {
+	limit := q.Limit
+	if limit <= 0 {
+		limit = 50
+	}
+	opts := options.Find().
+		SetSort(bson.D{{Key: "timestamp", Value: -1}, {Key: "_id", Value: -1}}).
+		SetLimit(int64(limit + 1))
+	cur, err := s.c.Find(ctx, q.filter(), opts)
+	if err != nil {
+		return nil, false, err
+	}
+	defer cur.Close(ctx)
+	if err := cur.All(ctx, &events); err != nil {
+		return nil, false, err
+	}
+	if len(events) > limit {
+		return events[:limit], true, nil
+	}
+	return events, false, nil
+}
+
+// Count returns the number of events matching the query (ignoring paging).
+func (s *Store) Count(ctx context.Context, q ListQuery) (int64, error) {
+	q.After = nil
+	return s.c.CountDocuments(ctx, q.filter())
 }
