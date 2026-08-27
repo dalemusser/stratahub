@@ -5,6 +5,7 @@ import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/store/activity"
 	"github.com/dalemusser/stratahub/internal/app/store/memberstatus"
+	"github.com/dalemusser/stratahub/internal/app/store/memberstatuslog"
 	"github.com/dalemusser/stratahub/internal/app/store/sessions"
 	"github.com/dalemusser/stratahub/internal/app/system/auditlog"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
@@ -43,8 +44,10 @@ type MemberHandler struct {
 
 	// Survey tracking: launching a resource linked to a tracked survey records
 	// an "opened" status for the member (see recordSurveyOpened). Either may
-	// be nil, in which case launches are not tracked.
+	// be nil, in which case launches are not tracked. StatusLog receives one
+	// entry per tracked launch for the Survey Events viewer.
 	MemberStatus *memberstatus.Store
+	StatusLog    *memberstatuslog.Store
 	SurveyConfig *memberstatuscfg.Config
 }
 
@@ -72,6 +75,7 @@ func NewMemberHandler(db *mongo.Database, store storage.Store, errLog *uierrors.
 		Sessions:     sessStore,
 		SessionMgr:   sessionMgr,
 		MemberStatus: memberstatus.New(db),
+		StatusLog:    memberstatuslog.New(db),
 	}
 	// Survey list is optional here: without it, launches simply aren't tracked.
 	if cfg, err := memberstatuscfg.Load(); err != nil {

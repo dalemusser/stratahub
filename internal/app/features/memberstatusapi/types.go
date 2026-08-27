@@ -18,8 +18,10 @@ type statusRequest struct {
 }
 
 // statusResponse is the JSON body returned for an accepted status event.
+// EventID identifies the log entry for this request (Survey Events viewer).
 type statusResponse struct {
 	OK          bool       `json:"ok"`
+	EventID     string     `json:"event_id,omitempty"`
 	UserID      string     `json:"user_id"`
 	Entity      string     `json:"entity"`
 	EntityKey   string     `json:"entity_key"`
@@ -37,11 +39,13 @@ type pingResponse struct {
 	Entities  []string `json:"entities"`
 }
 
-// errorResponse is the JSON body returned for every non-2xx result.
+// errorResponse is the JSON body returned for every non-2xx result. EventID
+// is present when the request was authenticated (and therefore logged).
 type errorResponse struct {
 	OK      bool   `json:"ok"`
 	Error   string `json:"error"`
 	Message string `json:"message"`
+	EventID string `json:"event_id,omitempty"`
 }
 
 // Error codes (the "error" field of errorResponse). Stable strings a

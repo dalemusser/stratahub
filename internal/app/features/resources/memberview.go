@@ -457,7 +457,7 @@ func (h *MemberHandler) HandleLaunch(w http.ResponseWriter, r *http.Request) {
 
 	// Survey tracking: a launch of a linked survey resource marks it "opened"
 	// on the MHS Dashboard (best-effort; never blocks the redirect).
-	h.recordSurveyOpened(ctx, member.ID, member.WorkspaceID, res)
+	h.recordSurveyOpened(ctx, member.ID, member.WorkspaceID, member.OrganizationID, res)
 
 	h.Log.Info("resource launch redirect",
 		zap.String("resource_id", resourceID),
@@ -474,7 +474,7 @@ func (h *MemberHandler) HandleLaunch(w http.ResponseWriter, r *http.Request) {
 // resource linked to a tracked survey. It is best-effort: any failure is
 // logged and never blocks the launch redirect. First-wins on the timestamp,
 // so repeated launches change nothing but history.
-func (h *MemberHandler) recordSurveyOpened(ctx context.Context, userID primitive.ObjectID, workspaceID *primitive.ObjectID, res models.Resource) {
+func (h *MemberHandler) recordSurveyOpened(ctx context.Context, userID primitive.ObjectID, workspaceID, orgID *primitive.ObjectID, res models.Resource) {
 	if res.TrackedEntityID == "" || h.MemberStatus == nil || h.SurveyConfig == nil {
 		return
 	}
@@ -487,7 +487,30 @@ func (h *MemberHandler) recordSurveyOpened(ctx context.Context, userID primitive
 	if workspaceID == nil || workspaceID.IsZero() || userID.IsZero() {
 		return
 	}
-	_, err := h.MemberStatus.Record(ctx, memberstatus.RecordInput{
+
+	// Log entry for the Survey Events viewer (same shape as API events).
+	entry := models.MemberStatusLogEntry{
+		WorkspaceID: *workspaceID,
+		Source:      models.MemberStatusSourceLaunch,
+		Request: models.MemberStatusLogRequest{
+			UserID:     userID.Hex(),
+			Entity:     item.Title,
+			State:      models.MemberStatusOpened,
+			StateNorm:  models.MemberStatusOpened,
+			ResourceID: res.ID.Hex(),
+		},
+		Resolved: models.MemberStatusLogResolved{
+			UserID:         &userID,
+			OrganizationID: orgID,
+			EntityKey:      item.ID,
+			EntityTitle:    item.Title,
+			KnownEntity:    true,
+			StateApplied:   models.MemberStatusOpened,
+		},
+		Outcome: models.MemberStatusLogOutcome{HTTPStatus: http.StatusOK},
+	}
+
+	doc, err := h.MemberStatus.Record(ctx, memberstatus.RecordInput{
 		WorkspaceID: *workspaceID,
 		UserID:      userID,
 		EntityKey:   item.ID,
@@ -501,5 +524,13 @@ func (h *MemberHandler) recordSurveyOpened(ctx context.Context, userID primitive
 			zap.String("resource_id", res.ID.Hex()),
 			zap.String("entity_key", item.ID),
 			zap.String("member_id", userID.Hex()))
+		entry.Outcome = models.MemberStatusLogOutcome{HTTPStatus: http.StatusInternalServerError, Error: "server_error", Message: "Could not record the launch."}
+	} else {
+		entry.Resolved.ResultingState = doc.State
+	}
+	if h.StatusLog != nil {
+		if _, err := h.StatusLog.Append(ctx, entry); err != nil {
+			h.Log.Warn("failed to log survey launch", zap.Error(err), zap.String("resource_id", res.ID.Hex()))
+		}
 	}
 }

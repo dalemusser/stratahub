@@ -12,6 +12,7 @@ package memberstatusapi
 //   - LoginID / loginID / login_id: The human-readable string users type to log in
 
 import (
+	"context"
 	"crypto/subtle"
 	"encoding/json"
 	"errors"
@@ -22,6 +23,7 @@ import (
 	"time"
 
 	"github.com/dalemusser/stratahub/internal/app/store/memberstatus"
+	"github.com/dalemusser/stratahub/internal/app/store/memberstatuslog"
 	settingsstore "github.com/dalemusser/stratahub/internal/app/store/settings"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
 	"github.com/dalemusser/stratahub/internal/app/system/memberstatuscfg"
@@ -53,6 +55,7 @@ type Handler struct {
 	Settings *settingsstore.Store
 	Users    *userstore.Store
 	Status   *memberstatus.Store
+	Events   *memberstatuslog.Store // append-only log of every authenticated request
 	Config   *memberstatuscfg.Config
 	Limiter  *ratelimit.Limiter // counts failed authentications per IP
 	Log      *zap.Logger
@@ -70,6 +73,7 @@ func NewHandler(db *mongo.Database, logger *zap.Logger) (*Handler, error) {
 		Settings: settingsstore.New(db),
 		Users:    userstore.New(db),
 		Status:   memberstatus.New(db),
+		Events:   memberstatuslog.New(db),
 		Config:   cfg,
 		Limiter:  ratelimit.New(authFailureLimit, authFailureWindow),
 		Log:      logger,
@@ -80,6 +84,7 @@ func NewHandler(db *mongo.Database, logger *zap.Logger) (*Handler, error) {
 //
 // Verifies connectivity and the shared key, and reports the entity names in
 // use so the provider can confirm the exact strings before sending events.
+// Pings change nothing and are not logged to the event log.
 func (h *Handler) HandlePing(w http.ResponseWriter, r *http.Request) {
 	ws, _, ok := h.authenticate(w, r)
 	if !ok {
@@ -95,44 +100,69 @@ func (h *Handler) HandlePing(w http.ResponseWriter, r *http.Request) {
 // HandleStatus — POST /api/member-status
 //
 // Records one status event for a member. Idempotent and monotonic: see
-// memberstatus.Store.Record for the exact semantics.
+// memberstatus.Store.Record for the exact semantics. Every authenticated
+// request — accepted or rejected — is appended to the event log, and its
+// event_id is returned so the provider can find it in the Survey Events view.
 func (h *Handler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 	ws, req, ok := h.authenticate(w, r)
 	if !ok {
 		return
 	}
 	ctx := r.Context()
+	remoteIP := ratelimit.ClientIP(r)
+
+	// The log entry for this request, filled in as we go.
+	entry := models.MemberStatusLogEntry{
+		ID:          primitive.NewObjectID(),
+		WorkspaceID: ws.ID,
+		ReceivedAt:  time.Now().UTC(),
+		Source:      models.MemberStatusSourceAPI,
+		RemoteIP:    remoteIP,
+		Request: models.MemberStatusLogRequest{
+			UserID:     strings.TrimSpace(req.UserID),
+			Entity:     strings.TrimSpace(req.Entity),
+			State:      strings.TrimSpace(req.State),
+			StateNorm:  strings.ToLower(strings.TrimSpace(req.State)),
+			OccurredAt: strings.TrimSpace(req.OccurredAt),
+		},
+	}
+	// reject logs the outcome and writes the error response with the event id.
+	reject := func(code int, errCode, msg string) {
+		entry.Outcome = models.MemberStatusLogOutcome{HTTPStatus: code, Error: errCode, Message: msg}
+		h.appendLog(ctx, entry)
+		writeJSON(w, code, errorResponse{OK: false, Error: errCode, Message: msg, EventID: entry.ID.Hex()})
+	}
 
 	// --- Validate the event fields ---
 
-	userID, err := primitive.ObjectIDFromHex(strings.TrimSpace(req.UserID))
+	userID, err := primitive.ObjectIDFromHex(entry.Request.UserID)
 	if err != nil {
-		writeError(w, http.StatusBadRequest, errInvalidUserID, "user_id must be a 24-character hex id.")
+		reject(http.StatusBadRequest, errInvalidUserID, "user_id must be a 24-character hex id.")
 		return
 	}
 
-	entity := strings.TrimSpace(req.Entity)
+	entity := entry.Request.Entity
 	if entity == "" || len(entity) > maxEntityLen {
-		writeError(w, http.StatusBadRequest, errInvalidEntity,
+		reject(http.StatusBadRequest, errInvalidEntity,
 			fmt.Sprintf("entity is required and must be at most %d characters.", maxEntityLen))
 		return
 	}
 
 	// Only provider-reportable states are accepted here; "opened" is written
 	// by StrataHub itself when a member launches the linked resource.
-	state := strings.ToLower(strings.TrimSpace(req.State))
+	state := entry.Request.StateNorm
 	switch state {
 	case models.MemberStatusStarted, models.MemberStatusCompleted:
 	default:
-		writeError(w, http.StatusBadRequest, errInvalidState, `state must be "started" or "completed".`)
+		reject(http.StatusBadRequest, errInvalidState, `state must be "started" or "completed".`)
 		return
 	}
 
 	var occurredAt *time.Time
-	if s := strings.TrimSpace(req.OccurredAt); s != "" {
+	if s := entry.Request.OccurredAt; s != "" {
 		t, err := time.Parse(time.RFC3339, s)
 		if err != nil {
-			writeError(w, http.StatusBadRequest, errInvalidOccurredAt, "occurred_at must be an RFC 3339 timestamp (e.g. 2026-08-25T14:03:11Z).")
+			reject(http.StatusBadRequest, errInvalidOccurredAt, "occurred_at must be an RFC 3339 timestamp (e.g. 2026-08-25T14:03:11Z).")
 			return
 		}
 		t = t.UTC()
@@ -151,8 +181,8 @@ func (h *Handler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 			zap.String("user_id", userID.Hex()),
 			zap.String("entity", entity),
 			zap.String("state", state),
-			zap.String("remote_ip", ratelimit.ClientIP(r)))
-		writeError(w, http.StatusNotFound, errUnknownUser, "No active member with that user_id in this workspace.")
+			zap.String("remote_ip", remoteIP))
+		reject(http.StatusNotFound, errUnknownUser, "No active member with that user_id in this workspace.")
 	}
 
 	user, err := h.Users.GetMemberByID(ctx, userID)
@@ -162,7 +192,7 @@ func (h *Handler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	case err != nil:
 		h.Log.Error("member status: user lookup failed", zap.Error(err))
-		writeError(w, http.StatusInternalServerError, errServer, "Lookup failed; please retry.")
+		reject(http.StatusInternalServerError, errServer, "Lookup failed; please retry.")
 		return
 	}
 	switch {
@@ -174,6 +204,8 @@ func (h *Handler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 		unknownUser("member is not active")
 		return
 	}
+	entry.Resolved.UserID = &userID
+	entry.Resolved.OrganizationID = user.OrganizationID
 
 	// --- Resolve the entity and record ---
 
@@ -182,6 +214,10 @@ func (h *Handler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 	if known {
 		display = item.Title
 	}
+	entry.Resolved.EntityKey = entityKey
+	entry.Resolved.EntityTitle = display
+	entry.Resolved.KnownEntity = known
+	entry.Resolved.StateApplied = state
 
 	doc, err := h.Status.Record(ctx, memberstatus.RecordInput{
 		WorkspaceID: ws.ID,
@@ -191,7 +227,7 @@ func (h *Handler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 		State:       state,
 		Source:      models.MemberStatusSourceAPI,
 		OccurredAt:  occurredAt,
-		RemoteIP:    ratelimit.ClientIP(r),
+		RemoteIP:    remoteIP,
 	})
 	if err != nil {
 		h.Log.Error("member status: record failed",
@@ -199,9 +235,12 @@ func (h *Handler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 			zap.String("user_id", userID.Hex()),
 			zap.String("entity_key", entityKey),
 			zap.Error(err))
-		writeError(w, http.StatusInternalServerError, errServer, "Could not record the event; please retry.")
+		reject(http.StatusInternalServerError, errServer, "Could not record the event; please retry.")
 		return
 	}
+	entry.Resolved.ResultingState = doc.State
+	entry.Outcome = models.MemberStatusLogOutcome{HTTPStatus: http.StatusOK}
+	h.appendLog(ctx, entry)
 
 	fields := []zap.Field{
 		zap.String("workspace_id", ws.ID.Hex()),
@@ -209,7 +248,8 @@ func (h *Handler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 		zap.String("entity_key", entityKey),
 		zap.String("state", state),
 		zap.String("resulting_state", doc.State),
-		zap.String("remote_ip", ratelimit.ClientIP(r)),
+		zap.String("event_id", entry.ID.Hex()),
+		zap.String("remote_ip", remoteIP),
 	}
 	if known {
 		h.Log.Info("member status recorded", fields...)
@@ -220,6 +260,7 @@ func (h *Handler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 
 	writeJSON(w, http.StatusOK, statusResponse{
 		OK:          true,
+		EventID:     entry.ID.Hex(),
 		UserID:      userID.Hex(),
 		Entity:      doc.Entity,
 		EntityKey:   entityKey,
@@ -231,9 +272,24 @@ func (h *Handler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
+// appendLog stores the request's log entry. Logging is best-effort: a
+// failure is reported in the server log but never changes the API response.
+func (h *Handler) appendLog(ctx context.Context, entry models.MemberStatusLogEntry) {
+	if h.Events == nil {
+		return
+	}
+	if _, err := h.Events.Append(ctx, entry); err != nil {
+		h.Log.Error("member status: event log append failed",
+			zap.String("event_id", entry.ID.Hex()),
+			zap.String("workspace_id", entry.WorkspaceID.Hex()),
+			zap.Error(err))
+	}
+}
+
 // authenticate resolves the workspace, decodes the body, and validates the
 // shared key. On any failure it has already written the response and returns
-// ok=false. Failed key checks are throttled per client IP.
+// ok=false. Failed key checks are throttled per client IP. Nothing that fails
+// here reaches the event log (the shared key is never stored anywhere).
 func (h *Handler) authenticate(w http.ResponseWriter, r *http.Request) (ws *workspace.Info, req statusRequest, ok bool) {
 	ws = workspace.FromRequest(r)
 	if ws == nil || ws.IsApex || ws.ID.IsZero() {

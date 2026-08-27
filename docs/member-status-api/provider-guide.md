@@ -78,6 +78,7 @@ configuration catches up.
 ```json
 {
   "ok": true,
+  "event_id": "6a8fd0c2e1a4b3f9c2d5e7a1",
   "user_id": "68f138c495cdf54a392b20aa",
   "entity": "MHS Engagement",
   "entity_key": "mhs",
@@ -93,6 +94,13 @@ was applied (which may be higher than the state you sent — see below).
 `started_at` / `completed_at` are StrataHub's receipt times for the first
 report of each state; a field is omitted when that state has not been
 reported.
+
+`event_id` identifies StrataHub's record of this request. Every request that
+passes authentication is logged — accepted or rejected — with exactly what
+was sent and how it was handled, and StrataHub staff can look an `event_id`
+up in their Survey Events view. If something looks wrong on your side, quote
+the `event_id` and they can see the same record. Rejected requests carry an
+`event_id` too (except authentication failures, which are not logged).
 
 ---
 

@@ -33,6 +33,7 @@ type env struct {
 	db      *mongo.Database
 	h       *memberstatusapi.Handler
 	wsID    primitive.ObjectID
+	orgID   primitive.ObjectID
 	member  models.User
 	router  http.Handler // workspace context injected, API mounted
 	apexRtr http.Handler // no workspace context (apex host)
@@ -51,12 +52,13 @@ func newEnv(t *testing.T) *env {
 
 	fx := testutil.NewFixtures(t, db)
 	ws := fx.CreateWorkspace(ctx, "MHS", "mhs")
-	member := fx.CreateUserInWorkspace(ctx, "Alice Cole", "acole@example.org", "member", ws.ID, nil)
+	org := fx.CreateOrganizationInWorkspace(ctx, "Hillsdale Middle School", ws.ID)
+	member := fx.CreateUserInWorkspace(ctx, "Alice Cole", "acole@example.org", "member", ws.ID, &org.ID)
 	if err := settingsstore.New(db).SetMemberStatusAPIKey(ctx, ws.ID, goodKey); err != nil {
 		t.Fatalf("set key: %v", err)
 	}
 
-	e := &env{t: t, db: db, h: h, wsID: ws.ID, member: member}
+	e := &env{t: t, db: db, h: h, wsID: ws.ID, orgID: org.ID, member: member}
 	e.router = e.buildRouter(&ws.ID, nil)
 	e.apexRtr = e.buildRouter(nil, nil)
 	return e

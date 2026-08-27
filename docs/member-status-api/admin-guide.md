@@ -153,3 +153,11 @@ the provider's IP address). Rejected `unknown_user` requests are logged as
 warnings (`member status: unknown user`) with the reason — no such id, member
 in a different workspace, or member not active — which the provider's uniform
 404 does not reveal. The shared key is never logged.
+
+In addition, every request that passes authentication — accepted or rejected
+— and every tracked survey launch is recorded in the **event log**
+(`member_status_log`, kept for 400 days): the request exactly as sent, what
+it resolved to (student, organization, survey, state), and the outcome. The
+API returns each record's `event_id` to the provider, so they can quote it
+when asking about a specific send. Requests with a wrong or missing key are
+not in the event log (they are throttled and appear only in the server log).

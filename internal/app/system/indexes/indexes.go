@@ -89,6 +89,9 @@ func EnsureAll(ctx context.Context, db *mongo.Database) error {
 	if err := ensureMemberStatus(ctx, db); err != nil {
 		problems = append(problems, "member_status: "+err.Error())
 	}
+	if err := ensureMemberStatusLog(ctx, db); err != nil {
+		problems = append(problems, "member_status_log: "+err.Error())
+	}
 
 	if len(problems) > 0 {
 		return errors.New(strings.Join(problems, "; "))
@@ -1037,6 +1040,46 @@ func ensureMemberStatus(ctx context.Context, db *mongo.Database) error {
 			},
 			Options: options.Index().
 				SetName("idx_memberstatus_workspace_entity_state"),
+		},
+	})
+}
+
+func ensureMemberStatusLog(ctx context.Context, db *mongo.Database) error {
+	c := db.Collection("member_status_log")
+	// Retention: keep entries 400 days (models.MemberStatusLogRetention).
+	const retentionSeconds = int32(400 * 24 * 60 * 60)
+	return ensureIndexSet(ctx, c, []mongo.IndexModel{
+		// Newest-first listing with a cursor on (received_at, _id).
+		{
+			Keys: bson.D{
+				{Key: "workspace_id", Value: 1},
+				{Key: "received_at", Value: -1},
+				{Key: "_id", Value: -1},
+			},
+			Options: options.Index().SetName("idx_mslog_ws_received"),
+		},
+		// Per-student history.
+		{
+			Keys: bson.D{
+				{Key: "workspace_id", Value: 1},
+				{Key: "resolved.user_id", Value: 1},
+				{Key: "received_at", Value: -1},
+			},
+			Options: options.Index().SetName("idx_mslog_ws_user_received"),
+		},
+		// Per-survey history.
+		{
+			Keys: bson.D{
+				{Key: "workspace_id", Value: 1},
+				{Key: "resolved.entity_key", Value: 1},
+				{Key: "received_at", Value: -1},
+			},
+			Options: options.Index().SetName("idx_mslog_ws_entity_received"),
+		},
+		// Expire old entries.
+		{
+			Keys:    bson.D{{Key: "received_at", Value: 1}},
+			Options: options.Index().SetName("ttl_mslog_received").SetExpireAfterSeconds(retentionSeconds),
 		},
 	})
 }
