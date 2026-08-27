@@ -115,7 +115,7 @@ Handles application initialization and lifecycle:
 | **errors** | Error page handlers and logging |
 | **activity** | Activity logging and tracking |
 | **announcements** | Announcement management |
-| **auditlog** | Audit trail logging |
+| **viewers** | Data-viewers framework at `/views/{slug}`: role gate, `viewscope` scoping, filter bar with URL state, cursor paging, Live toggle, CSV export, shared templates. Viewers live in `viewers/views/`: **Survey Events** (`/views/survey-events`; member-status events from the API and launches) and **Audit Log** (`/views/audit-log`; `/audit` redirects there). How-to: `docs/viewers/adding-a-viewer.md` |
 | **heartbeat** | Application heartbeat/monitoring |
 | **status** | Status indicators |
 
@@ -142,7 +142,7 @@ MongoDB data access with consistent patterns. Each store package handles one col
 | **sessions** | `sessions/` | Session management |
 | **activity** | `activity/` | Activity logging |
 | **announcements** | `announcement/` | Site announcements |
-| **audit** | `audit/` | Audit trail |
+| **audit_events** | `audit/` | Audit trail (auth + admin events); `ListQuery`/`List`/`Count` back the Audit Log viewer |
 | **email_verification** | `emailverify/` | Email verification tokens |
 | **oauth_state** | `oauthstate/` | OAuth2 state tokens |
 | **metrics** | `metrics/` | Application metrics |
@@ -153,6 +153,7 @@ MongoDB data access with consistent patterns. Each store package handles one col
 | **mhs_user_progress** | `mhsuserprogress/` | MHS user progress tracking |
 | **group_app_settings** | `groupapps/` | Group-level app settings |
 | **member_status** | `memberstatus/` | Per (workspace, user, entity) survey status: opened → started → completed ladder, first-wins timestamps, capped history |
+| **member_status_log** | `memberstatuslog/` | Append-only log of every member-status event (API requests accepted or rejected, survey launches): request as sent, what it resolved to, outcome; `List`/`Count`/`Summarize` with a `(received_at, _id)` cursor back the Survey Events viewer; 400-day TTL |
 
 **Store Pattern:**
 ```go
@@ -206,6 +207,7 @@ func (s *Store) GetByID(ctx context.Context, id primitive.ObjectID) (Model, erro
 | **mhs_user_progress.go** | MHS user progress data |
 | **groupappsetting.go** | Group-level application settings |
 | **memberstatus.go** | MemberStatus (a member's status on a tracked entity/survey) with the state ladder and rank helpers |
+| **memberstatuslog.go** | MemberStatusLogEntry (one received member-status event: request, resolved, outcome) |
 | **authmethods.go** | Authentication method constants |
 
 ### System Utilities (`internal/app/system/`)
@@ -228,6 +230,7 @@ Shared packages for common functionality. **Always use these before implementing
 | **txn/** | Transaction wrapper (MongoDB + DocumentDB fallback) |
 | **status/** | Status constants (active, disabled) |
 | **memberstatuscfg/** | Loads the embedded `mhs_member_status.json` (tracked surveys: ids, titles, provider names); shared by the API, the dashboard, and the resource forms |
+| **viewscope/** | Role reach for data lists: `Resolve(ctx, db, r, Options{OrgID, GroupID})` → `*Scope`; `Scope.Filter(ctx, orgField, userField)` yields the Mongo constraint (nil for admin/analyst, org `$in` for coordinators, member `$in` for leaders, match-nothing when empty); `Orgs`/`Groups` option lists. Used by the viewers framework; other list features can adopt it |
 
 **Critical**: When implementing features, always check these utilities first. Duplicating functionality adds technical debt and inconsistency.
 
@@ -539,7 +542,7 @@ internal/app/features/{feature}/templates/
 
 ### Menu Structure
 
-Menu templates are role-based (`menu_admin`, `menu_analyst`, `menu_coordinator`, `menu_leader`, `menu_member`, `menu_visitor`) with shared components (`menu_common`, `menu_footer`).
+Menu templates are role-based (`menu_admin`, `menu_analyst`, `menu_coordinator`, `menu_leader`, `menu_member`, `menu_visitor`) with shared components (`menu_common`, `menu_footer`). Data viewers get one hand-placed entry per role block that may open them (e.g. "Survey Events", "Audit Log"); `/views` also lists every viewer available to the role.
 
 ## Styling with Tailwind CSS
 
@@ -921,6 +924,22 @@ make css-watch
 - **mhsgrading** — Grading system integrated with StrataHub
 
 ## Recent Work Completed
+
+### Data Viewers Framework (2026-08)
+- `internal/app/features/viewers`: one mechanism for role-gated, scoped,
+  filterable, pageable lists at `/views/{slug}` (`/table` partial,
+  `/rows/{id}` detail, `/export.csv`); a viewer is one file implementing
+  `viewers.Viewer` (+ optional `Summarizer`, `Liveable`, `Exporter`),
+  registered in bootstrap
+- `internal/app/system/viewscope`: shared role reach (admin/analyst whole
+  workspace; coordinator assigned orgs; leader own groups) with org/group
+  selection, used by the framework for rows, detail, and export
+- Cursor paging on `{sortField, _id}` with matching compound indexes
+  (DocumentDB-safe); filter values live in the URL; generic CSV
+- Viewers: **Survey Events** (`member_status_log`: every API and launch
+  event, accepted or rejected, with `event_id` for support) and **Audit
+  Log** (replaces the former standalone feature; `/audit` redirects)
+- Docs: `docs/viewers/adding-a-viewer.md` (how-to), `docs/viewers/plan.md`
 
 ### Member Status API + Surveys Tab (2026-08)
 - Inbound `POST /api/member-status` for the survey provider (Abt): body-key

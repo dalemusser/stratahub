@@ -42,12 +42,11 @@ Add a UI (likely on the Profile page) that lets users selectively clear browser-
 - Theme (browser copy — database preference still applies on next load)
 - Sidebar state
 - Timezone (Activity)
-- Timezone (Audit Log)
 - Organization sidebar (Groups/Members/Leaders — could group as one item)
 
 ### Design Considerations
 
-- **Role filtering:** Only show items relevant to the user's role. A member wouldn't see "Audit Log Timezone" or org sidebar toggles.
+- **Role filtering:** Only show items relevant to the user's role. A member wouldn't see "Activity Timezone" or org sidebar toggles.
 - **Labeling:** Avoid "Reset Preferences" — that implies it would reset database-backed preferences (like the theme setting on Profile). This is browser-local state, not account preferences.
 - **Confirmation:** A brief confirmation or immediate feedback (not a modal) since clearing individual items is low-risk.
 - **All items reset gracefully:** Theme falls back to system preference, sidebar expands, announcements reappear, timezones fall back to browser default, org sidebars show.

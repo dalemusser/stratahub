@@ -4,7 +4,7 @@ This document describes the plan for implementing audit logging in StrataHub for
 
 ## Overview
 
-Audit logging captures security-relevant events for review by system administrators and workspace admins. Events are stored in MongoDB for querying and will have a future admin UI.
+Audit logging captures security-relevant events for review by system administrators and workspace admins. Events are stored in MongoDB (`audit_events`) and reviewed in the **Audit Log** viewer at `/views/audit-log` (admins and coordinators; a viewer on the data-viewers framework, see `docs/viewers/`).
 
 ## Stakeholders
 
@@ -122,10 +122,12 @@ type AuditEvent struct {
 
 ### Phase 3: Admin UI
 
-1. Event list view with filtering
-2. User activity timeline
-3. Export functionality (CSV, JSON)
-4. Real-time event stream (optional)
+Delivered as the Audit Log viewer (`/views/audit-log`,
+`internal/app/features/viewers/views/auditlog.go`): filterable list (time
+range, category, event type, result, person, IP, event id), per-row detail
+with the raw event, summary chips, CSV export, coordinator scoping by
+organization. Not done: a per-user activity timeline and a real-time stream
+(the viewers framework's Live toggle could provide the latter).
 
 ## Logging Strategy
 

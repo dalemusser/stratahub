@@ -58,9 +58,10 @@ An inbound, key-authenticated endpoint the survey provider calls when a student 
 
 ## Data Viewers
 
-One framework for role-gated, scoped, filterable event/log/data lists, so each new list is a small viewer rather than a new feature.
+One framework (`/views/{slug}`) for role-gated, scoped, filterable event/log/data lists, so each new list is a small viewer rather than a new feature. Live viewers: **Survey Events** (`/views/survey-events`) and **Audit Log** (`/views/audit-log`).
 
-- [Viewers Framework Plan](viewers/plan.md) - Registry, viewer interface, shared scoping, filters, cursor paging, live refresh, export; Survey Events as the first viewer, Audit Log as the second; task breakdown and decisions
+- [Adding a Viewer](viewers/adding-a-viewer.md) - How-to: store query + index, the viewer file (filters, columns, query, detail, optional summary/live/export), registration, menu, tests, checklist
+- [Viewers Framework Plan](viewers/plan.md) - Design and delivery record: registry, viewer interface, shared scoping (`viewscope`), filters, cursor paging, live refresh, export; Survey Events as the first viewer, Audit Log as the second
 
 ## Deployment
 

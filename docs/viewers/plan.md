@@ -61,6 +61,14 @@ point at which extracting the common core pays back.
 
 ## 4. Architecture
 
+> The sketches in this section are the design as proposed. The delivered
+> API is documented in [adding-a-viewer.md](adding-a-viewer.md) and in
+> `internal/app/features/viewers/viewer.go`, and differs in details (no
+> `SortKey`/`Scope` methods — the cursor key is viewer-formatted and the
+> framework resolves scope; `Cell.HTML`/`Detail.HTML` instead of snippets;
+> detail at `/rows/{id}`; no `bool` filter type). Where they differ, the
+> how-to is the reference.
+
 ### 4.1 Packages
 
 ```
@@ -235,20 +243,20 @@ Mapped onto the framework (full data design in
 | V3 ✅ (2026-08-27) | Survey Events data: `member_status_log` model/store/indexes/TTL; API and launch-hook writers; `event_id` in API responses; tests; provider + admin guide updates. Delivered: `models.MemberStatusLogEntry` (request as sent incl. `state_norm`, resolved user/org/entity/state, outcome), `store/memberstatuslog` (`Append` with clipping, `Get`, `List` with every viewer filter + `(received_at,_id)` cursor, `Count`, `Summarize`), indexes `idx_mslog_ws_received` / `_ws_user_received` / `_ws_entity_received` + `ttl_mslog_received` (400 d). The API logs every authenticated request (accepted or rejected) and returns `event_id` on both; unauthenticated failures and pings are not logged. `recordSurveyOpened` logs each tracked launch (source `launch`, with the resource id and the resulting state). Guides updated. | 1 day |
 | V4 ✅ (2026-08-27) | Survey Events viewer on the framework; menu entries + cross-links; tests. Delivered: `features/viewers/views/surveyevents.go` (`NewSurveyEvents(db)`; roles admin/analyst/coordinator/leader; filters received-range (default 7 d) / source / survey incl. unrecognized / state sent / result incl. specific error codes / student by name-prefix or hex id / event id; columns Received (student's org zone) · Source · Student (link filters to them) · Survey · State sent · Result pills; detail with every stored field + JSON; Summarizer chips; Live 10 s; generic CSV) registered in bootstrap; menu "Survey Events" for admin, coordinator, leader, analyst; links from the Surveys tab legend, the survey modal (pre-filtered to the student), and the Settings API section; `memberstatuslog.ListQuery.UserIDs` added for name search. Tests: meta, rows/cells/scoping (leader, coordinator, admin), every filter, cursor paging, detail incl. out-of-scope 404, summary. Verified in the browser on the dev server: events generated through the real API and a real launch; leader saw only their students' events (rejected rows hidden), admin saw all incl. rejected; filters drive the URL; detail toggle; dark mode; zero console errors. | ½ day |
 | V5 ✅ (2026-08-27) | Audit Log ported as the second viewer; old route redirected; tests. Delivered: `features/viewers/views/auditlog.go` (`NewAuditLog(db)`; roles admin/coordinator; filters when (default any time) / category / event type (every constant, humanized) / result / person by name-prefix or hex id (actor **or** affected user) / IP (exact) / event id; columns Time (event's org zone, UTC fallback) · Category · Event · Actor · Target · Organization · Result · IP with the retired feature's actor/target rules — auth events show the user as actor, admin events show actor + affected user, failed logins for unknown users show the attempted login id muted; detail with every field, the `details` map, user agent and JSON; Summarizer chips Events/Failed; not live; generic CSV — the retired feature had no export). Store: `audit.ListQuery`/`List`/`Count` with the `(timestamp, _id)` cursor and index `idx_audit_ws_timestamp` `{workspace_id, timestamp, _id}`. The `auditlog` feature (handler, list, routes, template, types) is deleted; `/audit` and `/audit/*` redirect (302) to `/views/audit-log`; menu and admin-dashboard links point at the viewer. Scope via `scope.Filter(ctx, "organization_id", "user_id")`: coordinators see events tagged with their organizations (org-less events such as failed logins for unknown users and key rotations are admin-only). Tests: meta, rows/cells/scoping, every filter, cursor paging, detail incl. out-of-scope 404, summary. Net: ≈380 lines of viewer replace ≈900 lines of feature. | ½ day |
-| V6 | Docs: this plan ticked, "adding a viewer" how-to, `ai/context.md`, docs index | ½ day |
+| V6 ✅ (2026-08-27) | Docs: this plan ticked, "adding a viewer" how-to, `ai/context.md`, docs index. Delivered: `docs/viewers/adding-a-viewer.md` (store query + index, viewer file section by section, registration, menu/cross-links, tests, checklist — written against the delivered API, which is the reference where the sketches in §4 differ); `ai/context.md` (viewers + viewscope rows, `member_status_log` store/model rows, menu note, Recent Work section); `docs/docs_index.md` Data Viewers section; `docs/audit_logging_plan.md` and `docs/localstorage.md` brought in line with the Audit Log viewer. | ¼ day |
 
 V1–V4 deliver the Survey Events log (≈3½ days, versus ≈2 days standalone);
 V5 is the validation step and first payback; each later viewer is ≈½ day.
 
-## 8. Decisions to confirm
+## 8. Decisions (resolved)
 
-1. Framework first (this plan) vs. standalone Survey Events now and extract
-   later — the difference is ≈1½ days up front.
-2. Port Audit Log as the second viewer (recommended) or pick another.
-3. Survey Events data decisions carried over from
-   `docs/member-status-api/plan.md` §8.6: log rejected-but-authenticated
-   requests (recommended), 400-day retention, provider-developer access via
-   an analyst account against a test group, names shown to analysts as in
-   the Members Report.
-4. Menu placement: per-viewer entries only (recommended) or also a "Data
-   Views" index entry.
+1. Framework first — built as this plan describes (V1–V2), then Survey
+   Events on it (V3–V4).
+2. Audit Log ported as the second viewer (V5); the standalone feature is
+   deleted and `/audit` redirects.
+3. Survey Events data: rejected-but-authenticated requests are logged
+   (unauthenticated failures and pings are not); 400-day TTL; the
+   provider's developer can be given an analyst account against a test
+   group; analysts see student names, as in the Members Report.
+4. Menu placement: per-viewer entries in each role's menu block; `/views`
+   exists as an index but has no menu entry.
