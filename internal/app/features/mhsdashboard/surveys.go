@@ -89,7 +89,9 @@ func (h *Handler) loadSurveyCells(ctx context.Context, wsID primitive.ObjectID, 
 		docs := byUser[hex]
 		cells := make([]SurveyCell, 0, len(h.SurveyConfig.Items))
 		for _, item := range h.SurveyConfig.Items {
-			cells = append(cells, buildSurveyCell(item, findSurveyDoc(docs, item), loc, m.FullName))
+			cell := buildSurveyCell(item, findSurveyDoc(docs, item), loc, m.FullName)
+			cell.UserID = hex
+			cells = append(cells, cell)
 		}
 		out[hex] = cells
 	}

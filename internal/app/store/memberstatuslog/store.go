@@ -90,7 +90,8 @@ type ListQuery struct {
 	StateSent string    // normalized state as sent (opened/started/completed)
 	Outcome   string    // OutcomeAccepted, OutcomeRejected, or a specific error code
 	UserID    *primitive.ObjectID
-	RawUserID string // request.user_id exactly as sent (finds unresolved ids too)
+	UserIDs   []primitive.ObjectID // resolved.user_id ∈ (e.g. from a name search); empty slice matches nothing
+	RawUserID string               // request.user_id exactly as sent (finds unresolved ids too)
 	EventID   *primitive.ObjectID
 
 	After *Position
@@ -137,6 +138,9 @@ func (q ListQuery) filter() bson.M {
 	}
 	if q.UserID != nil {
 		f["resolved.user_id"] = *q.UserID
+	}
+	if q.UserIDs != nil {
+		f["resolved.user_id"] = bson.M{"$in": q.UserIDs}
 	}
 	if q.RawUserID != "" {
 		f["request.user_id"] = q.RawUserID

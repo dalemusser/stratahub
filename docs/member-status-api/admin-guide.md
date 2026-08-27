@@ -136,7 +136,36 @@ validate JSON before deploying.
 
 ---
 
-## 5. Troubleshooting
+## 5. Check that events arrived: the Survey Events view
+
+Menu → **Survey Events** (admins, coordinators, leaders, and analysts; also
+linked from the Surveys tab's legend, from a survey's status modal, and from
+the Settings page). It lists every event StrataHub received, newest first —
+each provider request, accepted or rejected, and each survey link a student
+opened — so you (or the provider's developer, with an analyst login) can
+confirm an event arrived, was stored, and carried the right content.
+
+- **Filters:** received time (last hour / 24 h / 7 d / 30 d / custom), source
+  (provider or launch), survey, state sent, result (accepted, rejected, or a
+  specific error), student (name or 24-character id), event id, and — for
+  roles that span several — organization and group. The address bar follows
+  the filters, so a view can be bookmarked or pasted to someone.
+- **Rows:** received time (in the student's organization time zone), source,
+  student, survey (unrecognized names are flagged), the state as sent, and
+  the result — the student's resulting status when accepted, or the error
+  code when rejected.
+- **▸ Details:** everything stored for that event, including the request
+  exactly as it arrived and the stored record as JSON. This is the "is it
+  what I sent?" view; the `event_id` at the top matches the one the API
+  returned to the provider.
+- **Live:** tick the box to refresh every 10 seconds while watching a test
+  send arrive. **Export CSV** downloads the current filter.
+- You see only what your role may: leaders their groups' students,
+  coordinators their organizations, admins and analysts the whole workspace.
+  Rejected events with no matching student are visible to admins and
+  analysts only.
+
+## 6. Troubleshooting
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|

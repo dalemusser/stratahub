@@ -41,6 +41,7 @@ import (
 	uploadcsvfeature "github.com/dalemusser/stratahub/internal/app/features/uploadcsv"
 	userinfofeature "github.com/dalemusser/stratahub/internal/app/features/userinfo"
 	viewersfeature "github.com/dalemusser/stratahub/internal/app/features/viewers"
+	"github.com/dalemusser/stratahub/internal/app/features/viewers/views"
 	workspacesfeature "github.com/dalemusser/stratahub/internal/app/features/workspaces"
 	"github.com/dalemusser/stratahub/internal/app/loginactions"
 	appresources "github.com/dalemusser/stratahub/internal/app/resources"
@@ -621,6 +622,11 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		// Data viewers: role-gated, scoped, filterable lists (docs/viewers/plan.md).
 		// Viewers are registered here; each applies its own role gate.
 		viewerRegistry := viewersfeature.NewRegistry()
+		if surveyEvents, err := views.NewSurveyEvents(deps.StrataHubMongoDatabase); err != nil {
+			logger.Error("survey events viewer unavailable", zap.Error(err))
+		} else {
+			viewerRegistry.Register(surveyEvents)
+		}
 		viewersHandler := viewersfeature.NewHandler(deps.StrataHubMongoDatabase, viewerRegistry, errLog, logger)
 		wsr.Mount("/views", viewersfeature.Routes(viewersHandler, sessionMgr))
 	})

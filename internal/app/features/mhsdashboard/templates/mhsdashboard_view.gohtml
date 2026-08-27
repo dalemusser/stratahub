@@ -858,6 +858,7 @@
         <span class="mhs-survey-cell mhs-survey-completed mhs-survey-legend"><span class="mhs-survey-glyph">✓</span> Completed</span>
       </div>
       <span class="text-slate-400">Click a cell for dates and details</span>
+      <a href="/views/survey-events" class="ml-auto text-indigo-600 dark:text-indigo-400 hover:underline whitespace-nowrap" title="Every survey event received, newest first">Event log &rarr;</a>
     </div>
     {{ end }}
     <!-- Maps Legend -->
@@ -977,6 +978,7 @@
       <div id="mhs-survey-modal-timeline" class="space-y-2 text-sm"></div>
     </div>
     <p id="mhs-survey-modal-source" class="mt-4 text-xs text-slate-400"></p>
+    <p class="mt-2 text-xs"><a id="mhs-survey-modal-events" href="/views/survey-events" class="text-indigo-600 dark:text-indigo-400 hover:underline">View this student's survey events &rarr;</a></p>
   </div>
 </div>
 
@@ -2097,6 +2099,11 @@
       empty.className = 'text-slate-500';
       empty.textContent = 'No activity recorded for this survey yet.';
       timeline.appendChild(empty);
+    }
+
+    var eventsLink = document.getElementById('mhs-survey-modal-events');
+    if (eventsLink) {
+      eventsLink.href = '/views/survey-events?when=' + (d.userId ? '&student=' + encodeURIComponent(d.userId) : '');
     }
 
     var source = document.getElementById('mhs-survey-modal-source');

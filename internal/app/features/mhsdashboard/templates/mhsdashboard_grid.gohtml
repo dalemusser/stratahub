@@ -270,7 +270,7 @@
                   data-survey-description="{{ .Description }}"
                   data-state="{{ .State }}" data-label="{{ .Label }}" data-glyph="{{ .Glyph }}"
                   data-opened-at="{{ .OpenedAt }}" data-started-at="{{ .StartedAt }}" data-completed-at="{{ .CompletedAt }}"
-                  data-source="{{ .Source }}">
+                  data-source="{{ .Source }}" data-user-id="{{ .UserID }}">
             <span class="mhs-survey-glyph" aria-hidden="true">{{ .Glyph }}</span>
             <span class="mhs-survey-label">{{ .Label }}</span>
             {{ if .ShortDate }}<span class="mhs-survey-date">&middot; {{ .ShortDate }}</span>{{ end }}

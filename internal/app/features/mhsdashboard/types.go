@@ -121,6 +121,7 @@ type SurveyCell struct {
 	ShortName   string
 	Description string
 	StudentName string
+	UserID      string // member's hex id (links to the Survey Events view)
 
 	State     string // models.MemberStatusNotStarted / Opened / Started / Completed
 	Label     string // "Not started" / "Opened" / "Started" / "Completed"

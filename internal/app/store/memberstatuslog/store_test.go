@@ -152,6 +152,8 @@ func TestListFiltersAndPaging(t *testing.T) {
 		"specific error":    {memberstatuslog.ListQuery{Outcome: "unknown_user"}, "-unknown_user"},
 		"other error":       {memberstatuslog.ListQuery{Outcome: "invalid_state"}, ""},
 		"user bob":          {memberstatuslog.ListQuery{UserID: &bob}, "pre"},
+		"user ids":          {memberstatuslog.ListQuery{UserIDs: []primitive.ObjectID{bob, alice}}, "pre,mhs,pre,name:mid survey,post"},
+		"user ids empty":    {memberstatuslog.ListQuery{UserIDs: []primitive.ObjectID{}}, ""},
 		"raw user id":       {memberstatuslog.ListQuery{RawUserID: "0123456789abcdef01234567"}, "-unknown_user"},
 		"event id":          {memberstatuslog.ListQuery{EventID: &ids[1]}, "mhs"},
 		"last 7 days":       {memberstatuslog.ListQuery{From: now.Add(-7 * 24 * time.Hour)}, "pre,mhs,pre,-unknown_user,name:mid survey"},
