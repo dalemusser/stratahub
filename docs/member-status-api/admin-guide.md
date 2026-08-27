@@ -149,4 +149,7 @@ validate JSON before deploying.
 | The server log shows `member status recorded for unrecognized entity name` | Provider sent a name not in the configuration | Same as above — add the alias |
 
 Every accepted event is logged (workspace, student id, survey key, state, and
-the provider's IP address); the shared key is never logged.
+the provider's IP address). Rejected `unknown_user` requests are logged as
+warnings (`member status: unknown user`) with the reason — no such id, member
+in a different workspace, or member not active — which the provider's uniform
+404 does not reveal. The shared key is never logged.

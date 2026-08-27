@@ -141,20 +141,37 @@ func (h *Handler) HandleStatus(w http.ResponseWriter, r *http.Request) {
 
 	// --- The member must exist, be active, and belong to this workspace ---
 
+	// Unknown users are logged at Warn (with the reason, which the uniform
+	// 404 deliberately omits) so a stream of them from the provider is
+	// visible on the StrataHub side, not only on theirs.
+	unknownUser := func(reason string) {
+		h.Log.Warn("member status: unknown user",
+			zap.String("reason", reason),
+			zap.String("workspace_id", ws.ID.Hex()),
+			zap.String("user_id", userID.Hex()),
+			zap.String("entity", entity),
+			zap.String("state", state),
+			zap.String("remote_ip", ratelimit.ClientIP(r)))
+		writeError(w, http.StatusNotFound, errUnknownUser, "No active member with that user_id in this workspace.")
+	}
+
 	user, err := h.Users.GetMemberByID(ctx, userID)
 	switch {
 	case errors.Is(err, mongo.ErrNoDocuments):
-		writeError(w, http.StatusNotFound, errUnknownUser, "No active member with that user_id in this workspace.")
+		unknownUser("no member with this id")
 		return
 	case err != nil:
 		h.Log.Error("member status: user lookup failed", zap.Error(err))
 		writeError(w, http.StatusInternalServerError, errServer, "Lookup failed; please retry.")
 		return
 	}
-	if user.WorkspaceID == nil || *user.WorkspaceID != ws.ID ||
-		(user.Status != "" && user.Status != status.Active) {
+	switch {
+	case user.WorkspaceID == nil || *user.WorkspaceID != ws.ID:
 		// Same response as not-found: don't reveal that the id exists elsewhere.
-		writeError(w, http.StatusNotFound, errUnknownUser, "No active member with that user_id in this workspace.")
+		unknownUser("member belongs to a different workspace")
+		return
+	case user.Status != "" && user.Status != status.Active:
+		unknownUser("member is not active")
 		return
 	}
 
