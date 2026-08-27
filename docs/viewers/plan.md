@@ -230,7 +230,7 @@ Mapped onto the framework (full data design in
 
 | Task | Scope | Effort |
 |------|-------|--------|
-| V1 | `viewscope`: `Scope`, `Resolve`, filters; tests per role | ½ day |
+| V1 ✅ (2026-08-26) | `viewscope`: `Scope`, `Resolve`, filters; tests per role. Delivered as `internal/app/system/viewscope`: `Resolve(ctx, db, r, Options{OrgID, GroupID})` → `*Scope`; one `Filter(ctx, orgField, userField)` that picks the right constraint for the role (org `$in` for coordinators/org selections, member-id `$in` for leaders/group selections, match-nothing for an empty reach, nil when unrestricted); `UserIDs` (cached), `Orgs`/`Groups` option lists, `ErrForbidden`/`ErrNoWorkspace`/`ErrOutOfScope`. Coordinators are scoped to assigned orgs (as Activity does; the MHS Dashboard currently shows coordinators every group — a discrepancy to reconcile when it adopts `viewscope`). Leaders' inactive groups are excluded, matching the dashboards. | ½ day |
 | V2 | `viewers` feature: registry, interface, filter specs + parsing + URL state, cursor paging, routes, page/table/detail/index templates (light/dark), Live toggle, CSV streaming; render test; handler tests (role gate, scope on detail/export) | 1½ days |
 | V3 | Survey Events data: `member_status_log` model/store/indexes/TTL; API and launch-hook writers; `event_id` in API responses; tests; provider + admin guide updates | 1 day |
 | V4 | Survey Events viewer on the framework; menu entries + cross-links; tests | ½ day |
