@@ -1,0 +1,30 @@
+{{/* viewers_detail: one row's expanded detail, inserted after its table row. */}}
+{{ define "viewers_detail" }}
+<tr class="viewer-detail bg-gray-50 dark:bg-gray-900/40 border-b border-gray-200 dark:border-gray-700">
+  <td colspan="{{ .ColSpan }}" class="px-4 py-3">
+    <div class="flex items-start justify-between gap-4">
+      <div>
+        {{ if .Detail.Title }}<div class="font-semibold text-gray-800 dark:text-gray-100">{{ .Detail.Title }}</div>{{ end }}
+        {{ if .Detail.Subtitle }}<div class="text-xs text-gray-500 dark:text-gray-400">{{ .Detail.Subtitle }}</div>{{ end }}
+      </div>
+      <button type="button" aria-label="Close" onclick="this.closest('tr').remove()"
+              class="text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 text-lg leading-none">&times;</button>
+    </div>
+    {{ if .Detail.Fields }}
+    <dl class="mt-2 grid gap-x-4 gap-y-1 text-sm" style="grid-template-columns: max-content 1fr;">
+      {{ range .Detail.Fields }}
+      <dt class="text-gray-500 dark:text-gray-400 whitespace-nowrap">{{ .Label }}</dt>
+      <dd class="text-gray-800 dark:text-gray-100 break-all {{ if .Mono }}font-mono text-xs{{ end }}">{{ .Value }}</dd>
+      {{ end }}
+    </dl>
+    {{ end }}
+    {{ if .Detail.HTML }}<div class="mt-2">{{ .Detail.HTML }}</div>{{ end }}
+    {{ if .Detail.RawJSON }}
+    <details class="mt-3">
+      <summary class="text-xs text-gray-500 dark:text-gray-400 cursor-pointer select-none">Stored record (JSON)</summary>
+      <pre class="mt-1 text-xs font-mono bg-white dark:bg-gray-900 border dark:border-gray-700 rounded p-2 overflow-auto max-h-80 text-gray-800 dark:text-gray-200">{{ .Detail.RawJSON }}</pre>
+    </details>
+    {{ end }}
+  </td>
+</tr>
+{{ end }}

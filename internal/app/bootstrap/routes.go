@@ -40,6 +40,7 @@ import (
 	systemusersfeature "github.com/dalemusser/stratahub/internal/app/features/systemusers"
 	uploadcsvfeature "github.com/dalemusser/stratahub/internal/app/features/uploadcsv"
 	userinfofeature "github.com/dalemusser/stratahub/internal/app/features/userinfo"
+	viewersfeature "github.com/dalemusser/stratahub/internal/app/features/viewers"
 	workspacesfeature "github.com/dalemusser/stratahub/internal/app/features/workspaces"
 	"github.com/dalemusser/stratahub/internal/app/loginactions"
 	appresources "github.com/dalemusser/stratahub/internal/app/resources"
@@ -616,6 +617,12 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 
 		// User-facing announcements view (authenticated users)
 		wsr.Mount("/my-announcements", announcementsfeature.ViewRoutes(announcementsHandler, sessionMgr))
+
+		// Data viewers: role-gated, scoped, filterable lists (docs/viewers/plan.md).
+		// Viewers are registered here; each applies its own role gate.
+		viewerRegistry := viewersfeature.NewRegistry()
+		viewersHandler := viewersfeature.NewHandler(deps.StrataHubMongoDatabase, viewerRegistry, errLog, logger)
+		wsr.Mount("/views", viewersfeature.Routes(viewersHandler, sessionMgr))
 	})
 
 	// System status page (admin only - no workspace required)

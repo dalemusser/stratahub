@@ -1,0 +1,146 @@
+{{ define "viewers_page" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="mb-3 flex flex-wrap items-start justify-between gap-3">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-1">{{ .Title }}</h1>
+    {{ if .Description }}<p class="text-sm text-gray-500 dark:text-gray-400">{{ .Description }}</p>{{ end }}
+  </div>
+  <div class="flex items-center gap-2">
+    <a href="/views" class="text-sm px-2 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">All views</a>
+    <a id="viewer-export" href="{{ .ExportURL }}" class="text-sm px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700">Export CSV</a>
+  </div>
+</div>
+
+{{ if .Chips }}
+<div id="viewer-chips" class="flex flex-wrap gap-2 mb-3">
+  {{ range .Chips }}
+  <div class="px-3 py-1.5 rounded bg-white dark:bg-gray-800 shadow text-sm">
+    <span class="text-gray-500 dark:text-gray-400">{{ .Label }}</span>
+    <span class="ml-1 font-semibold text-gray-800 dark:text-gray-100 {{ .Class }}">{{ .Value }}</span>
+  </div>
+  {{ end }}
+</div>
+{{ end }}
+
+<!-- Filter bar: any change re-fetches the table; the server keeps the address bar in step (HX-Replace-Url). -->
+<form id="viewer-filters"
+      hx-get="{{ .TableURL }}"
+      hx-target="#viewer-table"
+      hx-swap="innerHTML"
+      hx-trigger="change, keyup changed delay:300ms, submit"
+      onsubmit="return false"
+      class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-2 flex flex-wrap items-end gap-3">
+
+  {{ if .ShowOrg }}
+  <div class="flex flex-col gap-1">
+    <label for="viewer-org" class="text-xs text-gray-600 dark:text-gray-400">Organization</label>
+    <select id="viewer-org" name="org"
+            class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+      <option value="">All organizations</option>
+      {{ range .Orgs }}<option value="{{ .Value }}" {{ if .Selected }}selected{{ end }}>{{ .Label }}</option>{{ end }}
+    </select>
+  </div>
+  {{ end }}
+
+  {{ if .ShowGroup }}
+  <div class="flex flex-col gap-1">
+    <label for="viewer-group" class="text-xs text-gray-600 dark:text-gray-400">Group</label>
+    <select id="viewer-group" name="group"
+            class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+      <option value="">All groups</option>
+      {{ range .Groups }}<option value="{{ .Value }}" {{ if .Selected }}selected{{ end }}>{{ .Label }}</option>{{ end }}
+    </select>
+  </div>
+  {{ end }}
+
+  {{ range .Filters }}
+  <div class="flex flex-col gap-1">
+    <label for="viewer-f-{{ .Key }}" class="text-xs text-gray-600 dark:text-gray-400">{{ .Label }}</label>
+    {{ if eq .Type "select" }}
+    <select id="viewer-f-{{ .Key }}" name="{{ .Key }}"
+            class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+      <option value="">Any</option>
+      {{ range .Options }}<option value="{{ .Value }}" {{ if .Selected }}selected{{ end }}>{{ .Label }}</option>{{ end }}
+    </select>
+    {{ else if eq .Type "daterange" }}
+    <div class="flex items-center gap-2">
+      <select id="viewer-f-{{ .Key }}" name="{{ .Key }}"
+              onchange="viewerToggleCustom(this)"
+              class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+        {{ range .Options }}<option value="{{ .Value }}" {{ if .Selected }}selected{{ end }}>{{ .Label }}</option>{{ end }}
+      </select>
+      <span class="viewer-custom-range {{ if not .IsCustom }}hidden{{ end }} flex items-center gap-1">
+        <input type="datetime-local" name="{{ .Key }}_from" value="{{ .From }}" title="From (UTC)"
+               class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+        <span class="text-xs text-gray-500 dark:text-gray-400">to</span>
+        <input type="datetime-local" name="{{ .Key }}_to" value="{{ .To }}" title="To (UTC)"
+               class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
+      </span>
+    </div>
+    {{ else }}
+    <input id="viewer-f-{{ .Key }}" type="text" name="{{ .Key }}" value="{{ .Value }}" placeholder="{{ .Placeholder }}"
+           autocomplete="off" spellcheck="false"
+           class="text-sm border border-gray-300 dark:border-gray-600 rounded px-2 py-1.5 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 {{ if eq .Type "id" }}font-mono w-64{{ else }}w-48{{ end }}">
+    {{ end }}
+  </div>
+  {{ end }}
+
+  <div class="flex items-center gap-3 ml-auto">
+    {{ if .LiveSeconds }}
+    <label class="flex items-center gap-1.5 text-sm text-gray-700 dark:text-gray-300" title="Refresh every {{ .LiveSeconds }} seconds">
+      <input id="viewer-live" type="checkbox" name="live" value="1" {{ if .Live }}checked{{ end }}
+             class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+      Live
+    </label>
+    {{ end }}
+    <button type="button" onclick="viewerReset()"
+            class="text-sm px-2 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">Reset</button>
+  </div>
+</form>
+
+<!-- The table. Live mode polls the same URL with the form's values while the Live box is checked. -->
+<div id="viewer-table"
+     {{ if .LiveSeconds }}
+     hx-get="{{ .TableURL }}"
+     hx-include="#viewer-filters"
+     hx-trigger="every {{ .LiveSeconds }}s [document.getElementById('viewer-live') && document.getElementById('viewer-live').checked]"
+     hx-swap="innerHTML"
+     {{ end }}>
+  {{ template "viewers_table" .Table }}
+</div>
+
+<script>
+  // Show the custom from/to inputs only for the "Custom" preset.
+  function viewerToggleCustom(sel) {
+    var span = sel.parentElement.querySelector('.viewer-custom-range');
+    if (span) span.classList.toggle('hidden', sel.value !== 'custom');
+  }
+  // Clear every filter and reload the table.
+  function viewerReset() {
+    var form = document.getElementById('viewer-filters');
+    form.querySelectorAll('input[type=text], input[type=datetime-local]').forEach(function (i) { i.value = ''; });
+    form.querySelectorAll('select').forEach(function (s) { s.value = ''; viewerToggleCustom(s); });
+    htmx.trigger(form, 'submit');
+  }
+  // Expander: a second click on an open row closes it instead of re-fetching.
+  function viewerToggleDetail(btn) {
+    var tr = btn.closest('tr');
+    var next = tr && tr.nextElementSibling;
+    if (next && next.classList.contains('viewer-detail')) { next.remove(); return true; }
+    return false;
+  }
+  // Keep the Export link on the current filters.
+  document.body.addEventListener('htmx:afterSettle', function (e) {
+    if (!e.detail || !e.detail.xhr) return;
+    var replaced = e.detail.xhr.getResponseHeader('HX-Replace-Url');
+    if (replaced) {
+      var q = replaced.indexOf('?') >= 0 ? replaced.slice(replaced.indexOf('?')) : '';
+      var a = document.getElementById('viewer-export');
+      if (a) a.href = a.href.split('?')[0] + q;
+    }
+  });
+</script>
+{{ end }}

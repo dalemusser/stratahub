@@ -1,0 +1,25 @@
+{{ define "viewers_index" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="mb-4">
+  <h1 class="text-2xl font-bold text-gray-800 dark:text-gray-200 mb-1">📄 Data Views</h1>
+  <p class="text-sm text-gray-500 dark:text-gray-400">Event and data lists available to you.</p>
+</div>
+
+{{ if .Viewers }}
+<div class="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+  {{ range .Viewers }}
+  <a href="/views/{{ .Slug }}" class="block bg-white dark:bg-gray-800 rounded shadow p-4 hover:shadow-md hover:bg-gray-50 dark:hover:bg-gray-700">
+    <div class="font-semibold text-gray-800 dark:text-gray-100">{{ .Title }}</div>
+    <div class="text-sm text-gray-500 dark:text-gray-400 mt-1">{{ .Description }}</div>
+  </a>
+  {{ end }}
+</div>
+{{ else }}
+<div class="bg-white dark:bg-gray-800 rounded shadow p-6 text-gray-500 dark:text-gray-400">
+  No data views are available for your role.
+</div>
+{{ end }}
+{{ end }}

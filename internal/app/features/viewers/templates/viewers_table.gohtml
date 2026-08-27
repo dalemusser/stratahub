@@ -1,0 +1,68 @@
+{{/* viewers_table: the whole table (filter change / initial render). */}}
+{{ define "viewers_table" }}
+{{ if .Error }}
+<div class="p-4 rounded border border-red-300 dark:border-red-700 bg-red-50 dark:bg-red-900/30 text-red-700 dark:text-red-300 text-sm">{{ .Error }}</div>
+{{ else }}
+{{ if .Total }}<div class="text-xs text-gray-500 dark:text-gray-400 mb-1">{{ .Total }} matching</div>{{ end }}
+<div class="bg-white dark:bg-gray-800 rounded shadow overflow-auto" style="max-height: calc(100vh - 17rem); min-height: 8rem;">
+  <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+    <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs sticky top-0 z-10">
+      <tr class="border-b border-gray-300 dark:border-gray-600">
+        {{ range .Columns }}<th class="px-3 py-2 whitespace-nowrap {{ .Class }}">{{ .Label }}</th>{{ end }}
+        <th class="px-2 py-2 w-8"></th>
+      </tr>
+    </thead>
+    <tbody id="viewer-rows">
+      {{ template "viewers_rows" . }}
+    </tbody>
+  </table>
+</div>
+{{ end }}
+{{ end }}
+
+{{/* viewers_rows: rows plus the load-more row; also served alone for ?after= continuations,
+     where it replaces the previous load-more row (hx-swap="outerHTML"). */}}
+{{ define "viewers_rows" }}
+{{ range .Rows }}
+<tr id="viewer-row-{{ .ID }}" class="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 {{ .Class }}">
+  {{ range $i, $c := .Cells }}
+  <td class="px-3 py-1.5 align-top {{ with index $.Columns $i }}{{ .Class }}{{ if .Mono }} font-mono text-xs{{ end }}{{ end }}" {{ if $c.Title }}title="{{ $c.Title }}"{{ end }}>
+    {{- if $c.HTML -}}
+      {{ $c.HTML }}
+    {{- else if $c.Href -}}
+      <a href="{{ $c.Href }}" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ $c.Text }}</a>
+    {{- else if $c.Class -}}
+      <span class="{{ $c.Class }}">{{ $c.Text }}</span>
+    {{- else -}}
+      {{ $c.Text }}
+    {{- end -}}
+  </td>
+  {{ end }}
+  <td class="px-2 py-1.5 align-top">
+    <button type="button" aria-label="Details"
+            hx-get="/views/{{ $.Slug }}/rows/{{ .ID }}"
+            hx-target="closest tr"
+            hx-swap="afterend"
+            hx-on:htmx:before-request="if (viewerToggleDetail(this)) event.preventDefault()"
+            class="text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400">▸</button>
+  </td>
+</tr>
+{{ end }}
+{{ if .NextURL }}
+<tr id="viewer-load-more">
+  <td colspan="{{ .ColSpan }}" class="px-3 py-2 text-center">
+    <button type="button"
+            hx-get="{{ .NextURL }}"
+            hx-target="#viewer-load-more"
+            hx-swap="outerHTML"
+            class="text-sm px-3 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">Load more</button>
+  </td>
+</tr>
+{{ else if not .Rows }}
+  {{ if not .IsMore }}
+<tr>
+  <td colspan="{{ .ColSpan }}" class="p-8 text-center text-gray-500 dark:text-gray-400">No rows match the current filters.</td>
+</tr>
+  {{ end }}
+{{ end }}
+{{ end }}
