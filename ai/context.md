@@ -953,7 +953,10 @@ make css-watch
 - MHS Dashboard **Surveys** tab with per-student status pills and a detail
   modal; `Resource.TrackedEntityID` links a survey resource so a member's
   launch records "opened"
-- Docs: `docs/member-status-api/` (provider guide, admin guide, plan)
+- Docs: `docs/member-status-api/` (provider guide, admin guide, plan,
+  rollout to-do). **Status:** all code is on `main`; only the settings fix is
+  deployed. Go-live steps (deploy, set key, link resources, hand-off to Abt,
+  curl verification) are in `docs/member-status-api/rollout-todo.md`
 - Also fixed: both settings pages previously rebuilt `SiteSettings` from the
   form and blanked fields they don't carry (e.g. the active MHS collection);
   handlers now overlay the form onto the current document

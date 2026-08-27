@@ -55,6 +55,7 @@ An inbound, key-authenticated endpoint the survey provider calls when a student 
 - [Provider Guide](member-status-api/provider-guide.md) - The integration contract for the survey provider: endpoint, shared key, payload, survey names, semantics, error codes, examples
 - [Admin Guide](member-status-api/admin-guide.md) - Setting the shared key, linking survey resources for the "Opened" state, reading the Surveys tab, changing the survey list, troubleshooting
 - [Plan](member-status-api/plan.md) - Design, decisions, and task-by-task implementation record; §8 specifies the Survey Events log (first data viewer)
+- [Rollout To-Do](member-status-api/rollout-todo.md) - Operator checklist for going live: backup, deploy, set the key, link the survey resources, hand-off to the provider, end-to-end curl verification, post-go-live watch items
 
 ## Data Viewers
 
