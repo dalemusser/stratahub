@@ -252,9 +252,70 @@
 
   function getOrCreateDeviceId() {
     var key = 'mhs-device-id';
-    var id = localStorage.getItem(key);
-    if (!id) { id = crypto.randomUUID(); localStorage.setItem(key, id); }
+    var id = null;
+    try { id = localStorage.getItem(key); } catch (e) {}
+    if (!id) {
+      id = newDeviceId();
+      try { localStorage.setItem(key, id); } catch (e) {}
+    }
     return id;
+  }
+
+  // crypto.randomUUID needs Chrome 92+; aged Chromebooks are exactly the
+  // devices whose telemetry we most need, so fall back to a random hex id.
+  function newDeviceId() {
+    try {
+      if (window.crypto && crypto.randomUUID) return crypto.randomUUID();
+    } catch (e) {}
+    var hex = '';
+    try {
+      var buf = new Uint8Array(16);
+      crypto.getRandomValues(buf);
+      for (var i = 0; i < buf.length; i++) hex += ('0' + buf[i].toString(16)).slice(-2);
+    } catch (e) {
+      for (var j = 0; j < 32; j++) hex += Math.floor(Math.random() * 16).toString(16);
+    }
+    return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20, 32);
+  }
+
+  // Progress wording for the hero card. Bytes and elapsed time make a
+  // slow-but-healthy download distinguishable from a frozen one; the wait
+  // text explains a quiet download and says what happens next.
+  function mhsFormatMB(bytes) {
+    return Math.round((bytes || 0) / 1048576) + ' MB';
+  }
+  function mhsFormatElapsed(ms) {
+    var s = Math.max(0, Math.round((ms || 0) / 1000));
+    var m = Math.floor(s / 60);
+    return m + ':' + (s % 60 < 10 ? '0' : '') + (s % 60);
+  }
+  function mhsProgressLabel(detail) {
+    var parts = [(detail.percent || 0) + '%'];
+    if (detail.downloadTotal) parts.push(mhsFormatMB(detail.downloaded) + ' of ' + mhsFormatMB(detail.downloadTotal));
+    if (typeof detail.elapsedMs === 'number') parts.push(mhsFormatElapsed(detail.elapsedMs));
+    return parts.join(' \u00b7 ');
+  }
+  function mhsDownloadWaitText(detail) {
+    if (detail.note) return detail.note;
+    if (!(detail.waitingMs >= 5000)) return '';
+    var text = 'No data received for ' + Math.round(detail.waitingMs / 1000) + ' s.';
+    if (typeof detail.switchInMs === 'number') {
+      var sw = Math.round(detail.switchInMs / 1000);
+      text += sw > 0 ? ' If nothing arrives in ' + sw + ' s, switching to the direct download method.' : ' Switching to the direct download method\u2026';
+    } else if (typeof detail.resumeInMs === 'number') {
+      var rs = Math.round(detail.resumeInMs / 1000);
+      text += rs > 0 ? ' Resuming automatically in ' + rs + ' s if it stays quiet.' : ' Resuming automatically\u2026';
+    }
+    return text;
+  }
+  // 'retrying' status: what went wrong, when the next automatic attempt is.
+  function mhsRetryText(detail) {
+    var secs = Math.round((detail.retryInMs || 0) / 1000);
+    var why = detail.error || 'Download interrupted.';
+    if (!/[.!?\u2026]$/.test(why)) why += '.';
+    var attempt = detail.attempt || 1;
+    return why + ' Retrying automatically ' + (secs > 0 ? 'in ' + secs + ' s' : 'now') +
+      (attempt > 1 ? ' (attempt ' + attempt + ')' : '') + '.';
   }
 
   function detectDeviceType() {
@@ -329,7 +390,9 @@
         sw_registered: !!(navigator.serviceWorker && navigator.serviceWorker.controller),
         unit_status: unitStatuses || {},
         storage_quota: 0,
-        storage_usage: 0
+        storage_usage: 0,
+        storage_persisted: null,
+        background_fetch_available: !!(manager.swRegistration && manager.swRegistration.backgroundFetch)
       };
       function send() {
         fetch('/missionhydrosci/api/device-status', {
@@ -338,13 +401,16 @@
           body: JSON.stringify(report)
         }).catch(function(e) { console.warn('Device status report failed:', e); });
       }
+      function withPersisted(next) {
+        manager.getStoragePersisted().then(function(p) { report.storage_persisted = p; next(); }).catch(next);
+      }
       if (navigator.storage && navigator.storage.estimate) {
         navigator.storage.estimate().then(function(est) {
           report.storage_quota = est.quota || 0;
           report.storage_usage = est.usage || 0;
-          send();
-        }).catch(send);
-      } else { send(); }
+          withPersisted(send);
+        }).catch(function() { withPersisted(send); });
+      } else { withPersisted(send); }
     });
   }
 
@@ -415,7 +481,12 @@
           statusEl.className = 'text-xs text-blue-600 dark:text-blue-400 ml-2';
           break;
         case 'stalled':
-          statusEl.textContent = 'Stalled or paused';
+          statusEl.textContent = 'Stalled \u2014 restarting';
+          statusEl.className = 'text-xs text-amber-600 dark:text-amber-400 ml-2';
+          break;
+        case 'retrying':
+          var rs = Math.round((detail.retryInMs || 0) / 1000);
+          statusEl.textContent = rs > 0 ? 'Retrying in ' + rs + ' s' : 'Retrying\u2026';
           statusEl.className = 'text-xs text-amber-600 dark:text-amber-400 ml-2';
           break;
         case 'error':
@@ -479,27 +550,47 @@
             break;
           case 'downloading':
             var pct2 = detail.percent || 0;
-            mainStatus.textContent = 'Downloading...';
-            mainStatus.className = 'text-sm text-blue-600 dark:text-blue-400 mt-1';
+            var waitText = mhsDownloadWaitText(detail);
+            mainStatus.textContent = waitText || 'Downloading...';
+            mainStatus.className = waitText
+              ? 'text-sm text-amber-600 dark:text-amber-400 mt-1'
+              : 'text-sm text-blue-600 dark:text-blue-400 mt-1';
             if (mainProgressWrap) mainProgressWrap.classList.remove('hidden');
             if (mainProgressBar) mainProgressBar.style.width = pct2 + '%';
-            if (mainProgressText) mainProgressText.textContent = pct2 + '%';
+            if (mainProgressText) mainProgressText.textContent = mhsProgressLabel(detail);
             if (mainDownloadBtn) mainDownloadBtn.classList.add('hidden');
             if (mainPlayBtn) mainPlayBtn.classList.add('hidden');
             break;
           case 'stalled':
-            mainStatus.textContent = 'Download stalled or paused — if the browser shows a "Paused" download notification, choose Resume there; or press Retry to restart.';
+            mainStatus.textContent = 'Download stalled \u2014 restarting automatically\u2026';
             mainStatus.className = 'text-sm text-amber-600 dark:text-amber-400 mt-1';
             // Keep the progress bar visible — the download is still running
             if (mainProgressWrap) mainProgressWrap.classList.remove('hidden');
-            if (mainDownloadBtn) { mainDownloadBtn.classList.remove('hidden'); mainDownloadBtn.disabled = false; mainDownloadBtn.textContent = 'Retry'; }
+            if (mainDownloadBtn) { mainDownloadBtn.classList.remove('hidden'); mainDownloadBtn.disabled = false; mainDownloadBtn.textContent = 'Retry now'; }
+            if (mainPlayBtn) mainPlayBtn.classList.add('hidden');
+            break;
+          case 'retrying':
+            // Automatic retry pending: say why, count down, keep the bar where
+            // it was, and offer to skip the wait.
+            mainStatus.textContent = mhsRetryText(detail);
+            mainStatus.className = 'text-sm text-amber-600 dark:text-amber-400 mt-1';
+            if (mainProgressWrap) {
+              if (detail.downloadTotal) {
+                mainProgressWrap.classList.remove('hidden');
+                if (mainProgressBar) mainProgressBar.style.width = (detail.percent || 0) + '%';
+                if (mainProgressText) mainProgressText.textContent = mhsProgressLabel(detail);
+              } else {
+                mainProgressWrap.classList.add('hidden');
+              }
+            }
+            if (mainDownloadBtn) { mainDownloadBtn.classList.remove('hidden'); mainDownloadBtn.disabled = false; mainDownloadBtn.textContent = 'Retry now'; }
             if (mainPlayBtn) mainPlayBtn.classList.add('hidden');
             break;
           case 'error':
             mainStatus.textContent = detail.error || 'Download failed';
             mainStatus.className = 'text-sm text-red-600 dark:text-red-400 mt-1';
             if (mainProgressWrap) mainProgressWrap.classList.add('hidden');
-            if (mainDownloadBtn) { mainDownloadBtn.classList.remove('hidden'); mainDownloadBtn.disabled = false; mainDownloadBtn.textContent = 'Retry'; }
+            if (mainDownloadBtn) { mainDownloadBtn.classList.remove('hidden'); mainDownloadBtn.disabled = false; mainDownloadBtn.textContent = 'Retry now'; }
             if (mainPlayBtn) mainPlayBtn.classList.add('hidden');
             break;
         }
@@ -531,7 +622,13 @@
             nextStatusEl.className = 'text-center text-xs text-gray-400 dark:text-gray-500 mt-3';
             break;
           case 'stalled':
-            nextStatusEl.textContent = (unitTitles[nextUnit] || 'Next unit') + ' download stalled';
+            nextStatusEl.textContent = (unitTitles[nextUnit] || 'Next unit') + ' download stalled \u2014 restarting';
+            nextStatusEl.className = 'text-center text-xs text-amber-600 dark:text-amber-400 mt-3';
+            break;
+          case 'retrying':
+            var nrs = Math.round((detail.retryInMs || 0) / 1000);
+            nextStatusEl.textContent = (unitTitles[nextUnit] || 'Next unit') + ' download interrupted \u2014 ' +
+              (nrs > 0 ? 'retrying in ' + nrs + ' s' : 'retrying\u2026');
             nextStatusEl.className = 'text-center text-xs text-amber-600 dark:text-amber-400 mt-3';
             break;
           case 'error':
@@ -578,7 +675,7 @@
     // DOM writes. Refresh eagerly on real transitions, at most every 10s
     // while downloading. Every refresh stamps the throttle so an eager
     // refresh isn't immediately followed by a redundant throttled one.
-    if (status !== 'downloading' || Date.now() - lastStorageRefresh > 10000) {
+    if ((status !== 'downloading' && status !== 'retrying') || Date.now() - lastStorageRefresh > 10000) {
       refreshStorageUI();
     }
 
@@ -617,8 +714,10 @@
       try {
         var currentStatus = cacheStatus[currentUnit];
 
-        // Current unit not cached — download it
-        if (currentStatus === 'not_cached' || currentStatus === 'partial') {
+        // Current unit not cached — download it. An undefined status means
+        // the manifest never loaded (or doesn't list the unit): downloadUnit
+        // re-fetches it and keeps retrying, with the reason on screen.
+        if (currentStatus === undefined || currentStatus === 'not_cached' || currentStatus === 'partial') {
           manager.downloadUnit(currentUnit);
         } else if (currentStatus === 'cached' && nextUnit) {
           // Current cached — auto-download the next unit if storage allows
@@ -679,6 +778,10 @@
   window.mhsDownload = function(unitId) {
     if (unitId !== currentUnit && unitId !== nextUnit) {
       addManualDownload(unitId);
+    }
+    if (cacheStatus[unitId] === 'retrying') {
+      manager.retryNow(unitId); // skip the countdown
+      return;
     }
     if (cacheStatus[unitId] === 'stalled') {
       // Retry of a stalled download: abort the stuck fetch and start over.

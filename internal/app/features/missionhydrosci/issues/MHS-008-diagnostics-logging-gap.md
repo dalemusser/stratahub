@@ -1,7 +1,7 @@
 # MHS-008 — Diagnostics gap: can't see cache inventory / failure reasons server-side
 
 **Priority:** P3
-**Status:** Documented
+**Status:** Superseded 2026-09-07 — the per-step load log shown to users (A1) and its server-side storage and viewer (A2) in `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md` deliver this; nothing further is tracked under this issue.
 
 ## Summary
 

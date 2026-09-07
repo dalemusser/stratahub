@@ -2,6 +2,9 @@
 package missionhydrosci
 
 import (
+	"net/url"
+	"strings"
+
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/store/mhsbuilds"
 	"github.com/dalemusser/stratahub/internal/app/store/mhscollections"
@@ -35,6 +38,8 @@ type Handler struct {
 	ErrLog            *uierrors.ErrorLogger
 	CDNBaseURL        string // e.g., "https://cdn.adroit.games/mhs"
 	Services          GameServices
+	Tuning            ManifestTuning  // client download timing, served with the manifest
+	Probes            []ManifestProbe // game-service reachability probes, served with the manifest
 	ProgressStore     *mhsuserprogress.Store
 	DeviceStatusStore *mhsdevicestatus.Store
 	SettingsStore     *settingsstore.Store
@@ -44,6 +49,24 @@ type Handler struct {
 	StaffAuthVerifier *staffauth.Verifier
 	UnlockStore       *staffauth.UnlockStore
 	authThrottle      *authThrottle // per-member backoff on failed member-auth attempts
+}
+
+// ProbesFromServices derives reachability probes (the services' /health
+// routes) from the configured game-service endpoints, so a client can tell a
+// blocked log or save host from a working one before a download or launch.
+// Endpoints that are unset or malformed produce no probe.
+func ProbesFromServices(s GameServices) []ManifestProbe {
+	var probes []ManifestProbe
+	add := func(name, endpoint string) {
+		u, err := url.Parse(strings.TrimSpace(endpoint))
+		if err != nil || u.Scheme == "" || u.Host == "" {
+			return
+		}
+		probes = append(probes, ManifestProbe{Name: name, URL: u.Scheme + "://" + u.Host + "/health"})
+	}
+	add("log", s.LogSubmitURL)
+	add("save", s.StateSaveURL)
+	return probes
 }
 
 // NewHandler constructs a new Handler.

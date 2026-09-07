@@ -547,15 +547,26 @@
           break;
         case 'downloading':
           var pct = detail.percent || 0;
-          statusEl.textContent = 'Downloading ' + pct + '%';
+          var waitNote = detail.note ? ' \u2014 ' + detail.note
+            : (detail.waitingMs >= 5000 ? ' \u2014 no data for ' + Math.round(detail.waitingMs / 1000) + ' s' : '');
+          statusEl.textContent = 'Downloading ' + pct + '%' + waitNote;
           statusEl.className = 'text-xs text-blue-600 dark:text-blue-400 ml-2';
           if (downloadBtn) { downloadBtn.classList.remove('hidden'); downloadBtn.disabled = true; downloadBtn.textContent = 'Downloading...'; }
           if (clearBtn) clearBtn.classList.add('hidden');
           break;
         case 'stalled':
-          statusEl.textContent = 'Stalled or paused';
+          statusEl.textContent = 'Stalled \u2014 restarting automatically';
           statusEl.className = 'text-xs text-amber-600 dark:text-amber-400 ml-2';
-          if (downloadBtn) { downloadBtn.classList.remove('hidden'); downloadBtn.disabled = false; downloadBtn.textContent = 'Retry'; }
+          if (downloadBtn) { downloadBtn.classList.remove('hidden'); downloadBtn.disabled = false; downloadBtn.textContent = 'Retry now'; }
+          if (clearBtn) clearBtn.classList.add('hidden');
+          break;
+        case 'retrying':
+          var rsecs = Math.round((detail.retryInMs || 0) / 1000);
+          statusEl.textContent = (rsecs > 0 ? 'Retrying in ' + rsecs + ' s' : 'Retrying\u2026') +
+            ((detail.attempt || 1) > 1 ? ' (attempt ' + detail.attempt + ')' : '') +
+            (detail.error ? ' \u2014 ' + detail.error : '');
+          statusEl.className = 'text-xs text-amber-600 dark:text-amber-400 ml-2';
+          if (downloadBtn) { downloadBtn.classList.remove('hidden'); downloadBtn.disabled = false; downloadBtn.textContent = 'Retry now'; }
           if (clearBtn) clearBtn.classList.add('hidden');
           break;
         case 'error':
@@ -582,7 +593,7 @@
     }
 
     // Throttled storage refresh (see the launcher's onStatus for rationale)
-    if (status !== 'downloading' || Date.now() - lastStorageRefresh > 10000) {
+    if ((status !== 'downloading' && status !== 'retrying') || Date.now() - lastStorageRefresh > 10000) {
       refreshStorageUI();
     }
 
@@ -617,7 +628,7 @@
         var currentStatus = cacheStatus[currentUnit];
 
         // Current unit not cached — download it
-        if (currentStatus === 'not_cached' || currentStatus === 'partial') {
+        if (currentStatus === undefined || currentStatus === 'not_cached' || currentStatus === 'partial') {
           manager.downloadUnit(currentUnit);
         } else if (currentStatus === 'cached' && nextUnit) {
           // Current cached — auto-download the next unit if storage allows
@@ -771,6 +782,10 @@
   window.mhsDownload = function(unitId) {
     if (unitId !== currentUnit && unitId !== nextUnit) {
       addManualDownload(unitId);
+    }
+    if (cacheStatus[unitId] === 'retrying') {
+      manager.retryNow(unitId); // skip the countdown
+      return;
     }
     if (cacheStatus[unitId] === 'stalled') {
       var retryBtn = document.getElementById('download-btn-' + unitId);

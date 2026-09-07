@@ -310,6 +310,14 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		logger,
 	)
 	missionHydroSciHandler.StaffAuthVerifier = staffAuthVerifier
+	// Client download timing + game-service reachability probes, served with
+	// the content manifest (see docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md, A0).
+	missionHydroSciHandler.Tuning = missionhydroscifeature.ManifestTuning{
+		FrozenSwitchMs:  appCfg.MHSFrozenSwitchMs,
+		FallbackStallMs: appCfg.MHSFallbackStallMs,
+		KeepaliveMs:     appCfg.MHSKeepaliveMs,
+	}
+	missionHydroSciHandler.Probes = missionhydroscifeature.ProbesFromServices(missionHydroSciHandler.Services)
 	r.Get("/sw.js", missionHydroSciHandler.ServeServiceWorker)
 	r.Get("/manifest.json", missionHydroSciHandler.ServeManifest)
 	r.Handle("/missionhydrosci/content/*", missionHydroSciHandler.ContentFallback())

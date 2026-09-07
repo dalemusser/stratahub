@@ -40,19 +40,29 @@ func (s *Store) Upsert(ctx context.Context, status models.MHSDeviceStatus) error
 			"storage_baseline_usage": status.StorageUsage,
 		},
 		"$set": bson.M{
-			"workspace_id":  status.WorkspaceID,
-			"user_id":       status.UserID,
-			"device_id":     status.DeviceID,
+			"workspace_id":   status.WorkspaceID,
+			"user_id":        status.UserID,
+			"device_id":      status.DeviceID,
 			"device_type":    status.DeviceType,
 			"device_details": status.DeviceDetails,
 			"pwa_installed":  status.PWAInstalled,
-			"sw_registered": status.SWRegistered,
-			"unit_status":   status.UnitStatus,
-			"storage_quota": status.StorageQuota,
-			"storage_usage": status.StorageUsage,
-			"last_seen":     now,
-			"updated_at":    now,
+			"sw_registered":  status.SWRegistered,
+			"unit_status":    status.UnitStatus,
+			"storage_quota":  status.StorageQuota,
+			"storage_usage":  status.StorageUsage,
+			"last_seen":      now,
+			"updated_at":     now,
 		},
+	}
+
+	// Optional diagnostics: only written when the page reported them, so an
+	// older page never clears a value a newer one recorded.
+	set := update["$set"].(bson.M)
+	if status.StoragePersisted != nil {
+		set["storage_persisted"] = *status.StoragePersisted
+	}
+	if status.BackgroundFetchAvailable != nil {
+		set["background_fetch_available"] = *status.BackgroundFetchAvailable
 	}
 
 	opts := options.Update().SetUpsert(true)

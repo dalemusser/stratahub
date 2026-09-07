@@ -104,6 +104,13 @@ type AppConfig struct {
 	// MHS Content Delivery
 	MHSCDNBaseURL string // CDN base URL for MHS game builds (e.g., "https://cdn.adroit.games/mhs")
 
+	// MHS client download timing (milliseconds). Served to the delivery JS
+	// through the content manifest so thresholds can be changed with a config
+	// edit and restart instead of a JS deploy. Zero means "client default".
+	MHSFrozenSwitchMs  int // Background Fetch quiet this long (visible tab) before switching to the direct download
+	MHSFallbackStallMs int // direct (SW) download quiet this long before one auto-resume, then Stalled
+	MHSKeepaliveMs     int // how often pages nudge the service worker to keep progress reporting alive
+
 	// MHS S3 storage (separate from materials storage — may use a different bucket/credentials)
 	MHSS3Region          string // AWS region for MHS CDN S3 bucket
 	MHSS3Bucket          string // S3 bucket name (e.g., "adroit-cdn")

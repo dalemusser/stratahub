@@ -23,6 +23,10 @@ type deviceStatusRequest struct {
 	UnitStatus    map[string]string `json:"unit_status"`
 	StorageQuota  int64             `json:"storage_quota"`
 	StorageUsage  int64             `json:"storage_usage"`
+	// Optional (older pages omit them): whether the origin's storage is
+	// persisted (MHS-005) and whether the Background Fetch API exists.
+	StoragePersisted         *bool `json:"storage_persisted"`
+	BackgroundFetchAvailable *bool `json:"background_fetch_available"`
 }
 
 // HandleDeviceStatus receives a device status report from the client.
@@ -34,7 +38,7 @@ func (h *Handler) HandleDeviceStatus(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req deviceStatusRequest
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+	if err := json.NewDecoder(io.LimitReader(r.Body, 32<<10)).Decode(&req); err != nil {
 		http.Error(w, "invalid request body", http.StatusBadRequest)
 		return
 	}
@@ -67,6 +71,9 @@ func (h *Handler) HandleDeviceStatus(w http.ResponseWriter, r *http.Request) {
 		UnitStatus:    unitStatus,
 		StorageQuota:  req.StorageQuota,
 		StorageUsage:  req.StorageUsage,
+
+		StoragePersisted:         req.StoragePersisted,
+		BackgroundFetchAvailable: req.BackgroundFetchAvailable,
 	}
 
 	if err := h.DeviceStatusStore.Upsert(r.Context(), status); err != nil {
@@ -90,6 +97,7 @@ type downloadErrorRequest struct {
 	StorageQuota int64  `json:"storage_quota"`
 	StorageUsage int64  `json:"storage_usage"`
 	UserAgent    string `json:"user_agent"`
+	Preflight    string `json:"preflight"` // one-line reachability summary, e.g. "cdn:ok 120ms; log:ok 80ms; save:FAIL timeout"
 }
 
 // HandleDownloadError records a client-side unit-download failure. It is
@@ -131,6 +139,7 @@ func (h *Handler) HandleDownloadError(w http.ResponseWriter, r *http.Request) {
 		zap.Int64("storage_usage", req.StorageUsage),
 		zap.String("message", clip(req.Message, 500)),
 		zap.String("user_agent", clip(req.UserAgent, 300)),
+		zap.String("preflight", clip(req.Preflight, 300)),
 	)
 
 	w.WriteHeader(http.StatusNoContent)

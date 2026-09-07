@@ -462,14 +462,26 @@ func (h *Handler) collectionToManifest(ctx context.Context, coll models.MHSColle
 	}
 }
 
+// attachClientConfig adds the deployment's client timing values and
+// reachability probes to a manifest response. Both are optional; zero
+// values are omitted so the client keeps its defaults.
+func (h *Handler) attachClientConfig(m *ContentManifest) {
+	if h.Tuning != (ManifestTuning{}) {
+		t := h.Tuning
+		m.Tuning = &t
+	}
+	if len(h.Probes) > 0 {
+		m.Probes = h.Probes
+	}
+}
+
 // ServeContentManifest returns the content manifest as JSON.
 func (h *Handler) ServeContentManifest(w http.ResponseWriter, r *http.Request) {
 	manifest, ok := h.resolveManifest(r)
 	if !ok {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(ContentManifest{CDNBaseURL: h.CDNBaseURL})
-		return
+		manifest = ContentManifest{CDNBaseURL: h.CDNBaseURL}
 	}
+	h.attachClientConfig(&manifest)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(manifest)

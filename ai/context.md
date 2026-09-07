@@ -925,6 +925,17 @@ make css-watch
 
 ## Recent Work Completed
 
+### Unit loading status + Unit 2 Device Test (2026-09, in progress)
+- Plan: `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md`
+  (approved 2026-09-07). A0 implemented 2026-09-07 (awaiting dev deploy +
+  device test): faster switch to the direct download path, content-server
+  and space preflights, never-give-up automatic retries with a visible
+  countdown (`retrying` status), server-tunable timings via the manifest; A1: per-step load log with Copy
+  report on the units/play/manage pages; B: standalone, account-free Unit 2
+  device test at `/missionhydrosci/devicetest` per workspace (test ids are
+  `ffffffff` + 16 random hex, never a real user id); A2: students' step logs
+  stored on failure/completion for review in a viewer
+
 ### Data Viewers Framework (2026-08)
 - `internal/app/features/viewers`: one mechanism for role-gated, scoped,
   filterable, pageable lists at `/views/{slug}` (`/table` partial,

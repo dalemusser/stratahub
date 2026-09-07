@@ -54,9 +54,17 @@
     this._stallState = {}; // unitId -> { lastProgressAt, maxDownloaded, stalled, fallback?, successSince?, successReconciled? }
     this._retryInFlight = {}; // unitId -> true while retryDownload's awaits are pending
     this._progressKeepalive = null; // interval handle for the SW attachProgress keepalive
+    this._wanted = {}; // unitId -> true while a requested download is outstanding (until 'cached' or removed)
+    this._retryAttempts = {}; // unitId -> consecutive automatic retries without new bytes (drives the backoff)
+    this._pendingRetries = {}; // unitId -> { kind, dueAt, attempt, base, timer, tick } while a retry is scheduled
+    this.preflightResult = null; // last content-server/services reachability probe (see preflight)
+    this.storagePersisted = null; // result of navigator.storage.persist() from init(); null if unavailable
   }
 
-  var PROGRESS_KEEPALIVE_MS = 20000;
+  // How often pages nudge the SW to keep progress broadcasts alive. This also
+  // bounds how long a HEALTHY download can look silent after an SW restart, so
+  // the frozen-switch window (FROZEN_SWITCH_MS) must stay comfortably above it.
+  var PROGRESS_KEEPALIVE_MS = 10000;
 
   /**
    * While any download is active, periodically asks the SW to (re)attach its
@@ -83,7 +91,7 @@
       } catch (err) {
         // Best effort
       }
-    }, PROGRESS_KEEPALIVE_MS);
+    }, this._tune('keepaliveMs', PROGRESS_KEEPALIVE_MS));
   };
 
   /**
@@ -100,6 +108,18 @@
         console.log('MHS Service Worker registered');
       } catch (err) {
         console.error('MHS SW registration failed:', err);
+      }
+    }
+
+    // Ask the browser to treat this origin's storage as durable (MHS-005).
+    // Best effort: Chrome grants it silently for installed/engaged sites and
+    // otherwise returns false; nothing prompts. The result is reported with
+    // device status so evictable-storage devices are visible server-side.
+    if (navigator.storage && navigator.storage.persist) {
+      try {
+        this.storagePersisted = await navigator.storage.persist();
+      } catch (err) {
+        this.storagePersisted = null;
       }
     }
 
@@ -139,6 +159,7 @@
         for (var i = 0; i < ids.length; i++) {
           self._stallState[ids[i]].lastProgressAt = Date.now();
         }
+        self._kickPendingRetries();      // Run any retry whose countdown expired while hidden
         self._recheckActiveDownloads(); // Clear completed BG fetches from tracking
         self.checkAllCacheStatus();      // Detect cached/not_cached for cleared units
       }
@@ -525,9 +546,21 @@
   };
 
   var PROGRESS_POLL_MS = 5000;      // how often to re-obtain a fresh registration
-  var STALL_THRESHOLD_MS = 150000;  // no byte progress for ~2.5 min (tab visible) => stalled
+  // Quiet-download windows (tab visible, no new bytes). These are defaults;
+  // the server can override any of them per deployment through the
+  // manifest's `tuning` block (see _tune) without a JS deploy.
+  var BG_STALL_MS = 150000;       // Background Fetch quiet this long => 'stalled' (the frozen-switch fires first)
+  var FALLBACK_STALL_MS = 45000;  // SW fallback loop quiet this long => restarted automatically (every time)
   var SUCCESS_BROADCAST_GRACE_MS = 45000; // BG fetch success but no 'cached' broadcast => reconcile
-  var FROZEN_SWITCH_MS = 60000; // BG fetch progress frozen this long (visible tab) => switch to fallback
+  var FROZEN_SWITCH_MS = 25000;   // BG fetch frozen this long => switch to fallback (must exceed the keepalive)
+  var PREFLIGHT_TIMEOUT_MS = 8000; // reachability probe budget per URL
+  // Automatic retry backoff (seconds) after a failure; the last value repeats
+  // forever. Downloads are never given up on: a network that is down now may
+  // be up in a minute, and nobody should have to notice that and press a
+  // button — the page shows a countdown and tries again by itself.
+  var RETRY_BACKOFF_S = [5, 10, 20, 30, 60];
+  var QUOTA_RETRY_S = 60; // out-of-space re-check interval (someone has to free space first)
+  var SPACE_HEADROOM_BYTES = 20 * 1024 * 1024; // slack on top of a unit's size for the space preflight
   var PREFER_FALLBACK_KEY = 'mhs-prefer-fallback-until'; // localStorage: skip BG fetch until this time
   MHSDeliveryManager.PREFER_FALLBACK_KEY = PREFER_FALLBACK_KEY; // exported so Reset can purge it
 
@@ -548,6 +581,262 @@
       return Date.now() < parseInt(localStorage.getItem(PREFER_FALLBACK_KEY) || '0', 10);
     } catch (err) {
       return false;
+    }
+  };
+
+  /**
+   * Returns a timing value, preferring a positive number from the manifest's
+   * `tuning` block (server-configurable per deployment) over the built-in
+   * default. Keys: frozenSwitchMs, fallbackStallMs, bgStallMs, keepaliveMs.
+   */
+  MHSDeliveryManager.prototype._tune = function(name, dflt) {
+    var t = this.manifest && this.manifest.tuning;
+    var v = t && t[name];
+    return (typeof v === 'number' && v > 0) ? v : dflt;
+  };
+
+  // One reachability probe: resolves {ok, ms, status, error}; never rejects.
+  // 'cors' mode requires a readable OK response (the CDN serves CORS headers);
+  // 'no-cors' mode treats any response, even an opaque one, as reachable,
+  // which is enough to tell "blocked by a filter" from "up".
+  function probeURL(url, mode) {
+    var started = Date.now();
+    var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var timer = controller ? setTimeout(function() { controller.abort(); }, PREFLIGHT_TIMEOUT_MS) : null;
+    var opts = { method: 'GET', mode: mode, cache: 'no-store', credentials: 'omit' };
+    if (controller) opts.signal = controller.signal;
+    return fetch(url, opts).then(function(resp) {
+      if (timer) clearTimeout(timer);
+      var ok = (mode === 'no-cors') ? true : !!resp.ok;
+      try { if (resp.body && resp.body.cancel) resp.body.cancel(); } catch (e) { /* ignore */ }
+      return { ok: ok, ms: Date.now() - started, status: resp.status || 0, error: ok ? '' : ('HTTP ' + resp.status) };
+    }).catch(function(err) {
+      if (timer) clearTimeout(timer);
+      var aborted = err && err.name === 'AbortError';
+      return { ok: false, ms: Date.now() - started, status: 0,
+        error: aborted ? ('no response within ' + Math.round(PREFLIGHT_TIMEOUT_MS / 1000) + 's') : String((err && err.message) || err) };
+    });
+  }
+
+  function hostOf(url) {
+    try { return new URL(url, window.location.href).host; } catch (e) { return url; }
+  }
+
+  // The message shown when the content server cannot be reached.
+  function cdnUnreachableMessage(host, error) {
+    return 'Cannot reach the game content server (' + host + '). A school firewall or ' +
+      'content filter may be blocking it — ask your IT staff to allow ' + host +
+      ', then tap Retry.' + (error ? ' (' + error + ')' : '');
+  }
+
+  /**
+   * Checks that the content server (and, informationally, the game services)
+   * can be reached before a download starts, so a blocked CDN fails in
+   * seconds with a specific message instead of sitting at 0% until the stall
+   * machinery gives up. Probes the unit's smallest file on the CDN (CORS, must
+   * be OK) and any `probes` the manifest lists (no-cors, reachability only).
+   * A successful CDN result is cached for the manager's lifetime; a failed one
+   * is not, so Retry re-checks. Never throws.
+   */
+  MHSDeliveryManager.prototype.preflight = async function(unit) {
+    if (this.preflightResult && this.preflightResult.cdn && this.preflightResult.cdn.ok) {
+      return this.preflightResult;
+    }
+    var result = { cdn: null, services: [], at: new Date().toISOString() };
+    var base = (this.manifest && this.manifest.cdnBaseUrl) || '';
+    if (base && unit && unit.files && unit.files.length) {
+      var smallest = unit.files[0];
+      for (var i = 1; i < unit.files.length; i++) {
+        if ((unit.files[i].size || 0) < (smallest.size || 0)) smallest = unit.files[i];
+      }
+      result.cdn = await probeURL(base + '/' + smallest.path, 'cors');
+      result.cdn.host = hostOf(base);
+    }
+    var probes = (this.manifest && this.manifest.probes) || [];
+    var checks = [];
+    for (var p = 0; p < probes.length; p++) {
+      (function(probe) {
+        checks.push(probeURL(probe.url, 'no-cors').then(function(r) {
+          return { name: probe.name, host: hostOf(probe.url), ok: r.ok, ms: r.ms, error: r.error };
+        }));
+      })(probes[p]);
+    }
+    if (checks.length) {
+      try { result.services = await Promise.all(checks); } catch (e) { /* individual probes never reject */ }
+    }
+    for (var s = 0; s < result.services.length; s++) {
+      if (!result.services[s].ok) {
+        console.warn('MHS preflight: game service "' + result.services[s].name + '" (' +
+          result.services[s].host + ') unreachable: ' + result.services[s].error);
+      }
+    }
+    this.preflightResult = result;
+    return result;
+  };
+
+  // Compact one-line summary of the last preflight for telemetry.
+  MHSDeliveryManager.prototype._preflightSummary = function() {
+    var r = this.preflightResult;
+    if (!r) return '';
+    var parts = [];
+    if (r.cdn) parts.push('cdn:' + (r.cdn.ok ? 'ok ' + r.cdn.ms + 'ms' : 'FAIL ' + r.cdn.error));
+    for (var i = 0; i < r.services.length; i++) {
+      var sv = r.services[i];
+      parts.push(sv.name + ':' + (sv.ok ? 'ok ' + sv.ms + 'ms' : 'FAIL ' + sv.error));
+    }
+    return parts.join('; ');
+  };
+
+  MHSDeliveryManager.prototype._findUnit = function(unitId) {
+    if (!this.manifest || !this.manifest.units) return null;
+    return this.manifest.units.find(function(u) { return u.id === unitId; }) || null;
+  };
+
+  // Sum of the manifest sizes of a unit's files that are not in its cache yet
+  // (all of them when nothing is cached). Cache lookups only; no network.
+  MHSDeliveryManager.prototype._missingBytes = async function(unit) {
+    var total = unit.totalSize || unit.files.reduce(function(sum, f) { return sum + f.size; }, 0);
+    if (!('caches' in window)) return total;
+    try {
+      var cache = await caches.open(this._unitCachePrefix + unit.id + '-v' + unit.version);
+      var missing = 0;
+      for (var i = 0; i < unit.files.length; i++) {
+        var match = await cache.match(this._contentPrefix + unit.files[i].path);
+        if (!match) missing += unit.files[i].size || 0;
+      }
+      return missing;
+    } catch (err) {
+      return total;
+    }
+  };
+
+  /**
+   * Per-unit space preflight (MHS-006): a download that cannot fit should
+   * wait for space, not fail part-way through a long transfer (and, on
+   * retries, not re-download a file every minute only to fail at cache.put).
+   * Compares the bytes still missing from the unit's cache with the free
+   * quota. Resolves null when no estimate exists.
+   */
+  MHSDeliveryManager.prototype._checkSpace = async function(unit) {
+    if (!(navigator.storage && navigator.storage.estimate)) return null;
+    var est;
+    try { est = await navigator.storage.estimate(); } catch (err) { return null; }
+    if (!est || !est.quota) return null;
+    var missing = await this._missingBytes(unit);
+    if (missing <= 0) return null;
+    var need = Math.round(missing * 1.05) + SPACE_HEADROOM_BYTES;
+    var free = est.quota - (est.usage || 0);
+    if (free >= need) return { ok: true, freeBytes: free, needBytes: need };
+    var mb = function(b) { return Math.round(b / 1048576); };
+    return {
+      ok: false, freeBytes: free, needBytes: need,
+      summary: 'free ' + mb(free) + 'MB < need ' + mb(need) + 'MB',
+      message: 'Not enough free space on this device: about ' + mb(free) + ' MB free, this unit still needs about ' +
+        mb(need) + ' MB. Free up space or clear other downloads — the download continues automatically once there is room.'
+    };
+  };
+
+  /**
+   * Never give up. A requested download is a standing intent: it stays
+   * "wanted" until the unit is cached or the user removes it, every failure
+   * or stall schedules the next attempt here (backoff capped at a minute,
+   * reset by real progress), and a 'retrying' status with a live countdown
+   * keeps the page honest about what is happening. The Retry button becomes
+   * "retry now": it only skips the wait (see retryNow).
+   * kind: 'error' (re-run downloadUnit after the backoff) or 'stalled'
+   * (restart at once through retryDownload, which resumes from the cache).
+   */
+  MHSDeliveryManager.prototype._scheduleRetry = function(unitId, kind, base) {
+    this._clearPendingRetry(unitId);
+    if (!this._wanted[unitId]) return;
+    var attempt = (this._retryAttempts[unitId] || 0) + 1;
+    this._retryAttempts[unitId] = attempt;
+
+    var delayS = 0;
+    if (kind !== 'stalled') {
+      delayS = RETRY_BACKOFF_S[Math.min(attempt - 1, RETRY_BACKOFF_S.length - 1)];
+      if (base.errorClass === 'quota') delayS = Math.max(delayS, QUOTA_RETRY_S);
+    }
+    // Repeated Background Fetch failures: prefer the direct path from now on.
+    // It is a different mechanism (plain fetches inside the service worker)
+    // and immune to the download-service problems that fail Background Fetch.
+    if (base.path === 'bg' && attempt >= 3) this._preferFallback(true);
+
+    var self = this;
+    var pending = { kind: kind, dueAt: Date.now() + delayS * 1000, attempt: attempt, base: base, timer: null, tick: null };
+    this._pendingRetries[unitId] = pending;
+
+    function announce(remainingMs) {
+      var d = {};
+      for (var k in base) d[k] = base[k];
+      d.local = true;
+      d.attempt = attempt;
+      d.retryInMs = Math.max(0, remainingMs);
+      self._fireStatus(unitId, 'retrying', d);
+    }
+
+    function tick() {
+      if (self._pendingRetries[unitId] !== pending) return; // superseded or canceled
+      var remaining = pending.dueAt - Date.now();
+      if (remaining > 0) {
+        announce(remaining);
+        pending.timer = setTimeout(tick, Math.min(1000, remaining));
+        return;
+      }
+      delete self._pendingRetries[unitId];
+      announce(0);
+      var run = (pending.kind === 'stalled') ? self.retryDownload(unitId) : self.downloadUnit(unitId);
+      Promise.resolve(run).catch(function(err) {
+        console.warn('Automatic retry failed to start:', err);
+      });
+    }
+    pending.tick = tick;
+    tick();
+  };
+
+  // Cancels a scheduled retry. The intent to download stays unless
+  // _forgetDownload is called as well.
+  MHSDeliveryManager.prototype._clearPendingRetry = function(unitId) {
+    var p = this._pendingRetries[unitId];
+    if (!p) return;
+    if (p.timer) clearTimeout(p.timer);
+    delete this._pendingRetries[unitId];
+  };
+
+  // Drops the standing intent to download a unit: no further automatic
+  // retries. Used when a unit is cached, deleted, or cleaned up.
+  MHSDeliveryManager.prototype._forgetDownload = function(unitId) {
+    this._clearPendingRetry(unitId);
+    delete this._wanted[unitId];
+    delete this._retryAttempts[unitId];
+  };
+
+  MHSDeliveryManager.prototype._forgetAllDownloads = function() {
+    var ids = Object.keys(this._pendingRetries).concat(Object.keys(this._wanted));
+    for (var i = 0; i < ids.length; i++) this._forgetDownload(ids[i]);
+  };
+
+  /**
+   * Runs a scheduled retry now instead of waiting out the countdown (the
+   * Retry button). With nothing scheduled it simply starts the download.
+   */
+  MHSDeliveryManager.prototype.retryNow = function(unitId) {
+    var p = this._pendingRetries[unitId];
+    this._clearPendingRetry(unitId);
+    var run = (p && p.kind === 'stalled') ? this.retryDownload(unitId) : this.downloadUnit(unitId);
+    return Promise.resolve(run).catch(function(err) { console.warn('Retry failed to start:', err); });
+  };
+
+  // Fires due retries at once when the tab becomes visible again — hidden
+  // tabs throttle timers, so a countdown may have expired unnoticed.
+  MHSDeliveryManager.prototype._kickPendingRetries = function() {
+    var ids = Object.keys(this._pendingRetries);
+    for (var i = 0; i < ids.length; i++) {
+      var p = this._pendingRetries[ids[i]];
+      if (p && p.tick) {
+        if (p.timer) clearTimeout(p.timer);
+        p.tick();
+      }
     }
   };
 
@@ -644,6 +933,7 @@
    * interval until the download is no longer tracked as active.
    */
   MHSDeliveryManager.prototype._startStallMonitor = function(unitId, extraState, tickFn) {
+    this._wanted[unitId] = true; // a tracked download (incl. one adopted after a reload) is a standing intent
     if (this._downloadMonitors[unitId]) {
       clearInterval(this._downloadMonitors[unitId]);
       delete this._downloadMonitors[unitId];
@@ -683,13 +973,36 @@
   MHSDeliveryManager.prototype._maybeFireStalled = function(unitId, unit) {
     var state = this._stallState[unitId];
     if (!state || state.stalled) return;
-    if (Date.now() - state.lastProgressAt < STALL_THRESHOLD_MS) return;
-    state.stalled = true;
+    var threshold = state.fallback
+      ? this._tune('fallbackStallMs', FALLBACK_STALL_MS)
+      : this._tune('bgStallMs', BG_STALL_MS);
+    var quietMs = Date.now() - state.lastProgressAt;
+    if (quietMs < threshold) return;
     var totalSize = unit.totalSize || unit.files.reduce(function(sum, f) { return sum + f.size; }, 0);
+    var percent = totalSize > 0 ? Math.round((state.maxDownloaded / totalSize) * 100) : 0;
+
+    // Never give up: a quiet download (SW killed mid-file, connection
+    // black-holed, a Background Fetch that could not be switched) is restarted
+    // automatically, every time. retryDownload cancels the loop without
+    // purging, so the replacement resumes from the last completed file.
+    // 'stalled' still fires for pages that listen for it; the scheduled
+    // restart follows at once (and the scheduler counts the attempts).
+    state.stalled = true;
+    var quietS = Math.round(quietMs / 1000);
     this._fireStatus(unitId, 'stalled', {
       downloaded: state.maxDownloaded,
       downloadTotal: totalSize,
-      percent: totalSize > 0 ? Math.round((state.maxDownloaded / totalSize) * 100) : 0
+      percent: percent,
+      quietMs: quietMs,
+      autoRetry: true
+    });
+    console.warn('Download quiet for ' + quietS + 's — restarting automatically:', unitId);
+    this._scheduleRetry(unitId, 'stalled', {
+      error: 'No data received for ' + quietS + ' s — restarting the download.',
+      errorClass: 'stalled',
+      downloaded: state.maxDownloaded,
+      downloadTotal: totalSize,
+      percent: percent
     });
   };
 
@@ -869,15 +1182,42 @@
     // (Background Fetch caches atomically on success), so aborting re-fetches
     // only cheap, re-downloadable bytes — far better than staying stuck.
     var noNewBytes = downloaded <= state.maxDownloaded;
+    var frozenMs = this._tune('frozenSwitchMs', FROZEN_SWITCH_MS);
+    var quietMs = Date.now() - state.lastProgressAt;
+    var unitTotal = unit.totalSize || unit.files.reduce(function(sum, f) { return sum + f.size; }, 0);
+
+    // While nothing arrives, tell the page how long it has been quiet and when
+    // the switch is due, so the wait is visible instead of a frozen "0%".
+    // `local` marks this as page-generated: it is not a liveness signal.
+    if (fresh.result === '' && noNewBytes && !state.stalled &&
+        document.visibilityState === 'visible' && quietMs >= PROGRESS_POLL_MS) {
+      this._fireStatus(unitId, 'downloading', {
+        downloaded: state.maxDownloaded,
+        downloadTotal: unitTotal,
+        percent: unitTotal > 0 ? Math.round((state.maxDownloaded / unitTotal) * 100) : 0,
+        local: true,
+        waitingMs: quietMs,
+        switchInMs: Math.max(0, frozenMs - quietMs)
+      });
+    }
+
     if (fresh.result === '' && noNewBytes &&
         document.visibilityState === 'visible' &&
-        Date.now() - state.lastProgressAt > FROZEN_SWITCH_MS) {
+        quietMs > frozenMs) {
       console.warn('Background Fetch progress frozen for ' +
-        Math.round(FROZEN_SWITCH_MS / 1000) + 's (paused) — switching to fallback download:', fetchId);
+        Math.round(frozenMs / 1000) + 's (paused) — switching to fallback download:', fetchId);
       this._preferFallback(true);
+      var frozenAt = state.maxDownloaded;
       var switched = await this._startFallbackDownload(unitId, unit); // resets the stall monitor
       if (switched) {
         try { await fresh.abort(); } catch (abortErr) { /* best effort */ }
+        this._fireStatus(unitId, 'downloading', {
+          downloaded: frozenAt,
+          downloadTotal: unitTotal,
+          percent: unitTotal > 0 ? Math.round((frozenAt / unitTotal) * 100) : 0,
+          local: true,
+          note: 'The background download stopped receiving data — switched to the direct download method. Keep this tab open until it finishes.'
+        });
         return;
       }
       // No active worker to hand off to yet — leave the paused Background Fetch
@@ -895,10 +1235,10 @@
    * Watchdog for a SW sequential fallback download (no Background Fetch
    * registration to poll). Its liveness signal is the SW's progress
    * broadcasts — at least one per second while bytes move (fed into the
-   * stall state by _fireStatus). If they go quiet for STALL_THRESHOLD_MS
+   * stall state by _fireStatus). If they go quiet for FALLBACK_STALL_MS
    * while the tab is visible (SW killed mid-download, network black hole),
-   * surface 'stalled' so the user gets the same Retry affordance as the
-   * Background Fetch path. A retry re-posts fallbackDownload and resumes
+   * resume once automatically, then surface 'stalled' so the user gets the
+   * same Retry affordance as the Background Fetch path. A retry re-posts fallbackDownload and resumes
    * from the last completed file, since partial caches are kept on failure.
    */
   MHSDeliveryManager.prototype._monitorFallbackDownload = function(unitId, unit) {
@@ -909,6 +1249,21 @@
       if (document.visibilityState === 'hidden') {
         state.lastProgressAt = Date.now();
         return;
+      }
+      // Surface the wait (and what happens next) while the loop is quiet.
+      var quietMs = Date.now() - state.lastProgressAt;
+      if (!state.stalled && quietMs >= PROGRESS_POLL_MS) {
+        var threshold = self._tune('fallbackStallMs', FALLBACK_STALL_MS);
+        var total = unit.totalSize || unit.files.reduce(function(sum, f) { return sum + f.size; }, 0);
+        var detail = {
+          downloaded: state.maxDownloaded,
+          downloadTotal: total,
+          percent: total > 0 ? Math.round((state.maxDownloaded / total) * 100) : 0,
+          local: true,
+          waitingMs: quietMs
+        };
+        detail.resumeInMs = Math.max(0, threshold - quietMs);
+        self._fireStatus(unitId, 'downloading', detail);
       }
       self._maybeFireStalled(unitId, unit);
     });
@@ -938,13 +1293,15 @@
     // Fire a terminal status on the early returns — a silent return here leaves
     // the units/manage Retry button disabled (mhsDownload disables it before
     // calling) with the unit stuck showing "Stalled".
-    if (!this.manifest) {
-      this._fireStatus(unitId, 'error', { error: 'Could not load the game list. Please check your connection and try again.' });
+    this._wanted[unitId] = true;
+    this._clearPendingRetry(unitId);
+    if (!this.manifestLoaded) {
+      this._fireStatus(unitId, 'error', { error: 'Could not load the game list. Check the connection.', errorClass: 'manifest' });
       return;
     }
-    var unit = this.manifest.units.find(function(u) { return u.id === unitId; });
+    var unit = this._findUnit(unitId);
     if (!unit) {
-      this._fireStatus(unitId, 'error', { error: 'This unit is not available in the current game version.' });
+      this._fireStatus(unitId, 'error', { error: 'This unit is not available in the current game version.', errorClass: 'unit-missing' });
       return;
     }
 
@@ -956,6 +1313,19 @@
     this._retryInFlight[unitId] = true;
 
     try {
+      // A retry after a network fix must confirm the content server is
+      // reachable before restarting anything (a failed probe is never cached).
+      var pf = await this.preflight(unit);
+      if (pf.cdn && !pf.cdn.ok) {
+        this._fireStatus(unitId, 'error', {
+          error: cdnUnreachableMessage(pf.cdn.host, pf.cdn.error),
+          errorClass: 'cdn-unreachable',
+          rawError: pf.cdn.error,
+          path: ''
+        });
+        return;
+      }
+
       try {
         var reg = await this._waitForSW(5000);
         if (reg && reg.backgroundFetch) {
@@ -1205,38 +1575,79 @@
    * API is unavailable or fails to start.
    */
   MHSDeliveryManager.prototype.downloadUnit = async function(unitId) {
-    // Both early returns MUST fire a terminal status. Callers (the play-page
-    // overlay, the units/manage pipelines) drive their UI off status events, so
-    // a silent return leaves them hanging — the overlay on "Downloading next
-    // unit..." forever, a units Retry button stuck disabled.
-    if (!this.manifest) {
-      console.error('Manifest not loaded');
-      this._fireStatus(unitId, 'error', { error: 'Could not load the game list. Please check your connection and try again.' });
-      return;
-    }
-
-    var unit = this.manifest.units.find(function(u) { return u.id === unitId; });
-    if (!unit) {
-      console.error('Unit not found:', unitId);
-      this._fireStatus(unitId, 'error', { error: 'This unit is not available in the current game version.' });
-      return;
-    }
-
-    if (!navigator.serviceWorker) {
-      this._fireStatus(unitId, 'error', { error: 'Service worker not supported.' });
-      return;
-    }
-
     // Prevent duplicate downloads — if already active, skip
     if (this._activeDownloads[unitId]) {
       return;
     }
+    // A download request is a standing intent: the unit stays wanted until
+    // it is cached or removed, and every failure below schedules a retry.
+    this._wanted[unitId] = true;
+    this._clearPendingRetry(unitId);
+
+    // Every early return MUST fire a terminal status. Callers (the play-page
+    // overlay, the units/manage pipelines) drive their UI off status events,
+    // and the retry scheduler keys off 'error' — a silent return would leave
+    // them hanging. A manifest that failed to load (or doesn't list the unit
+    // yet) is re-fetched here, so a retry after an outage picks it up.
+    var lateManifest = false;
+    if (!this.manifestLoaded || !this._findUnit(unitId)) {
+      await this.refreshManifest();
+      lateManifest = this.manifestLoaded;
+    }
+    if (!this.manifestLoaded) {
+      console.error('Manifest not loaded');
+      this._fireStatus(unitId, 'error', { error: 'Could not load the game list. Check the connection.', errorClass: 'manifest' });
+      return;
+    }
+    var unit = this._findUnit(unitId);
+    if (!unit) {
+      console.error('Unit not found:', unitId);
+      this._fireStatus(unitId, 'error', { error: 'This unit is not available in the current game version.', errorClass: 'unit-missing' });
+      return;
+    }
+
+    if (!navigator.serviceWorker) {
+      this._fireStatus(unitId, 'error', { error: 'Service worker not supported.', errorClass: 'no-sw' });
+      return;
+    }
 
     this._activeDownloads[unitId] = true;
+    // The manifest arrived late (init's own attempt had failed): refresh the
+    // other units' statuses now that they are known. This unit is skipped by
+    // checkAllCacheStatus because it is active.
+    if (lateManifest) this.checkAllCacheStatus().catch(function() {});
+
     var totalSize = unit.totalSize || unit.files.reduce(function(sum, f) { return sum + f.size; }, 0);
     this._fireStatus(unitId, 'downloading', { percent: 0, downloaded: 0, downloadTotal: totalSize });
 
     try {
+      // Fail fast and specifically when the content server is blocked, instead
+      // of starting a download that can only sit at 0% until the stall
+      // machinery gives up (school filters and security software do this).
+      // The scheduler keeps re-checking, so a filter fixed later just works.
+      var pf = await this.preflight(unit);
+      if (pf.cdn && !pf.cdn.ok) {
+        this._fireStatus(unitId, 'error', {
+          error: cdnUnreachableMessage(pf.cdn.host, pf.cdn.error),
+          errorClass: 'cdn-unreachable',
+          rawError: pf.cdn.error,
+          path: ''
+        });
+        return;
+      }
+
+      // Space preflight (MHS-006): wait for room rather than fail mid-transfer.
+      var space = await this._checkSpace(unit);
+      if (space && !space.ok) {
+        this._fireStatus(unitId, 'error', {
+          error: space.message,
+          errorClass: 'quota',
+          rawError: space.summary,
+          path: ''
+        });
+        return;
+      }
+
       var reg = await this._waitForSW(10000);
       if (!reg) {
         throw new Error('Service worker not ready. Please refresh the page and try again.');
@@ -1310,6 +1721,7 @@
    * Deletes a unit's cache and aborts any active download for it.
    */
   MHSDeliveryManager.prototype.deleteUnit = async function(unitId) {
+    this._forgetDownload(unitId); // the user removed it — stop retrying
     if (!this.manifest) return;
 
     var unit = this.manifest.units.find(function(u) { return u.id === unitId; });
@@ -1385,6 +1797,7 @@
     // and stop SW fallback loops so they can't broadcast a false 'cached'
     await this._abortAllBGFetches();
     this._cancelFallbackDownloads();
+    this._forgetAllDownloads();
 
     if ('caches' in window) {
       try {
@@ -1418,6 +1831,7 @@
     // and stop SW fallback loops so they can't broadcast a false 'cached'
     await this._abortAllBGFetches();
     this._cancelFallbackDownloads();
+    this._forgetAllDownloads();
 
     if ('caches' in window) {
       try {
@@ -1478,6 +1892,17 @@
     return null;
   };
 
+  /**
+   * Whether the origin's storage is currently persisted (not evictable).
+   * @returns {Promise<boolean|null>} null when the API is unavailable
+   */
+  MHSDeliveryManager.prototype.getStoragePersisted = async function() {
+    if (navigator.storage && navigator.storage.persisted) {
+      try { return await navigator.storage.persisted(); } catch (err) { return null; }
+    }
+    return null;
+  };
+
   // Internal: handle status updates from BroadcastChannel
   MHSDeliveryManager.prototype._handleStatusUpdate = function(data) {
     if (data && data.type === 'status') {
@@ -1507,7 +1932,9 @@
     // second while alive). For Background Fetch downloads the SW broadcasts
     // byte progress — strictly new bytes count as progress there, matching
     // the poller's monotonic/sticky rules.
-    if (status === 'downloading') {
+    // Page-generated 'downloading' statuses (detail.local: waiting countdowns,
+    // switch/resume notes) carry no new bytes and are NOT liveness signals.
+    if (status === 'downloading' && !(detail && detail.local)) {
       var dlState = this._stallState[unitId];
       if (dlState) {
         var newBytes = detail && typeof detail.downloaded === 'number' &&
@@ -1516,6 +1943,7 @@
           dlState.maxDownloaded = detail.downloaded;
           dlState.lastProgressAt = Date.now();
           dlState.stalled = false;
+          this._retryAttempts[unitId] = 0; // real progress resets the retry backoff
         } else if (dlState.fallback) {
           dlState.lastProgressAt = Date.now();
           dlState.stalled = false;
@@ -1523,9 +1951,16 @@
       }
     }
 
+    // Let pages show elapsed time beside the percentage.
+    if (status === 'downloading' && detail && this._stallState[unitId] &&
+        typeof detail.elapsedMs !== 'number') {
+      detail.elapsedMs = Date.now() - this._stallState[unitId].startedAt;
+    }
+
     // Clear active download tracking and stall monitors on terminal statuses
     if (status === 'cached' || status === 'error' || status === 'not_cached') {
       delete this._activeDownloads[unitId];
+      if (status === 'cached') this._forgetDownload(unitId); // done — no retries outstanding
       if (this._downloadMonitors[unitId]) {
         clearInterval(this._downloadMonitors[unitId]);
         delete this._downloadMonitors[unitId];
@@ -1547,6 +1982,15 @@
     // report from, covering the launcher and the manage page.
     if (status === 'error') {
       this._reportDownloadError(unitId, detail || {});
+    }
+
+    // Never give up: a failed download that is still wanted gets its next
+    // attempt scheduled (with a visible countdown) instead of a dead end.
+    if (status === 'error' && this._wanted[unitId]) {
+      var base = {};
+      var src = detail || {};
+      for (var key in src) base[key] = src[key];
+      this._scheduleRetry(unitId, 'error', base);
     }
   };
 
@@ -1577,7 +2021,8 @@
         path: detail.path || '',
         storage_quota: quota || 0,
         storage_usage: usage || 0,
-        user_agent: (navigator && navigator.userAgent) || ''
+        user_agent: (navigator && navigator.userAgent) || '',
+        preflight: self._preflightSummary().slice(0, 300)
       };
       try {
         fetch(self._downloadErrorUrl, {

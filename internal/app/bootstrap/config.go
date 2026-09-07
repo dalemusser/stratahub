@@ -83,6 +83,9 @@ var appConfigKeys = []config.AppKey{
 
 	// MHS Content Delivery
 	{Name: "mhs_cdn_base_url", Default: "", Desc: "CDN base URL for MHS game builds (e.g., https://cdn.adroit.games/mhs)"},
+	{Name: "mhs_frozen_switch_ms", Default: 25000, Desc: "Background Fetch quiet this long (ms, visible tab) before switching to the direct download"},
+	{Name: "mhs_fallback_stall_ms", Default: 45000, Desc: "Direct (SW) download quiet this long (ms, visible tab) before one auto-resume, then Stalled"},
+	{Name: "mhs_keepalive_ms", Default: 10000, Desc: "How often (ms) pages nudge the service worker to keep download progress alive"},
 
 	// MHS S3 storage (separate from materials storage — may use a different bucket/credentials)
 	{Name: "mhs_s3_region", Default: "", Desc: "AWS region for MHS CDN S3 bucket"},
@@ -199,6 +202,10 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 
 		// MHS Content Delivery
 		MHSCDNBaseURL: appValues.String("mhs_cdn_base_url"),
+
+		MHSFrozenSwitchMs:  appValues.Int("mhs_frozen_switch_ms"),
+		MHSFallbackStallMs: appValues.Int("mhs_fallback_stall_ms"),
+		MHSKeepaliveMs:     appValues.Int("mhs_keepalive_ms"),
 
 		// MHS S3 storage
 		MHSS3Region:          appValues.String("mhs_s3_region"),

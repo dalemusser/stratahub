@@ -473,7 +473,15 @@
             downloadStarted = true;
             clearStallRedirect();
             var pct = detail.percent || 0;
-            if (msg) msg.textContent = 'Downloading next unit... ' + pct + '%';
+            var waitNote = '';
+            if (detail.note) {
+              waitNote = ' \u2014 ' + detail.note;
+            } else if (detail.waitingMs >= 5000) {
+              waitNote = ' \u2014 no data for ' + Math.round(detail.waitingMs / 1000) + ' s';
+              if (typeof detail.switchInMs === 'number') waitNote += ', switching to direct download in ' + Math.round(detail.switchInMs / 1000) + ' s';
+              else if (typeof detail.resumeInMs === 'number') waitNote += ', resuming in ' + Math.round(detail.resumeInMs / 1000) + ' s';
+            }
+            if (msg) msg.textContent = 'Downloading next unit... ' + pct + '%' + waitNote;
             if (barFill) barFill.style.width = pct + '%';
             if (barText) barText.textContent = pct + '%';
           } else if (status === 'cached') {

@@ -48,13 +48,13 @@ type PlayData struct {
 
 	// Game service config (injected into __mhsBridgeConfig for new builds)
 	// Each URL is a full endpoint (e.g., "https://log.adroit.games/api/log/submit")
-	LogSubmitURL     string
-	LogAuth          string
-	StateSaveURL     string
-	StateLoadURL     string
-	SettingsSaveURL  string
-	SettingsLoadURL  string
-	SaveAuth         string
+	LogSubmitURL    string
+	LogAuth         string
+	StateSaveURL    string
+	StateLoadURL    string
+	SettingsSaveURL string
+	SettingsLoadURL string
+	SaveAuth        string
 }
 
 // OfflineData is the view model for the offline fallback page.
@@ -81,8 +81,29 @@ type ContentManifestUnit struct {
 	TotalSize       int64                 `json:"totalSize"`
 }
 
+// ManifestTuning carries the client download timing values (milliseconds)
+// the delivery JS applies in place of its built-in defaults. Served with the
+// manifest so thresholds can be adjusted per deployment without a JS deploy.
+// Zero fields are omitted and the client keeps its default for them.
+type ManifestTuning struct {
+	FrozenSwitchMs  int `json:"frozenSwitchMs,omitempty"`  // Background Fetch quiet this long (visible tab) => switch to the direct download
+	FallbackStallMs int `json:"fallbackStallMs,omitempty"` // direct (SW) download quiet this long => auto-resume once, then Stalled
+	BgStallMs       int `json:"bgStallMs,omitempty"`       // Background Fetch quiet this long => Stalled (normally never reached)
+	KeepaliveMs     int `json:"keepaliveMs,omitempty"`     // how often pages nudge the SW to keep progress alive
+}
+
+// ManifestProbe is a reachability probe the client runs before its first
+// download (no-cors GET; any response counts as reachable). Used to tell a
+// blocked game-service host from a working one.
+type ManifestProbe struct {
+	Name string `json:"name"`
+	URL  string `json:"url"`
+}
+
 // ContentManifest is the JSON response for the content manifest API.
 type ContentManifest struct {
 	CDNBaseURL string                `json:"cdnBaseUrl"`
 	Units      []ContentManifestUnit `json:"units"`
+	Tuning     *ManifestTuning       `json:"tuning,omitempty"`
+	Probes     []ManifestProbe       `json:"probes,omitempty"`
 }

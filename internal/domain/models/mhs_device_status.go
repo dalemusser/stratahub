@@ -26,7 +26,12 @@ type MHSDeviceStatus struct {
 	StorageQuota         int64              `bson:"storage_quota" json:"storage_quota"`
 	StorageUsage         int64              `bson:"storage_usage" json:"storage_usage"`
 	StorageBaselineUsage int64              `bson:"storage_baseline_usage" json:"storage_baseline_usage"`
-	LastSeen             time.Time          `bson:"last_seen" json:"last_seen"`
-	CreatedAt            time.Time          `bson:"created_at" json:"created_at"`
-	UpdatedAt            time.Time          `bson:"updated_at" json:"updated_at"`
+	// Optional diagnostics (absent from reports by older pages): whether the
+	// origin's storage is persisted (not evictable) and whether the browser
+	// exposes the Background Fetch API.
+	StoragePersisted         *bool     `bson:"storage_persisted,omitempty" json:"storage_persisted,omitempty"`
+	BackgroundFetchAvailable *bool     `bson:"background_fetch_available,omitempty" json:"background_fetch_available,omitempty"`
+	LastSeen                 time.Time `bson:"last_seen" json:"last_seen"`
+	CreatedAt                time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt                time.Time `bson:"updated_at" json:"updated_at"`
 }

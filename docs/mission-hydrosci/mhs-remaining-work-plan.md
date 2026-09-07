@@ -1,15 +1,15 @@
 # Mission HydroSci — Remaining Work Plan
 
-**Last updated:** 2026-07-28 (status snapshot 2026-08-17)
+**Last updated:** 2026-09-07
 **Purpose:** A living backlog of open Mission HydroSci items, to be worked through
 incrementally as time and token budget allow. This is the canonical to-do list;
 update the **Status** column as items are done.
 
-> **Working-tree note (2026-08-17):** the items marked **DONE** here — P1-1,
-> SEC-1, SEC-2 — plus the P1-1 code and this doc are **committed to git? NO**:
-> they are deployed to dev and verified but sit **uncommitted** in the working
-> tree on top of HEAD `9406908`. Run `git status` on resume and commit when
-> ready. (Everything through the ACER/network fixes *is* committed at `9406908`.)
+> **2026-09-07:** the loading-status and Unit 2 device-test plan
+> (`mhs-loading-status-and-unit2-device-test-plan.md`) is approved and under
+> way. It absorbs RDY-2 and UX-5 (its step A0), supersedes DOC-3 / MHS-008
+> (steps A1 and A2), and gives OPS-1 its data source (A2). The rows below
+> point to it. The working tree is clean; everything marked DONE is committed.
 
 **Where these came from:** the round-4 feature review
 (`mhs-feature-review-072226.md`, dated 2026-07-22) plus the running fix log
@@ -45,7 +45,7 @@ the code has shifted since (line numbers especially).
 | SEC-1 | `checkMemberAuth` fails **open** on an unknown member-auth mode (no `default:`) | P1 | S | **DONE 2026-07-28** |
 | SEC-2 | `/api/auth/start` is unthrottled (mail-bomb / enumeration / code-invalidation) | P1 | S | **DONE 2026-07-28** |
 | SEC-3 | `ValidateAndConsumeToken` doesn't verify workspace binding | P3 | S | OPEN |
-| SEC-4 | `HandleDeviceStatus` input unbounded (contrast bounded `HandleDownloadError`) | P3 | S | OPEN |
+| SEC-4 | `HandleDeviceStatus` input unbounded (contrast bounded `HandleDownloadError`) | P3 | S | PARTIAL 2026-09-07 (body capped at 32 KB); field/map caps OPEN |
 | SEC-5 | Unlock-window gated actions not logged with attribution | P3 | S | OPEN |
 | DL-1 | SW download-creation race → BG fetch + fallback both run for one unit | P2 | M | OPEN |
 | DL-2 | Play overlay `autoCleanup([nextUnit])` wipes manual pre-downloads | P2 | S | OPEN |
@@ -59,13 +59,13 @@ the code has shifted since (line numbers especially).
 | UX-2 | Contrast fix (MHS-A4) nullified at runtime by JS class strings | P3 | S | OPEN |
 | UX-3 | 429 backoff is a dead-end alert; no `Retry-After` / client handling | P3 | M | OPEN |
 | UX-4 | `handleUnitComplete` has no `resp.ok` check (latent progress-drop) | P3 | S | OPEN |
-| UX-5 | `crypto.randomUUID()` no fallback — kills device telemetry on old Chrome | P3 | S | OPEN |
+| UX-5 | `crypto.randomUUID()` no fallback — kills device telemetry on old Chrome | P3 | S | **DONE 2026-09-07** (A0, awaiting deploy) |
 | UX-6 | `quota === 0` → `NaN%` (guard only checks `!estimate`) | P3 | S | OPEN |
 | UX-7 | Initial device report counts events, not units — can send incomplete | P3 | S | OPEN |
 | UX-8 | Collection picker interpolates `c.id` unescaped into onclick (hardening) | P3 | S | OPEN |
 | RDY-1 | **iPad smoke pass has never been done** (fallback-only platform) | P1 | L | OPEN |
-| RDY-2 | MHS-005: request `navigator.storage.persist()` + report `persisted()` | P1 | S | OPEN |
-| RDY-3 | MHS-006: per-unit space preflight before downloading | P1 | M | OPEN |
+| RDY-2 | MHS-005: request `navigator.storage.persist()` + report `persisted()` | P1 | S | **DONE 2026-09-07** (A0, awaiting deploy) |
+| RDY-3 | MHS-006: per-unit space preflight before downloading | P1 | M | **DONE 2026-09-07** (A0: missing bytes vs free quota, re-checked every minute; awaiting deploy) |
 | RDY-4 | Dev-sentinel user seeded into default/prod workspace unconditionally | P1 | S | OPEN |
 | RDY-5 | `progress.go` `totalUnits = 5` fallback breaks a future 6-unit collection | P2 | S | OPEN |
 | RDY-6 | MHS-004: guest-profile verification run, then close/re-scope | P3 | M | OPEN |
@@ -74,8 +74,8 @@ the code has shifted since (line numbers especially).
 | ARCH-3 | Dead code: `PlayData.CDNBaseURL`, `nextUnitVersion`, others | P3 | S | OPEN |
 | DOC-1 | Feature `README.md` stale (SW 1.0.7, "no Go tests", missing files/routes) | P2 | M | OPEN |
 | DOC-2 | `issues/README.md` stale (1.0.7, open-issue list, smoke-test checklist) | P2 | M | OPEN |
-| DOC-3 | Formally close / re-scope `issues/MHS-008` (only telemetry half shipped) | P3 | S | OPEN |
-| OPS-1 | No monitoring/alert on `"mhs download error"` log; no teacher runbook | P2 | M | OPEN |
+| DOC-3 | Formally close / re-scope `issues/MHS-008` (only telemetry half shipped) | P3 | S | superseded → loading-status plan A1/A2 |
+| OPS-1 | No monitoring/alert on `"mhs download error"` log; no teacher runbook | P2 | M | data source → loading-status plan A2; runbook OPEN |
 | TEST-1 | Zero automated tests for the newest behaviors; no JS test harness | P2 | L | OPEN |
 
 ---

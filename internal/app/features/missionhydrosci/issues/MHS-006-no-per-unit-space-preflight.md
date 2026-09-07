@@ -1,7 +1,7 @@
 # MHS-006 — No per-unit space pre-flight before downloading
 
 **Priority:** P1
-**Status:** Documented
+**Status:** Implemented 2026-09-07 (A0 of `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md`) — `downloadUnit` compares the bytes still missing from the unit's cache (plus 5% and 20 MB headroom) with `navigator.storage.estimate()` free quota before each attempt; when it does not fit, the page shows free vs needed MB and the retry scheduler re-checks every minute, so freeing space resumes the download without a click. Not yet deployed or device-verified.
 
 ## Summary
 
