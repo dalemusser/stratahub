@@ -1,7 +1,7 @@
 # MHS-005 — Cache Storage is evictable — `persist()` never requested
 
 **Priority:** P1
-**Status:** Implemented 2026-09-07 (A0 of `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md`) — `MHSDeliveryManager.init()` requests `navigator.storage.persist()` (best effort, no prompt on Chrome/Safari) and the units page reports `navigator.storage.persisted()` as `storage_persisted` in device status, alongside `background_fetch_available`. Not yet deployed or device-verified.
+**Status:** Implemented 2026-09-07 (A0 of `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md`) — `MHSDeliveryManager.init()` requests `navigator.storage.persist()` (best effort, no prompt on Chrome/Safari) and the units page reports `navigator.storage.persisted()` as `storage_persisted` in device status, alongside `background_fetch_available`. Deployed 2026-09-07; device verification pending.
 
 ## Summary
 

@@ -65,12 +65,11 @@ Facts the plan depends on, with locations. Line numbers are as of HEAD `4bf18c7`
 
 ### A0. Fast fixes (about 1 day; ships alone)
 
-> **Status (2026-09-07): implemented, not yet deployed or device-tested.**
-> Items 1–6 below, the never-give-up retry scheduler and the space preflight are in the working tree (uncommitted). Verified locally:
+> **Status (2026-09-07): implemented, committed (`5c12cde`) and deployed to the shared adroit.games service at 16:16 PDT; device verification still pending.**
+> Items 1–6 below, the never-give-up retry scheduler and the space preflight are live. Verified locally before deploy:
 > `node --check` on the delivery JS and the concatenated worker, all four
 > templates parse, `go build`, `go vet`, and the feature and bootstrap Go tests
-> pass. Next: deploy to dev (`stratahub_update/aws_update.sh`; note it bounces
-> the shared service) and run the device recipe at the end of this section.
+> pass. After deploy: `/health` 200, the served delivery script carries the new code, the worker serves a new asset hash, no errors in the service log. Next: run the device recipe at the end of this section.
 > Server-side additions: config keys `mhs_frozen_switch_ms`,
 > `mhs_fallback_stall_ms`, `mhs_keepalive_ms` (defaults 25000 / 45000 / 10000)
 > served in the manifest's `tuning` block; the manifest also carries `probes`

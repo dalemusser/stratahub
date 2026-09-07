@@ -59,13 +59,13 @@ the code has shifted since (line numbers especially).
 | UX-2 | Contrast fix (MHS-A4) nullified at runtime by JS class strings | P3 | S | OPEN |
 | UX-3 | 429 backoff is a dead-end alert; no `Retry-After` / client handling | P3 | M | OPEN |
 | UX-4 | `handleUnitComplete` has no `resp.ok` check (latent progress-drop) | P3 | S | OPEN |
-| UX-5 | `crypto.randomUUID()` no fallback — kills device telemetry on old Chrome | P3 | S | **DONE 2026-09-07** (A0, awaiting deploy) |
+| UX-5 | `crypto.randomUUID()` no fallback — kills device telemetry on old Chrome | P3 | S | **DONE 2026-09-07** (A0, deployed) |
 | UX-6 | `quota === 0` → `NaN%` (guard only checks `!estimate`) | P3 | S | OPEN |
 | UX-7 | Initial device report counts events, not units — can send incomplete | P3 | S | OPEN |
 | UX-8 | Collection picker interpolates `c.id` unescaped into onclick (hardening) | P3 | S | OPEN |
 | RDY-1 | **iPad smoke pass has never been done** (fallback-only platform) | P1 | L | OPEN |
-| RDY-2 | MHS-005: request `navigator.storage.persist()` + report `persisted()` | P1 | S | **DONE 2026-09-07** (A0, awaiting deploy) |
-| RDY-3 | MHS-006: per-unit space preflight before downloading | P1 | M | **DONE 2026-09-07** (A0: missing bytes vs free quota, re-checked every minute; awaiting deploy) |
+| RDY-2 | MHS-005: request `navigator.storage.persist()` + report `persisted()` | P1 | S | **DONE 2026-09-07** (A0, deployed) |
+| RDY-3 | MHS-006: per-unit space preflight before downloading | P1 | M | **DONE 2026-09-07** (A0: missing bytes vs free quota, re-checked every minute; deployed) |
 | RDY-4 | Dev-sentinel user seeded into default/prod workspace unconditionally | P1 | S | OPEN |
 | RDY-5 | `progress.go` `totalUnits = 5` fallback breaks a future 6-unit collection | P2 | S | OPEN |
 | RDY-6 | MHS-004: guest-profile verification run, then close/re-scope | P3 | M | OPEN |

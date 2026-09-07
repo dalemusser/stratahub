@@ -927,8 +927,8 @@ make css-watch
 
 ### Unit loading status + Unit 2 Device Test (2026-09, in progress)
 - Plan: `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md`
-  (approved 2026-09-07). A0 implemented 2026-09-07 (awaiting dev deploy +
-  device test): faster switch to the direct download path, content-server
+  (approved 2026-09-07). A0 implemented and deployed 2026-09-07 (device
+  test pending): faster switch to the direct download path, content-server
   and space preflights, never-give-up automatic retries with a visible
   countdown (`retrying` status), server-tunable timings via the manifest; A1: per-step load log with Copy
   report on the units/play/manage pages; B: standalone, account-free Unit 2
