@@ -1,0 +1,35 @@
+{{ define "mhs_steplog_panel" }}
+<!-- Status details: the per-load step log (mhs-steplog.js). Rows are filled
+     by MHSStepLog.mount; the <template> row carries the classes so Tailwind
+     compiles them. Collapsed by default; opens itself on the first warning
+     or failure. Copy report copies the plain-text log for support. -->
+<div id="mhs-steplog" class="mt-4 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 text-left">
+  <button type="button" data-steplog="toggle" aria-expanded="false" aria-controls="mhs-steplog-body"
+          class="w-full flex items-center gap-2 px-3 py-2 text-xs font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700 rounded-lg">
+    <span data-steplog="chevron" aria-hidden="true" class="w-3 text-gray-500 dark:text-gray-400">&#9656;</span>
+    <span class="whitespace-nowrap">Status details</span>
+    <span data-steplog="summary" class="font-normal text-gray-500 dark:text-gray-400 truncate"></span>
+  </button>
+  <div id="mhs-steplog-body" data-steplog="body" class="hidden border-t border-gray-200 dark:border-gray-700 px-3 py-2">
+    <ol data-steplog="rows" class="space-y-1 text-xs"></ol>
+    <div data-steplog="live" class="mt-2 text-xs text-gray-600 dark:text-gray-400" aria-live="polite"></div>
+    <div class="mt-2 flex flex-wrap items-center gap-2">
+      <button type="button" data-steplog="copy"
+              class="px-2 py-1 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-700">Copy report</button>
+      <span data-steplog="copied" class="text-xs text-green-600 dark:text-green-400 hidden">Copied</span>
+      <details data-steplog="full" class="ml-auto text-xs text-gray-500 dark:text-gray-400">
+        <summary class="cursor-pointer select-none">Full log</summary>
+      </details>
+    </div>
+    <pre data-steplog="text" class="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-words text-[11px] leading-snug text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-900 rounded p-2 hidden"></pre>
+  </div>
+  <template data-steplog="row">
+    <li class="flex items-baseline gap-1">
+      <span data-steplog="icon" class="inline-block w-4 text-center font-bold text-gray-400 dark:text-gray-500 text-blue-600 dark:text-blue-400 text-green-600 dark:text-green-400 text-amber-600 dark:text-amber-400 text-red-600 dark:text-red-400"></span>
+      <span data-steplog="label" class="w-28 shrink-0 text-gray-500 dark:text-gray-400"></span>
+      <span data-steplog="msg" class="ml-1 flex-1 min-w-0 break-words text-gray-700 dark:text-gray-300"></span>
+      <span data-steplog="time" class="ml-1 shrink-0 tabular-nums text-gray-400 dark:text-gray-500"></span>
+    </li>
+  </template>
+</div>
+{{ end }}

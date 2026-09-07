@@ -24,8 +24,8 @@ func (h *Handler) ServeServiceWorker(w http.ResponseWriter, r *http.Request) {
 	// Inject the current asset content hashes as real constants. The SW uses
 	// them to precache versioned asset URLs (exact-match cache keys), and any
 	// asset change alters the SW bytes so browsers install the update.
-	fmt.Fprintf(w, "const MHS_ASSET_VERSIONS = { tailwind: %q, mhsDelivery: %q };\n\n",
-		appresources.TailwindVersion(), appresources.MHSDeliveryVersion())
+	fmt.Fprintf(w, "const MHS_ASSET_VERSIONS = { tailwind: %q, mhsDelivery: %q, mhsSteplog: %q };\n\n",
+		appresources.TailwindVersion(), appresources.MHSDeliveryVersion(), appresources.MHSSteplogVersion())
 
 	files := []string{
 		"static/sw-cache.js",

@@ -130,6 +130,8 @@
          background (default) or need the tab kept open (fallback devices).
          Shown by JS only while a download is active. -->
     <div id="download-mode-notice" class="hidden mt-4 rounded-md px-3 py-2 text-xs text-center" aria-live="polite"></div>
+
+    {{ template "mhs_steplog_panel" . }}
     </div>
 
     <!-- Active game version — always visible for every role. Support's first
@@ -184,6 +186,7 @@
   </section>
 </div>
 
+<script src="/assets/js/mhs-steplog.js?v={{ mhsSteplogVersion }}"></script>
 <script src="/assets/js/mhs-delivery.js?v={{ mhsDeliveryVersion }}"></script>
 <script>
 (function() {
@@ -441,6 +444,26 @@
     appShellCachePrefix: 'missionhydrosci-app-shell-',
     csrfToken: csrfToken // enables download-error telemetry
   });
+
+  // Per-load step log: feeds the "Status details" panel and Copy report.
+  var unitVersions = { {{ range $i, $u := .Units }}{{ if $i }}, {{ end }}'{{ $u.ID }}': '{{ $u.Version }}'{{ end }} };
+  var stepLog = new MHSStepLog();
+  stepLog.start({
+    page: 'units',
+    host: location.host,
+    workspace: location.hostname.split('.')[0],
+    unit: currentUnit,
+    version: unitVersions[currentUnit] || '',
+    unitTitle: unitTitles[currentUnit] || '',
+    collection: '{{ .ActiveCollectionName }}',
+    deviceId: getOrCreateDeviceId(),
+    deviceType: detectDeviceType(),
+    userAgent: navigator.userAgent,
+    deliveryVersion: '{{ mhsDeliveryVersion }}',
+    steplogVersion: '{{ mhsSteplogVersion }}'
+  });
+  manager.setStepLog(stepLog);
+  MHSStepLog.mount(stepLog, document.getElementById('mhs-steplog'), {});
 
   // Status callback: update UI for each unit
   manager.onStatus(function(unitId, status, detail) {

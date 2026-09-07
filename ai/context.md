@@ -930,8 +930,10 @@ make css-watch
   (approved 2026-09-07). A0 implemented and deployed 2026-09-07 (device
   test pending): faster switch to the direct download path, content-server
   and space preflights, never-give-up automatic retries with a visible
-  countdown (`retrying` status), server-tunable timings via the manifest; A1: per-step load log with Copy
-  report on the units/play/manage pages; B: standalone, account-free Unit 2
+  countdown (`retrying` status), server-tunable timings via the manifest;
+  A1 implemented 2026-09-07: `mhs-steplog.js` + shared `mhs_steplog_panel`
+  snippet ("Status details" panel, Copy report) on the units/play/manage
+  pages, fed by delivery-manager hooks; B: standalone, account-free Unit 2
   device test at `/missionhydrosci/devicetest` per workspace (test ids are
   `ffffffff` + 16 random hex, never a real user id); A2: students' step logs
   stored on failure/completion for review in a viewer

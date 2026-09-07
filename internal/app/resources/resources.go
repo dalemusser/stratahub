@@ -26,11 +26,17 @@ var (
 	tiptapVersion      = assets.ContentHash(AssetsFS, "assets/css/tiptap.css")
 	htmxVersion        = assets.ContentHash(AssetsFS, "assets/js/htmx.min.js")
 	mhsDeliveryVersion = assets.ContentHash(AssetsFS, "assets/js/mhs-delivery.js")
+	mhsSteplogVersion  = assets.ContentHash(AssetsFS, "assets/js/mhs-steplog.js")
 )
 
 // MHSDeliveryVersion returns the content hash of mhs-delivery.js.
 // Used by the Mission HydroSci SW handler to trigger browser reinstallation when JS changes.
 func MHSDeliveryVersion() string { return mhsDeliveryVersion }
+
+// MHSSteplogVersion returns the content hash of mhs-steplog.js (the per-load
+// step log), precached by the Mission HydroSci service worker like the
+// delivery script.
+func MHSSteplogVersion() string { return mhsSteplogVersion }
 
 // TailwindVersion returns the content hash of tailwind.css.
 func TailwindVersion() string { return tailwindVersion }
@@ -40,6 +46,7 @@ func init() {
 	templates.RegisterFunc("tiptapVersion", func() string { return tiptapVersion })
 	templates.RegisterFunc("htmxVersion", func() string { return htmxVersion })
 	templates.RegisterFunc("mhsDeliveryVersion", func() string { return mhsDeliveryVersion })
+	templates.RegisterFunc("mhsSteplogVersion", func() string { return mhsSteplogVersion })
 }
 
 var registerOnce sync.Once

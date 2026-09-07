@@ -2,7 +2,7 @@
 // This file is concatenated with sw-cache.js and sw-background-fetch.js
 // by the Go handler before being served at /sw.js.
 
-const SW_VERSION = '1.0.12';
+const SW_VERSION = '1.0.13';
 
 // ---- Install ----
 self.addEventListener('install', function(event) {
@@ -65,7 +65,8 @@ self.addEventListener('fetch', function(event) {
   // Hash-versioned app shell assets — exact-match cache-first. The ?v=<hash>
   // in the request is part of the cache key, so a new deploy's hash misses
   // the cache and fetches fresh on the FIRST load after a deploy.
-  if (path === '/assets/css/tailwind.css' || path === '/assets/js/mhs-delivery.js') {
+  if (path === '/assets/css/tailwind.css' || path === '/assets/js/mhs-delivery.js' ||
+      path === '/assets/js/mhs-steplog.js') {
     event.respondWith(versionedAssetFirst(event.request));
     return;
   }
@@ -216,6 +217,13 @@ self.addEventListener('message', function(event) {
     // can adopt the loops it lost track of across a reload.
     if (event.ports && event.ports[0]) {
       event.ports[0].postMessage({ activeFallbacks: listActiveFallbacks() });
+    }
+  } else if (data.action === 'getVersion') {
+    // Reply with this worker's version for the page's step log / support
+    // report. Older workers ignore the message; the page times out to
+    // "unknown".
+    if (event.ports && event.ports[0]) {
+      event.ports[0].postMessage({ version: SW_VERSION });
     }
   }
 });

@@ -57,6 +57,8 @@
     this._wanted = {}; // unitId -> true while a requested download is outstanding (until 'cached' or removed)
     this._retryAttempts = {}; // unitId -> consecutive automatic retries without new bytes (drives the backoff)
     this._pendingRetries = {}; // unitId -> { kind, dueAt, attempt, base, timer, tick } while a retry is scheduled
+    this._steplog = null; // MHSStepLog (see setStepLog); null = no per-load logging
+    this._logSamples = {}; // unitId -> { at, bytes, bucket } throttling progress samples in the step log
     this.preflightResult = null; // last content-server/services reachability probe (see preflight)
     this.storagePersisted = null; // result of navigator.storage.persist() from init(); null if unavailable
   }
@@ -99,16 +101,29 @@
    * sets up BroadcastChannel listener, and checks initial cache status.
    */
   MHSDeliveryManager.prototype.init = async function() {
+    var self = this;
     // Register service worker (skip when swUrl is explicitly null/empty)
     if (this._swUrl && 'serviceWorker' in navigator) {
+      this._step('sw', 'running', 'Registering the service worker…');
       try {
         this.swRegistration = await navigator.serviceWorker.register(this._swUrl, {
           scope: this._swScope
         });
         console.log('MHS Service Worker registered');
+        this._step('sw', 'ok', 'Service worker registered' +
+          (navigator.serviceWorker.controller ? ' and controlling this page' : ' (not yet controlling this page)'));
+        // Its version, for the report (older workers don't answer: "unknown").
+        this._getSWVersion().then(function(v) {
+          if (!v) return;
+          self._logContext('swVersion', v);
+          self._step('sw', 'ok', 'Service worker active (v' + v + ')');
+        });
       } catch (err) {
         console.error('MHS SW registration failed:', err);
+        this._step('sw', 'fail', 'Service worker registration failed: ' + ((err && err.message) || err));
       }
+    } else if (!('serviceWorker' in navigator)) {
+      this._step('sw', 'fail', 'Service workers are not supported in this browser — downloads cannot be saved for offline play');
     }
 
     // Ask the browser to treat this origin's storage as durable (MHS-005).
@@ -118,6 +133,9 @@
     if (navigator.storage && navigator.storage.persist) {
       try {
         this.storagePersisted = await navigator.storage.persist();
+        this._step('storage', this.storagePersisted ? 'ok' : 'info', this.storagePersisted
+          ? 'Storage is persistent (protected from eviction)'
+          : 'Storage is best-effort (the browser may evict downloads under pressure)');
       } catch (err) {
         this.storagePersisted = null;
       }
@@ -145,6 +163,7 @@
 
     // Check initial cache status for all units
     await this.checkAllCacheStatus();
+    this._logStorageSummary().catch(function() {});
 
     // When tab becomes visible: reset stall monitors, recheck BG fetch states, then cache status
     var self = this;
@@ -327,6 +346,7 @@
         }
         await caches.delete(name);
         console.log('Pruned stale unit cache:', name);
+        this._step('storage', 'info', 'Removed an old download: ' + name.substring(this._unitCachePrefix.length));
       }
     } catch (err) {
       console.warn('Stale cache prune failed:', err);
@@ -385,6 +405,7 @@
    * Fetches the content manifest from the server.
    */
   MHSDeliveryManager.prototype.refreshManifest = async function() {
+    this._step('manifest', 'running', 'Loading the game list…');
     try {
       var response = await fetch(this._manifestUrl);
       if (!response.ok) throw new Error('manifest HTTP ' + response.status);
@@ -394,8 +415,18 @@
       }
       this.manifest = parsed;
       this.manifestLoaded = true;
+      var names = [];
+      for (var mi = 0; mi < parsed.units.length; mi++) {
+        var mu = parsed.units[mi];
+        names.push(mu.id + ' v' + mu.version + ' (' + fmtMB(mu.totalSize) + ' MB)');
+      }
+      this._step('manifest', parsed.units.length ? 'ok' : 'warn', parsed.units.length
+        ? 'Game list loaded: ' + names.join(', ')
+        : 'Game list loaded but it has no units (no active game version for this account)');
     } catch (err) {
       console.error('Failed to fetch MHS content manifest:', err);
+      this._step('manifest', 'fail', 'Could not load the game list: ' + ((err && err.message) || err) +
+        (this.manifest && this.manifest.units && this.manifest.units.length ? ' (keeping the previous list)' : ''));
       // Do NOT let a transient failure look like "the game has no units."
       // Reading an empty manifest as authoritative would prune every
       // downloaded unit cache (offline data loss — the feature's core
@@ -424,13 +455,16 @@
   MHSDeliveryManager.prototype.checkAllCacheStatus = async function() {
     if (!this.manifest || !this.manifest.units) return;
 
+    var summary = [];
     for (var i = 0; i < this.manifest.units.length; i++) {
       var unit = this.manifest.units[i];
       // Don't override status for units with an active download
-      if (this._activeDownloads[unit.id]) continue;
+      if (this._activeDownloads[unit.id]) { summary.push(unit.id + ' downloading'); continue; }
       var status = await this._checkUnitCache(unit);
+      summary.push(unit.id + ' ' + (status === 'cached' ? 'downloaded' : status === 'partial' ? 'partial' : 'not downloaded'));
       this._fireStatus(unit.id, status, {});
     }
+    if (summary.length) this._step('storage', 'info', 'Cache check: ' + summary.join(', '));
   };
 
   /**
@@ -649,8 +683,12 @@
       for (var i = 1; i < unit.files.length; i++) {
         if ((unit.files[i].size || 0) < (smallest.size || 0)) smallest = unit.files[i];
       }
+      this._step('cdn', 'running', 'Checking the content server (' + hostOf(base) + ')…');
       result.cdn = await probeURL(base + '/' + smallest.path, 'cors');
       result.cdn.host = hostOf(base);
+      this._step('cdn', result.cdn.ok ? 'ok' : 'fail', result.cdn.ok
+        ? 'Content server reachable (' + result.cdn.ms + ' ms)'
+        : 'Cannot reach the content server ' + result.cdn.host + ': ' + result.cdn.error);
     }
     var probes = (this.manifest && this.manifest.probes) || [];
     var checks = [];
@@ -665,10 +703,12 @@
       try { result.services = await Promise.all(checks); } catch (e) { /* individual probes never reject */ }
     }
     for (var s = 0; s < result.services.length; s++) {
-      if (!result.services[s].ok) {
-        console.warn('MHS preflight: game service "' + result.services[s].name + '" (' +
-          result.services[s].host + ') unreachable: ' + result.services[s].error);
+      var sv = result.services[s];
+      if (!sv.ok) {
+        console.warn('MHS preflight: game service "' + sv.name + '" (' + sv.host + ') unreachable: ' + sv.error);
       }
+      this._step('services', sv.ok ? 'ok' : 'warn', 'Game ' + sv.name + ' service (' + sv.host + ') ' +
+        (sv.ok ? 'reachable (' + sv.ms + ' ms)' : 'unreachable: ' + sv.error + ' — the game may report a connection error'));
     }
     this.preflightResult = result;
     return result;
@@ -765,6 +805,8 @@
     var self = this;
     var pending = { kind: kind, dueAt: Date.now() + delayS * 1000, attempt: attempt, base: base, timer: null, tick: null };
     this._pendingRetries[unitId] = pending;
+    this._step('download', 'warn', (base.error || 'Download interrupted.') + ' Retrying ' +
+      (delayS > 0 ? 'in ' + delayS + ' s' : 'now') + ' (attempt ' + attempt + ')');
 
     function announce(remainingMs) {
       var d = {};
@@ -837,6 +879,164 @@
         if (p.timer) clearTimeout(p.timer);
         p.tick();
       }
+    }
+  };
+
+  /**
+   * Attaches an MHSStepLog (mhs-steplog.js): from then on the manager records
+   * what it does — worker, game list, storage, reachability, method, download
+   * progress and retries, verification — as timestamped steps the page shows
+   * in its "Status details" panel and the user can copy into a report.
+   */
+  MHSDeliveryManager.prototype.setStepLog = function(log) {
+    this._steplog = log || null;
+  };
+
+  // Records a step; never lets logging break delivery.
+  MHSDeliveryManager.prototype._step = function(step, state, msg, detail) {
+    if (!this._steplog) return;
+    try { this._steplog.record(step, state, msg, detail); } catch (e) { /* ignore */ }
+  };
+
+  MHSDeliveryManager.prototype._logContext = function(key, value) {
+    if (!this._steplog || !this._steplog.set) return;
+    try { this._steplog.set(key, value); } catch (e) { /* ignore */ }
+  };
+
+  function pad2(n) { return (n < 10 ? '0' : '') + n; }
+  function fmtMB(bytes) { return Math.round((bytes || 0) / 1048576); }
+  function fmtDuration(ms) {
+    var s = Math.max(0, Math.round(ms / 1000));
+    return Math.floor(s / 60) + ':' + pad2(s % 60);
+  }
+
+  /**
+   * Asks the active worker for its version (a 'getVersion' message answered
+   * over a MessageChannel). Resolves '' on timeout or an older worker.
+   */
+  MHSDeliveryManager.prototype._getSWVersion = function() {
+    var self = this;
+    return new Promise(function(resolve) {
+      if (!navigator.serviceWorker) { resolve(''); return; }
+      var settled = false;
+      function finish(v) { if (settled) return; settled = true; resolve(v || ''); }
+      var timer = setTimeout(function() { finish(''); }, 2000);
+      self._waitForSW(1500).then(function(reg) {
+        var target = (reg && reg.active) || navigator.serviceWorker.controller;
+        if (!target) { clearTimeout(timer); finish(''); return; }
+        try {
+          var channel = new MessageChannel();
+          channel.port1.onmessage = function(ev) { clearTimeout(timer); finish(ev.data && ev.data.version); };
+          target.postMessage({ action: 'getVersion' }, [channel.port2]);
+        } catch (e) { clearTimeout(timer); finish(''); }
+      }).catch(function() { clearTimeout(timer); finish(''); });
+    });
+  };
+
+  // One 'storage' line: usage, quota, persistence.
+  MHSDeliveryManager.prototype._logStorageSummary = async function() {
+    if (!this._steplog) return;
+    try {
+      var est = await this.getStorageEstimate();
+      if (!est || !est.quota) return;
+      var persisted = await this.getStoragePersisted();
+      var text = fmtMB(est.usage) + ' MB used of ' + fmtMB(est.quota) + ' MB (' +
+        Math.round((est.usage / est.quota) * 100) + '%)' +
+        (persisted === null ? '' : ' · persisted: ' + (persisted ? 'yes' : 'no'));
+      this._logContext('storage', text);
+      this._step('storage', persisted === false ? 'warn' : 'ok', 'Storage: ' + text +
+        (persisted === false ? ' — the browser may evict downloads under pressure' : ''));
+    } catch (e) { /* ignore */ }
+  };
+
+  // After a completed download, confirm the files really are all there.
+  MHSDeliveryManager.prototype._verifyForLog = async function(unitId) {
+    if (!this._steplog) return;
+    var unit = this._findUnit(unitId);
+    if (!unit) return;
+    try {
+      var state = await this._checkUnitCache(unit);
+      if (state === 'cached') {
+        this._step('verify', 'ok', 'All ' + unit.files.length + ' files present; largest file size verified');
+      } else {
+        this._step('verify', 'warn', 'Files missing or a size mismatch after download (' + state + ')');
+      }
+    } catch (e) {
+      this._step('verify', 'warn', 'Could not verify files: ' + ((e && e.message) || e));
+    }
+  };
+
+  /**
+   * Translates status events (from this page and from the worker's
+   * broadcasts) into step-log lines. Progress is sampled at most every 5 s
+   * or per 10% bucket; countdown ticks are skipped ('retrying' is logged once
+   * per attempt by _scheduleRetry); detail.silent skips an event the caller
+   * already logged under a better step.
+   */
+  MHSDeliveryManager.prototype._logStatus = function(unitId, status, detail, wasActive) {
+    if (!this._steplog) return;
+    detail = detail || {};
+    if (detail.silent) return;
+    var unit = this._findUnit(unitId);
+    var title = unit ? unit.title : unitId;
+    switch (status) {
+      case 'downloading': {
+        if (detail.note) { this._step('download', 'warn', detail.note); return; }
+        if (detail.waitingMs >= 5000) {
+          var wmsg = 'No data for ' + Math.round(detail.waitingMs / 1000) + ' s';
+          if (typeof detail.switchInMs === 'number') wmsg += ' — switching to the direct download in ' + Math.round(detail.switchInMs / 1000) + ' s';
+          else if (typeof detail.resumeInMs === 'number') wmsg += ' — restarting in ' + Math.round(detail.resumeInMs / 1000) + ' s';
+          this._step('download', 'warn', wmsg);
+          return;
+        }
+        if (typeof detail.downloaded !== 'number') return;
+        var now = Date.now();
+        var sample = this._logSamples[unitId];
+        var pct = detail.percent || 0;
+        var bucket = Math.floor(pct / 10);
+        if (sample && now - sample.at < 5000 && bucket === sample.bucket) return;
+        var rate = '';
+        if (sample && detail.downloaded > sample.bytes && now > sample.at) {
+          var bps = (detail.downloaded - sample.bytes) / ((now - sample.at) / 1000);
+          rate = ' · ' + (bps / 1048576).toFixed(1) + ' MB/s';
+          if (detail.downloadTotal && bps > 0) {
+            rate += ' · ' + fmtDuration(((detail.downloadTotal - detail.downloaded) / bps) * 1000) + ' left';
+          }
+        }
+        this._logSamples[unitId] = { at: now, bytes: detail.downloaded, bucket: bucket };
+        this._step('download', 'running', title + ': ' + pct + '% · ' + fmtMB(detail.downloaded) + ' of ' +
+          fmtMB(detail.downloadTotal) + ' MB' + rate);
+        return;
+      }
+      case 'stalled':
+        this._step('download', 'warn', title + ': no data received for ' + Math.round((detail.quietMs || 0) / 1000) +
+          ' s — restarting the download');
+        return;
+      case 'retrying':
+        return;
+      case 'error':
+        this._step('download', 'fail', title + ': ' + (detail.error || 'Download failed') +
+          (detail.errorClass ? ' [' + detail.errorClass + (detail.failureReason ? ':' + detail.failureReason : '') + ']' : '') +
+          (detail.rawError ? ' — ' + detail.rawError : ''), { path: detail.path || '' });
+        return;
+      case 'cached': {
+        if (!wasActive) return; // an init-time cache check, not a download we ran
+        delete this._logSamples[unitId];
+        var st = this._stallState[unitId];
+        var total = unit ? (unit.totalSize || 0) : 0;
+        var took = st ? Date.now() - st.startedAt : 0;
+        var msg = title + ': download complete';
+        if (total) msg += ' — ' + fmtMB(total) + ' MB';
+        if (took > 0) {
+          msg += ' in ' + fmtDuration(took);
+          if (total) msg += ' (' + ((total / 1048576) / (took / 1000)).toFixed(1) + ' MB/s)';
+        }
+        this._step('download', 'ok', msg);
+        this._verifyForLog(unitId).catch(function() {});
+        return;
+      }
+      default:
+        return;
     }
   };
 
@@ -1211,11 +1411,15 @@
       var switched = await this._startFallbackDownload(unitId, unit); // resets the stall monitor
       if (switched) {
         try { await fresh.abort(); } catch (abortErr) { /* best effort */ }
+        this._logContext('downloadMode', 'direct');
+        this._step('method', 'warn', 'Background download stopped receiving data for ' + Math.round(quietMs / 1000) +
+          ' s — switched to the direct download (keep this tab open)');
         this._fireStatus(unitId, 'downloading', {
           downloaded: frozenAt,
           downloadTotal: unitTotal,
           percent: unitTotal > 0 ? Math.round((frozenAt / unitTotal) * 100) : 0,
           local: true,
+          silent: true,
           note: 'The background download stopped receiving data — switched to the direct download method. Keep this tab open until it finishes.'
         });
         return;
@@ -1618,6 +1822,7 @@
     if (lateManifest) this.checkAllCacheStatus().catch(function() {});
 
     var totalSize = unit.totalSize || unit.files.reduce(function(sum, f) { return sum + f.size; }, 0);
+    this._step('download', 'running', 'Requesting ' + unit.title + ' v' + unit.version + ' (' + fmtMB(totalSize) + ' MB)');
     this._fireStatus(unitId, 'downloading', { percent: 0, downloaded: 0, downloadTotal: totalSize });
 
     try {
@@ -1669,6 +1874,8 @@
           if (reg.active) reg.active.postMessage({ action: 'attachProgress' });
           this._startProgressKeepalive(reg);
           console.log('Reconnected to existing Background Fetch:', fetchId);
+          this._logContext('downloadMode', 'background');
+          this._step('method', 'info', 'Reconnected to a background download already in progress');
           return;
         }
       }
@@ -1679,6 +1886,8 @@
       if (this._preferFallback() && await this._startFallbackDownload(unitId, unit)) {
         this._startProgressKeepalive(reg);
         console.log('Using SW fallback download (Background Fetch pauses on this device):', fetchId);
+        this._logContext('downloadMode', 'direct');
+        this._step('method', 'info', 'Direct download — this device paused background downloads earlier; keep this tab open');
         return;
       }
 
@@ -1702,6 +1911,8 @@
         this._monitorDownload(unitId, unit);
         this._startProgressKeepalive(reg);
         console.log('Requested SW Background Fetch:', fetchId);
+        this._logContext('downloadMode', 'background');
+        this._step('method', 'info', 'Background download (Chrome) — continues if you leave the page');
         return;
       }
 
@@ -1710,6 +1921,10 @@
         throw new Error('Service worker not available. Please refresh and try again.');
       }
       this._startProgressKeepalive(reg);
+      this._logContext('downloadMode', 'direct');
+      this._step('method', 'info', reg.backgroundFetch
+        ? 'Direct download — the background download could not start; keep this tab open'
+        : 'Direct download — this browser has no background download API (Safari/iPad, guest profiles); keep this tab open');
     } catch (err) {
       console.error('Download failed:', err);
       this._activeDownloads[unitId] = false;
@@ -1722,6 +1937,7 @@
    */
   MHSDeliveryManager.prototype.deleteUnit = async function(unitId) {
     this._forgetDownload(unitId); // the user removed it — stop retrying
+    this._step('storage', 'info', 'Removed the downloaded files for ' + unitId);
     if (!this.manifest) return;
 
     var unit = this.manifest.units.find(function(u) { return u.id === unitId; });
@@ -1793,6 +2009,7 @@
    * version. Orphaned old-version caches are cleared too.
    */
   MHSDeliveryManager.prototype.deleteAllUnits = async function() {
+    this._step('storage', 'info', 'Removing all downloaded units');
     // Abort first so a late backgroundfetchsuccess can't repopulate a cache,
     // and stop SW fallback loops so they can't broadcast a false 'cached'
     await this._abortAllBGFetches();
@@ -1827,6 +2044,7 @@
    * @param {string[]} [localStorageKeys] - localStorage keys to remove.
    */
   MHSDeliveryManager.prototype.purgeAllMHSData = async function(localStorageKeys) {
+    this._step('storage', 'info', 'Resetting all local Mission HydroSci data');
     // Abort first so a late backgroundfetchsuccess can't repopulate a cache,
     // and stop SW fallback loops so they can't broadcast a false 'cached'
     await this._abortAllBGFetches();
@@ -1927,6 +2145,7 @@
 
   // Internal: fire all status callbacks
   MHSDeliveryManager.prototype._fireStatus = function(unitId, status, detail) {
+    var wasActive = !!this._activeDownloads[unitId];
     // Feed the stall watchdog from 'downloading' broadcasts. For fallback
     // loops any broadcast is a liveness signal (they fire at least once a
     // second while alive). For Background Fetch downloads the SW broadcasts
@@ -1956,6 +2175,9 @@
         typeof detail.elapsedMs !== 'number') {
       detail.elapsedMs = Date.now() - this._stallState[unitId].startedAt;
     }
+
+    // Step log (before the cleanup below, which drops the stall state's timings)
+    this._logStatus(unitId, status, detail, wasActive);
 
     // Clear active download tracking and stall monitors on terminal statuses
     if (status === 'cached' || status === 'error' || status === 'not_cached') {

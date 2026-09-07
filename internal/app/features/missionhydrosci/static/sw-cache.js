@@ -19,7 +19,8 @@ function versionedAssetURL(path, version) {
 const APP_SHELL_URLS = [
   '/missionhydrosci/units',
   versionedAssetURL('/assets/css/tailwind.css', typeof MHS_ASSET_VERSIONS !== 'undefined' ? MHS_ASSET_VERSIONS.tailwind : ''),
-  versionedAssetURL('/assets/js/mhs-delivery.js', typeof MHS_ASSET_VERSIONS !== 'undefined' ? MHS_ASSET_VERSIONS.mhsDelivery : '')
+  versionedAssetURL('/assets/js/mhs-delivery.js', typeof MHS_ASSET_VERSIONS !== 'undefined' ? MHS_ASSET_VERSIONS.mhsDelivery : ''),
+  versionedAssetURL('/assets/js/mhs-steplog.js', typeof MHS_ASSET_VERSIONS !== 'undefined' ? MHS_ASSET_VERSIONS.mhsSteplog : '')
 ];
 
 /**

@@ -172,6 +172,12 @@
           <div id="loading-bar" class="loading-bar-fill" style="width: 0%"></div>
         </div>
         <p id="loading-text" role="status" aria-live="polite" style="margin-top:8px; font-size:14px; opacity:0.7;">Initializing...</p>
+        <p id="loading-step" style="margin-top:4px; font-size:12px; opacity:0.6;"></p>
+        <!-- The per-load step log; hidden until a launch step fails, then
+             shown so the user can read and copy where it stopped. -->
+        <div id="loading-steplog" style="display:none; margin-top:12px; width:min(560px, 92vw); text-align:left;">
+          {{ template "mhs_steplog_panel" . }}
+        </div>
       </div>
       <canvas id="unity-canvas" width="1400" height="800" tabindex="-1"></canvas>
 
@@ -285,6 +291,7 @@
     </script>
 
     <!-- Block unit-to-unit transitions and handle completion -->
+    <script src="/assets/js/mhs-steplog.js?v={{ mhsSteplogVersion }}"></script>
     <script src="/assets/js/mhs-delivery.js?v={{ mhsDeliveryVersion }}"></script>
     <script>
     (function() {
@@ -326,6 +333,7 @@
       function handleUnitComplete() {
         if (completionHandled) return;
         completionHandled = true;
+        if (window.__mhsStepLog) window.__mhsStepLog.record('game', 'ok', 'Unit complete reported by the game');
 
         // Show overlay immediately
         var overlay = document.getElementById('unit-complete-overlay');
@@ -385,6 +393,7 @@
           fetchIdPrefix: 'missionhydrosci-',
           csrfToken: csrfToken // enables download-error telemetry
         });
+        if (window.__mhsStepLog) mgr.setStepLog(window.__mhsStepLog);
 
         mgr.refreshManifest().then(function() {
           // Unity is already torn down, so every branch from here MUST end in a
@@ -593,6 +602,47 @@
       var buildUrl = contentUrl + '/Build';
       var loaderUrl = buildUrl + '/' + unitId + '.loader.js';
 
+      // Per-load step log (continues the units page's log in this tab).
+      var stepLog = new MHSStepLog();
+      stepLog.start({
+        page: 'play',
+        host: location.host,
+        workspace: location.hostname.split('.')[0],
+        unit: unitId,
+        version: unitVersion,
+        unitTitle: '{{ .UnitTitle }}',
+        deviceId: (function() { try { return localStorage.getItem('mhs-device-id') || ''; } catch (e) { return ''; } })(),
+        userAgent: navigator.userAgent,
+        deliveryVersion: '{{ mhsDeliveryVersion }}',
+        steplogVersion: '{{ mhsSteplogVersion }}'
+      });
+      window.__mhsStepLog = stepLog; // shared with the completion overlay's manager
+      var stepPanel = MHSStepLog.mount(stepLog, document.getElementById('mhs-steplog'), {});
+      var loadingStepEl = document.getElementById('loading-step');
+      stepLog.onChange(function(entry) {
+        if (!entry || !loadingStepEl) return;
+        loadingStepEl.textContent = (MHSStepLog.STEP_LABELS[entry.step] || entry.step) + ': ' + entry.msg;
+      });
+      function showStepLogOnFailure() {
+        var wrap = document.getElementById('loading-steplog');
+        if (wrap) wrap.style.display = 'block';
+        if (stepPanel) stepPanel.open();
+      }
+      var launchStartedAt = Date.now();
+      var lastMilestone = -1;
+      function loaderSource() {
+        try {
+          var abs = new URL(loaderUrl, location.href).href;
+          var entries = performance.getEntriesByName(abs);
+          if (entries && entries.length) {
+            var e = entries[entries.length - 1];
+            if (e.transferSize === 0 && e.decodedBodySize > 0) return ' (from the downloaded files)';
+            if (e.transferSize > 0) return ' (from the network)';
+          }
+        } catch (e) { /* not available */ }
+        return '';
+      }
+
       // Register this play session so the units page's stale-cache prune
       // won't delete this unit's cache out from under the running game —
       // a content deploy can bump the version mid-session, making this
@@ -615,6 +665,9 @@
       function reportCrash(type, message, stack, phase) {
         if (crashReported) return;
         crashReported = true;
+        stepLog.record('game', 'fail', 'Crash (' + (type || 'unknown') + ', ' + (phase || crashPhase) + '): ' +
+          String(message || '').slice(0, 200));
+        if ((phase || crashPhase) !== 'running') showStepLogOnFailure();
 
         var logUrl = '{{ .LogSubmitURL }}';
         var logAuth = '{{ .LogAuth }}';
@@ -743,11 +796,14 @@
       }
 
       // Load the Unity loader script
+      stepLog.record('launch', 'running', 'Loading the game loader (' + unitId + '.loader.js)…');
       var script = document.createElement('script');
       script.src = loaderUrl;
       script.onload = function() {
         loadingText.textContent = 'Starting Unity...';
         crashPhase = 'compiling';
+        stepLog.record('launch', 'ok', 'Game loader loaded' + loaderSource());
+        stepLog.record('launch', 'running', 'Starting Unity…');
 
         createUnityInstance(canvas, {
           dataUrl: buildUrl + '/{{ .DataFile }}',
@@ -760,6 +816,12 @@
           autoSyncPersistentDataPath: true,
         }, function(progress) {
           loadingBar.style.width = (progress * 100) + '%';
+          var milestone = progress < 0.5 ? 0 : (progress < 0.9 ? 1 : 2);
+          if (milestone !== lastMilestone) {
+            lastMilestone = milestone;
+            stepLog.record('launch', 'running', ['Loading assets…', 'Compiling…', 'Almost ready…'][milestone] +
+              ' (' + Math.round(progress * 100) + '%)');
+          }
           if (progress < 0.5) {
             loadingText.textContent = 'Loading assets...';
           } else if (progress < 0.9) {
@@ -774,6 +836,7 @@
           canvas = instance.Module.canvas;
           loadingOverlay.classList.add('hidden');
           onResize();
+          stepLog.record('launch', 'ok', 'Unity started in ' + ((Date.now() - launchStartedAt) / 1000).toFixed(1) + ' s');
 
           // Tell MHSBridge this is PWA mode — game will use mhsUnitComplete callback.
           // Pass identity JSON for new builds; old builds ignore the parameter.
@@ -781,8 +844,16 @@
             user_id: '{{ .UserIDHex }}',
             name: '{{ .UserName }}'
           }));
+          stepLog.record('game', 'running', 'Game running — identity sent to the game');
+          requestAnimationFrame(function() {
+            requestAnimationFrame(function() {
+              stepLog.record('game', 'ok', 'Game is rendering');
+            });
+          });
         }).catch(function(err) {
           loadingText.textContent = 'Error: ' + err.message;
+          stepLog.record('launch', 'fail', 'Unity failed to start: ' + err.message);
+          showStepLogOnFailure();
           loadingBar.style.width = '100%';
           loadingBar.style.background = '#ef4444';
           console.error('Unity load error:', err);
@@ -791,6 +862,8 @@
       };
       script.onerror = function() {
         loadingText.textContent = 'Failed to load game. Is this unit downloaded?';
+        stepLog.record('launch', 'fail', 'The game loader failed to load — the unit may not be downloaded, or the content server is unreachable');
+        showStepLogOnFailure();
         loadingBar.style.width = '100%';
         reportCrash('load_error', 'Failed to load Unity loader script: ' + loaderUrl, '', 'loading');
         loadingBar.style.background = '#ef4444';

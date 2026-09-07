@@ -101,6 +101,17 @@ Verification: `node --check` on the JS and the concatenated SW; template parse; 
 
 ### A1. Step/status log and display (2–3 days)
 
+> **Status (2026-09-07): implemented.** `mhs-steplog.js` (hash-versioned and
+> precached like the delivery script; `SW_VERSION` 1.0.13 adds the
+> `getVersion` reply), the shared `mhs_steplog_panel` snippet in the shared
+> templates set (each page compiles against the shared set only, so a partial
+> used by three pages has to live there), delivery-manager hooks for every step
+> below, and the panel on the units, manage and play pages (the play page shows
+> the current step under the loading bar and reveals the panel when a launch
+> step fails). Copy report is in; Send report waits for B's storage as planned.
+> Verified: JS syntax, concatenated worker, template parse with the snippet,
+> `go build`/`vet`/tests, a local server start that compiles every page.
+
 Goal: every load, on every surface, produces a human-readable, timestamped step list that the user can see and copy, and that the server can store.
 
 **Client module** `internal/app/resources/assets/js/mhs-steplog.js` (new; add to the precache list in `sw.go` so it is versioned like `mhs-delivery.js`, per MHS-012):
