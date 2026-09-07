@@ -13,7 +13,7 @@ integration to Abt. Companion to the [Admin Guide](admin-guide.md) and the
 piece already in production is the settings-save fix (Task 0). One deploy
 delivers the API, the Surveys tab, resource Survey Tracking, and the two
 viewers. The deploy itself changes nothing user-visible until a key is set;
-the API answers `401 not_configured` until then.
+the API answers `401 not_configured` to any keyed request until then.
 
 Order matters: **0 → 1 → 2 → 3 → 5 (self-test) → 4 (hand to Abt) → 6**.
 Do steps 2, 3, and 5 on the **Dev MHS** workspace first, then repeat them on
@@ -57,15 +57,20 @@ are per workspace.)
       ```bash
       curl -sS https://mhs.adroit.games/health
 
-      # Route is live and CSRF-exempt; no key set yet → 401 not_configured
+      # Route is live and CSRF-exempt; no key set yet → 401 not_configured.
+      # Send a placeholder key: the API rejects a *missing* key before it
+      # looks at the workspace, so an empty body always gets "unauthorized".
       curl -sS -i -X POST https://mhs.adroit.games/api/member-status/ping \
-        -H 'Content-Type: application/json' -d '{}'
+        -H 'Content-Type: application/json' -d '{"key":"smoke-test"}'
 
       # Old audit address redirects to the viewer
       curl -sS -o /dev/null -w '%{http_code} -> %{redirect_url}\n' https://mhs.adroit.games/audit
       ```
       Expect `200`, then `HTTP/… 401` with
       `{"ok":false,"error":"not_configured",…}`, then `302 -> …/views/audit-log`.
+      (If a key is already set on the workspace the ping returns
+      `401 unauthorized` / "Invalid shared key" instead — also fine, and it
+      counts as one failed authentication toward the per-IP throttle.)
 - [ ] Log in as admin on MHS: menu shows **Audit Log** and **Survey Events**;
       `/views/audit-log` lists recent logins; `/views/survey-events` is empty;
       MHS Dashboard has a **Surveys** tab (all ○ Not started); a resource's
