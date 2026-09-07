@@ -141,7 +141,7 @@ func TestDashboardRendersSurveysTab(t *testing.T) {
 		t.Errorf("tab button does not carry the configured title: %q", body[i:i+min(end, 200)])
 	}
 	// Four header columns, one per configured survey.
-	for _, title := range []string{"Pre-Survey", "MHS Engagement", "EWS Engagement", "Post-Survey"} {
+	for _, title := range []string{"Pre", "MHS Engagement", "EWS Engagement", "Post"} {
 		if !strings.Contains(body, ">"+title+"</th>") {
 			t.Errorf("missing survey column header %q", title)
 		}

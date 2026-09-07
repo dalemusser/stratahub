@@ -56,6 +56,8 @@ An inbound, key-authenticated endpoint the survey provider calls when a student 
 - [Admin Guide](member-status-api/admin-guide.md) - Setting the shared key, linking survey resources for the "Opened" state, reading the Surveys tab, changing the survey list, troubleshooting
 - [Plan](member-status-api/plan.md) - Design, decisions, and task-by-task implementation record; §8 specifies the Survey Events log (first data viewer)
 - [Rollout To-Do](member-status-api/rollout-todo.md) - Operator checklist for going live: backup, deploy, set the key, link the survey resources, hand-off to the provider, end-to-end curl verification, post-go-live watch items
+- [Check Script](member-status-api/check-script.md) - Running `scripts/member-status-api-check.sh`: inputs, the fifteen checks and their expected responses, reading the output against Survey Events, what each failure means
+- [Surveys Tab](member-status-api/surveys-tab.md) - The MHS Dashboard's Surveys tab: reading the pills, legend, and modal; the state ladder; how an API event (or a survey launch) becomes a cell, step by step
 
 ## Data Viewers
 

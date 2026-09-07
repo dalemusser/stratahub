@@ -15,7 +15,7 @@ import (
 
 func TestTrackedEntityHelpers(t *testing.T) {
 	opts := trackedEntityOptions()
-	if len(opts) != 4 || opts[0].ID != "pre" || opts[0].Label != "Pre-Survey" || opts[3].ID != "post" {
+	if len(opts) != 4 || opts[0].ID != "pre" || opts[0].Label != "Pre" || opts[3].ID != "post" {
 		t.Errorf("options from embedded config: %+v", opts)
 	}
 	for _, id := range []string{"", "pre", "mhs", "ews", "post"} {
@@ -69,7 +69,7 @@ func TestRecordSurveyOpened(t *testing.T) {
 	if err != nil {
 		t.Fatalf("expected an opened document: %v", err)
 	}
-	if doc.State != models.MemberStatusOpened || doc.OpenedAt == nil || doc.Source != models.MemberStatusSourceLaunch || doc.Entity != "Pre-Survey" {
+	if doc.State != models.MemberStatusOpened || doc.OpenedAt == nil || doc.Source != models.MemberStatusSourceLaunch || doc.Entity != "Pre" {
 		t.Errorf("doc: %+v", doc)
 	}
 	entries, _, err := logStore.List(ctx, memberstatuslog.ListQuery{WorkspaceID: wsID, Source: models.MemberStatusSourceLaunch})
@@ -79,7 +79,7 @@ func TestRecordSurveyOpened(t *testing.T) {
 	e := entries[0]
 	if e.Request.ResourceID != linked.ID.Hex() || e.Request.UserID != userID.Hex() || e.Request.StateNorm != models.MemberStatusOpened ||
 		e.Resolved.UserID == nil || *e.Resolved.UserID != userID || e.Resolved.OrganizationID == nil || *e.Resolved.OrganizationID != orgID ||
-		e.Resolved.EntityKey != "pre" || e.Resolved.EntityTitle != "Pre-Survey" || !e.Resolved.KnownEntity ||
+		e.Resolved.EntityKey != "pre" || e.Resolved.EntityTitle != "Pre" || !e.Resolved.KnownEntity ||
 		e.Resolved.StateApplied != models.MemberStatusOpened || e.Resolved.ResultingState != models.MemberStatusOpened || !e.Accepted() {
 		t.Errorf("launch log entry: %+v", e)
 	}

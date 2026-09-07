@@ -109,10 +109,10 @@ are per workspace.)
 
       | Resource (Abt link) | Survey Tracking |
       |---------------------|-----------------|
-      | Pre-survey          | Pre-Survey      |
+      | Pre-survey          | Pre             |
       | MHS engagement      | MHS Engagement  |
       | EWS engagement      | EWS Engagement  |
-      | Post-survey         | Post-Survey     |
+      | Post-survey         | Post            |
 
 - [ ] **Check each resource's URL identity mode.** The API identifies
       students by the 24-character hex `user_id` — the value StrataHub puts
@@ -155,6 +155,17 @@ are per workspace.)
       > survey links.
 
 ## 5. Verify end to end (curl)
+
+**Quick way:** `scripts/member-status-api-check.sh` runs every check in this
+section and prints PASS/FAIL for each, with the event ids to look up
+afterwards. The key goes in the environment, never on the command line:
+
+```bash
+MEMBER_STATUS_KEY='<KEY>' scripts/member-status-api-check.sh $HOST <USER_ID>
+# optional third argument: a survey the student has not completed yet (default Pre)
+```
+
+The commands below are the same checks by hand.
 
 Set these once per shell. Get a test student's `user_id` from Survey Events
 (filter Student by name; the id is in the row tooltip and the ▸ Details
@@ -214,6 +225,7 @@ J='Content-Type: application/json'
   - **Survey Events** (tick *Live* while sending): one row per request
     above, `Provider` source, the states as sent, the results; ▸ Details
     shows the request exactly as sent and the `event_id` you got back.
+    `images/survey-events-test.png` shows what the finished run looks like.
   - **MHS Dashboard → Surveys**: the test student shows ◑ Completed for Pre
     with the first `started`/`completed` receipt times; the modal links to
     their Survey Events.
@@ -267,3 +279,4 @@ J='Content-Type: application/json'
 | Survey list | `internal/app/resources/mhs_member_status.json` (embedded; edit → redeploy) |
 | Contract for Abt | `docs/member-status-api/provider-guide.md` |
 | Admin how-to + troubleshooting | `docs/member-status-api/admin-guide.md` (§6 has the symptom → fix table) |
+| Check script | `scripts/member-status-api-check.sh <host> [<user_id>] [<survey>]`, key in `MEMBER_STATUS_KEY` — [how-to](check-script.md) |

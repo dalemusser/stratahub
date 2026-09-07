@@ -142,10 +142,10 @@ Config file `internal/app/resources/mhs_member_status.json` (embedded alongside 
 {
   "tab_title": "Surveys",
   "items": [
-    { "id": "pre",  "title": "Pre-Survey",     "short_name": "Pre",  "api_names": ["Pre"],            "description": "Taken before Unit 1." },
+    { "id": "pre",  "title": "Pre",     "short_name": "Pre",  "api_names": ["Pre"],            "description": "Taken before Unit 1." },
     { "id": "mhs",  "title": "MHS Engagement", "short_name": "MHS",  "api_names": ["MHS Engagement"], "description": "…" },
     { "id": "ews",  "title": "EWS Engagement", "short_name": "EWS",  "api_names": ["EWS Engagement"], "description": "…" },
-    { "id": "post", "title": "Post-Survey",    "short_name": "Post", "api_names": ["Post"],           "description": "Taken after the final unit." }
+    { "id": "post", "title": "Post",    "short_name": "Post", "api_names": ["Post"],           "description": "Taken after the final unit." }
   ]
 }
 ```

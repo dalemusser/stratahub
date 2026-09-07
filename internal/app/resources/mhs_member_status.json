@@ -3,7 +3,7 @@
   "items": [
     {
       "id": "pre",
-      "title": "Pre-Survey",
+      "title": "Pre",
       "short_name": "Pre",
       "api_names": ["Pre"],
       "description": "Survey taken before students begin Mission HydroSci."
@@ -24,7 +24,7 @@
     },
     {
       "id": "post",
-      "title": "Post-Survey",
+      "title": "Post",
       "short_name": "Post",
       "api_names": ["Post"],
       "description": "Survey taken after students finish Mission HydroSci."

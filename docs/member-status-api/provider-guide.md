@@ -95,12 +95,16 @@ was applied (which may be higher than the state you sent — see below).
 report of each state; a field is omitted when that state has not been
 reported.
 
+`entity` echoes StrataHub's name for the survey — the same string you sent —
+and `entity_key` is StrataHub's internal id for it, which you can ignore.
+
 `event_id` identifies StrataHub's record of this request. Every request that
 passes authentication is logged — accepted or rejected — with exactly what
 was sent and how it was handled, and StrataHub staff can look an `event_id`
-up in their Survey Events view. If something looks wrong on your side, quote
-the `event_id` and they can see the same record. Rejected requests carry an
-`event_id` too (except authentication failures, which are not logged).
+up in their Survey Events view (see [Seeing that a call worked](#seeing-that-a-call-worked)).
+If something looks wrong on your side, quote the `event_id` and they can see
+the same record. Rejected requests carry an `event_id` too (except
+authentication failures, which are not logged).
 
 ---
 
@@ -145,6 +149,34 @@ Content-Type: application/json
 
 `entities` lists the exact survey names currently configured, in order — a
 convenient way to confirm your strings match before sending real events.
+
+---
+
+## Seeing that a call worked
+
+The response is the first confirmation: `200` with `"ok": true`, plus the
+`state` and timestamps StrataHub now holds for that student and survey. Keep
+the `event_id`.
+
+StrataHub also logs every request that passed authentication, accepted or
+rejected, in a view its staff call **Survey Events**. Each row is one
+request: when it arrived, that it came from the provider, the student it
+resolved to, the survey (an unrecognized name is flagged), the state you
+sent, and the result — the student's resulting status when accepted, or the
+error code when rejected. Opening a row shows the request exactly as it
+arrived and the `event_id` that was returned to you.
+
+![Survey Events after a test run: four accepted events for one student, one of them under an unrecognized survey name, and four rejected requests](images/survey-events-test.png)
+
+Two ways to use it:
+
+- **During integration testing**, ask StrataHub for an analyst login on
+  their test workspace. You can then watch your own test sends land (tick
+  *Live* for a 10-second refresh) and filter by *Event id* to find a
+  specific one.
+- **In production**, StrataHub staff use the same view. If a send looks
+  wrong on your side, quote the `event_id` from the response and they can
+  open the same record.
 
 ---
 

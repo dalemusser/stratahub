@@ -55,7 +55,7 @@ which resource is which survey.
 For each survey resource (Resources → open the resource → **Edit**):
 
 1. Under **Survey Tracking**, choose the survey this resource is
-   (Pre-Survey, MHS Engagement, EWS Engagement, or Post-Survey).
+   (Pre, MHS Engagement, EWS Engagement, or Post).
 2. Save.
 
 That's all. From then on, when a student launches the resource, the Surveys
@@ -68,6 +68,10 @@ The View page for a resource shows its current Survey Tracking selection.
 ---
 
 ## 3. Read the Surveys tab
+
+For the full picture — every state, the ladder rules, the modal, and how an
+event received by the API becomes a cell — see the
+[Surveys Tab](surveys-tab.md) guide. In short:
 
 MHS Dashboard → **Surveys** tab (leaders, admins, coordinators).
 
@@ -104,7 +108,7 @@ The surveys are defined in one file in the StrataHub source:
   "items": [
     {
       "id": "pre",
-      "title": "Pre-Survey",
+      "title": "Pre",
       "short_name": "Pre",
       "api_names": ["Pre"],
       "description": "Survey taken before students begin Mission HydroSci."
@@ -145,6 +149,14 @@ each provider request, accepted or rejected, and each survey link a student
 opened — so you (or the provider's developer, with an analyst login) can
 confirm an event arrived, was stored, and carried the right content.
 
+![Survey Events after a test run: four accepted events for one student, one of them under an unrecognized survey name, and four rejected requests](images/survey-events-test.png)
+
+_Above: a test workspace after the checks in the rollout to-do
+(`scripts/member-status-api-check.sh`) — the four rejected requests need no
+real student; the four accepted ones are one test student's `started`,
+`completed`, a late `started` that left the status at Completed, and a send
+under an unrecognized name._
+
 - **Filters:** received time (last hour / 24 h / 7 d / 30 d / custom), source
   (provider or launch), survey, state sent, result (accepted, rejected, or a
   specific error), student (name or 24-character id), event id, and — for
@@ -166,6 +178,10 @@ confirm an event arrived, was stored, and carried the right content.
   analysts only.
 
 ## 6. Troubleshooting
+
+The quickest way to reproduce a symptom is `scripts/member-status-api-check.sh`
+(see the [Check Script](check-script.md) guide); its output names the HTTP
+status and error code to look up below.
 
 | Symptom | Likely cause | Fix |
 |---------|--------------|-----|

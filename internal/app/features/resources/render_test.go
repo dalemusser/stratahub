@@ -66,7 +66,7 @@ func TestResourceFormsRenderSurveyTracking(t *testing.T) {
 		t.Fatalf("new: status %d; %s", rec.Code, rec.Body.String())
 	}
 	body := rec.Body.String()
-	for _, want := range []string{`name="tracked_entity_id"`, `<option value="" selected>None`, `<option value="pre" >Pre-Survey`, `<option value="post" >Post-Survey`} {
+	for _, want := range []string{`name="tracked_entity_id"`, `<option value="" selected>None`, `<option value="pre" >Pre</option>`, `<option value="post" >Post</option>`} {
 		if !strings.Contains(body, want) {
 			t.Errorf("new form missing %q", want)
 		}
@@ -108,7 +108,7 @@ func TestResourceFormsRenderSurveyTracking(t *testing.T) {
 		t.Fatalf("view: status %d; %s", rec.Code, rec.Body.String())
 	}
 	body = rec.Body.String()
-	if !strings.Contains(body, `value="Pre-Survey" readonly`) || !strings.Contains(body, "Opening this resource marks the survey") {
+	if !strings.Contains(body, `value="Pre" readonly`) || !strings.Contains(body, "Opening this resource marks the survey") {
 		t.Error("view page does not show the survey tracking label")
 	}
 }
