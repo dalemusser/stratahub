@@ -26,7 +26,7 @@ survey-specific.
 
 | Fact | Consequence |
 |------|-------------|
-| Workspace is resolved from the request `Host` by `workspace.Middleware` (`internal/app/system/workspace/workspace.go:50`); `workspace.IDFromRequest(r)` gives the ID, `NilObjectID` on apex. | The provider calls the **workspace host** (e.g. `https://mhs.adroit.games/api/member-status`). No key→workspace lookup needed. Apex → 400 JSON. |
+| Workspace is resolved from the request `Host` by `workspace.Middleware` (`internal/app/system/workspace/workspace.go:50`); `workspace.IDFromRequest(r)` gives the ID, `NilObjectID` on apex. | The provider calls the **workspace host** (e.g. `https://<workspace-host>/api/member-status`). No key→workspace lookup needed. Apex → 400 JSON. |
 | Per-workspace admin settings live in `site_settings` (`models.SiteSettings`), edited at `/settings` (admin + superadmin; menu label "Settings", title "Workspace Settings"). The MHS section there already holds `MHSMemberAuthKeyword`, `EnableClaudeSummaries`, `ClaudeModel`. | The shared key goes in `SiteSettings` and is edited on `/settings`, in the existing MHS section. |
 | `settingsstore.Save` `$set`s a fixed whitelist of fields from the struct it is handed. `/settings` (`settings/admin.go:298-311`) and `/workspaces/{id}/settings` (`workspaces/settings.go:221-229`) both build a **fresh** struct from form fields, so each save blanks fields the form doesn't carry (today: `/settings` blanks `mhs_active_collection_id`; the apex page blanks nearly everything MHS-related). | **Pre-existing bug.** Must be fixed before adding the key, or the key will be wiped by the next unrelated settings save. See Task 0. |
 | `gorilla/csrf` is installed globally (`bootstrap/routes.go:252`) before every mount; no exemption mechanism exists yet. Sub-router middleware runs *after* it. | Add a path-scoped `csrf.UnsafeSkipCheck` middleware immediately **before** `r.Use(csrfMiddleware)`. |
@@ -42,7 +42,7 @@ survey-specific.
 
 ### 3.1 API contract (provider-facing)
 
-Base: the workspace host, e.g. `https://mhs.adroit.games`.
+Base: the workspace host, written `https://<workspace-host>` in the guides.
 
 **Auth.** Server-to-server over HTTPS; no cookies, no login, no session. The provider's server includes the workspace's shared key **as a string field in the JSON body** (`"key"`). The key is per workspace, set by an admin on the Settings page. Missing/invalid → `401` JSON. No key configured for the workspace → `401` with `"error":"not_configured"`. Repeated failures from one IP are throttled (`429`). (An `Authorization: Bearer <key>` header is accepted as an undocumented alternative; the body field is the contract.)
 

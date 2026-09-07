@@ -26,8 +26,8 @@ Settings → **Member Status API — Shared Key** (in the Mission HydroSci secti
    you — 16 to 128 characters, no spaces).
 2. Click **Save**. The key takes effect immediately.
 3. Click **Show** and **Copy** to hand the key to the provider, along with the
-   endpoint shown on the same page (for example
-   `POST https://mhs.adroit.games/api/member-status`). Send it through a
+   endpoint shown on the same page
+   (`POST https://<workspace-host>/api/member-status`). Send it through a
    private channel, not email in the clear if you can avoid it.
 
 Give the provider the [Provider Guide](provider-guide.md); it has everything

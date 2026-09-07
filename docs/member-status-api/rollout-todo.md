@@ -6,8 +6,11 @@ integration to Abt. Companion to the [Admin Guide](admin-guide.md) and the
 [Provider Guide](provider-guide.md)._
 
 > This file lives in a **public repository**. Never paste the shared key, a
-> real survey URL, or a student's name into it. Placeholders: `<KEY>`,
-> `<USER_ID>`.
+> real survey URL, a student's name, or the server's address into it.
+> Placeholders: `<KEY>`, `<USER_ID>`, `<workspace-host>` (the MHS workspace
+> URL), and `<server>` (the SSH target; user, host, and key file are in
+> `stratahub_update/aws_update.sh`, outside this repo). Remote paths are
+> relative to the service user's home (`~`).
 
 **Starting point (2026-08-27):** everything is on `main` (`5a2827c`). The only
 piece already in production is the settings-save fix (Task 0). One deploy
@@ -31,8 +34,8 @@ are per workspace.)
       ```
 - [ ] Keep the running binary so rollback is a rename:
       ```bash
-      ssh -i ~/Desktop/Adroit.pem ubuntu@adroit.games \
-        'cp /home/ubuntu/stratahub-linux-386 /home/ubuntu/stratahub-linux-386.prev'
+      ssh <server> \
+        'cp ~/stratahub-linux-386 ~/stratahub-linux-386.prev'
       ```
 - [ ] Confirm `stratahub_update/config.toml` is the one you want uploaded
       (the update script uploads it alongside the binary).
@@ -50,21 +53,22 @@ are per workspace.)
       400-day `ttl_mslog_received`, and `idx_audit_ws_timestamp` on
       `audit_events`); index builds are logged as `ensuring index`:
       ```bash
-      ssh -i ~/Desktop/Adroit.pem ubuntu@adroit.games \
+      ssh <server> \
         "journalctl -u stratahub -n 300 --no-pager | grep -i 'ensuring index\|member_status\|mslog\|audit_ws\|listening\|error'"
       ```
 - [ ] Smoke checks (no login needed):
       ```bash
-      curl -sS https://mhs.adroit.games/health
+      HOST=https://<workspace-host>
+      curl -sS $HOST/health
 
       # Route is live and CSRF-exempt; no key set yet → 401 not_configured.
       # Send a placeholder key: the API rejects a *missing* key before it
       # looks at the workspace, so an empty body always gets "unauthorized".
-      curl -sS -i -X POST https://mhs.adroit.games/api/member-status/ping \
+      curl -sS -i -X POST $HOST/api/member-status/ping \
         -H 'Content-Type: application/json' -d '{"key":"smoke-test"}'
 
       # Old audit address redirects to the viewer
-      curl -sS -o /dev/null -w '%{http_code} -> %{redirect_url}\n' https://mhs.adroit.games/audit
+      curl -sS -o /dev/null -w '%{http_code} -> %{redirect_url}\n' $HOST/audit
       ```
       Expect `200`, then `HTTP/… 401` with
       `{"ok":false,"error":"not_configured",…}`, then `302 -> …/views/audit-log`.
@@ -78,8 +82,8 @@ are per workspace.)
 - [ ] **Rollback** (if anything is wrong): the new collections and indexes
       are harmless to leave in place.
       ```bash
-      ssh -i ~/Desktop/Adroit.pem ubuntu@adroit.games \
-        'sudo systemctl stop stratahub && mv /home/ubuntu/stratahub-linux-386.prev /home/ubuntu/stratahub-linux-386 && sudo systemctl start stratahub && sudo systemctl status stratahub'
+      ssh <server> \
+        'sudo systemctl stop stratahub && mv ~/stratahub-linux-386.prev ~/stratahub-linux-386 && sudo systemctl start stratahub && sudo systemctl status stratahub'
       ```
 
 ## 2. Set the shared key (per workspace)
@@ -91,7 +95,7 @@ are per workspace.)
 - [ ] Confirm the key works (also confirms the survey names the workspace
       expects):
       ```bash
-      HOST=https://mhs.adroit.games
+      HOST=https://<workspace-host>
       KEY='<KEY>'
       curl -sS -X POST $HOST/api/member-status/ping \
         -H 'Content-Type: application/json' -d "{\"key\":\"$KEY\"}"
@@ -128,7 +132,7 @@ are per workspace.)
   - the **Provider Guide** (`docs/member-status-api/provider-guide.md` — the
     complete contract: endpoint, payload, names, semantics, error codes,
     curl/Python examples);
-  - the **host**: `https://mhs.adroit.games`;
+  - the **host** (the MHS workspace URL; not written here, this repo is public);
   - the **key**;
   - the four `entity` strings exactly: `Pre`, `MHS Engagement`,
     `EWS Engagement`, `Post` (the ping response lists them too);
@@ -143,7 +147,7 @@ are per workspace.)
 - [ ] Message skeleton:
 
       > StrataHub is ready to receive survey status. Endpoint and format are in
-      > the attached guide; the host is https://mhs.adroit.games. The shared key
+      > the attached guide; the host is <workspace-host>. The shared key
       > follows separately. Please start with the ping call to confirm the key
       > and the survey names, then send `started`/`completed` events as they
       > occur. Responses include an `event_id` — include it if you ask us about
@@ -157,7 +161,7 @@ Set these once per shell. Get a test student's `user_id` from Survey Events
 panel), from the Members Report CSV, or from the launch row created in §3.
 
 ```bash
-HOST=https://mhs.adroit.games
+HOST=https://<workspace-host>
 KEY='<KEY>'
 UID_HEX='<USER_ID>'          # 24 lowercase hex characters
 J='Content-Type: application/json'
@@ -216,7 +220,7 @@ J='Content-Type: application/json'
   - **Server log** for the warnings on the unknown-user and
     unrecognized-name sends:
     ```bash
-    ssh -i ~/Desktop/Adroit.pem ubuntu@adroit.games \
+    ssh <server> \
       "journalctl -u stratahub -n 200 --no-pager | grep -i 'member status'"
     ```
 - [ ] Clean up the test student's status if you used a real class group
@@ -255,7 +259,7 @@ J='Content-Type: application/json'
 | Thing | Where |
 |-------|-------|
 | Deploy / stop / backup scripts | `/Users/dale/Documents/catchupstratahub/stratahub_update/{aws_update.sh, aws_stop.sh, aws_db_backup.sh}` |
-| Server | `ubuntu@adroit.games`, key `~/Desktop/Adroit.pem`, service `stratahub`, binary `/home/ubuntu/stratahub-linux-386`, config `/home/ubuntu/config.toml` |
+| Server | SSH target and key file: see `stratahub_update/aws_update.sh` (not in this repo); service `stratahub`; binary `~/stratahub-linux-386` and config `~/config.toml` in the service user's home |
 | Logs | `journalctl -u stratahub -f` |
 | Key setting | Settings → Member Status API — Shared Key (`/settings`) |
 | Resource link | Resources → Edit → Survey Tracking |

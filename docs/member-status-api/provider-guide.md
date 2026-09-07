@@ -23,17 +23,17 @@ no session, no cookies, no login — just a shared key included in each request.
 | States you report | `started`, `completed` |
 | Retries | Safe: the endpoint is idempotent (see "Semantics") |
 
-The **workspace host** is the StrataHub host students use for the study, for
-example `https://mhs.adroit.games`. StrataHub provides the host and the shared
-key when the integration is set up. If either changes you will be told; the
-request format will not change.
+The **workspace host** is the StrataHub host students use for the study. It
+is written as `<workspace-host>` throughout this guide; StrataHub gives you
+the actual host and the shared key when the integration is set up. If either
+changes you will be told; the request format will not change.
 
 ---
 
 ## Reporting an event
 
 ```
-POST https://mhs.adroit.games/api/member-status
+POST https://<workspace-host>/api/member-status
 Content-Type: application/json
 ```
 
@@ -127,7 +127,7 @@ Send events as they happen, one request per event. There is no batch endpoint.
 ## Checking connectivity and the key
 
 ```
-POST https://mhs.adroit.games/api/member-status/ping
+POST https://<workspace-host>/api/member-status/ping
 Content-Type: application/json
 
 {"key": "ms_…the shared key…"}
@@ -180,7 +180,7 @@ and should not be retried unchanged.
 ### curl
 
 ```bash
-curl -sS -X POST https://mhs.adroit.games/api/member-status \
+curl -sS -X POST https://<workspace-host>/api/member-status \
   -H 'Content-Type: application/json' \
   -d '{"key":"ms_…","user_id":"68f138c495cdf54a392b20aa","entity":"Pre","state":"started"}'
 ```
@@ -190,7 +190,7 @@ curl -sS -X POST https://mhs.adroit.games/api/member-status \
 ```python
 import requests
 
-STRATAHUB = "https://mhs.adroit.games"
+STRATAHUB = "https://<workspace-host>"  # the host StrataHub gave you
 KEY = "ms_…"
 
 def report(user_id: str, entity: str, state: str, occurred_at: str | None = None) -> dict:

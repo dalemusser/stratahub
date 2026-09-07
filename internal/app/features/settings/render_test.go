@@ -108,7 +108,7 @@ func TestMemberStatusEndpoint(t *testing.T) {
 		tls         bool
 		want        string
 	}{
-		{"mhs.adroit.games", "", false, "https://mhs.adroit.games/api/member-status"},
+		{"hub.example.org", "", false, "https://hub.example.org/api/member-status"},
 		{"localhost:8080", "", false, "http://localhost:8080/api/member-status"},
 		{"127.0.0.1:8080", "", false, "http://127.0.0.1:8080/api/member-status"},
 		{"localhost:8080", "https", false, "https://localhost:8080/api/member-status"},
