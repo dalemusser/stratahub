@@ -9,9 +9,11 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/store/mhsbuilds"
 	"github.com/dalemusser/stratahub/internal/app/store/mhscollections"
 	"github.com/dalemusser/stratahub/internal/app/store/mhsdevicestatus"
+	"github.com/dalemusser/stratahub/internal/app/store/mhsdevicetests"
 	"github.com/dalemusser/stratahub/internal/app/store/mhsuserprogress"
 	settingsstore "github.com/dalemusser/stratahub/internal/app/store/settings"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
+	"github.com/dalemusser/stratahub/internal/app/system/ratelimit"
 	"github.com/dalemusser/stratahub/internal/app/system/staffauth"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.uber.org/zap"
@@ -42,13 +44,15 @@ type Handler struct {
 	Probes            []ManifestProbe // game-service reachability probes, served with the manifest
 	ProgressStore     *mhsuserprogress.Store
 	DeviceStatusStore *mhsdevicestatus.Store
+	DeviceTestStore   *mhsdevicetests.Store
 	SettingsStore     *settingsstore.Store
 	CollectionStore   *mhscollections.Store
 	BuildStore        *mhsbuilds.Store
 	SessionMgr        *auth.SessionManager
 	StaffAuthVerifier *staffauth.Verifier
 	UnlockStore       *staffauth.UnlockStore
-	authThrottle      *authThrottle // per-member backoff on failed member-auth attempts
+	authThrottle      *authThrottle      // per-member backoff on failed member-auth attempts
+	startLimiter      *ratelimit.Limiter // per-IP quota on starting device-test runs
 }
 
 // ProbesFromServices derives reachability probes (the services' /health
@@ -79,11 +83,13 @@ func NewHandler(db *mongo.Database, errLog *uierrors.ErrorLogger, cdnBaseURL str
 		Services:          services,
 		ProgressStore:     mhsuserprogress.New(db),
 		DeviceStatusStore: mhsdevicestatus.New(db),
+		DeviceTestStore:   mhsdevicetests.New(db),
 		SettingsStore:     settingsstore.New(db),
 		CollectionStore:   mhscollections.New(db),
 		BuildStore:        mhsbuilds.New(db),
 		SessionMgr:        sm,
 		UnlockStore:       staffauth.NewUnlockStore(db),
 		authThrottle:      newAuthThrottle(),
+		startLimiter:      ratelimit.New(deviceTestStartLimit, deviceTestStartWindow),
 	}
 }

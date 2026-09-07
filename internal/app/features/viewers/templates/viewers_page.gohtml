@@ -11,6 +11,7 @@
   <div class="flex items-center gap-2">
     <a href="/views" class="text-sm px-2 py-1 border dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-300">All views</a>
     <a id="viewer-export" href="{{ .ExportURL }}" class="text-sm px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700">Export CSV</a>
+    {{ if .ExportJSONURL }}<a id="viewer-export-json" href="{{ .ExportJSONURL }}" class="text-sm px-2 py-1 bg-indigo-600 text-white rounded hover:bg-indigo-700" title="Every field, including logs and snapshots">Export JSON</a>{{ end }}
   </div>
 </div>
 
@@ -140,6 +141,8 @@
       var q = replaced.indexOf('?') >= 0 ? replaced.slice(replaced.indexOf('?')) : '';
       var a = document.getElementById('viewer-export');
       if (a) a.href = a.href.split('?')[0] + q;
+      var j = document.getElementById('viewer-export-json');
+      if (j) j.href = j.href.split('?')[0] + q;
     }
   });
 </script>

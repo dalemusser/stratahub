@@ -74,6 +74,19 @@ type Liveable interface {
 	LiveIntervalSeconds() int
 }
 
+// JSONExporter streams the current filter within scope as JSON — the
+// full-fidelity download for viewers whose rows carry more than their
+// columns (nested logs, snapshots). Served at /{slug}/export.json.
+type JSONExporter interface {
+	ExportJSON(ctx context.Context, scope *viewscope.Scope, f Filters, w io.Writer) error
+}
+
+// JSONDetailer returns one row as a JSON document for download, served at
+// /{slug}/rows/{id}/export.json. Return ErrNotFound for out-of-scope ids.
+type JSONDetailer interface {
+	DetailJSON(ctx context.Context, scope *viewscope.Scope, id string) ([]byte, error)
+}
+
 // ColumnSpec describes one table column.
 type ColumnSpec struct {
 	Key   string // stable identifier (CSV header falls back to Label)

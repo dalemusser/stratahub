@@ -83,5 +83,9 @@ func isExemptPath(path string) bool {
 		// Member Status API: key-authenticated server-to-server reports from an
 		// external provider. It has no user to show a maintenance page to, and
 		// events it reports during maintenance would otherwise be lost.
-		strings.HasPrefix(path, "/api/member-status")
+		strings.HasPrefix(path, "/api/member-status") ||
+		// Mission HydroSci device test: a public page a school runs without an
+		// account; its content route is served by the service worker/CDN.
+		strings.HasPrefix(path, "/missionhydrosci/devicetest") ||
+		strings.HasPrefix(path, "/missionhydrosci/content/")
 }

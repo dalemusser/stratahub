@@ -321,6 +321,15 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	r.Get("/sw.js", missionHydroSciHandler.ServeServiceWorker)
 	r.Get("/manifest.json", missionHydroSciHandler.ServeManifest)
 	r.Handle("/missionhydrosci/content/*", missionHydroSciHandler.ContentFallback())
+	// Unit 2 Device Test: public, no session. The workspace comes from the host
+	// (workspace.Middleware above), CSRF tokens are issued to anonymous pages,
+	// and this path is more specific than the session-gated /missionhydrosci
+	// mount, so it wins in chi's trie (as /missionhydrosci/content/* does).
+	// See docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md §4.
+	r.Route(missionhydroscifeature.DeviceTestPathPrefix, func(dt chi.Router) {
+		dt.Use(workspace.RequireWorkspace) // every handler bounds its own DB context
+		missionHydroSciHandler.MountDeviceTestRoutes(dt)
+	})
 
 	// Public pages
 	homeHandler := homefeature.NewHandler(deps.StrataHubMongoDatabase, logger)
@@ -639,6 +648,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 			viewerRegistry.Register(surveyEvents)
 		}
 		viewerRegistry.Register(views.NewAuditLog(deps.StrataHubMongoDatabase))
+		viewerRegistry.Register(views.NewDeviceTests(deps.StrataHubMongoDatabase, deps.StratalogDatabase, deps.MHSGraderDatabase))
 		viewersHandler := viewersfeature.NewHandler(deps.StrataHubMongoDatabase, viewerRegistry, errLog, logger)
 		wsr.Mount("/views", viewersfeature.Routes(viewersHandler, sessionMgr))
 	})

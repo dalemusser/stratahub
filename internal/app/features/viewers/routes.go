@@ -15,6 +15,8 @@ import (
 //	GET /views/{slug}/table          HTMX partial: table, or rows-only with ?after=
 //	GET /views/{slug}/rows/{id}      HTMX partial: one row's detail
 //	GET /views/{slug}/export.csv     CSV of the current filter within scope
+//	GET /views/{slug}/export.json    JSON of the current filter (JSONExporter viewers only)
+//	GET /views/{slug}/rows/{id}/export.json  one row as JSON (JSONDetailer viewers only)
 func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 	r := chi.NewRouter()
 	r.Use(sm.RequireSignedIn)
@@ -23,7 +25,9 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 	r.Get("/{slug}", h.ServePage)
 	r.Get("/{slug}/table", h.ServeTable)
 	r.Get("/{slug}/rows/{id}", h.ServeDetail)
+	r.Get("/{slug}/rows/{id}/export.json", h.ServeDetailJSON)
 	r.Get("/{slug}/export.csv", h.ServeExport)
+	r.Get("/{slug}/export.json", h.ServeExportJSON)
 
 	return r
 }

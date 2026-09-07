@@ -2,6 +2,11 @@
 
 **Discovered:** 2026-07-05
 **Area:** Content delivery (PWA download, Cache Storage, quota management)
+**Status (2026-09-07):** MHS-001..021 shipped; the loading-status work
+(automatic retries, preflights, the per-load step log) and the Unit 2 device
+test are implemented — see
+`docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md`;
+MHS-005/006/008 are closed by it. Earlier status, kept for the record:
 **Status (as of 2026-07-07): in QA.** All tracked fixes are implemented and
 the build is in the QA team's hands; issues will be filed here as feedback
 arrives. Timeline: MHS-001, -002, -003, -007, -009, -010, -011, -012

@@ -164,7 +164,7 @@
     </script>
 
     <div id="unity-container">
-      <a id="back-btn" href="/missionhydrosci/units" title="Back to Mission HydroSci" aria-label="Back to Mission HydroSci"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" style="vertical-align: middle;" aria-hidden="true"><path d="M13 4 L7 10 L13 16" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      <a id="back-btn" href="{{ if .PlayBackURL }}{{ .PlayBackURL }}{{ else }}/missionhydrosci/units{{ end }}" title="Back to Mission HydroSci" aria-label="Back to Mission HydroSci"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" style="vertical-align: middle;" aria-hidden="true"><path d="M13 4 L7 10 L13 16" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
       <button id="fullscreen-btn" onclick="toggleFullscreen()" title="Fullscreen" aria-label="Toggle fullscreen">⛶</button>
       <div id="loading-overlay">
         <h2>Loading {{ .UnitTitle }}...</h2>
@@ -330,10 +330,51 @@
         return isExternalGameUrl(url) || isUnitTransitionUrl(url);
       }
 
+      {{ if .DeviceTest }}
+      // Device test: there is no next unit and no progress record. Record the
+      // completion on the run and show the "Test complete" screen with the
+      // code the tester can quote back to us.
+      var deviceTestBase = '{{ .DeviceTestBase }}';
+      function deviceTestComplete() {
+        var overlay = document.getElementById('unit-complete-overlay');
+        var title = document.getElementById('overlay-title');
+        var msg = document.getElementById('overlay-message');
+        var bar = document.getElementById('overlay-download-bar');
+        if (title) title.textContent = 'Test complete';
+        if (msg) {
+          msg.textContent = '';
+          msg.appendChild(document.createTextNode('{{ .UnitTitle }} was finished on this device. Test code '));
+          var code = document.createElement('strong');
+          code.textContent = '{{ .DeviceTestShortID }}';
+          msg.appendChild(code);
+          msg.appendChild(document.createTextNode('. '));
+          var link = document.createElement('a');
+          link.href = deviceTestBase;
+          link.textContent = 'Back to the test page';
+          link.style.color = '#93c5fd';
+          link.style.textDecoration = 'underline';
+          msg.appendChild(link);
+        }
+        if (bar) bar.style.display = 'none';
+        if (overlay) overlay.classList.remove('hidden');
+        if (window.__mhsStepLog && window.__mhsStepLog.flush) window.__mhsStepLog.flush(true);
+        fetch(deviceTestBase + '/complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+          body: '{}',
+          keepalive: true
+        }).catch(function() {});
+      }
+      {{ end }}
+
       function handleUnitComplete() {
         if (completionHandled) return;
         completionHandled = true;
         if (window.__mhsStepLog) window.__mhsStepLog.record('game', 'ok', 'Unit complete reported by the game');
+        {{ if .DeviceTest }}
+        deviceTestComplete();
+        return;
+        {{ end }}
 
         // Show overlay immediately
         var overlay = document.getElementById('unit-complete-overlay');
@@ -557,8 +598,8 @@
       // the player uses the back button instead.
       // TODO: Remove backward compatibility note once all builds use the new MHSBridge.
       window.mhsEndGame = function() {
-        console.log('MHS: mhsEndGame called — returning to units page');
-        window.location.href = '/missionhydrosci/units';
+        console.log('MHS: mhsEndGame called — returning to the launcher');
+        window.location.href = '{{ if .PlayBackURL }}{{ .PlayBackURL }}{{ else }}/missionhydrosci/units{{ end }}';
       };
 
       // Expose for cleanup script
@@ -605,12 +646,13 @@
       // Per-load step log (continues the units page's log in this tab).
       var stepLog = new MHSStepLog();
       stepLog.start({
-        page: 'play',
+        page: {{ if .DeviceTest }}'devicetest-play'{{ else }}'play'{{ end }},
         host: location.host,
         workspace: location.hostname.split('.')[0],
         unit: unitId,
         version: unitVersion,
         unitTitle: '{{ .UnitTitle }}',
+        {{ if .DeviceTest }}testId: '{{ .DeviceTestID }}',{{ end }}
         deviceId: (function() { try { return localStorage.getItem('mhs-device-id') || ''; } catch (e) { return ''; } })(),
         userAgent: navigator.userAgent,
         deliveryVersion: '{{ mhsDeliveryVersion }}',
@@ -618,6 +660,21 @@
       });
       window.__mhsStepLog = stepLog; // shared with the completion overlay's manager
       var stepPanel = MHSStepLog.mount(stepLog, document.getElementById('mhs-steplog'), {});
+      {{ if .DeviceTest }}
+      // Device test: stream the log and the launch timings to the run record.
+      stepLog.enableServerFlush('{{ .DeviceTestBase }}/steps', '{{ .CSRFToken }}', 5000);
+      var deviceTestLoaderMs = 0;
+      function deviceTestSummary(body) {
+        try {
+          fetch('{{ .DeviceTestBase }}/summary', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{ .CSRFToken }}' },
+            body: JSON.stringify(body),
+            keepalive: true
+          }).catch(function() {});
+        } catch (e) { /* best effort */ }
+      }
+      {{ end }}
       var loadingStepEl = document.getElementById('loading-step');
       stepLog.onChange(function(entry) {
         if (!entry || !loadingStepEl) return;
@@ -668,6 +725,7 @@
         stepLog.record('game', 'fail', 'Crash (' + (type || 'unknown') + ', ' + (phase || crashPhase) + '): ' +
           String(message || '').slice(0, 200));
         if ((phase || crashPhase) !== 'running') showStepLogOnFailure();
+        {{ if .DeviceTest }}deviceTestSummary({ crash: true });{{ end }}
 
         var logUrl = '{{ .LogSubmitURL }}';
         var logAuth = '{{ .LogAuth }}';
@@ -804,6 +862,7 @@
         crashPhase = 'compiling';
         stepLog.record('launch', 'ok', 'Game loader loaded' + loaderSource());
         stepLog.record('launch', 'running', 'Starting Unity…');
+        {{ if .DeviceTest }}deviceTestLoaderMs = Date.now() - launchStartedAt;{{ end }}
 
         createUnityInstance(canvas, {
           dataUrl: buildUrl + '/{{ .DataFile }}',
@@ -848,6 +907,12 @@
           requestAnimationFrame(function() {
             requestAnimationFrame(function() {
               stepLog.record('game', 'ok', 'Game is rendering');
+              {{ if .DeviceTest }}
+              deviceTestSummary({
+                launch: { loader_ms: deviceTestLoaderMs, unity_ms: Date.now() - launchStartedAt, first_frame_ms: Date.now() - launchStartedAt },
+                gameplay_reached: true
+              });
+              {{ end }}
             });
           });
         }).catch(function(err) {

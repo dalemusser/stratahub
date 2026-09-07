@@ -55,6 +55,15 @@ type PlayData struct {
 	SettingsSaveURL string
 	SettingsLoadURL string
 	SaveAuth        string
+
+	// Device test (docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md):
+	// the page runs one unit for an anonymous tester. DeviceTest switches the
+	// template's completion, back-button and reporting branches.
+	DeviceTest        bool
+	DeviceTestID      string // 24-hex test id (also the game's user_id)
+	DeviceTestShortID string // last 6 hex characters, quoted back to us by testers
+	DeviceTestBase    string // "/missionhydrosci/devicetest/run/<id>"
+	PlayBackURL       string // where the back button goes
 }
 
 // OfflineData is the view model for the offline fallback page.

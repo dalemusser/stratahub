@@ -1,0 +1,443 @@
+{{ define "devicetest_run" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="max-w-2xl mx-auto">
+  <div class="mb-3 rounded-md bg-indigo-50 dark:bg-indigo-900/30 px-3 py-2 text-xs text-indigo-800 dark:text-indigo-200 flex flex-wrap items-center justify-between gap-2">
+    <span>Device test · {{ .School }}</span>
+    <span>Test code <strong class="font-mono">{{ .ShortID }}</strong></span>
+  </div>
+
+  <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+    <div class="text-center mb-4">
+      <h2 class="text-xl font-semibold text-gray-900 dark:text-gray-100">{{ .UnitTitle }} <span class="text-sm font-normal text-gray-500 dark:text-gray-400">v{{ .UnitVersion }} · {{ .SizeLabel }}</span></h2>
+      {{ if .Completed }}
+      <div id="unit-status" class="text-sm text-green-600 dark:text-green-400 font-medium mt-1">Test complete — {{ .UnitTitle }} was finished on this device.</div>
+      {{ else if .Expired }}
+      <div id="unit-status" class="text-sm text-amber-600 dark:text-amber-400 mt-1">This test run has expired. <a class="underline" href="/missionhydrosci/devicetest">Start a new test</a>.</div>
+      {{ else }}
+      <div id="unit-status" role="status" aria-live="polite" class="text-sm text-gray-500 dark:text-gray-400 mt-1">Checking...</div>
+      {{ end }}
+    </div>
+
+    <div id="progress-wrap" class="mb-4 hidden">
+      <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+        <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all" style="width: 0%"></div>
+      </div>
+      <div id="progress-text" class="text-xs text-gray-500 dark:text-gray-400 mt-1 text-center">0%</div>
+    </div>
+
+    <div class="flex flex-col gap-2">
+      <button id="download-btn" onclick="mhsDownload('{{ .UnitID }}')"
+              class="w-full px-4 py-3 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed hidden font-medium">Download</button>
+      <a id="play-btn" href="{{ .PlayURL }}"
+         class="w-full px-4 py-3 text-sm text-center bg-green-600 text-white rounded-lg hover:bg-green-700 {{ if or .Completed .Expired }}{{ else }}hidden{{ end }} no-loader font-medium">{{ if .Completed }}Play {{ .UnitTitle }} again{{ else }}Launch {{ .UnitTitle }}{{ end }}</a>
+    </div>
+
+    <div id="download-mode-notice" class="hidden mt-4 rounded-md px-3 py-2 text-xs text-center" aria-live="polite"></div>
+
+    <div id="storage-info" class="mt-4 hidden">
+      <div class="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400 mb-1">
+        <span>Device storage</span><span id="storage-text"></span>
+      </div>
+      <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2"><div id="storage-bar" class="bg-blue-600 h-2 rounded-full transition-all" style="width: 0%"></div></div>
+    </div>
+
+    {{ template "mhs_steplog_panel" . }}
+
+    <div class="mt-4 border-t border-gray-200 dark:border-gray-700 pt-3">
+      <label for="report-note" class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Something not working? Tell us what you saw and press Send report — the status details above go with it.</label>
+      <textarea id="report-note" rows="2" maxlength="2000" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm"></textarea>
+      <div class="mt-2 flex items-center gap-2">
+        <button type="button" id="report-btn" class="px-3 py-1.5 text-xs rounded bg-gray-700 text-white hover:bg-gray-800 dark:bg-gray-600 dark:hover:bg-gray-500">Send report</button>
+        <span id="report-status" class="text-xs text-gray-500 dark:text-gray-400"></span>
+        <span id="sw-status" class="ml-auto text-xs text-gray-400 dark:text-gray-500"></span>
+      </div>
+    </div>
+  </div>
+
+  <p class="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center">Keep this tab open while the download runs. Getting into the game is the important check; finishing the unit is the full one.</p>
+</div>
+
+<script src="/assets/js/mhs-steplog.js?v={{ mhsSteplogVersion }}"></script>
+<script src="/assets/js/mhs-delivery.js?v={{ mhsDeliveryVersion }}"></script>
+<script>
+(function() {
+  var base = '{{ .Base }}';
+  var testId = '{{ .TestID }}';
+  var unitId = '{{ .UnitID }}';
+  var unitTitle = '{{ .UnitTitle }}';
+  var csrfToken = '{{ .CSRFToken }}';
+  var completed = {{ if .Completed }}true{{ else }}false{{ end }};
+  var expired = {{ if .Expired }}true{{ else }}false{{ end }};
+  var cacheStatus = {};
+  var lastStorageRefresh = 0;
+  var unitTotal = 0;
+  function el(id) { return document.getElementById(id); }
+
+  function post(path, body, keepalive) {
+    try {
+      return fetch(base + path, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify(body || {}),
+        keepalive: !!keepalive
+      }).catch(function() {});
+    } catch (e) { return Promise.resolve(); }
+  }
+
+  function getOrCreateDeviceId() {
+    var key = 'mhs-device-id';
+    var id = null;
+    try { id = localStorage.getItem(key); } catch (e) {}
+    if (!id) {
+      id = newDeviceId();
+      try { localStorage.setItem(key, id); } catch (e) {}
+    }
+    return id;
+  }
+  function newDeviceId() {
+    try { if (window.crypto && crypto.randomUUID) return crypto.randomUUID(); } catch (e) {}
+    var hex = '';
+    try {
+      var buf = new Uint8Array(16);
+      crypto.getRandomValues(buf);
+      for (var i = 0; i < buf.length; i++) hex += ('0' + buf[i].toString(16)).slice(-2);
+    } catch (e) {
+      for (var j = 0; j < 32; j++) hex += Math.floor(Math.random() * 16).toString(16);
+    }
+    return hex.slice(0, 8) + '-' + hex.slice(8, 12) + '-' + hex.slice(12, 16) + '-' + hex.slice(16, 20) + '-' + hex.slice(20, 32);
+  }
+  function detectDeviceType() {
+    var ua = navigator.userAgent;
+    if (/CrOS/.test(ua)) return 'Chromebook';
+    if (navigator.maxTouchPoints > 0 && (/iPad/.test(ua) || /Macintosh/.test(ua))) return 'iPad';
+    if (/Macintosh/.test(ua)) return 'macOS';
+    if (/Windows/.test(ua)) return 'Windows';
+    if (/Android/.test(ua)) return 'Android';
+    if (/Linux/.test(ua)) return 'Linux';
+    return 'Other';
+  }
+  function mhsFormatMB(bytes) { return Math.round((bytes || 0) / 1048576) + ' MB'; }
+  function mhsFormatElapsed(ms) {
+    var s = Math.max(0, Math.round((ms || 0) / 1000));
+    var m = Math.floor(s / 60);
+    return m + ':' + (s % 60 < 10 ? '0' : '') + (s % 60);
+  }
+  function mhsProgressLabel(detail) {
+    var parts = [(detail.percent || 0) + '%'];
+    if (detail.downloadTotal) parts.push(mhsFormatMB(detail.downloaded) + ' of ' + mhsFormatMB(detail.downloadTotal));
+    if (typeof detail.elapsedMs === 'number') parts.push(mhsFormatElapsed(detail.elapsedMs));
+    return parts.join(' · ');
+  }
+  function mhsDownloadWaitText(detail) {
+    if (detail.note) return detail.note;
+    if (!(detail.waitingMs >= 5000)) return '';
+    var text = 'No data received for ' + Math.round(detail.waitingMs / 1000) + ' s.';
+    if (typeof detail.switchInMs === 'number') {
+      var sw = Math.round(detail.switchInMs / 1000);
+      text += sw > 0 ? ' If nothing arrives in ' + sw + ' s, switching to the direct download method.' : ' Switching to the direct download method…';
+    } else if (typeof detail.resumeInMs === 'number') {
+      var rs = Math.round(detail.resumeInMs / 1000);
+      text += rs > 0 ? ' Resuming automatically in ' + rs + ' s if it stays quiet.' : ' Resuming automatically…';
+    }
+    return text;
+  }
+  function mhsRetryText(detail) {
+    var secs = Math.round((detail.retryInMs || 0) / 1000);
+    var why = detail.error || 'Download interrupted.';
+    if (!/[.!?…]$/.test(why)) why += '.';
+    var attempt = detail.attempt || 1;
+    return why + ' Retrying automatically ' + (secs > 0 ? 'in ' + secs + ' s' : 'now') +
+      (attempt > 1 ? ' (attempt ' + attempt + ')' : '') + '.';
+  }
+
+  var manager = new MHSDeliveryManager({
+    swUrl: '/sw.js',
+    swScope: '/',
+    manifestUrl: base + '/manifest',
+    contentPrefix: '/missionhydrosci/content/',
+    channelName: 'missionhydrosci-delivery',
+    unitCachePrefix: 'missionhydrosci-unit-',
+    fetchIdPrefix: 'missionhydrosci-',
+    appShellCachePrefix: 'missionhydrosci-app-shell-'
+  });
+
+  // Step log: shown open, streamed to the server every 5 s.
+  var stepLog = new MHSStepLog();
+  stepLog.start({
+    page: 'devicetest',
+    host: location.host,
+    workspace: location.hostname.split('.')[0],
+    unit: unitId,
+    version: '{{ .UnitVersion }}',
+    unitTitle: unitTitle,
+    testId: testId,
+    deviceId: getOrCreateDeviceId(),
+    deviceType: detectDeviceType(),
+    userAgent: navigator.userAgent,
+    deliveryVersion: '{{ mhsDeliveryVersion }}',
+    steplogVersion: '{{ mhsSteplogVersion }}'
+  });
+  manager.setStepLog(stepLog);
+  MHSStepLog.mount(stepLog, el('mhs-steplog'), { open: true });
+  stepLog.enableServerFlush(base + '/steps', csrfToken, 5000);
+
+  // Download summary for the run record.
+  var dl = { startedAt: 0, stalls: 0, retries: 0, switched: false, path: '', done: false };
+
+  manager.onStatus(function(uid, status, detail) {
+    if (uid !== unitId) return;
+    cacheStatus[uid] = status;
+    var mainStatus = el('unit-status'), wrap = el('progress-wrap'), bar = el('progress-bar'), text = el('progress-text');
+    var dlBtn = el('download-btn'), playBtn = el('play-btn');
+    if (completed || expired) return;
+    switch (status) {
+      case 'cached':
+        mainStatus.textContent = 'Ready to play — press Launch to start the game on this device.';
+        mainStatus.className = 'text-sm text-green-600 dark:text-green-400 font-medium mt-1';
+        wrap.classList.add('hidden'); dlBtn.classList.add('hidden'); playBtn.classList.remove('hidden');
+        if (!dl.done && dl.startedAt) {
+          dl.done = true;
+          var secs = Math.max(0.001, (Date.now() - dl.startedAt) / 1000);
+          post('/summary', { download: { path: dl.path || (manager.getDownloadMode() === 'fallback' ? 'direct' : 'background'),
+            bytes: unitTotal, seconds: secs, avg_bps: unitTotal / secs, switched: dl.switched, stalls: dl.stalls, retries: dl.retries } });
+          sendDiagnostics();
+        }
+        break;
+      case 'not_cached':
+      case 'partial':
+        mainStatus.textContent = 'Downloading...';
+        mainStatus.className = 'text-sm text-blue-600 dark:text-blue-400 mt-1';
+        wrap.classList.add('hidden'); dlBtn.classList.add('hidden'); playBtn.classList.add('hidden');
+        break;
+      case 'downloading':
+        if (!dl.startedAt) { dl.startedAt = Date.now(); dl.path = manager.getDownloadMode() === 'fallback' ? 'direct' : 'background'; }
+        if (detail.note && /switched/i.test(detail.note)) { dl.switched = true; dl.path = 'direct'; }
+        var waitText = mhsDownloadWaitText(detail);
+        mainStatus.textContent = waitText || 'Downloading...';
+        mainStatus.className = waitText ? 'text-sm text-amber-600 dark:text-amber-400 mt-1' : 'text-sm text-blue-600 dark:text-blue-400 mt-1';
+        wrap.classList.remove('hidden');
+        bar.style.width = (detail.percent || 0) + '%';
+        text.textContent = mhsProgressLabel(detail);
+        dlBtn.classList.add('hidden'); playBtn.classList.add('hidden');
+        break;
+      case 'stalled':
+        dl.stalls++;
+        mainStatus.textContent = 'Download stalled — restarting automatically…';
+        mainStatus.className = 'text-sm text-amber-600 dark:text-amber-400 mt-1';
+        wrap.classList.remove('hidden');
+        dlBtn.classList.remove('hidden'); dlBtn.disabled = false; dlBtn.textContent = 'Retry now';
+        playBtn.classList.add('hidden');
+        break;
+      case 'retrying':
+        if ((detail.retryInMs || 0) <= 0) dl.retries++;
+        mainStatus.textContent = mhsRetryText(detail);
+        mainStatus.className = 'text-sm text-amber-600 dark:text-amber-400 mt-1';
+        if (detail.downloadTotal) { wrap.classList.remove('hidden'); bar.style.width = (detail.percent || 0) + '%'; text.textContent = mhsProgressLabel(detail); }
+        else wrap.classList.add('hidden');
+        dlBtn.classList.remove('hidden'); dlBtn.disabled = false; dlBtn.textContent = 'Retry now';
+        playBtn.classList.add('hidden');
+        break;
+      case 'error':
+        mainStatus.textContent = detail.error || 'Download failed';
+        mainStatus.className = 'text-sm text-red-600 dark:text-red-400 mt-1';
+        wrap.classList.add('hidden');
+        dlBtn.classList.remove('hidden'); dlBtn.disabled = false; dlBtn.textContent = 'Retry now';
+        playBtn.classList.add('hidden');
+        break;
+    }
+    if ((status !== 'downloading' && status !== 'retrying') || Date.now() - lastStorageRefresh > 10000) refreshStorageUI();
+    updateDownloadModeNotice();
+  });
+
+  function updateDownloadModeNotice() {
+    var n = el('download-mode-notice');
+    if (!n) return;
+    if (!manager.hasActiveDownload()) { n.classList.add('hidden'); return; }
+    var mode = manager.getDownloadMode();
+    n.textContent = MHSDeliveryManager.DOWNLOAD_MODE_MESSAGES[mode];
+    n.className = 'mt-4 rounded-md px-3 py-2 text-xs text-center ' + (mode === 'fallback'
+      ? 'bg-amber-50 text-amber-800 dark:bg-amber-900/30 dark:text-amber-200'
+      : 'bg-blue-50 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200');
+  }
+  function refreshStorageUI() { lastStorageRefresh = Date.now(); updateStorageInfo(); }
+  function updateStorageInfo() {
+    manager.getStorageEstimate().then(function(est) {
+      if (!est || !est.quota) return;
+      el('storage-info').classList.remove('hidden');
+      var usedMB = Math.round(est.usage / 1048576), quotaMB = Math.round(est.quota / 1048576);
+      var pct = Math.round((est.usage / est.quota) * 100);
+      el('storage-text').textContent = usedMB + ' MB / ' + quotaMB + ' MB (' + pct + '%)';
+      var sb = el('storage-bar');
+      sb.style.width = pct + '%';
+      sb.className = (pct > 80 ? 'bg-red-600' : pct > 60 ? 'bg-yellow-500' : 'bg-blue-600') + ' h-2 rounded-full transition-all';
+    }).catch(function() {});
+  }
+
+  function runPipeline() {
+    var st = cacheStatus[unitId];
+    if (st === undefined || st === 'not_cached' || st === 'partial') manager.downloadUnit(unitId);
+  }
+
+  // One-time device/browser/storage/network snapshot for the run record.
+  var diagnosticsSent = false;
+  async function collectDiagnostics() {
+    var d = {};
+    try { d.user_agent = navigator.userAgent; d.platform = navigator.platform; d.language = navigator.language; d.languages = (navigator.languages || []).join(','); } catch (e) {}
+    try { d.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch (e) {}
+    try { d.screen = screen.width + 'x' + screen.height + ' @' + window.devicePixelRatio; d.viewport = window.innerWidth + 'x' + window.innerHeight; d.orientation = (screen.orientation && screen.orientation.type) || ''; d.touch_points = navigator.maxTouchPoints || 0; } catch (e) {}
+    try { d.cpu_cores = navigator.hardwareConcurrency || 0; d.device_memory_gb = navigator.deviceMemory || 0; } catch (e) {}
+    try {
+      if (navigator.connection) { var c = navigator.connection; d.conn_type = c.type || ''; d.conn_effective = c.effectiveType || ''; d.conn_downlink_mbps = c.downlink || 0; d.conn_rtt_ms = c.rtt || 0; d.conn_save_data = !!c.saveData; }
+      d.online = navigator.onLine;
+    } catch (e) {}
+    try { d.standalone = window.matchMedia('(display-mode: standalone)').matches || !!navigator.standalone; } catch (e) {}
+    try {
+      d.sw_supported = 'serviceWorker' in navigator;
+      d.sw_controlling = !!(navigator.serviceWorker && navigator.serviceWorker.controller);
+      d.background_fetch = !!(manager.swRegistration && manager.swRegistration.backgroundFetch);
+      d.cache_api = 'caches' in window;
+      d.cookies_enabled = navigator.cookieEnabled;
+      d.cross_origin_isolated = !!window.crossOriginIsolated;
+      d.shared_array_buffer = typeof SharedArrayBuffer !== 'undefined';
+      d.webassembly = typeof WebAssembly !== 'undefined';
+      d.broadcast_channel = typeof BroadcastChannel !== 'undefined';
+    } catch (e) {}
+    try {
+      var cv = document.createElement('canvas');
+      var gl = cv.getContext('webgl2');
+      d.webgl = gl ? 'webgl2' : '';
+      if (!gl) { gl = cv.getContext('webgl') || cv.getContext('experimental-webgl'); d.webgl = gl ? 'webgl1' : 'none'; }
+      if (gl) {
+        var dbg = gl.getExtension('WEBGL_debug_renderer_info');
+        if (dbg) { d.gpu_vendor = gl.getParameter(dbg.UNMASKED_VENDOR_WEBGL); d.gpu_renderer = gl.getParameter(dbg.UNMASKED_RENDERER_WEBGL); }
+        d.max_texture_size = gl.getParameter(gl.MAX_TEXTURE_SIZE);
+      }
+    } catch (e) { d.webgl = 'error'; }
+    try {
+      if (navigator.storage && navigator.storage.estimate) {
+        var est = await navigator.storage.estimate();
+        d.storage_usage_mb = Math.round((est.usage || 0) / 1048576);
+        d.storage_quota_mb = Math.round((est.quota || 0) / 1048576);
+      }
+      d.storage_persisted = await manager.getStoragePersisted();
+    } catch (e) {}
+    try {
+      if ('caches' in window) {
+        var names = await caches.keys();
+        var inv = [];
+        for (var i = 0; i < names.length; i++) {
+          if (names[i].indexOf('missionhydrosci-') !== 0) continue;
+          var cache = await caches.open(names[i]);
+          var keys = await cache.keys();
+          inv.push(names[i] + ': ' + keys.length + ' files');
+        }
+        d.cache_inventory = inv.join('; ');
+      }
+    } catch (e) {}
+    try { if (navigator.getBattery) { var b = await navigator.getBattery(); d.battery_level = Math.round(b.level * 100); d.battery_charging = b.charging; } } catch (e) {}
+    try {
+      if (navigator.userAgentData) {
+        var uad = navigator.userAgentData;
+        d.uad_platform = uad.platform; d.uad_mobile = uad.mobile;
+        d.uad_brands = (uad.brands || []).map(function(b) { return b.brand + '/' + b.version; }).join(', ');
+        if (uad.getHighEntropyValues) {
+          var he = await uad.getHighEntropyValues(['architecture', 'bitness', 'model', 'platformVersion', 'fullVersionList']);
+          d.uad_architecture = he.architecture; d.uad_bitness = he.bitness; d.uad_model = he.model; d.uad_platform_version = he.platformVersion;
+          d.uad_full_versions = (he.fullVersionList || []).map(function(b) { return b.brand + '/' + b.version; }).join(', ');
+        }
+      }
+    } catch (e) {}
+    try { var nav = performance.getEntriesByType('navigation')[0]; if (nav) { d.page_load_ms = Math.round(nav.loadEventEnd || nav.duration || 0); d.ttfb_ms = Math.round(nav.responseStart || 0); } } catch (e) {}
+    return d;
+  }
+  function browserName(d) {
+    var fv = d.uad_full_versions || d.uad_brands || '';
+    var m = /(Google Chrome|Microsoft Edge|Chromium|Opera|Brave)\/([\d.]+)/.exec(fv);
+    if (m) return m[1] + ' ' + m[2];
+    var ua = navigator.userAgent;
+    var s;
+    if ((s = /Edg\/([\d.]+)/.exec(ua))) return 'Edge ' + s[1];
+    if ((s = /CriOS\/([\d.]+)/.exec(ua))) return 'Chrome iOS ' + s[1];
+    if ((s = /Chrome\/([\d.]+)/.exec(ua))) return 'Chrome ' + s[1];
+    if ((s = /Firefox\/([\d.]+)/.exec(ua))) return 'Firefox ' + s[1];
+    if ((s = /Version\/([\d.]+).*Safari/.exec(ua))) return 'Safari ' + s[1];
+    return '';
+  }
+  function platformName(d) {
+    if (d.uad_platform) return d.uad_platform + (d.uad_platform_version ? ' ' + d.uad_platform_version : '') + (d.uad_model ? ' (' + d.uad_model + ')' : '');
+    return navigator.platform || '';
+  }
+  function networkSummary(d) {
+    var parts = [];
+    if (d.conn_effective) parts.push(d.conn_effective);
+    if (d.conn_downlink_mbps) parts.push(d.conn_downlink_mbps + ' Mbps');
+    if (d.conn_rtt_ms) parts.push(d.conn_rtt_ms + ' ms');
+    if (d.conn_save_data) parts.push('save-data');
+    return parts.join(' · ');
+  }
+  function sendDiagnostics() {
+    collectDiagnostics().then(function(d) {
+      var first = !diagnosticsSent;
+      diagnosticsSent = true;
+      post('/diagnostics', { device_id: getOrCreateDeviceId(), device_type: detectDeviceType(), platform: platformName(d), browser: browserName(d), network: networkSummary(d), diagnostics: d });
+      if (first) stepLog.record('storage', 'info', 'Device snapshot sent (' + Object.keys(d).length + ' fields)');
+    }).catch(function() {});
+  }
+
+  manager.init().then(function() {
+    var sw = el('sw-status');
+    if (sw) sw.textContent = manager.swRegistration ? 'Service worker active' : 'Service worker not available';
+    var u = manager._findUnit ? manager._findUnit(unitId) : null;
+    if (u) unitTotal = u.totalSize || 0;
+    sendDiagnostics();
+    if (!completed && !expired) runPipeline();
+  }).catch(function(err) {
+    stepLog.record('sw', 'fail', 'Startup failed: ' + ((err && err.message) || err));
+  });
+
+  // After a deploy, reload once when a new service worker takes control.
+  if (navigator.serviceWorker && navigator.serviceWorker.controller) {
+    var swReloaded = false;
+    navigator.serviceWorker.addEventListener('controllerchange', function() {
+      if (swReloaded) return;
+      swReloaded = true;
+      var last = 0;
+      try { last = parseInt(sessionStorage.getItem('mhs-sw-reloaded') || '0', 10); } catch (e) {}
+      if (Date.now() - last < 10000) return;
+      try { sessionStorage.setItem('mhs-sw-reloaded', String(Date.now())); } catch (e) {}
+      window.location.reload();
+    });
+  }
+
+  window.mhsDownload = function(uid) {
+    if (cacheStatus[uid] === 'retrying') { manager.retryNow(uid); return; }
+    if (cacheStatus[uid] === 'stalled') { manager.retryDownload(uid); return; }
+    manager.downloadUnit(uid);
+  };
+
+  var reportBtn = el('report-btn');
+  if (reportBtn) {
+    reportBtn.addEventListener('click', function() {
+      var note = (el('report-note').value || '').trim();
+      var st = el('report-status');
+      if (!note) { st.textContent = 'Type a few words first.'; return; }
+      reportBtn.disabled = true;
+      stepLog.record('page', 'info', 'Tester report: ' + note.slice(0, 200));
+      Promise.resolve(stepLog.flush ? stepLog.flush(false) : null).then(function() {
+        return post('/report', { note: note });
+      }).then(function() {
+        st.textContent = 'Sent — thank you. Your test code is ' + '{{ .ShortID }}' + '.';
+        el('report-note').value = '';
+      }).catch(function() {
+        st.textContent = 'Could not send right now; it will be retried with the status log.';
+      }).then(function() { reportBtn.disabled = false; });
+    });
+  }
+
+  updateStorageInfo();
+})();
+</script>
+{{ end }}

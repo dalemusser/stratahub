@@ -93,6 +93,10 @@ func EnsureAll(ctx context.Context, db *mongo.Database) error {
 		problems = append(problems, "member_status_log: "+err.Error())
 	}
 
+	if err := ensureMHSDeviceTests(ctx, db); err != nil {
+		problems = append(problems, "mhs_device_tests: "+err.Error())
+	}
+
 	if len(problems) > 0 {
 		return errors.New(strings.Join(problems, "; "))
 	}
@@ -1080,6 +1084,40 @@ func ensureMemberStatusLog(ctx context.Context, db *mongo.Database) error {
 		{
 			Keys:    bson.D{{Key: "received_at", Value: 1}},
 			Options: options.Index().SetName("ttl_mslog_received").SetExpireAfterSeconds(retentionSeconds),
+		},
+	})
+}
+
+// ensureMHSDeviceTests indexes the Mission HydroSci device-test runs (and
+// members' stored load records). No TTL: runs are kept.
+func ensureMHSDeviceTests(ctx context.Context, db *mongo.Database) error {
+	c := db.Collection("mhs_device_tests")
+	return ensureIndexSet(ctx, c, []mongo.IndexModel{
+		// Newest-first listing with a cursor on (started_at, _id).
+		{
+			Keys: bson.D{
+				{Key: "workspace_id", Value: 1},
+				{Key: "started_at", Value: -1},
+				{Key: "_id", Value: -1},
+			},
+			Options: options.Index().SetName("idx_mhsdevicetest_ws_started"),
+		},
+		// School filter (prefix regex on form.school).
+		{
+			Keys: bson.D{
+				{Key: "workspace_id", Value: 1},
+				{Key: "form.school", Value: 1},
+			},
+			Options: options.Index().SetName("idx_mhsdevicetest_ws_school"),
+		},
+		// Member load records by member.
+		{
+			Keys: bson.D{
+				{Key: "workspace_id", Value: 1},
+				{Key: "user_id", Value: 1},
+				{Key: "started_at", Value: -1},
+			},
+			Options: options.Index().SetName("idx_mhsdevicetest_ws_user_started"),
 		},
 	})
 }

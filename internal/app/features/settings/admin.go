@@ -16,6 +16,7 @@ import (
 	"time"
 
 	settingsstore "github.com/dalemusser/stratahub/internal/app/store/settings"
+	"github.com/dalemusser/stratahub/internal/app/store/mhsbuilds"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/htmlsanitize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
@@ -43,6 +44,14 @@ type settingsVM struct {
 	MHSStaffUnlockMinutes int    // staff unlock duration for the manage page (minutes)
 	EnableClaudeSummaries bool   // AI student summaries toggle
 	ClaudeModel           string // Selected Claude model ID
+
+	// MHS device test: the public route's switch, the chosen Unit 2 build
+	// ("unit2|2.2.3" or "" for the active collection's), the options, and
+	// the URL to hand a school.
+	MHSDeviceTestEnabled bool
+	MHSDeviceTestUnitKey string
+	MHSDeviceTestBuilds  []deviceTestBuildVM
+	MHSDeviceTestURL     string
 
 	// Member Status API shared key (see docs/member-status-api/plan.md)
 	MemberStatusAPIKey      string     // current key, rendered into a masked input
@@ -83,6 +92,44 @@ func (h *Handler) ServeSettings(w http.ResponseWriter, r *http.Request) {
 
 // buildVM assembles the settings form view model from a settings document.
 // Used by both the initial render and the re-render after a validation error.
+// deviceTestBuildVM is one selectable Unit 2 build.
+type deviceTestBuildVM struct {
+	Key   string // "unit2|2.2.3"
+	Label string
+}
+
+// deviceTestBuilds lists the Unit 2 builds already on the CDN, newest first.
+func (h *Handler) deviceTestBuilds(ctx context.Context) []deviceTestBuildVM {
+	builds, err := mhsbuilds.New(h.DB).ListByUnit(ctx, models.MHSDeviceTestUnitID)
+	if err != nil {
+		h.Log.Warn("settings: listing device-test builds failed", zap.Error(err))
+		return nil
+	}
+	out := make([]deviceTestBuildVM, 0, len(builds))
+	for _, b := range builds {
+		label := "v" + b.Version
+		if b.BuildIdentifier != "" {
+			label += " · " + b.BuildIdentifier
+		}
+		label += fmt.Sprintf(" · %d MB", b.TotalSize/1048576)
+		if !b.CreatedAt.IsZero() {
+			label += " · uploaded " + b.CreatedAt.UTC().Format("2006-01-02")
+		}
+		out = append(out, deviceTestBuildVM{Key: models.MHSDeviceTestUnitID + "|" + b.Version, Label: label})
+	}
+	return out
+}
+
+// deviceTestURL is the public device-test URL for this workspace's host.
+func deviceTestURL(r *http.Request) string {
+	scheme := "https"
+	if r.TLS == nil && r.Header.Get("X-Forwarded-Proto") != "https" &&
+		(strings.HasPrefix(r.Host, "localhost") || strings.HasPrefix(r.Host, "127.0.0.1")) {
+		scheme = "http"
+	}
+	return scheme + "://" + r.Host + "/missionhydrosci/devicetest"
+}
+
 func (h *Handler) buildVM(ctx context.Context, r *http.Request, userID primitive.ObjectID, settings models.SiteSettings, errMsg string) settingsVM {
 	// Get current user's auth method for protection
 	var currentUserMethod string
@@ -126,6 +173,10 @@ func (h *Handler) buildVM(ctx context.Context, r *http.Request, userID primitive
 		MHSStaffUnlockMinutes:   displayUnlockMinutes(settings.MHSStaffUnlockMinutes),
 		EnableClaudeSummaries:   settings.EnableClaudeSummaries,
 		ClaudeModel:             settings.ClaudeModel,
+		MHSDeviceTestEnabled:    settings.MHSDeviceTestEnabled,
+		MHSDeviceTestUnitKey:    deviceTestUnitKey(settings.MHSDeviceTestUnit),
+		MHSDeviceTestBuilds:     h.deviceTestBuilds(ctx),
+		MHSDeviceTestURL:        deviceTestURL(r),
 		MemberStatusAPIKey:      settings.MemberStatusAPIKey,
 		MemberStatusAPIKeySetAt: settings.MemberStatusAPIKeySetAt,
 		MemberStatusEndpoint:    memberStatusEndpoint(r),
@@ -214,6 +265,8 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	mhsStaffUnlockStr := strings.TrimSpace(r.FormValue("mhs_staff_unlock_minutes"))
 	enableClaudeSummaries := r.FormValue("enable_claude_summaries") != ""
 	claudeModel := strings.TrimSpace(r.FormValue("claude_model"))
+	mhsDeviceTestEnabled := r.FormValue("mhs_device_test_enabled") != ""
+	mhsDeviceTestUnitKey := strings.TrimSpace(r.FormValue("mhs_device_test_unit"))
 	memberStatusAPIKey := strings.TrimSpace(r.FormValue("member_status_api_key"))
 
 	// Validation
@@ -269,6 +322,26 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 
 	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Long())
 	defer cancel()
+
+	// Device-test build: must be a Unit 2 build that still exists.
+	var mhsDeviceTestUnit *models.MHSUnitVersionRef
+	if mhsDeviceTestUnitKey != "" {
+		unitID, version, ok := strings.Cut(mhsDeviceTestUnitKey, "|")
+		if !ok || unitID != models.MHSDeviceTestUnitID || strings.TrimSpace(version) == "" {
+			h.renderWithError(w, r, wsID, "Invalid device-test build selection.")
+			return
+		}
+		exists, err := mhsbuilds.New(h.DB).Exists(ctx, unitID, version)
+		if err != nil {
+			h.ErrLog.LogServerError(w, r, "check device-test build failed", err, "Couldn't validate the device-test build.", "/settings")
+			return
+		}
+		if !exists {
+			h.renderWithError(w, r, wsID, "The selected device-test build no longer exists.")
+			return
+		}
+		mhsDeviceTestUnit = &models.MHSUnitVersionRef{UnitID: unitID, Version: version}
+	}
 
 	// Check if current user's auth method is in the selected list
 	var currentUserMethod string
@@ -365,6 +438,8 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	settings.MHSStaffUnlockMinutes = mhsStaffUnlockMinutes
 	settings.EnableClaudeSummaries = enableClaudeSummaries
 	settings.ClaudeModel = claudeModel
+	settings.MHSDeviceTestEnabled = mhsDeviceTestEnabled
+	settings.MHSDeviceTestUnit = mhsDeviceTestUnit
 	settings.UpdatedByID = &memberID
 	settings.UpdatedByName = uname
 
@@ -439,4 +514,12 @@ func uploadLogo(ctx context.Context, store storage.Store, filename string, reade
 		Path: path,
 		Size: size,
 	}, nil
+}
+
+// deviceTestUnitKey renders the stored build reference as the select value.
+func deviceTestUnitKey(ref *models.MHSUnitVersionRef) string {
+	if ref == nil || ref.Version == "" {
+		return ""
+	}
+	return ref.UnitID + "|" + ref.Version
 }

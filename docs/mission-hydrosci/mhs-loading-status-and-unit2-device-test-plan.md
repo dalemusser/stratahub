@@ -151,6 +151,21 @@ Endpoint: `POST /missionhydrosci/api/steplog` (session-gated, CSRF token as toda
 
 ## 4. Workstream B — Unit 2 Device Test (standalone, one route per workspace)
 
+> **Status (2026-09-07): implemented.** Site Settings gained the enable switch
+> and the Unit 2 build selector; the public routes live under
+> `/missionhydrosci/devicetest` (landing, start, run page, one-unit manifest,
+> play, diagnostics, steps, summary, report, complete), registered at the root
+> router beside the content fallback; the play template has a device-test
+> mode; `mhs_device_tests` holds the runs (store, indexes, marked ids via
+> `models.NewMHSDeviceTestUserID`); the **Device Tests** viewer (admin,
+> analyst) shows runs with the step timeline, diagnostics and the run's game
+> telemetry, plus CSV, JSON and per-run JSON export (the JSON export is a new
+> optional capability of the viewers framework). Admin guide:
+> `device-test-guide.md`. Verified: build, vet, Go tests (settings render,
+> viewers, feature helpers, id marker), template parse, a local server run
+> (landing renders, bogus run id 404, viewer and settings behind login).
+> Device verification pending with the rest.
+
 ### 4.1 Goals and non-goals
 
 - **One fixed URL per workspace:** `https://<workspace-host>/missionhydrosci/devicetest`. There is nothing to create or manage; the workspace is resolved from the host, so the same route works in every workspace.

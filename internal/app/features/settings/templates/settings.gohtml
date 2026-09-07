@@ -162,6 +162,38 @@
   </div>
 
   <div class="border-t dark:border-gray-700 pt-4">
+    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Mission HydroSci &mdash; Device Test</label>
+    <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
+      A public page a school can open, with no account, that downloads and plays Unit 2 exactly as a student would and records what happened (see the Device Tests view). Leave it off unless a school is testing.
+    </p>
+    <div class="space-y-3 bg-gray-50 dark:bg-gray-700 p-3 rounded border dark:border-gray-600">
+      <label class="flex items-center gap-2">
+        <input type="checkbox" name="mhs_device_test_enabled" value="1"
+               {{ if .MHSDeviceTestEnabled }}checked{{ end }}
+               class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+        <span class="text-sm text-gray-700 dark:text-gray-300">Enable the device test</span>
+      </label>
+      <div>
+        <label class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Unit 2 build to run</label>
+        <select name="mhs_device_test_unit"
+                class="w-full max-w-md border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm">
+          <option value="" {{ if eq .MHSDeviceTestUnitKey "" }}selected{{ end }}>Use the active collection's Unit 2</option>
+          {{ range .MHSDeviceTestBuilds }}
+          <option value="{{ .Key }}" {{ if eq $.MHSDeviceTestUnitKey .Key }}selected{{ end }}>{{ .Label }}</option>
+          {{ end }}
+        </select>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Only builds already uploaded to the CDN are listed.</p>
+      </div>
+      <div>
+        <label class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Link to give a school</label>
+        <input type="text" readonly value="{{ .MHSDeviceTestURL }}" onclick="this.select()"
+               class="w-full max-w-md border dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 p-2 rounded text-sm font-mono">
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Works only while the device test is enabled.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="border-t dark:border-gray-700 pt-4">
     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Member Status API &mdash; Shared Key</label>
     <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">
       An external provider (for example the survey system) reports when a member starts or completes

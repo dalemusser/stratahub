@@ -67,6 +67,8 @@ func (s *Store) Save(ctx context.Context, workspaceID primitive.ObjectID, settin
 			"mhs_member_auth_keyword":      settings.MHSMemberAuthKeyword,
 			"mhs_staff_unlock_minutes":     settings.MHSStaffUnlockMinutes,
 			"mhs_active_collection_id":     settings.MHSActiveCollectionID,
+			"mhs_device_test_enabled":      settings.MHSDeviceTestEnabled,
+			"mhs_device_test_unit":         settings.MHSDeviceTestUnit,
 			"enable_claude_summaries":      settings.EnableClaudeSummaries,
 			"claude_model":                 settings.ClaudeModel,
 			"member_status_api_key":        settings.MemberStatusAPIKey,

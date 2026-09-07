@@ -437,29 +437,47 @@ func (h *Handler) collectionToManifest(ctx context.Context, coll models.MHSColle
 			continue // skip units with no build data rather than serving empty files
 		}
 
-		files := make([]ContentManifestFile, len(build.Files))
-		for j, f := range build.Files {
-			files[j] = ContentManifestFile{
-				Path: f.Path,
-				Size: f.Size,
-			}
-		}
-		units = append(units, ContentManifestUnit{
-			ID:              u.UnitID,
-			Title:           u.Title,
-			Version:         u.Version,
-			BuildIdentifier: u.BuildIdentifier,
-			DataFile:        build.DataFile,
-			FrameworkFile:   build.FrameworkFile,
-			CodeFile:        build.CodeFile,
-			Files:           files,
-			TotalSize:       build.TotalSize,
-		})
+		units = append(units, buildToManifestUnit(u.UnitID, u.Title, u.Version, u.BuildIdentifier, build))
 	}
 	return ContentManifest{
 		CDNBaseURL: h.CDNBaseURL,
 		Units:      units,
 	}
+}
+
+// buildToManifestUnit converts one build record (plus the title and build
+// identifier the collection carries for it) into a manifest unit.
+func buildToManifestUnit(unitID, title, version, buildIdentifier string, build models.MHSBuild) ContentManifestUnit {
+	files := make([]ContentManifestFile, len(build.Files))
+	for j, f := range build.Files {
+		files[j] = ContentManifestFile{Path: f.Path, Size: f.Size}
+	}
+	if buildIdentifier == "" {
+		buildIdentifier = build.BuildIdentifier
+	}
+	return ContentManifestUnit{
+		ID:              unitID,
+		Title:           title,
+		Version:         version,
+		BuildIdentifier: buildIdentifier,
+		DataFile:        build.DataFile,
+		FrameworkFile:   build.FrameworkFile,
+		CodeFile:        build.CodeFile,
+		Files:           files,
+		TotalSize:       build.TotalSize,
+	}
+}
+
+// oneUnitManifest returns a manifest holding just the given build, with the
+// client tuning and probes attached. The device test uses it so its page
+// sees exactly one unit and nothing to fall back to.
+func (h *Handler) oneUnitManifest(unitID, title, version string, build models.MHSBuild) ContentManifest {
+	m := ContentManifest{
+		CDNBaseURL: h.CDNBaseURL,
+		Units:      []ContentManifestUnit{buildToManifestUnit(unitID, title, version, "", build)},
+	}
+	h.attachClientConfig(&m)
+	return m
 }
 
 // attachClientConfig adds the deployment's client timing values and

@@ -86,6 +86,7 @@ container wired up in `bootstrap/routes.go`.
 | `manifest.go` | Serves the PWA `manifest.json`. |
 | `device_status.go` | Receives device/storage/telemetry reports (`mhs_device_status`). |
 | `appcheck.go` | `RequireApp` middleware — members only reach MHS if it is in their `EnabledApps`; staff always pass. |
+| `devicetest.go` | The public **Unit 2 Device Test** (`/missionhydrosci/devicetest`, no session): landing form, run page, one-unit manifest, play in device-test mode, and the run's telemetry endpoints; records in `mhs_device_tests`. Guide: `docs/mission-hydrosci/device-test-guide.md`. |
 
 **Manifest resolution is per user, most-specific wins** (`resolveCollection`):
 
@@ -101,6 +102,10 @@ per-device.
 
 ### Client side (PWA)
 
+- **`internal/app/resources/assets/js/mhs-steplog.js`** — the per-load step
+  log (`MHSStepLog`): every load's steps as timestamped entries, the shared
+  "Status details" panel (`resources/templates/mhs_steplog_panel.gohtml`),
+  Copy report, and (device test) the server flush.
 - **`internal/app/resources/assets/js/mhs-delivery.js`** — the
   `MHSDeliveryManager`. Registers the service worker, fetches the manifest,
   tracks per-unit cache status, orchestrates downloads, monitors progress and
@@ -342,3 +347,25 @@ explicit.
   collection-switch under `staffauth`, and the one-time auto-reload on a device
   that had the previous service worker — ideally on both a slow-network Chromebook
   and an iPad, since those exercise the two different download paths.
+
+## 2026-09 additions (loading status and the device test)
+
+Plan and status: `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md`.
+
+- **Never give up.** A requested download is a standing intent: every
+  failure schedules the next attempt itself (backoff 5–60 s, reset by real
+  progress), a `retrying` status carries the reason, a live countdown and
+  the attempt count, and Retry only skips the wait. The direct-download path
+  restarts itself after 45 s of silence; a Background Fetch that shows no new
+  bytes for 25 s switches to the direct path (keepalive every 10 s keeps that
+  safe). Values come from the manifest's `tuning` block (config keys
+  `mhs_frozen_switch_ms`, `mhs_fallback_stall_ms`, `mhs_keepalive_ms`).
+- **Preflights.** The content server (smallest file, 8 s budget) and the
+  log/save service hosts (`probes` in the manifest) are checked before the
+  first download; a blocked host fails in seconds with a specific message.
+  A per-unit space check compares the bytes still missing with the free
+  quota.
+- **Step log.** `mhs-steplog.js` + hooks throughout the delivery manager
+  (`setStepLog`); the panel is on the units, manage and play pages.
+- **Device test.** See `devicetest.go` above. `SW_VERSION` is 1.0.13 (adds
+  the `getVersion` reply).

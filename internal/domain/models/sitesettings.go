@@ -49,6 +49,12 @@ type SiteSettings struct {
 	// MHS active collection — per-workspace selection of which unit collection members see
 	MHSActiveCollectionID *primitive.ObjectID `bson:"mhs_active_collection_id,omitempty" json:"mhs_active_collection_id,omitempty"`
 
+	// MHS device test (docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md):
+	// the public /missionhydrosci/devicetest route works only while enabled and
+	// runs the chosen build; nil means the active collection's Unit 2.
+	MHSDeviceTestEnabled bool               `bson:"mhs_device_test_enabled,omitempty" json:"mhs_device_test_enabled,omitempty"`
+	MHSDeviceTestUnit    *MHSUnitVersionRef `bson:"mhs_device_test_unit,omitempty" json:"mhs_device_test_unit,omitempty"`
+
 	// MHS AI summaries
 	EnableClaudeSummaries bool   `bson:"enable_claude_summaries,omitempty" json:"enable_claude_summaries,omitempty"`
 	ClaudeModel           string `bson:"claude_model,omitempty" json:"claude_model,omitempty"`
@@ -105,6 +111,16 @@ func (s *SiteSettings) IsAuthMethodEnabled(method string) bool {
 	}
 	return false
 }
+
+// MHSUnitVersionRef names one build: a unit id and its version.
+type MHSUnitVersionRef struct {
+	UnitID  string `bson:"unit_id" json:"unit_id"`
+	Version string `bson:"version" json:"version"`
+}
+
+// MHSDeviceTestUnitID is the unit the device test runs (the largest and
+// historically most troublesome one).
+const MHSDeviceTestUnitID = "unit2"
 
 // GetMHSMemberAuth returns the MHS member authorization mode for this workspace.
 // If not configured, defaults to "staffauth".

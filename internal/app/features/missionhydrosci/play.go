@@ -17,16 +17,11 @@ func (h *Handler) ServePlay(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unit")
 
 	manifest, _ := h.resolveManifest(r)
-	var unitTitle, unitVersion string
+	var unit *ContentManifestUnit
 	var nextUnitID, nextUnitVersion string
-	var dataFile, frameworkFile, codeFile string
-	for i, u := range manifest.Units {
-		if u.ID == unitID {
-			unitTitle = u.Title
-			unitVersion = u.Version
-			dataFile = u.DataFile
-			frameworkFile = u.FrameworkFile
-			codeFile = u.CodeFile
+	for i := range manifest.Units {
+		if manifest.Units[i].ID == unitID {
+			unit = &manifest.Units[i]
 			if i+1 < len(manifest.Units) {
 				nextUnitID = manifest.Units[i+1].ID
 				nextUnitVersion = manifest.Units[i+1].Version
@@ -35,7 +30,7 @@ func (h *Handler) ServePlay(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	if unitTitle == "" {
+	if unit == nil || unit.Title == "" {
 		http.NotFound(w, r)
 		return
 	}
@@ -79,23 +74,56 @@ func (h *Handler) ServePlay(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	h.renderPlay(w, r, playRender{
+		Unit:            *unit,
+		NextUnitID:      nextUnitID,
+		NextUnitVersion: nextUnitVersion,
+		UserName:        userName,
+		UserIDHex:       userIDHex,
+		BackURL:         "/missionhydrosci/units",
+	})
+}
+
+// playRender is what renderPlay needs beyond the request: the manifest unit
+// to run, the identity to hand the game, and (for the device test) the
+// run's ids and endpoints.
+type playRender struct {
+	Unit            ContentManifestUnit
+	NextUnitID      string
+	NextUnitVersion string
+	UserName        string
+	UserIDHex       string
+	BackURL         string
+	DeviceTest      *deviceTestPlay // nil for the normal launcher
+}
+
+// deviceTestPlay carries the device-test run into the play template.
+type deviceTestPlay struct {
+	ID      string // 24-hex test id = game user_id
+	ShortID string
+	Base    string // "/missionhydrosci/devicetest/run/<id>"
+}
+
+// renderPlay renders the Unity host page. The game-service URLs and keys are
+// rendered here for every launch, student or device test alike.
+func (h *Handler) renderPlay(w http.ResponseWriter, r *http.Request, p playRender) {
 	// Prevent iOS PWA from HTTP-caching the play page HTML.
 	// The service worker handles offline caching separately.
 	w.Header().Set("Cache-Control", "no-cache, no-store")
 
 	data := PlayData{
 		BaseVM:          viewdata.LoadBase(r, h.DB),
-		UnitID:          unitID,
-		UnitTitle:       unitTitle,
-		UnitVersion:     unitVersion,
+		UnitID:          p.Unit.ID,
+		UnitTitle:       p.Unit.Title,
+		UnitVersion:     p.Unit.Version,
 		CDNBaseURL:      h.CDNBaseURL,
-		UserName:        userName,
-		UserIDHex:       userIDHex,
-		NextUnitID:      nextUnitID,
-		NextUnitVersion: nextUnitVersion,
-		DataFile:        dataFile,
-		FrameworkFile:   frameworkFile,
-		CodeFile:        codeFile,
+		UserName:        p.UserName,
+		UserIDHex:       p.UserIDHex,
+		NextUnitID:      p.NextUnitID,
+		NextUnitVersion: p.NextUnitVersion,
+		DataFile:        p.Unit.DataFile,
+		FrameworkFile:   p.Unit.FrameworkFile,
+		CodeFile:        p.Unit.CodeFile,
 		LogSubmitURL:    h.Services.LogSubmitURL,
 		LogAuth:         h.Services.LogAuth,
 		StateSaveURL:    h.Services.StateSaveURL,
@@ -103,15 +131,21 @@ func (h *Handler) ServePlay(w http.ResponseWriter, r *http.Request) {
 		SettingsSaveURL: h.Services.SettingsSaveURL,
 		SettingsLoadURL: h.Services.SettingsLoadURL,
 		SaveAuth:        h.Services.SaveAuth,
+		PlayBackURL:     p.BackURL,
 	}
-	data.Title = unitTitle
+	if p.DeviceTest != nil {
+		data.DeviceTest = true
+		data.DeviceTestID = p.DeviceTest.ID
+		data.DeviceTestShortID = p.DeviceTest.ShortID
+		data.DeviceTestBase = p.DeviceTest.Base
+	}
+	data.Title = p.Unit.Title
 
 	templates.Render(w, r, "missionhydrosci_play", data)
 }
 
-// RedirectToPlay handles game-initiated unit transitions that bypass PWA mode.
-// When MHSBridge navigates to ../unit2/index.html (URL mode), the browser resolves
-// it to /missionhydrosci/unit2/index.html. This redirects to /missionhydrosci/play/unit2.
+// RedirectToPlay handles game-initiated unit transitions in URL mode: the
+// game navigates to ../unitN/index.html, which resolves here.
 func (h *Handler) RedirectToPlay(w http.ResponseWriter, r *http.Request) {
 	unitID := chi.URLParam(r, "unit")
 	target := "/missionhydrosci/play/" + unitID

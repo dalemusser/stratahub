@@ -106,6 +106,7 @@ Handles application initialization and lifecycle:
 | **gameconfig** | Game/activity configuration (MHS) |
 | **uploadcsv** | CSV import for MHS data |
 | **memberstatusapi** | Inbound `POST /api/member-status` (+ `/ping`): the survey provider reports a member's survey started/completed; shared key in the body, no session/CSRF; feeds the dashboard's Surveys tab (`docs/member-status-api/`) |
+| **missionhydrosci/devicetest** | Public `/missionhydrosci/devicetest` (no session; workspace from host): a school downloads and plays Unit 2 as a student would; runs recorded in `mhs_device_tests` with `ffffffff`-marked game ids; enable + build in Site Settings; results in the **Device Tests** viewer (`docs/mission-hydrosci/device-test-guide.md`) |
 
 **Utility & System:**
 
@@ -115,7 +116,7 @@ Handles application initialization and lifecycle:
 | **errors** | Error page handlers and logging |
 | **activity** | Activity logging and tracking |
 | **announcements** | Announcement management |
-| **viewers** | Data-viewers framework at `/views/{slug}`: role gate, `viewscope` scoping, filter bar with URL state, cursor paging, Live toggle, CSV export, shared templates. Viewers live in `viewers/views/`: **Survey Events** (`/views/survey-events`; member-status events from the API and launches) and **Audit Log** (`/views/audit-log`; `/audit` redirects there). How-to: `docs/viewers/adding-a-viewer.md` |
+| **viewers** | Data-viewers framework at `/views/{slug}`: role gate, `viewscope` scoping, filter bar with URL state, cursor paging, Live toggle, CSV export, optional JSON export (`JSONExporter`/`JSONDetailer`), shared templates. Viewers live in `viewers/views/`: **Survey Events** (`/views/survey-events`), **Audit Log** (`/views/audit-log`; `/audit` redirects there), **Device Tests** (`/views/device-tests`; admin/analyst). How-to: `docs/viewers/adding-a-viewer.md` |
 | **heartbeat** | Application heartbeat/monitoring |
 | **status** | Status indicators |
 
@@ -933,7 +934,8 @@ make css-watch
   countdown (`retrying` status), server-tunable timings via the manifest;
   A1 implemented 2026-09-07: `mhs-steplog.js` + shared `mhs_steplog_panel`
   snippet ("Status details" panel, Copy report) on the units/play/manage
-  pages, fed by delivery-manager hooks; B: standalone, account-free Unit 2
+  pages, fed by delivery-manager hooks; B implemented 2026-09-07 (guide:
+  `docs/mission-hydrosci/device-test-guide.md`): standalone, account-free Unit 2
   device test at `/missionhydrosci/devicetest` per workspace (test ids are
   `ffffffff` + 16 random hex, never a real user id); A2: students' step logs
   stored on failure/completion for review in a viewer

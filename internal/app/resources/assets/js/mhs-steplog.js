@@ -47,6 +47,7 @@
     this.startedAt = Date.now();
     this._listeners = [];
     this._persist = opts.persist !== false;
+    this._flushed = 0; // entries already sent to the server (see enableServerFlush)
     this._restore();
   }
   MHSStepLog.STEPS = STEPS;
@@ -63,6 +64,7 @@
       this.startedAt = saved.startedAt;
       this.entries = saved.entries.slice(-MAX_ENTRIES);
       this.context = saved.context || {};
+      this._flushed = Math.min(saved.flushed || 0, this.entries.length);
     } catch (e) { /* start fresh */ }
   };
 
@@ -70,7 +72,7 @@
     if (!this._persist) return;
     try {
       sessionStorage.setItem(STORAGE_KEY, JSON.stringify({
-        startedAt: this.startedAt, context: this.context, entries: this.entries
+        startedAt: this.startedAt, context: this.context, entries: this.entries, flushed: this._flushed
       }));
     } catch (e) { /* private mode or quota — the in-memory log still works */ }
   };
@@ -138,7 +140,11 @@
       entry = last;
     } else {
       this.entries.push(entry);
-      if (this.entries.length > MAX_ENTRIES) this.entries.splice(0, this.entries.length - MAX_ENTRIES);
+      if (this.entries.length > MAX_ENTRIES) {
+        var removed = this.entries.length - MAX_ENTRIES;
+        this.entries.splice(0, removed);
+        this._flushed = Math.max(0, this._flushed - removed);
+      }
     }
     this._save();
     this._notify(entry);
@@ -169,6 +175,7 @@
 
   MHSStepLog.prototype.clear = function() {
     this.entries = [];
+    this._flushed = 0;
     this.startedAt = Date.now();
     this._save();
     this._notify(null);
@@ -226,6 +233,54 @@
         (e.repeats > 1 ? ' (x' + e.repeats + ')' : '') + detailText(e.detail));
     }
     return lines.join('\n');
+  };
+
+  var FLUSH_MAX_ENTRIES = 40; // per request, so a final keepalive body stays under the 64 KB limit
+
+  /**
+   * Streams new entries to the server: POST {context, entries:[...]} to url
+   * every intervalMs (default 5 s), whenever the tab is hidden, and on
+   * pagehide (keepalive). The count already sent travels with the log in
+   * sessionStorage, so a page move never resends history; a failed post is
+   * simply retried on the next tick. Used by the device test.
+   */
+  MHSStepLog.prototype.enableServerFlush = function(url, csrfToken, intervalMs) {
+    var self = this;
+    var inflight = false;
+    function flush(final) {
+      if (inflight && !final) return Promise.resolve(false);
+      var pending = self.entries.slice(self._flushed, self._flushed + FLUSH_MAX_ENTRIES);
+      if (!pending.length) return Promise.resolve(true);
+      inflight = true;
+      var sentThrough = self._flushed + pending.length;
+      var opts = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken || '' },
+        body: JSON.stringify({ context: self.context, entries: pending }),
+        keepalive: !!final
+      };
+      var p;
+      try { p = fetch(url, opts); } catch (e) { p = Promise.reject(e); }
+      return p.then(function(resp) {
+        if (resp && resp.ok) {
+          self._flushed = Math.max(self._flushed, sentThrough);
+          self._save();
+          return true;
+        }
+        return false;
+      }).catch(function() { return false; }).then(function(ok) {
+        inflight = false;
+        return ok;
+      });
+    }
+    this.flush = function(final) { return flush(!!final); };
+    if (this._flushTimer) clearInterval(this._flushTimer);
+    this._flushTimer = setInterval(function() { flush(false); }, intervalMs || 5000);
+    window.addEventListener('pagehide', function() { flush(true); });
+    document.addEventListener('visibilitychange', function() {
+      if (document.visibilityState === 'hidden') flush(true);
+    });
+    flush(false);
   };
 
   /** Copies text to the clipboard; resolves true on success. */

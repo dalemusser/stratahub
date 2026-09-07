@@ -95,10 +95,11 @@ type pageVM struct {
 	Groups    []optionVM
 	Filters   []filterVM
 
-	Chips       []Chip
-	TableURL    string
-	ExportURL   string
-	Live        bool
+	Chips         []Chip
+	TableURL      string
+	ExportURL     string
+	ExportJSONURL string // empty unless the viewer implements JSONExporter
+	Live          bool
 	LiveSeconds int
 
 	Table tableVM
@@ -268,6 +269,9 @@ func (h *Handler) ServePage(w http.ResponseWriter, r *http.Request) {
 	if l, ok := v.(Liveable); ok && l.LiveIntervalSeconds() > 0 {
 		vm.LiveSeconds = l.LiveIntervalSeconds()
 	}
+	if _, ok := v.(JSONExporter); ok {
+		vm.ExportJSONURL = withQuery(basePath+"/"+v.Slug()+"/export.json", req.stateQuery())
+	}
 
 	// Organization / group selectors from the scope.
 	orgs, err := req.scope.Orgs(ctx)
@@ -386,6 +390,68 @@ func (h *Handler) ServeExport(w http.ResponseWriter, r *http.Request) {
 		// Headers are already sent; log and stop the stream.
 		h.Log.Error("viewers: export failed", zap.String("view", v.Slug()), zap.Error(err))
 	}
+}
+
+// ServeExportJSON streams the current filter within scope as JSON, for
+// viewers that implement JSONExporter; others get 404.
+func (h *Handler) ServeExportJSON(w http.ResponseWriter, r *http.Request) {
+	req, ok := h.resolve(w, r, true)
+	if !ok {
+		return
+	}
+	e, ok := req.viewer.(JSONExporter)
+	if !ok {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Long())
+	defer cancel()
+
+	filename := fmt.Sprintf("%s-%s.json", req.viewer.Slug(), time.Now().UTC().Format("20060102-1504"))
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+filename+`"`)
+	w.Header().Set("Cache-Control", "no-store")
+
+	h.Log.Info("viewers: export json",
+		zap.String("view", req.viewer.Slug()),
+		zap.String("role", req.role),
+		zap.String("query", req.stateQuery().Encode()))
+
+	if err := e.ExportJSON(ctx, req.scope, req.filters, w); err != nil {
+		h.Log.Error("viewers: export json failed", zap.String("view", req.viewer.Slug()), zap.Error(err))
+	}
+}
+
+// ServeDetailJSON returns one row as a downloadable JSON document, for
+// viewers that implement JSONDetailer; others get 404.
+func (h *Handler) ServeDetailJSON(w http.ResponseWriter, r *http.Request) {
+	req, ok := h.resolve(w, r, true)
+	if !ok {
+		return
+	}
+	d, ok := req.viewer.(JSONDetailer)
+	if !ok {
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
+	defer cancel()
+
+	id := chi.URLParam(r, "id")
+	body, err := d.DetailJSON(ctx, req.scope, id)
+	switch {
+	case errors.Is(err, ErrNotFound):
+		http.Error(w, "not found", http.StatusNotFound)
+		return
+	case err != nil:
+		h.Log.Error("viewers: detail json failed", zap.String("view", req.viewer.Slug()), zap.String("id", id), zap.Error(err))
+		http.Error(w, "detail failed", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Content-Disposition", `attachment; filename="`+req.viewer.Slug()+"-"+id+`.json"`)
+	w.Header().Set("Cache-Control", "no-store")
+	_, _ = w.Write(body)
 }
 
 // --- helpers -----------------------------------------------------------------
