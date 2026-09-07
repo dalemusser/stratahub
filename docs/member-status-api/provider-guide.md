@@ -50,7 +50,7 @@ Content-Type: application/json
 | Field | Required | Description |
 |-------|----------|-------------|
 | `key` | yes | The shared key for this workspace. Compared exactly; keep it secret. |
-| `user_id` | yes | The student's StrataHub id: 24 lowercase hex characters. This is the value StrataHub places in `__userid` on the survey link (de-identified configuration). |
+| `user_id` | yes | The student's StrataHub id: 24 lowercase hex characters. This is the value StrataHub places in `__userid` on the survey link under the ABT-deidentified configuration. |
 | `entity` | yes | The survey's name — one of the strings listed below. Matching is case-insensitive and ignores surrounding whitespace, but please send the exact string. Maximum 100 characters. |
 | `state` | yes | `started` or `completed` (case-insensitive). |
 | `occurred_at` | no | When the event happened on your side, as an RFC 3339 timestamp (e.g. `2026-08-25T14:03:11Z`). Stored for reference; StrataHub also records its own receipt time. |

@@ -12,11 +12,26 @@ integration to Abt. Companion to the [Admin Guide](admin-guide.md) and the
 > `stratahub_update/aws_update.sh`, outside this repo). Remote paths are
 > relative to the service user's home (`~`).
 
-**Starting point (2026-08-27):** everything is on `main` (`5a2827c`). The only
-piece already in production is the settings-save fix (Task 0). One deploy
-delivers the API, the Surveys tab, resource Survey Tracking, and the two
-viewers. The deploy itself changes nothing user-visible until a key is set;
-the API answers `401 not_configured` to any keyed request until then.
+**Status (2026-09-07 — paused until Abt reports back or a problem arises):**
+
+- Deployed 2026-08-29 (build `20260829-205653`) to both workspace hosts;
+  the API, the Surveys tab, resource Survey Tracking, and both viewers are
+  live (§1).
+- Shared key set and ping-verified on **Dev MHS** and on **MHS** (§2).
+- End-to-end checks passed 15/15 on Dev MHS with
+  `scripts/member-status-api-check.sh` (§5); the dashboard and Survey Events
+  screenshots in the guides are from that run.
+- Hand-off sent to Abt 2026-09-07: MHS host, key, an **analyst login on
+  MHS** for their developer, and a test student on MHS for their sends —
+  Abt implements directly against MHS, not Dev MHS (§4).
+- Survey Tracking + ABT-deidentified on the four MHS survey resources is
+  being done by someone else (§3, open). §6 starts when Abt's first real
+  events arrive; tick Task 7 in the plan then.
+
+The original starting point: everything was on `main` at `5a2827c` with only
+the settings-save fix (Task 0) in production; one deploy delivered the rest,
+and it changes nothing user-visible until a key is set (the API answers
+`401 not_configured` to any keyed request until then).
 
 Order matters: **0 → 1 → 2 → 3 → 5 (self-test) → 4 (hand to Abt) → 6**.
 Do steps 2, 3, and 5 on the **Dev MHS** workspace first, then repeat them on
@@ -43,7 +58,7 @@ are per workspace.)
 
 ## 1. Deploy
 
-- [ ] Run the update (builds `stratahub-linux-386`, uploads config + binary,
+- [x] Run the update (builds `stratahub-linux-386`, uploads config + binary,
       stops/swaps/starts the `stratahub` systemd service):
       ```bash
       cd /Users/dale/Documents/catchupstratahub/stratahub_update && ./aws_update.sh
@@ -56,7 +71,7 @@ are per workspace.)
       ssh <server> \
         "journalctl -u stratahub -n 300 --no-pager | grep -i 'ensuring index\|member_status\|mslog\|audit_ws\|listening\|error'"
       ```
-- [ ] Smoke checks (no login needed):
+- [x] Smoke checks (no login needed):
       ```bash
       HOST=https://<workspace-host>
       curl -sS $HOST/health
@@ -88,11 +103,11 @@ are per workspace.)
 
 ## 2. Set the shared key (per workspace)
 
-- [ ] Settings → **Member Status API — Shared Key** → **Generate** → **Save**
+- [x] Settings → **Member Status API — Shared Key** → **Generate** → **Save**
       → **Show** / **Copy**. Put the key in your password manager now; it is
       shown masked afterwards and is never logged.
 - [ ] The change appears in **Audit Log** as `member_status_key_changed`.
-- [ ] Confirm the key works (also confirms the survey names the workspace
+- [x] Confirm the key works (also confirms the survey names the workspace
       expects):
       ```bash
       HOST=https://<workspace-host>
@@ -127,7 +142,7 @@ are per workspace.)
 
 ## 4. Hand the integration to Abt
 
-- [ ] Send, through a private channel for the key (not the same message as
+- [x] Send, through a private channel for the key (not the same message as
       the rest if you can help it):
   - the **Provider Guide** (`docs/member-status-api/provider-guide.md` — the
     complete contract: endpoint, payload, names, semantics, error codes,
@@ -137,14 +152,14 @@ are per workspace.)
   - the four `entity` strings exactly: `Pre`, `MHS Engagement`,
     `EWS Engagement`, `Post` (the ping response lists them too);
   - the reminder that `user_id` is the `__userid` value from the survey links.
-- [ ] Ask them to: (1) run the `ping` first; (2) send `started` and
+- [x] Ask them to: (1) run the `ping` first; (2) send `started` and
       `completed` as they happen, one request per event; (3) quote the
       `event_id` from any response when asking about a specific send.
-- [ ] Optional: give Abt's developer an **analyst** login on the **Dev MHS**
+- [x] Optional: give Abt's developer an **analyst** login on the **Dev MHS**
       workspace (System Users → new analyst) so they can watch their test
       events land in Survey Events. Analysts see the whole workspace, so do
       this on the test workspace, not on MHS.
-- [ ] Message skeleton:
+- [x] Message skeleton:
 
       > StrataHub is ready to receive survey status. Endpoint and format are in
       > the attached guide; the host is <workspace-host>. The shared key
@@ -178,50 +193,50 @@ UID_HEX='<USER_ID>'          # 24 lowercase hex characters
 J='Content-Type: application/json'
 ```
 
-- [ ] Ping:
+- [x] Ping:
       ```bash
       curl -sS -X POST $HOST/api/member-status/ping -H "$J" -d "{\"key\":\"$KEY\"}"
       ```
       → `{"ok":true,"workspace":"mhs","entities":[…]}`
-- [ ] Started:
+- [x] Started:
       ```bash
       curl -sS -X POST $HOST/api/member-status -H "$J" \
         -d "{\"key\":\"$KEY\",\"user_id\":\"$UID_HEX\",\"entity\":\"Pre\",\"state\":\"started\",\"occurred_at\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}"
       ```
       → `200 {"ok":true,"event_id":"…","entity_key":"pre","known_entity":true,"state":"started","started_at":"…"}`
-- [ ] Completed:
+- [x] Completed:
       ```bash
       curl -sS -X POST $HOST/api/member-status -H "$J" \
         -d "{\"key\":\"$KEY\",\"user_id\":\"$UID_HEX\",\"entity\":\"Pre\",\"state\":\"completed\"}"
       ```
       → `200 … "state":"completed","started_at":"…","completed_at":"…"`
-- [ ] Idempotent / monotonic — resend `started`; status stays `completed`
+- [x] Idempotent / monotonic — resend `started`; status stays `completed`
       and the timestamps do not move:
       ```bash
       curl -sS -X POST $HOST/api/member-status -H "$J" \
         -d "{\"key\":\"$KEY\",\"user_id\":\"$UID_HEX\",\"entity\":\"pre\",\"state\":\"Started\"}"
       ```
       (also shows the case-insensitive matching on `entity` and `state`)
-- [ ] Unknown student → `404 unknown_user`, and the request still gets an
+- [x] Unknown student → `404 unknown_user`, and the request still gets an
       `event_id` (it is in Survey Events under Result → *Rejected: unknown user*):
       ```bash
       curl -sS -i -X POST $HOST/api/member-status -H "$J" \
         -d "{\"key\":\"$KEY\",\"user_id\":\"0123456789abcdef01234567\",\"entity\":\"Pre\",\"state\":\"started\"}"
       ```
-- [ ] Unrecognized survey name → still `200`, `"known_entity":false`, flagged
+- [x] Unrecognized survey name → still `200`, `"known_entity":false`, flagged
       amber in Survey Events:
       ```bash
       curl -sS -X POST $HOST/api/member-status -H "$J" \
         -d "{\"key\":\"$KEY\",\"user_id\":\"$UID_HEX\",\"entity\":\"Mid Survey\",\"state\":\"started\"}"
       ```
-- [ ] Wrong key → `401 unauthorized` (do this once or twice, not in a loop:
+- [x] Wrong key → `401 unauthorized` (do this once or twice, not in a loop:
       20 failures from one address in 5 minutes trips `429 rate_limited`;
       it clears on the next success or after 5 minutes):
       ```bash
       curl -sS -i -X POST $HOST/api/member-status -H "$J" \
         -d "{\"key\":\"wrong\",\"user_id\":\"$UID_HEX\",\"entity\":\"Pre\",\"state\":\"started\"}"
       ```
-- [ ] Then look at it from the inside:
+- [x] Then look at it from the inside:
   - **Survey Events** (tick *Live* while sending): one row per request
     above, `Provider` source, the states as sent, the results; ▸ Details
     shows the request exactly as sent and the `event_id` you got back.

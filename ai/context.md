@@ -954,9 +954,12 @@ make css-watch
   modal; `Resource.TrackedEntityID` links a survey resource so a member's
   launch records "opened"
 - Docs: `docs/member-status-api/` (provider guide, admin guide, plan,
-  rollout to-do). **Status:** all code is on `main`; only the settings fix is
-  deployed. Go-live steps (deploy, set key, link resources, hand-off to Abt,
-  curl verification) are in `docs/member-status-api/rollout-todo.md`
+  rollout to-do, check-script and Surveys-tab guides, overview README).
+  **Status (2026-09-07):** in production since 2026-08-29; keys set on both
+  workspaces; verified end to end with `scripts/member-status-api-check.sh`;
+  hand-off sent to Abt. Paused pending Abt's implementation; the resource
+  links on MHS are being set up separately. State and remaining steps are
+  in `docs/member-status-api/rollout-todo.md`
 - Also fixed: both settings pages previously rebuilt `SiteSettings` from the
   form and blanked fields they don't carry (e.g. the active MHS collection);
   handlers now overlay the form onto the current document

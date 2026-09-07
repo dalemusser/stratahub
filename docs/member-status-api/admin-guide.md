@@ -187,7 +187,7 @@ status and error code to look up below.
 |---------|--------------|-----|
 | Provider gets `401 not_configured` | No key set on this workspace | Set the key (section 1) |
 | Provider gets `401 unauthorized` | Key mismatch | Compare with Settings → Show; re-send the key |
-| Provider gets `404 unknown_user` | The `user_id` is not an active member of this workspace | Check the student exists, is active, and is a *member* (not a leader); confirm the provider is using the `__userid` from the de-identified links, not an email |
+| Provider gets `404 unknown_user` | The `user_id` is not an active member of this workspace | Check the student exists, is active, and is a *member* (not a leader); confirm the provider is using the `__userid` from ABT-deidentified links, not an email (ABT-identifiable links carry the email) |
 | Provider gets `429 rate_limited` | 20 failed authentications from one address in 5 minutes | Fix the key; the limit clears on the next success or after 5 minutes |
 | A survey shows Started/Completed but the name in the provider's data differs | Name not in `api_names` | Add it (section 4). Events sent under the unknown name were stored and will appear once the name is configured |
 | Opened never appears | Resource not linked | Set Survey Tracking on the resource (section 2) |

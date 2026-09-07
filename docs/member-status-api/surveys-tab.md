@@ -109,7 +109,7 @@ MHS Dashboard, Surveys tab   ──▶  6. list the group's members
 **Step 1–2: authenticate and identify the student.** The request carries the
 workspace's shared key in the body; the workspace is the host the request
 was sent to. `user_id` is the 24-character hex id StrataHub puts in the
-survey link as `__userid` under the de-identified resource mode, so the
+survey link as `__userid` under the **ABT-deidentified** identity mode, so the
 provider can report on a student without ever holding their name. The id
 must belong to an **active member of that workspace**; anything else is
 rejected as `unknown_user` and nothing is recorded.
