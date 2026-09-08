@@ -69,7 +69,8 @@ const (
 	EventMaterialUnassigned           = "material_unassigned"
 	EventGroupAppEnabled              = "group_app_enabled"
 	EventGroupAppDisabled             = "group_app_disabled"
-	EventMemberStatusKeyChanged       = "member_status_key_changed" // Member Status API shared key set, rotated, or cleared
+	EventMemberStatusKeyChanged       = "member_status_key_changed"     // Member Status API shared key set, rotated, or cleared
+	EventMemberStatusOriginsChanged   = "member_status_origins_changed" // Member Status API allowed browser origins (CORS) changed
 )
 
 // Event represents an audit event.

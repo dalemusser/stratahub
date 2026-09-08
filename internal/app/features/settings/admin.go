@@ -11,12 +11,14 @@ import (
 	"io"
 	"net/http"
 	"path/filepath"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 
-	settingsstore "github.com/dalemusser/stratahub/internal/app/store/settings"
+	"github.com/dalemusser/stratahub/internal/app/features/memberstatusapi"
 	"github.com/dalemusser/stratahub/internal/app/store/mhsbuilds"
+	settingsstore "github.com/dalemusser/stratahub/internal/app/store/settings"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	"github.com/dalemusser/stratahub/internal/app/system/htmlsanitize"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
@@ -54,9 +56,10 @@ type settingsVM struct {
 	MHSDeviceTestURL     string
 
 	// Member Status API shared key (see docs/member-status-api/plan.md)
-	MemberStatusAPIKey      string     // current key, rendered into a masked input
-	MemberStatusAPIKeySetAt *time.Time // when the current key was set; nil if none
-	MemberStatusEndpoint    string     // absolute URL the provider posts to, for display
+	MemberStatusAPIKey         string     // current key, rendered into a masked input
+	MemberStatusAPIKeySetAt    *time.Time // when the current key was set; nil if none
+	MemberStatusEndpoint       string     // absolute URL the provider posts to, for display
+	MemberStatusAllowedOrigins string     // allowed browser origins (CORS), one per line, for the textarea
 
 	Error string
 }
@@ -160,27 +163,28 @@ func (h *Handler) buildVM(ctx context.Context, r *http.Request, userID primitive
 	}
 
 	return settingsVM{
-		BaseVM:                  viewdata.NewBaseVM(r, h.DB, "Settings", "/dashboard"),
-		HasLogo:                 settings.HasLogo(),
-		LogoName:                settings.LogoName,
-		LandingTitle:            landingTitle,
-		LandingContent:          settings.LandingContent,
-		AllAuthMethods:          models.AllAuthMethods,
-		EnabledAuthMethods:      enabledMap,
-		CurrentUserMethod:       currentUserMethod,
-		MHSMemberAuth:           settings.GetMHSMemberAuth(),
-		MHSMemberAuthKeyword:    settings.MHSMemberAuthKeyword,
-		MHSStaffUnlockMinutes:   displayUnlockMinutes(settings.MHSStaffUnlockMinutes),
-		EnableClaudeSummaries:   settings.EnableClaudeSummaries,
-		ClaudeModel:             settings.ClaudeModel,
-		MHSDeviceTestEnabled:    settings.MHSDeviceTestEnabled,
-		MHSDeviceTestUnitKey:    deviceTestUnitKey(settings.MHSDeviceTestUnit),
-		MHSDeviceTestBuilds:     h.deviceTestBuilds(ctx),
-		MHSDeviceTestURL:        deviceTestURL(r),
-		MemberStatusAPIKey:      settings.MemberStatusAPIKey,
-		MemberStatusAPIKeySetAt: settings.MemberStatusAPIKeySetAt,
-		MemberStatusEndpoint:    memberStatusEndpoint(r),
-		Error:                   errMsg,
+		BaseVM:                     viewdata.NewBaseVM(r, h.DB, "Settings", "/dashboard"),
+		HasLogo:                    settings.HasLogo(),
+		LogoName:                   settings.LogoName,
+		LandingTitle:               landingTitle,
+		LandingContent:             settings.LandingContent,
+		AllAuthMethods:             models.AllAuthMethods,
+		EnabledAuthMethods:         enabledMap,
+		CurrentUserMethod:          currentUserMethod,
+		MHSMemberAuth:              settings.GetMHSMemberAuth(),
+		MHSMemberAuthKeyword:       settings.MHSMemberAuthKeyword,
+		MHSStaffUnlockMinutes:      displayUnlockMinutes(settings.MHSStaffUnlockMinutes),
+		EnableClaudeSummaries:      settings.EnableClaudeSummaries,
+		ClaudeModel:                settings.ClaudeModel,
+		MHSDeviceTestEnabled:       settings.MHSDeviceTestEnabled,
+		MHSDeviceTestUnitKey:       deviceTestUnitKey(settings.MHSDeviceTestUnit),
+		MHSDeviceTestBuilds:        h.deviceTestBuilds(ctx),
+		MHSDeviceTestURL:           deviceTestURL(r),
+		MemberStatusAPIKey:         settings.MemberStatusAPIKey,
+		MemberStatusAPIKeySetAt:    settings.MemberStatusAPIKeySetAt,
+		MemberStatusEndpoint:       memberStatusEndpoint(r),
+		MemberStatusAllowedOrigins: strings.Join(settings.MemberStatusAPIAllowedOrigins, "\n"),
+		Error:                      errMsg,
 	}
 }
 
@@ -268,6 +272,7 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	mhsDeviceTestEnabled := r.FormValue("mhs_device_test_enabled") != ""
 	mhsDeviceTestUnitKey := strings.TrimSpace(r.FormValue("mhs_device_test_unit"))
 	memberStatusAPIKey := strings.TrimSpace(r.FormValue("member_status_api_key"))
+	memberStatusOriginsText := r.FormValue("member_status_api_allowed_origins")
 
 	// Validation
 	if siteName == "" {
@@ -280,6 +285,11 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if msg := validateMemberStatusKey(memberStatusAPIKey); msg != "" {
 		h.renderWithError(w, r, wsID, msg)
+		return
+	}
+	memberStatusOrigins, err := memberstatusapi.ParseAllowedOrigins(memberStatusOriginsText)
+	if err != nil {
+		h.renderWithError(w, r, wsID, "Allowed browser origins: "+err.Error()+".")
 		return
 	}
 
@@ -455,6 +465,10 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 			settings.MemberStatusAPIKeySetAt = &now
 		}
 	}
+	// Allowed browser origins (CORS): already normalized by the parser, so a
+	// re-saved unchanged list compares equal and is not audited again.
+	originsChanged := !slices.Equal(memberStatusOrigins, current.MemberStatusAPIAllowedOrigins)
+	settings.MemberStatusAPIAllowedOrigins = memberStatusOrigins
 
 	if err := store.Save(ctx, wsID, settings); err != nil {
 		h.Log.Error("failed to save settings", zap.Error(err))
@@ -462,9 +476,14 @@ func (h *Handler) HandleSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if keyChanged {
+	if keyChanged || originsChanged {
 		role, _, actorID, _ := authz.UserCtx(r)
-		h.AuditLog.MemberStatusKeyChanged(ctx, r, actorID, role, memberStatusAPIKey == "")
+		if keyChanged {
+			h.AuditLog.MemberStatusKeyChanged(ctx, r, actorID, role, memberStatusAPIKey == "")
+		}
+		if originsChanged {
+			h.AuditLog.MemberStatusOriginsChanged(ctx, r, actorID, role, memberStatusOrigins)
+		}
 	}
 
 	http.Redirect(w, r, "/settings", http.StatusSeeOther)

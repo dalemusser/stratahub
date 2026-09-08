@@ -59,9 +59,10 @@ func TestSettingsPageRenders(t *testing.T) {
 
 	setAt := time.Date(2026, 8, 26, 14, 30, 0, 0, time.UTC)
 	settings := models.SiteSettings{
-		SiteName:                "MHS",
-		MemberStatusAPIKey:      "ms_render_test_key_0123456789",
-		MemberStatusAPIKeySetAt: &setAt,
+		SiteName:                      "MHS",
+		MemberStatusAPIKey:            "ms_render_test_key_0123456789",
+		MemberStatusAPIKeySetAt:       &setAt,
+		MemberStatusAPIAllowedOrigins: []string{"https://surveys.example.com", "http://localhost:3000"},
 	}
 
 	for _, tc := range []struct {
@@ -77,12 +78,14 @@ func TestSettingsPageRenders(t *testing.T) {
 				`value="ms_render_test_key_0123456789"`,
 				"Set on Aug 26, 2026 14:30 UTC",
 				"POST https://mhs.example.com/api/member-status",
+				"Allowed browser origins",
+				"https://surveys.example.com\nhttp://localhost:3000</textarea>",
 			},
 		},
 		{
 			name:     "without key",
 			settings: models.SiteSettings{SiteName: "MHS"},
-			want:     []string{"Member Status API", "No key is set."},
+			want:     []string{"Member Status API", "No key is set.", `name="member_status_api_allowed_origins"`, "></textarea>"},
 		},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

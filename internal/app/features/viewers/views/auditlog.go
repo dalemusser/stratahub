@@ -78,7 +78,7 @@ var auditEventTypes = map[string][]string{
 		audit.EventCoordinatorAssignedToOrg, audit.EventCoordinatorUnassignedFromOrg,
 		audit.EventMaterialAssigned, audit.EventMaterialAssignmentUpdated, audit.EventMaterialUnassigned,
 		audit.EventGroupAppEnabled, audit.EventGroupAppDisabled,
-		audit.EventMemberStatusKeyChanged,
+		audit.EventMemberStatusKeyChanged, audit.EventMemberStatusOriginsChanged,
 	},
 }
 

@@ -56,15 +56,17 @@ func TestHandleSettings_PreservesFieldsNotOnForm(t *testing.T) {
 	store := settingsstore.New(handler.DB)
 	collID := primitive.NewObjectID()
 	seed := models.SiteSettings{
-		SiteName:              "Old Site",
-		LandingTitle:          "Old Landing",
-		LandingContent:        "<p>Old content</p>",
-		MHSMemberAuth:         "keyword",
-		MHSMemberAuthKeyword:  "open-sesame",
-		MHSStaffUnlockMinutes: 30,
-		MHSActiveCollectionID: &collID,
-		EnableClaudeSummaries: true,
-		ClaudeModel:           "claude-haiku-4-5-20251001",
+		SiteName:                      "Old Site",
+		LandingTitle:                  "Old Landing",
+		LandingContent:                "<p>Old content</p>",
+		MHSMemberAuth:                 "keyword",
+		MHSMemberAuthKeyword:          "open-sesame",
+		MHSStaffUnlockMinutes:         30,
+		MHSActiveCollectionID:         &collID,
+		EnableClaudeSummaries:         true,
+		ClaudeModel:                   "claude-haiku-4-5-20251001",
+		MemberStatusAPIKey:            "ms_seeded_key_0123456789abcdef",
+		MemberStatusAPIAllowedOrigins: []string{"https://surveys.example.com"},
 	}
 	if err := store.Save(ctx, ws.ID, seed); err != nil {
 		t.Fatalf("seed settings: %v", err)
@@ -125,6 +127,12 @@ func TestHandleSettings_PreservesFieldsNotOnForm(t *testing.T) {
 	}
 	if !saved.EnableClaudeSummaries || saved.ClaudeModel != "claude-haiku-4-5-20251001" {
 		t.Errorf("Claude settings: got %v/%q, want true/claude-haiku-4-5-20251001 (must be preserved)", saved.EnableClaudeSummaries, saved.ClaudeModel)
+	}
+	if saved.MemberStatusAPIKey != "ms_seeded_key_0123456789abcdef" {
+		t.Errorf("MemberStatusAPIKey: got %q, want the seeded key (must be preserved)", saved.MemberStatusAPIKey)
+	}
+	if len(saved.MemberStatusAPIAllowedOrigins) != 1 || saved.MemberStatusAPIAllowedOrigins[0] != "https://surveys.example.com" {
+		t.Errorf("MemberStatusAPIAllowedOrigins: got %v, want [https://surveys.example.com] (must be preserved)", saved.MemberStatusAPIAllowedOrigins)
 	}
 
 	// The workspace record: name/subdomain updated, everything else intact.

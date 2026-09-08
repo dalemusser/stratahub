@@ -229,6 +229,17 @@
           <a href="/views/survey-events" class="text-indigo-600 dark:text-indigo-400 hover:underline">Survey Events</a> view.
         </p>
       </div>
+      <div>
+        <label for="member-status-origins" class="block text-sm text-gray-700 dark:text-gray-300 mb-1">Allowed browser origins</label>
+        <textarea id="member-status-origins" name="member_status_api_allowed_origins" rows="2"
+                  autocomplete="off" spellcheck="false" placeholder="https://surveys.example.com"
+                  class="w-full max-w-md border dark:border-gray-600 dark:bg-gray-800 dark:text-gray-100 p-2 rounded text-sm font-mono">{{ .MemberStatusAllowedOrigins }}</textarea>
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          Only needed when the provider calls the API from JavaScript in a web page (for example the survey page itself)
+          rather than from its own server. Enter that page's origin exactly as the browser reports it &mdash; scheme and
+          host, no path &mdash; one per line. Leave empty for server-to-server use.
+        </p>
+      </div>
     </div>
   </div>
 

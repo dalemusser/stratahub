@@ -9,6 +9,7 @@ import (
 	"context"
 	"net/http"
 	"strconv"
+	"strings"
 
 	"github.com/dalemusser/stratahub/internal/app/store/audit"
 	"github.com/dalemusser/stratahub/internal/app/system/ratelimit"
@@ -900,6 +901,25 @@ func (l *Logger) MemberStatusKeyChanged(ctx context.Context, r *http.Request, ac
 		Details: map[string]string{
 			"actor_role": actorRole,
 			"action":     action,
+		},
+	})
+}
+
+// MemberStatusOriginsChanged logs a change to the Member Status API's
+// allowed browser origins (the CORS list on Settings). The resulting list is
+// recorded; an empty list means browser calls are off again.
+func (l *Logger) MemberStatusOriginsChanged(ctx context.Context, r *http.Request, actorID primitive.ObjectID, actorRole string, origins []string) {
+	l.Log(ctx, audit.Event{
+		Category:  audit.CategoryAdmin,
+		EventType: audit.EventMemberStatusOriginsChanged,
+		ActorID:   &actorID,
+		IP:        ratelimit.ClientIP(r),
+		UserAgent: r.UserAgent(),
+		Success:   true,
+		Details: map[string]string{
+			"actor_role": actorRole,
+			"count":      strconv.Itoa(len(origins)),
+			"origins":    strings.Join(origins, " "),
 		},
 	})
 }
