@@ -165,15 +165,31 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 
 	r := chi.NewRouter()
 
-	// CORS middleware: must be early in the chain to handle preflight requests.
-	// Only active when enable_cors=true in config.
-	r.Use(middleware.CORSFromConfig(coreCfg))
-
 	// Workspace middleware: extracts workspace context from host/subdomain.
 	// In single-workspace mode, uses the default workspace for all requests.
 	// In multi-workspace mode, extracts from subdomain (e.g., mhs.adroit.games).
+	// It runs first because the Member Status API's CORS policy below reads
+	// the workspace; it only annotates the request (or refuses unknown hosts).
 	wsStore := workspacestore.New(deps.StrataHubMongoDatabase)
 	r.Use(workspace.Middleware(appCfg.PrimaryDomain, wsStore, appCfg.MultiWorkspace, logger))
+
+	// Member Status API: built before the middleware chain because its CORS
+	// policy (the workspace's allowed browser origins, set on Settings) must
+	// answer the API's preflights BEFORE the global CORS middleware, which
+	// otherwise answers them itself with no allow-origin header. The routes
+	// are mounted further down with the other features.
+	memberStatusAPIHandler, err := memberstatusapifeature.NewHandler(deps.StrataHubMongoDatabase, logger)
+	if err != nil {
+		logger.Error("member status API init failed", zap.Error(err))
+		return nil, err
+	}
+	r.Use(memberStatusAPIHandler.CORS())
+
+	// CORS middleware (global): must be early in the chain to handle preflight
+	// requests. Only active when enable_cors=true in config. Its origin list
+	// allows credentials and covers every route — never add the survey
+	// provider's origin here; that belongs on the workspace's Settings page.
+	r.Use(middleware.CORSFromConfig(coreCfg))
 
 	// Global auth middleware: loads SessionUser into context if logged in.
 	// This makes the current user available to all handlers via auth.CurrentUser(r).
@@ -531,15 +547,12 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	gameconfigfeature.MountRoutes(r, gameConfigHandler)
 
 	// Member Status API: an external provider reports members' survey
-	// started/completed events. Shared-key auth in the body, no session, no
+	// started/completed events — from its server or, for origins the
+	// workspace lists, from JavaScript in its web page (CORS middleware near
+	// the top of the chain). Shared-key auth in the body, no session, no
 	// CSRF (see CSRFExempt above), exempt from maintenance mode. Mounted
 	// outside the RequireWorkspace group; the handler resolves the workspace
 	// from the host and answers with JSON when it is missing.
-	memberStatusAPIHandler, err := memberstatusapifeature.NewHandler(deps.StrataHubMongoDatabase, logger)
-	if err != nil {
-		logger.Error("member status API init failed", zap.Error(err))
-		return nil, err
-	}
 	memberstatusapifeature.MountRoutes(r, memberStatusAPIHandler)
 
 	// Activity store - used by multiple features

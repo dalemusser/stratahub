@@ -2,9 +2,10 @@
 //
 // Member Status API: an inbound, key-authenticated JSON endpoint an external
 // provider (e.g. the survey system) calls to report that a member started or
-// completed an entity (a survey). Server-to-server only: no session, no
-// cookie, no CSRF — the workspace's shared key travels in the request body.
-// See docs/member-status-api/plan.md.
+// completed an entity (a survey). No session, no cookie, no CSRF — the
+// workspace's shared key travels in the request body. Callers are the
+// provider's server or, for origins the workspace lists, JavaScript in the
+// provider's own web page (see cors.go). See docs/member-status-api/plan.md.
 package memberstatusapi
 
 // Terminology: User Identifiers
@@ -36,8 +37,9 @@ import (
 	"go.uber.org/zap"
 )
 
-// PathPrefix is where the API is mounted. Referenced by the CSRF exemption
-// and the maintenance-mode exemption, so keep the three in step.
+// PathPrefix is where the API is mounted. Referenced by the CSRF exemption,
+// the CORS middleware, and the maintenance-mode exemption, so keep them in
+// step.
 const PathPrefix = "/api/member-status"
 
 const (

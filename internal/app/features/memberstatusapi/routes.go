@@ -3,7 +3,6 @@ package memberstatusapi
 
 import (
 	"net/http"
-	"strings"
 
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/go-chi/chi/v5"
@@ -36,7 +35,7 @@ func MountRoutes(r chi.Router, h *Handler) {
 // ServeHTTP, and sub-router middleware runs too late.
 func CSRFExempt(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if strings.HasPrefix(r.URL.Path, PathPrefix) {
+		if isAPIPath(r.URL.Path) {
 			r = csrf.UnsafeSkipCheck(r)
 		}
 		next.ServeHTTP(w, r)

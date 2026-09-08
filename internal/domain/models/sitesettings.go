@@ -67,6 +67,12 @@ type SiteSettings struct {
 	MemberStatusAPIKey      string     `bson:"member_status_api_key,omitempty" json:"-"`
 	MemberStatusAPIKeySetAt *time.Time `bson:"member_status_api_key_set_at,omitempty" json:"-"`
 
+	// Web-page origins ("https://host") allowed to call the Member Status
+	// API from JavaScript running in a browser (CORS). Normalized on save;
+	// empty means the API answers server-to-server callers only. See
+	// docs/member-status-api/plan.md §9.
+	MemberStatusAPIAllowedOrigins []string `bson:"member_status_api_allowed_origins,omitempty" json:"-"`
+
 	// Audit fields
 	UpdatedAt     *time.Time          `bson:"updated_at,omitempty" json:"updated_at,omitempty"`
 	UpdatedByID   *primitive.ObjectID `bson:"updated_by_id,omitempty" json:"updated_by_id,omitempty"`
