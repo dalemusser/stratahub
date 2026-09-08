@@ -139,7 +139,8 @@ answer, test id.
 **Chips** above the table: runs, reached gameplay, completed, failed now,
 last run.
 
-**The detail.** Click a row. It shows:
+**The detail.** Click anywhere on a row (or its ▸ button at the right); a
+second click closes it. It shows:
 
 - the form answers, the detected device and network, device id, IP address
   and user agent;

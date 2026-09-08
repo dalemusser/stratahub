@@ -203,8 +203,19 @@
           }
         }
 
-        // HTMX requests
-        document.body.addEventListener('htmx:beforeRequest', showLoader);
+        // HTMX requests. htmx fires htmx:beforeRequest and then its
+        // kebab-case twin htmx:before-request; an element that cancels the
+        // request in an hx-on handler (event.preventDefault(), e.g. the
+        // viewers' row toggle) does so on the twin, after the loader is
+        // already up, and a cancelled request never fires afterRequest. So
+        // the loader is taken down again when the twin arrives cancelled.
+        document.body.addEventListener('htmx:beforeRequest', function(e) {
+          if (e.defaultPrevented) return;
+          showLoader();
+        });
+        document.body.addEventListener('htmx:before-request', function(e) {
+          if (e.defaultPrevented) hideLoader();
+        });
         document.body.addEventListener('htmx:afterRequest', hideLoader);
 
         // Regular link clicks (full page navigation)

@@ -133,6 +133,17 @@
     if (next && next.classList.contains('viewer-detail')) { next.remove(); return true; }
     return false;
   }
+  // The whole row opens (and closes) its detail, not just the ▸ button.
+  // Clicks on links and controls inside a row, and clicks that end a text
+  // selection, are left alone.
+  document.addEventListener('click', function (e) {
+    var tr = e.target.closest('tr.viewer-row');
+    if (!tr) return;
+    if (e.target.closest('a, button, input, select, textarea, label, summary, details')) return;
+    try { if (String(window.getSelection())) return; } catch (err) { /* ignore */ }
+    var btn = tr.querySelector('button[aria-label="Details"]');
+    if (btn) btn.click();
+  });
   // Keep the Export link on the current filters.
   document.body.addEventListener('htmx:afterSettle', function (e) {
     if (!e.detail || !e.detail.xhr) return;

@@ -24,7 +24,7 @@
      where it replaces the previous load-more row (hx-swap="outerHTML"). */}}
 {{ define "viewers_rows" }}
 {{ range .Rows }}
-<tr id="viewer-row-{{ .ID }}" class="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 {{ .Class }}">
+<tr id="viewer-row-{{ .ID }}" class="viewer-row cursor-pointer border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 {{ .Class }}">
   {{ range $i, $c := .Cells }}
   <td class="px-3 py-1.5 align-top {{ with index $.Columns $i }}{{ .Class }}{{ if .Mono }} font-mono text-xs{{ end }}{{ end }}" {{ if $c.Title }}title="{{ $c.Title }}"{{ end }}>
     {{- if $c.HTML -}}
