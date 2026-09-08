@@ -168,7 +168,7 @@ This is a third data source for the dashboard (StrataHub DB, alongside mhsgrader
 - Key compared with `subtle.ConstantTimeCompare`; failures logged at Warn with IP and path; per-IP throttle (e.g. 20 failed auths / 5 min) using `internal/app/system/ratelimit`.
 - Endpoint is write-only and returns no PII (only echoes the IDs/timestamps it was given). `known_entity`/`unknown_user` responses do not reveal names.
 - Body limit 8 KB, `middleware.Timeout(timeouts.Short())`, JSON only.
-- **Server-to-server over HTTPS** (confirmed). The key travels in the POST body, which TLS protects in transit; it never appears in a URL, so it never lands in access logs or proxies. No CORS, no cookies, no session — the endpoint ignores `LoadSessionUser` state entirely.
+- **HTTPS, from the provider's server or — since 2026-09-08 — from the provider's web page** (§9). The key travels in the POST body, which TLS protects in transit; it never appears in a URL, so it never lands in access logs or proxies. No cookies, no session — the endpoint ignores `LoadSessionUser` state entirely. Browser calls are allowed only for origins the workspace lists (CORS without credentials); the key's visibility in such a page was accepted (§9.2).
 - The key is never written to logs, audit details, or responses; auth failures log only IP, path, and reason.
 
 ### 3.6 Linking a survey resource to a tracked survey ("Opened")
@@ -217,7 +217,7 @@ Rough effort: Task 0 ≈ 2 h; Tasks 1–3 ≈ 1 day; Tasks 4–5 ≈ 1 day; Task
 ## 5. Decisions (confirmed 2026-08-25)
 
 1. **Task 0 first.** The destructive settings-save bug is fixed and shipped before any of the new work lands.
-2. **Caller.** Server-to-server over HTTPS. The provider's server has no cookie and never logs in; it authenticates by including the shared key as a string in the posted JSON (`"key"`).
+2. **Caller.** Server-to-server over HTTPS. The provider's server has no cookie and never logs in; it authenticates by including the shared key as a string in the posted JSON (`"key"`). **Amended 2026-09-08:** the provider's own web page may also call, from the student's browser, when its origin is listed on the workspace's Settings (§9); the request and the key are unchanged.
 3. **Survey config.** Embedded JSON (`mhs_member_status.json`); no admin-editable list.
 4. **"Opened" is in scope**, not v2 — implemented as the resource link in §3.6 (`Resource.TrackedEntityID` + select on the resource forms + launch hook).
 
@@ -430,3 +430,93 @@ Rough effort: 8a ½ day, 8b ½ day, 8c 1 day, 8d–8e ½ day.
    their behalf.
 4. **Names for analysts:** show (consistent with Members Report; recommended)
    or add the de-identified toggle now.
+
+---
+
+## 9. Browser (cross-origin) calls — 2026-09-08
+
+### 9.1 Why
+
+Abt's developer reported that the calls would be made "using JavaScript in
+the browser" from the survey page and asked for cross-origin access for
+their site's origin only. Their survey system is a commercial product; the
+survey page contents are the only place they can add code. The API was
+designed server-to-server (§5.2) and had no CORS answer, so a browser
+blocked the call at the preflight.
+
+### 9.2 Findings and decisions
+
+- The API itself is CORS-neutral (body key, no cookies, no CSRF token,
+  JSON in and out); only the preflight answer and the
+  `Access-Control-Allow-Origin` header were missing.
+- Production already runs the **global** CORS middleware
+  (`middleware.CORSFromConfig`, `enable_cors = true` in the deployment
+  config) with `cors_allow_credentials = true` and the workspace hosts as
+  origins, for game clients calling `/api/user`. It was first in the chain
+  and answers **every** preflight itself — with no allow-origin header for
+  an origin it does not know — so a path-scoped middleware behind it could
+  never see the API's preflights. Adding the provider's origin to that
+  global list would have granted the survey site credentialed cross-origin
+  access to every route, so it was ruled out.
+- **Decision (Dale, 2026-09-08):** allow browser calls; the shared key
+  being visible in the provider's page source is accepted. CORS is a
+  browser rule, not authentication: the key still gates the write, the
+  endpoint returns no personal data, and every authenticated request is in
+  Survey Events. Options noted and not taken: asking Abt to relay through a
+  server (they cannot), and a signed per-launch token on the survey URL in
+  place of the key (would change the ABT URL spec; possible later).
+- The allowed origin(s) are a **per-workspace setting** kept out of the
+  public repo, like the key. A deployment-config key was the alternative;
+  per workspace matches the key's home and lets Dev MHS and MHS differ.
+
+### 9.3 Design
+
+- `SiteSettings.MemberStatusAPIAllowedOrigins []string`
+  (`member_status_api_allowed_origins`), on the `settingsstore.Save`
+  whitelist; both settings forms overlay it. Edited on `/settings` under the
+  Member Status API section as **Allowed browser origins**, one per line;
+  audited as `audit.EventMemberStatusOriginsChanged`
+  (`member_status_origins_changed`, details: count + list).
+- Origin rules (`memberstatusapi/origins.go`): `scheme://host[:port]`
+  only, lowercase, default port dropped, trailing slash tolerated; `https`
+  required except for loopback hosts; no path/query/fragment, no userinfo,
+  no wildcard, never `null`; at most 20. Matching is exact after
+  lowercasing (`www.` and bare host differ; so do ports and schemes).
+- `memberstatusapi/cors.go`: `(*Handler).CORS()` wraps go-chi/cors (already
+  in the module graph via waffle) with an `AllowOriginFunc` that reads the
+  workspace from the request context and its settings' list. Policy: POST;
+  request headers `Content-Type`, `Authorization`; `Max-Age` 3600;
+  **never** `Allow-Credentials`. Applies only to `/api/member-status` and
+  its routes; a pass-through for everything else. A preflight from a listed
+  origin gets 200 with the allow headers and stops the chain (it never
+  reaches CSRF or maintenance); an actual request gets the allow-origin
+  header on every response, error responses included, so the page can read
+  the JSON. A request from an unlisted origin is still processed — the key
+  is the authentication — but the browser gets no allow-origin header.
+- Bootstrap order (`routes.go`): **workspace middleware → API CORS →
+  global CORS**. The workspace middleware moved up (it only annotates the
+  request, or refuses unknown hosts); the API handler is constructed before
+  the chain and its routes are still mounted with the other features.
+  Game-client preflights still reach the global handler unchanged, and the
+  global list's origins get no browser access to the API unless also listed
+  on the workspace.
+- `scripts/member-status-api-check.sh`: `MEMBER_STATUS_ORIGIN` adds three
+  checks (listed-origin preflight allowed, unlisted refused, keyed call
+  with `Origin` echoes it and carries no credentials header).
+
+### 9.4 Task 9 — implementation record
+
+✅ Done 2026-09-08. Commits: API middleware + origin helpers + bootstrap
+reorder + store field and tests; Settings field + audit + tests; check
+script; docs (provider guide "Calling from a web page" with a `fetch`
+example and the key-visibility note, admin guide "Browser calls" + a
+troubleshooting row, README, check-script guide, rollout to-do §2/§5/§7,
+`ai/context.md`). Tests: `origins_test.go`, `cors_test.go` (allowed and
+refused preflights incl. look-alike origins and the apex host; error
+responses carry the header; pass-through; ordering proven against a
+production-shaped global handler with a control case), store round-trip,
+settings save/normalize/clear/validation, key untouched by an origins save,
+workspaces form preserves both, template render. Rollout: deploy, list the
+provider's origin on Dev MHS and MHS, run the check script with
+`MEMBER_STATUS_ORIGIN`, tell Abt's developer — steps in
+[rollout-todo.md](rollout-todo.md).

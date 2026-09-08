@@ -44,6 +44,32 @@ Each key change is written to the workspace **Audit Log** (event
 `member_status_key_changed`, with who changed it and whether it was set or
 cleared — never the key itself).
 
+### Browser calls: allowed origins
+
+Normally the provider's server makes the calls. If instead they come from
+JavaScript in the survey page itself, running in the student's browser, the
+browser allows them only for origins this workspace has listed. Ask the
+provider's developer for the page's **origin** — the scheme and host
+exactly as the browser reports it, for example `https://surveys.example.com`,
+with no path — and enter it under Settings → **Member Status API** →
+**Allowed browser origins**, one per line, then **Save**. Entries are
+checked on save: `https://` plus a host only (plain `http://` is accepted
+for `localhost` only), no wildcards; a mistyped line is named in the error.
+The change applies from the provider's next page load; a page already open
+may keep its earlier answer for up to an hour.
+
+Leave the field empty when the provider calls from its own server: an empty
+list means no web page may call the API from a browser. Server-to-server
+calls are unaffected either way.
+
+With browser calls the key is part of the provider's page and visible to
+anyone who views its source. This was accepted for the survey integration —
+the key can only report status, never read anything, and every request is
+in Survey Events — but rotate it if it turns up where it should not.
+
+Each change is written to the **Audit Log** as
+`member_status_origins_changed`, with the resulting list.
+
 ---
 
 ## 2. Link each survey resource (for the "Opened" state)
@@ -189,6 +215,7 @@ status and error code to look up below.
 | Provider gets `401 unauthorized` | Key mismatch | Compare with Settings → Show; re-send the key |
 | Provider gets `404 unknown_user` | The `user_id` is not an active member of this workspace | Check the student exists, is active, and is a *member* (not a leader); confirm the provider is using the `__userid` from ABT-deidentified links, not an email (ABT-identifiable links carry the email) |
 | Provider gets `429 rate_limited` | 20 failed authentications from one address in 5 minutes | Fix the key; the limit clears on the next success or after 5 minutes |
+| The provider's page shows a CORS error in the browser console, and nothing appears in Survey Events | The page's origin is not in **Allowed browser origins** on this workspace, or differs from it (http vs https, `www.` vs bare host, a port) | Ask the developer for the page's exact `location.origin` and add it (section 1, "Browser calls"). The browser blocked the request before sending it, so it is not logged anywhere |
 | A survey shows Started/Completed but the name in the provider's data differs | Name not in `api_names` | Add it (section 4). Events sent under the unknown name were stored and will appear once the name is configured |
 | Opened never appears | Resource not linked | Set Survey Tracking on the resource (section 2) |
 | The server log shows `member status recorded for unrecognized entity name` | Provider sent a name not in the configuration | Same as above — add the alias |

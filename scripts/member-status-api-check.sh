@@ -8,13 +8,19 @@
 # workspace.
 #
 # Usage:
-#   MEMBER_STATUS_KEY='<KEY>' scripts/member-status-api-check.sh https://<workspace-host> [<user_id>] [<survey>]
+#   MEMBER_STATUS_KEY='<KEY>' [MEMBER_STATUS_ORIGIN='https://<provider-origin>'] \
+#     scripts/member-status-api-check.sh https://<workspace-host> [<user_id>] [<survey>]
 #
 #   <workspace-host>  the workspace URL, e.g. the Dev MHS workspace
 #   <user_id>         optional 24-character hex id of a test student
 #   <survey>          optional survey name for the student checks (default: Pre);
 #                     pick one the student has not completed for a clean
 #                     started → completed ladder
+#
+# MEMBER_STATUS_ORIGIN, when set, adds three browser (CORS) checks: a
+# preflight from that origin must be allowed, a preflight from an unlisted
+# origin must not, and a keyed call carrying the origin must echo it. Use the
+# origin listed under "Allowed browser origins" on the workspace's Settings.
 #
 # The key comes from the environment so it never lands in this file or in
 # shell history. One wrong-key request is sent on purpose; it counts as a
@@ -29,14 +35,19 @@ HOST="${1:-}"
 UID_HEX="${2:-}"
 ENTITY="${3:-Pre}"
 KEY="${MEMBER_STATUS_KEY:-}"
+ORIGIN="${MEMBER_STATUS_ORIGIN:-}"
 
 if [ -z "$HOST" ] || [ -z "$KEY" ]; then
-  sed -n '2,25p' "$0" | sed 's/^# \{0,1\}//'
+  sed -n '2,31p' "$0" | sed 's/^# \{0,1\}//'
   exit 2
 fi
 HOST="${HOST%/}"
 if [ -n "$UID_HEX" ] && ! printf '%s' "$UID_HEX" | grep -Eq '^[0-9a-f]{24}$'; then
   echo "user_id must be 24 lowercase hex characters" >&2
+  exit 2
+fi
+if [ -n "$ORIGIN" ] && ! printf '%s' "$ORIGIN" | grep -Eq '^https?://[^/[:space:]]+$'; then
+  echo "MEMBER_STATUS_ORIGIN must be an origin (scheme and host only, no path), e.g. https://surveys.example.com" >&2
   exit 2
 fi
 
@@ -45,27 +56,32 @@ PASS=0
 FAIL=0
 BODY=""
 CODE=""
+HEADERS=""
 EVENT_IDS=""
 
-# request METHOD PATH DATA [extra curl args...]  → sets CODE and BODY
+# request METHOD PATH DATA [extra curl args...]  → sets CODE, BODY, and HEADERS
 request() {
   local method=$1 path=$2 data=$3
   shift 3
-  local tmp
+  local tmp hdr
   tmp=$(mktemp)
+  hdr=$(mktemp)
   if [ -n "$data" ]; then
-    CODE=$(curl -sS -m 20 -o "$tmp" -w '%{http_code}' -X "$method" "$HOST$path" -H "$J" -d "$data" "$@") || CODE="000"
+    CODE=$(curl -sS -m 20 -o "$tmp" -D "$hdr" -w '%{http_code}' -X "$method" "$HOST$path" -H "$J" -d "$data" "$@") || CODE="000"
   else
-    CODE=$(curl -sS -m 20 -o "$tmp" -w '%{http_code}' -X "$method" "$HOST$path" "$@") || CODE="000"
+    CODE=$(curl -sS -m 20 -o "$tmp" -D "$hdr" -w '%{http_code}' -X "$method" "$HOST$path" "$@") || CODE="000"
   fi
   BODY=$(cat "$tmp")
-  rm -f "$tmp"
+  HEADERS=$(tr -d '\r' < "$hdr")
+  rm -f "$tmp" "$hdr"
 }
 
 # jstr FIELD → string value of a top-level JSON string field ("" if absent)
 jstr() { printf '%s' "$BODY" | grep -o "\"$1\":\"[^\"]*\"" | head -1 | sed -e 's/^[^:]*://' -e 's/^"//' -e 's/"$//'; }
 # jraw FIELD → raw value of a non-string field (true/false/number)
 jraw() { printf '%s' "$BODY" | grep -o "\"$1\":[^,}]*" | head -1 | sed 's/^[^:]*://'; }
+# hdr NAME → value of a response header ("" if absent), name matched case-insensitively
+hdr() { printf '%s\n' "$HEADERS" | grep -i "^$1:" | head -1 | sed 's/^[^:]*:[[:space:]]*//'; }
 
 report() {
   local name=$1 ok=$2 detail=$3
@@ -121,6 +137,26 @@ expect "ping, wrong key (one failed auth)" 401 unauthorized
 
 request POST /api/member-status/ping "{}" -H "Authorization: Bearer $KEY"
 expect "ping, key in a Bearer header" 200 ok
+
+if [ -n "$ORIGIN" ]; then
+  # What a browser does before a cross-origin JSON POST from the survey page.
+  request OPTIONS /api/member-status "" -H "Origin: $ORIGIN" \
+    -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: content-type"
+  cond=0; [ "$(hdr access-control-allow-origin)" = "$ORIGIN" ] && hdr access-control-allow-methods | grep -q POST && cond=1
+  expect "preflight from $ORIGIN allowed" 200 "" "$cond"
+  echo "      allow-origin=$(hdr access-control-allow-origin) methods=$(hdr access-control-allow-methods) max-age=$(hdr access-control-max-age)"
+
+  request OPTIONS /api/member-status "" -H "Origin: https://not-listed.example" \
+    -H "Access-Control-Request-Method: POST" -H "Access-Control-Request-Headers: content-type"
+  cond=0; [ -z "$(hdr access-control-allow-origin)" ] && cond=1
+  expect "preflight from an unlisted origin refused" 200 "" "$cond"
+
+  request POST /api/member-status/ping "{\"key\":\"$KEY\"}" -H "Origin: $ORIGIN"
+  cond=0; [ "$(hdr access-control-allow-origin)" = "$ORIGIN" ] && [ -z "$(hdr access-control-allow-credentials)" ] && cond=1
+  expect "ping with Origin header echoes the origin" 200 ok "$cond"
+else
+  echo "      (MEMBER_STATUS_ORIGIN not set: browser/CORS checks skipped)"
+fi
 
 request GET /api/member-status ""
 expect "GET on the endpoint" 405

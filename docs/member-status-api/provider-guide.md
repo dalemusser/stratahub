@@ -19,6 +19,7 @@ no session, no cookies, no login — just a shared key included in each request.
 | Format | JSON request and response (`Content-Type: application/json`) |
 | Authentication | The workspace's shared key, sent as the `"key"` field of the JSON body |
 | Transport | HTTPS only |
+| Calling from a web page | Supported for the page origin(s) you name to StrataHub — see [Calling from a web page](#calling-from-a-web-page) |
 | Student identifier | `user_id` — the 24-character hex id you already receive as `__userid` on the survey link |
 | States you report | `started`, `completed` |
 | Retries | Safe: the endpoint is idempotent (see "Semantics") |
@@ -152,6 +153,82 @@ convenient way to confirm your strings match before sending real events.
 
 ---
 
+## Calling from a web page
+
+The calls do not have to come from a server. If your survey system only
+lets you add JavaScript to the survey page, the page itself can report the
+events from the student's browser. StrataHub supports this as a
+cross-origin request (CORS) for the page origins the workspace has
+registered.
+
+**Before the first call, tell StrataHub the page's origin** — the scheme
+and host the survey page is served from, exactly as the browser reports it
+(`location.origin` in the page's console, for example
+`https://surveys.example.com`). A StrataHub admin lists it on the
+workspace's Settings page. Only a listed origin is allowed: a different
+host, a plain-http variant, a `www.` difference, or another port does not
+match, so send the exact value. If the page is served from more than one
+origin, name each.
+
+Nothing about the request changes: same endpoint, same JSON body, same
+`key` field. The browser adds the cross-origin handshake itself — it first
+sends an `OPTIONS` "preflight" asking whether your origin may POST here,
+StrataHub answers yes for a registered origin, and the browser then sends
+the real request and lets your script read the response. Responses are
+readable on errors too (a `401` or `404` still arrives as JSON), so handle
+them exactly as a server would. No cookies are involved; do not send
+credentials.
+
+```javascript
+const STRATAHUB = "https://<workspace-host>"; // the host StrataHub gave you
+const KEY = "ms_…";
+
+async function report(userId, entity, state) {
+  const res = await fetch(STRATAHUB + "/api/member-status", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      key: KEY, user_id: userId, entity: entity, state: state,
+      occurred_at: new Date().toISOString(),
+    }),
+  });
+  const data = await res.json(); // readable for 2xx and 4xx/5xx alike
+  if (!data.ok) {
+    console.warn("StrataHub refused the event:", res.status, data.error, data.message, data.event_id);
+  }
+  return data;
+}
+
+// For example, on the survey's last page:
+report(new URLSearchParams(location.search).get("__userid"), "Pre", "completed");
+```
+
+`user_id` is the `__userid` value StrataHub placed on the survey link; how
+you read it back depends on your survey system (the example reads it from
+the page URL). Send `started` when the student begins and `completed` when
+they finish, one call each. A call that fails on the network is safe to
+retry (see [Semantics](#semantics)).
+
+**If the browser console shows a CORS error** (typically "No
+'Access-Control-Allow-Origin' header" or "blocked by CORS policy"), the
+browser did not send the request: the page's origin is not registered on
+that workspace, or it differs from the registered one. Compare
+`location.origin` with what StrataHub has. A request the browser blocked
+never reaches StrataHub and does not appear in Survey Events. A response
+that arrives with `"ok": false` is a different matter — the request was
+received and refused, and the [error table](#errors) applies.
+
+**The key is visible in the page.** JavaScript in a page can be read by
+anyone who opens the page, so a key used this way is not secret from the
+students taking the survey. StrataHub accepts this for survey status: the
+key permits only reporting a survey as started or completed, never reads
+anything, and every request is visible to StrataHub staff in Survey
+Events. Still, use it only from the registered origin, do not reuse it
+elsewhere, and if it turns up somewhere it should not, ask StrataHub for a
+rotation.
+
+---
+
 ## Seeing that a call worked
 
 The response is the first confirmation: `200` with `"ok": true`, plus the
@@ -205,6 +282,10 @@ Every error is JSON with this shape and a non-2xx status:
 `4xx` responses other than `429` indicate a problem with the request itself
 and should not be retried unchanged.
 
+A CORS error in the browser console is not one of these: it means the
+browser did not send the request at all (see
+[Calling from a web page](#calling-from-a-web-page)).
+
 ---
 
 ## Examples
@@ -238,15 +319,22 @@ def report(user_id: str, entity: str, state: str, occurred_at: str | None = None
 report("68f138c495cdf54a392b20aa", "MHS Engagement", "completed", "2026-08-25T14:03:11Z")
 ```
 
+### Browser JavaScript
+
+See [Calling from a web page](#calling-from-a-web-page) for the `fetch`
+version and what StrataHub needs from you first.
+
 ---
 
 ## Security notes
 
 - Always use HTTPS. The key travels in the request body, never in the URL, so
   it does not appear in access logs.
-- Treat the key like a password: store it in your service's secret
-  configuration, not in client-side code. It is per workspace and can be
-  rotated by a StrataHub administrator at any time; you will receive the new
-  key out of band.
+- Treat the key like a password. From a server, keep it in your service's
+  secret configuration. From a web page it is necessarily part of the page
+  (see [Calling from a web page](#calling-from-a-web-page)); use it only
+  from the origin you registered. The key is per workspace and can be
+  rotated by a StrataHub administrator at any time; you will receive the
+  new key out of band.
 - The endpoint returns no personal data. Responses echo only the ids and
   timestamps you supplied or that StrataHub recorded.

@@ -116,6 +116,23 @@ are per workspace.)
         -H 'Content-Type: application/json' -d "{\"key\":\"$KEY\"}"
       ```
       Expect `{"ok":true,"workspace":"mhs","entities":["Pre","MHS Engagement","EWS Engagement","Post"]}`.
+- [ ] **Browser calls (added 2026-09-08).** Abt calls from the survey page,
+      not from a server, so list the page's origin: Settings → **Member
+      Status API** → **Allowed browser origins** → the origin Abt's
+      developer gave (scheme and host only, exactly as their browser reports
+      it) → **Save**. Dev MHS first, then MHS. The change appears in
+      **Audit Log** as `member_status_origins_changed`.
+- [ ] Confirm the browser handshake (no key involved in this one):
+      ```bash
+      ORIGIN='https://<provider-origin>'
+      curl -sS -i -X OPTIONS $HOST/api/member-status -H "Origin: $ORIGIN" \
+        -H 'Access-Control-Request-Method: POST' \
+        -H 'Access-Control-Request-Headers: content-type' | grep -i '^access-control'
+      ```
+      Expect `access-control-allow-origin: <the origin>`,
+      `access-control-allow-methods: POST`, `access-control-max-age: 3600`,
+      and **no** `access-control-allow-credentials`. (Or run the check
+      script with `MEMBER_STATUS_ORIGIN`, §5.)
 
 ## 3. Link the four survey resources (Opened state)
 
@@ -159,6 +176,11 @@ are per workspace.)
       workspace (System Users → new analyst) so they can watch their test
       events land in Survey Events. Analysts see the whole workspace, so do
       this on the test workspace, not on MHS.
+- [ ] **2026-09-08:** tell Abt's developer that their origin is listed on
+      MHS and point them at the provider guide's *Calling from a web page*
+      section (the `fetch` example; a CORS error in the console means the
+      origin does not match what is listed; the key being visible in the
+      page is accepted on our side).
 - [x] Message skeleton:
 
       > StrataHub is ready to receive survey status. Endpoint and format are in
@@ -178,6 +200,7 @@ afterwards. The key goes in the environment, never on the command line:
 ```bash
 MEMBER_STATUS_KEY='<KEY>' scripts/member-status-api-check.sh $HOST <USER_ID>
 # optional third argument: a survey the student has not completed yet (default Pre)
+# add MEMBER_STATUS_ORIGIN='https://<provider-origin>' for the three browser (CORS) checks
 ```
 
 The commands below are the same checks by hand.
@@ -279,6 +302,9 @@ J='Content-Type: application/json'
 - The Survey Events view shows student names to analysts (as the Members
   Report does). Fine for staff; give an outside developer an analyst login
   only on a test workspace.
+- **The key is in Abt's survey page** (browser calls, accepted 2026-09-08):
+  anyone who views the page source can read it. It can only report status.
+  If it turns up outside the survey site, rotate it (§6) and tell Abt.
 - Nothing here touches `stratalog`, `stratasave`, or `mhsgrader`.
 
 ## Reference
@@ -294,4 +320,5 @@ J='Content-Type: application/json'
 | Survey list | `internal/app/resources/mhs_member_status.json` (embedded; edit → redeploy) |
 | Contract for Abt | `docs/member-status-api/provider-guide.md` |
 | Admin how-to + troubleshooting | `docs/member-status-api/admin-guide.md` (§6 has the symptom → fix table) |
-| Check script | `scripts/member-status-api-check.sh <host> [<user_id>] [<survey>]`, key in `MEMBER_STATUS_KEY` — [how-to](check-script.md) |
+| Check script | `scripts/member-status-api-check.sh <host> [<user_id>] [<survey>]`, key in `MEMBER_STATUS_KEY`, provider origin (optional, adds the CORS checks) in `MEMBER_STATUS_ORIGIN` — [how-to](check-script.md) |
+| Allowed browser origins | Settings → Member Status API → Allowed browser origins (`/settings`) |

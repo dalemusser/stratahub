@@ -105,7 +105,7 @@ Handles application initialization and lifecycle:
 | **missionhydrosci** | MHS-specific configuration and management |
 | **gameconfig** | Game/activity configuration (MHS) |
 | **uploadcsv** | CSV import for MHS data |
-| **memberstatusapi** | Inbound `POST /api/member-status` (+ `/ping`): the survey provider reports a member's survey started/completed; shared key in the body, no session/CSRF; feeds the dashboard's Surveys tab (`docs/member-status-api/`) |
+| **memberstatusapi** | Inbound `POST /api/member-status` (+ `/ping`): the survey provider reports a member's survey started/completed; shared key in the body, no session/CSRF; browser (CORS) calls allowed for the origins listed in Site Settings — its `CORS()` middleware sits ahead of the global one in bootstrap; feeds the dashboard's Surveys tab (`docs/member-status-api/`) |
 | **missionhydrosci/devicetest** | Public `/missionhydrosci/devicetest` (no session; workspace from host): a school downloads and plays Unit 2 as a student would; runs recorded in `mhs_device_tests` with `ffffffff`-marked game ids; enable + build in Site Settings; results in the **Device Tests** viewer (`docs/mhs-device-test/`: admin guide + tester guide) |
 
 **Utility & System:**
@@ -991,6 +991,17 @@ make css-watch
 - Also fixed: both settings pages previously rebuilt `SiteSettings` from the
   form and blanked fields they don't carry (e.g. the active MHS collection);
   handlers now overlay the form onto the current document
+- **Browser calls (2026-09-08):** Abt calls the API from JavaScript in the
+  survey page, so the API answers CORS for origins listed per workspace on
+  `/settings` (**Allowed browser origins**, `member_status_api_allowed_origins`,
+  audited as `member_status_origins_changed`). `memberstatusapi.CORS()`
+  (go-chi/cors, `AllowOriginFunc` against the workspace's list; POST,
+  Content-Type/Authorization, no credentials) is installed on the root
+  router after the workspace middleware and **before** the global
+  `CORSFromConfig`, which otherwise swallows every preflight; the global
+  list allows credentials and must never carry the provider's origin. Key
+  visibility in the page accepted by Dale. Check script: `MEMBER_STATUS_ORIGIN`
+  adds three CORS checks. Plan §9
 
 ### Custom ABT URL Identity Modes (2026-08, in production)
 - Two custom consumer modes for the Abt survey links: `abt-identifiable`

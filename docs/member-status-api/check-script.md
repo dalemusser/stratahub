@@ -33,11 +33,16 @@ there as the manual version of the same checks.
 
 ```bash
 MEMBER_STATUS_KEY='<KEY>' scripts/member-status-api-check.sh https://<workspace-host> [<user_id>] [<survey>]
+
+# with the browser (CORS) checks as well:
+MEMBER_STATUS_KEY='<KEY>' MEMBER_STATUS_ORIGIN='https://<provider-origin>' \
+  scripts/member-status-api-check.sh https://<workspace-host>
 ```
 
 | Input | Required | Meaning |
 |-------|----------|---------|
 | `MEMBER_STATUS_KEY` (environment) | yes | The workspace's shared key. It is read from the environment so it never appears in the script, in the command line, or in shell history. Set it on the same line as the command, as above, rather than exporting it. |
+| `MEMBER_STATUS_ORIGIN` (environment) | no | An origin listed under Settings → **Member Status API** → **Allowed browser origins** (scheme and host, no path). When set, three browser/CORS checks run as well. |
 | `<workspace-host>` | yes | The workspace URL, e.g. the Dev MHS workspace. A trailing slash is tolerated. |
 | `<user_id>` | no | A test student's hex id. Without it the script runs only the checks that change nothing. |
 | `<survey>` | no | The survey name to use, exactly as the provider sends it (default `Pre`). Pick one the student has not completed so the started → completed ladder is visible. |
@@ -72,6 +77,15 @@ clears the count.
 | state `opened` from the provider | `"state":"opened"` | `400 invalid_state` (only StrataHub records Opened) |
 | bad `occurred_at` | `"occurred_at":"yesterday"` | `400 invalid_occurred_at` |
 
+**With an origin** — three more, nothing recorded (what a browser does when
+the provider's page calls the API):
+
+| Check | Request | Expected |
+|-------|---------|----------|
+| preflight from the origin allowed | `OPTIONS /api/member-status` with `Origin`, `Access-Control-Request-Method: POST`, `Access-Control-Request-Headers: content-type` | `200` with `Access-Control-Allow-Origin` echoing the origin and `Access-Control-Allow-Methods` including `POST`; the allow-origin, methods, and max-age values are printed |
+| preflight from an unlisted origin refused | the same from `https://not-listed.example` | `200` with **no** `Access-Control-Allow-Origin` |
+| ping with Origin header echoes the origin | a keyed ping carrying `Origin` | `200`, `ok: true`, the allow-origin header present and **no** `Access-Control-Allow-Credentials` |
+
 **With a student** — four more, on the chosen survey:
 
 | Check | Request | Expected |
@@ -98,6 +112,10 @@ PASS  ping with the key                                HTTP 200
 PASS  ping, empty body (missing key)                   HTTP 401 error=unauthorized
 PASS  ping, wrong key (one failed auth)                HTTP 401 error=unauthorized
 PASS  ping, key in a Bearer header                     HTTP 200
+PASS  preflight from https://<provider-origin> allowed HTTP 200
+      allow-origin=https://<provider-origin> methods=POST max-age=3600
+PASS  preflight from an unlisted origin refused        HTTP 200
+PASS  ping with Origin header echoes the origin        HTTP 200
 PASS  GET on the endpoint                              HTTP 405
 PASS  non-object JSON body                             HTTP 400 error=bad_json
 PASS  unknown student (carries an event_id)            HTTP 404 error=unknown_user event_id=6a9e50a7e2ada9cb13ea7f5a
@@ -115,14 +133,16 @@ PASS  late 'Started' on 'post': stays completed, same times HTTP 200 event_id=6a
       state=completed started_at=2026-09-07T05:50:32.597Z completed_at=2026-09-07T05:50:32.912Z
 PASS  unrecognized survey name: stored and flagged     HTTP 200 event_id=6a9e50a9e2ada9cb13ea7f64
 
-15 passed, 0 failed.
+18 passed, 0 failed.
 Event ids to look up in Survey Events (▸ Details shows each request as received):
   6a9e50a7e2ada9cb13ea7f5a
   …
 ```
 
-Each line shows the HTTP status, the error code when there is one, and the
-`event_id` when the request was logged. The `ping` line also prints the
+(Without `MEMBER_STATUS_ORIGIN` the three preflight/origin lines are
+replaced by a note that the browser checks were skipped, and the total is
+15.) Each line shows the HTTP status, the error code when there is one, and
+the `event_id` when the request was logged. The `ping` line also prints the
 survey names the workspace expects — the same list the provider should
 compare its strings against.
 
@@ -155,6 +175,8 @@ causes, with the fix:
 | `started` → `404 error=unknown_user` | The id is not an **active member** of **this** workspace: a student from another workspace, a removed or disabled student, or a leader's id | Use a student from Members Report on the same workspace host |
 | `started` passes but `known_entity` is `false` | The third argument is not a configured survey name (the `ping` line lists them) | Use one of the listed names |
 | `late 'Started'` fails | The status moved or a timestamp changed after `completed` — a contract regression | Compare the two printed lines; report it with the event ids |
+| `preflight from … allowed` fails | That origin is not listed on this workspace, or differs from the listed one (scheme, `www.`, port); or the server predates browser support (2026-09-08) | Settings → Member Status API → Allowed browser origins: add the exact origin, Save, rerun |
+| `preflight from an unlisted origin refused` fails | The API allowed an origin it should not have — a regression | Review `memberstatusapi/cors.go` and the workspace's list |
 | `ping, empty body` shows `not_configured` instead of `unauthorized` | Not possible with the current handler; would mean the check order changed | Review `memberstatusapi/handler.go` |
 
 Everything the provider might see is in the [Provider Guide's error
@@ -187,4 +209,4 @@ table](provider-guide.md#errors); the admin-side symptoms are in the
 | The manual version of the checks | [Rollout To-Do §5](rollout-todo.md#5-verify-end-to-end-curl) |
 | What each response means to the provider | [Provider Guide](provider-guide.md) |
 | Key setting, Survey Events view, troubleshooting | [Admin Guide](admin-guide.md) |
-| The endpoint's behavior | `internal/app/features/memberstatusapi/handler.go` (`authenticate`, `HandleStatus`) |
+| The endpoint's behavior | `internal/app/features/memberstatusapi/handler.go` (`authenticate`, `HandleStatus`); browser calls in `cors.go` and `origins.go` |

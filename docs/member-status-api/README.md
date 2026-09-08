@@ -47,15 +47,19 @@ _The Launch URL field holds Abt's survey link; it is blanked here._
 
 **2. The shared key.** An admin generates a key on Settings → **Member
 Status API** and hands it to Abt privately, together with the workspace
-host. The key is per workspace; nothing else is needed on either side.
+host. The key is per workspace. If Abt's calls come from the survey page
+itself rather than from a server, the admin also lists that page's origin
+on the same Settings section so the browser allows them; nothing else is
+needed on either side.
 
 **3. The student opens the survey.** StrataHub records *Opened* for that
 student and survey, then sends the browser to Abt with the hex ids on the
 URL.
 
 **4. Abt reports progress.** When the student starts and when they finish,
-Abt's system makes one HTTPS call each to StrataHub's Member Status API,
-carrying the key, the same `__userid` value, the survey's name, and
+Abt's system — its server, or JavaScript in the survey page running in the
+student's browser — makes one HTTPS call each to StrataHub's Member Status
+API, carrying the key, the same `__userid` value, the survey's name, and
 `started` or `completed`. StrataHub answers with an `event_id`.
 
 **5. StrataHub records and logs.** Each student has one status per survey
@@ -84,8 +88,8 @@ the only key to it is StrataHub's Members Report.
 
 | Role | Does |
 |------|------|
-| StrataHub admin | Sets the shared key; sets the two options on each survey resource; watches Survey Events for rejected calls |
-| Abt's developer | Points their system at the workspace host with the key; sends `started` / `completed` per event; quotes `event_id` when asking about a call |
+| StrataHub admin | Sets the shared key (and, for calls from the survey page, the page's origin); sets the two options on each survey resource; watches Survey Events for rejected calls |
+| Abt's developer | Points their system at the workspace host with the key; if calling from the survey page, tells StrataHub the page's origin; sends `started` / `completed` per event; quotes `event_id` when asking about a call |
 | Teacher (leader) | Reads the Surveys tab; clicks a pill for dates |
 | StrataHub developer | Maintains the API, the survey list, the dashboard tab, and the viewer; runs the check script after a deploy |
 
