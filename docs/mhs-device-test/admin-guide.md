@@ -60,8 +60,12 @@ Send the school the link and the tester guide. Ask them to:
 - test on the **actual devices and network** students will use (a Chromebook
   in the classroom on the school Wi-Fi, not a laptop at home);
 - keep the tab open while the download runs;
-- play into the game at least until the first scene is on screen, and
-  finish the unit if they can;
+- use a keyboard and a trackpad or mouse (the game needs them, and the
+  opening part has to be played through before the Unit 2 content loads);
+- keep the sound on and report any audio problem, since whether sound works
+  is one of the things we need to learn;
+- play at least until the Unit 2 content has loaded and they are moving
+  around in it, and finish the unit if they can;
 - quote the six-character **test code** shown at the end (or on the run
   page) when they report anything.
 

@@ -23,7 +23,11 @@ files in the browser.
   is nearly full, the page will tell you how much room it needs.
 - **Keep the tab open.** On some devices the download only runs while the
   page is open. The page will say if that applies to you.
-- **Sound and a keyboard help**, but are not required for the test.
+- **You need a keyboard and a trackpad or mouse.** The game is controlled
+  with them, and you have to get through the opening part before the Unit 2
+  content itself loads and runs.
+- **Turn the sound on.** We need to know whether audio works on the device,
+  so play with the volume up and tell us about any problem with it.
 
 ## Step 1 — Open the link
 
@@ -66,9 +70,15 @@ When the download finishes, the card says **Ready to play** and a green
 
 ## Step 5 — Play
 
-Play at least until you are moving around in the game. That is the important
-check. If you have time, play through Unit 2 to the end; that confirms the
-device holds up for a whole chapter.
+Use the keyboard and the trackpad or mouse to get through the opening part
+and into Unit 2 itself; play at least until the unit's content has loaded
+and you are moving around in it. That is the important check. If you have
+time, play through Unit 2 to the end; that confirms the device holds up for
+a whole chapter.
+
+Listen as you play. If there is no sound, or it stutters, cuts out, or is out
+of step with what is on screen, note when it happened and include it in your
+report; audio problems are one of the things this test is for.
 
 When you finish the unit, the page shows **Test complete** and a six-character
 **test code**. Please note it down. If you stop earlier, the same code is at
