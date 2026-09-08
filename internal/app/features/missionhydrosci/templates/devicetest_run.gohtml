@@ -161,11 +161,14 @@
     channelName: 'missionhydrosci-delivery',
     unitCachePrefix: 'missionhydrosci-unit-',
     fetchIdPrefix: 'missionhydrosci-',
-    appShellCachePrefix: 'missionhydrosci-app-shell-'
+    appShellCachePrefix: 'missionhydrosci-app-shell-',
+    isolated: true // never prune or abort other units — a student may use this device
   });
 
-  // Step log: shown open, streamed to the server every 5 s.
+  // Step log: shown open, streamed to the server every 5 s. A log left in
+  // this tab by another run or by a student's pages is not ours.
   var stepLog = new MHSStepLog();
+  if (stepLog.context.testId !== testId) stepLog.reset();
   stepLog.start({
     page: 'devicetest',
     host: location.host,

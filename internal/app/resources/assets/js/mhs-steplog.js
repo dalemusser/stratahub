@@ -173,6 +173,13 @@
     }
   };
 
+  // Forgets everything, context included — used when a tab moves between a
+  // student's pages and a device-test run, which must not share a log.
+  MHSStepLog.prototype.reset = function() {
+    this.context = {};
+    this.clear();
+  };
+
   MHSStepLog.prototype.clear = function() {
     this.entries = [];
     this._flushed = 0;

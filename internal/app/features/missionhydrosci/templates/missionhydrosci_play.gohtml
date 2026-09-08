@@ -645,6 +645,11 @@
 
       // Per-load step log (continues the units page's log in this tab).
       var stepLog = new MHSStepLog();
+      {{ if .DeviceTest }}
+      if (stepLog.context.testId !== '{{ .DeviceTestID }}') stepLog.reset();
+      {{ else }}
+      if (stepLog.context.testId) stepLog.reset(); // a device-test run's log left in this tab is not this student's
+      {{ end }}
       stepLog.start({
         page: {{ if .DeviceTest }}'devicetest-play'{{ else }}'play'{{ end }},
         host: location.host,

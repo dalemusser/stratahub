@@ -43,6 +43,10 @@
     this.manifest = null;
     this.manifestLoaded = false; // true only after a fresh, successful manifest fetch
     this._csrfToken = opts.csrfToken || ''; // required to POST download-error telemetry
+    // Isolated managers (the device test) touch only the units in their own
+    // manifest: no pruning of other units' caches and no aborting of other
+    // units' downloads, which may belong to a student using the same device.
+    this._isolated = !!opts.isolated;
     this._downloadErrorUrl = opts.downloadErrorUrl || '/missionhydrosci/api/download-error';
     this._stepLogReportUrl = opts.stepLogReportUrl || '/missionhydrosci/api/steplog'; // member step-log outcomes (needs csrfToken)
     this._stepLogReported = {}; // unitId|outcome -> last sent time (dedupe)
@@ -161,7 +165,7 @@
     // Prune orphaned old-version caches. Must run after reconnecting so an
     // in-flight download of a valid unit is not disturbed; init-time pruning
     // also covers collection switches, which reload the page.
-    await this.pruneStaleCaches();
+    if (!this._isolated) await this.pruneStaleCaches();
 
     // Check initial cache status for all units
     await this.checkAllCacheStatus();
@@ -1660,7 +1664,7 @@
             if (reg.active) reg.active.postMessage({ action: 'attachProgress' });
             this._startProgressKeepalive(reg);
             console.log('Reconnected to Background Fetch:', ids[i]);
-          } else if (this.manifestLoaded) {
+          } else if (this.manifestLoaded && !this._isolated) {
             // No manifest unit at this unit+version — genuinely stale.
             // Abort it: it can only produce an unwanted old-version cache,
             // and while in flight it blocks pruning of that cache. Only do

@@ -512,6 +512,7 @@
   var mhsUnitVersions = { {{ range $i, $u := .Units }}{{ if $i }}, {{ end }}'{{ $u.ID }}': '{{ $u.Version }}'{{ end }} };
   var mhsUnitTitles = { {{ range $i, $u := .Units }}{{ if $i }}, {{ end }}'{{ $u.ID }}': '{{ $u.Title }}'{{ end }} };
   var stepLog = new MHSStepLog();
+  if (stepLog.context.testId) stepLog.reset(); // a device-test run's log left in this tab is not this student's
   stepLog.start({
     page: 'manage',
     host: location.host,
