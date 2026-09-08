@@ -31,8 +31,11 @@
     <div class="flex flex-col gap-2">
       <button id="download-btn" onclick="mhsDownload('{{ .UnitID }}')"
               class="w-full px-4 py-3 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed hidden font-medium">Download</button>
-      <a id="play-btn" href="{{ .PlayURL }}"
+      <a id="play-btn" href="{{ .PlayURL }}" target="_blank" onclick="return mhsLaunch(this)"
          class="w-full px-4 py-3 text-sm text-center bg-green-600 text-white rounded-lg hover:bg-green-700 {{ if or .Completed .Expired }}{{ else }}hidden{{ end }} no-loader font-medium">{{ if .Completed }}Play {{ .UnitTitle }} again{{ else }}Launch {{ .UnitTitle }}{{ end }}</a>
+    </div>
+    <div id="play-notice" class="hidden mt-3 rounded-md bg-green-50 dark:bg-green-900/30 px-3 py-2 text-sm text-green-800 dark:text-green-200">
+      {{ .UnitTitle }} is open in another tab. Play there for as long as you like. When you are done, close that tab, come back to this one, and answer the questions below.
     </div>
 
     <div id="download-mode-notice" class="hidden mt-4 rounded-md px-3 py-2 text-xs text-center" aria-live="polite"></div>
@@ -57,8 +60,7 @@
     </div>
   </div>
 
-  {{ if .Launched }}
-  <div id="questionnaire" class="mt-4 bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+  <div id="questionnaire" class="mt-4 bg-white dark:bg-gray-800 rounded-lg shadow p-4 {{ if not .Launched }}hidden{{ end }}">
     <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">How did it go?</h2>
     {{ if .Thanks }}
     <div class="mt-2 rounded-md bg-green-50 dark:bg-green-900/30 px-3 py-2 text-sm text-green-800 dark:text-green-200">Thank you — your answers are saved with test code <strong class="font-mono">{{ .ShortID }}</strong>.</div>
@@ -66,8 +68,8 @@
     {{ if .QError }}
     <div class="mt-2 rounded-md bg-red-50 dark:bg-red-900/30 px-3 py-2 text-sm text-red-700 dark:text-red-300">{{ .QError }}</div>
     {{ end }}
-    {{ if .ShowQuestionnaire }}
-    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1 mb-3">A few questions about things the page cannot see for itself. Answer what you can; the first one matters most.</p>
+    {{ if or .ShowQuestionnaire (not .Launched) }}
+    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1 mb-3">When you are done playing, a few questions about things the page cannot see for itself. Answer what you can; the first one matters most.</p>
     <form method="post" action="{{ .Base }}/questionnaire" class="space-y-4 text-sm">
       <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
       {{ $q := .Questionnaire }}
@@ -119,7 +121,6 @@
     <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Answered {{ .Questionnaire.AnsweredAt.Format "Jan 2, 2006 3:04 PM" }} UTC. <a class="underline" href="{{ .Base }}?edit=1#questionnaire">Update your answers</a></p>
     {{ end }}
   </div>
-  {{ end }}
 
   <p class="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center">Keep this tab open while the download runs. Getting into the game is the important check; finishing the unit is the full one.</p>
 </div>
@@ -478,6 +479,21 @@
       window.location.reload();
     });
   }
+
+  // Launch opens the game in a new tab so this page stays as the tester's
+  // home: the questionnaire is revealed here, and closing the game tab
+  // brings them straight back to it. An installed (standalone) app has no
+  // tabs, so it plays in place and the back arrow returns here.
+  window.mhsLaunch = function(link) {
+    var q = el('questionnaire'), notice = el('play-notice');
+    if (q) q.classList.remove('hidden');
+    stepLog.record('launch', 'running', 'Launch pressed — opening the game');
+    var standalone = false;
+    try { standalone = window.matchMedia('(display-mode: standalone)').matches || !!navigator.standalone; } catch (e) {}
+    if (standalone) { window.location.href = link.href; return false; }
+    if (notice) notice.classList.remove('hidden');
+    return true; // let the browser open the new tab
+  };
 
   window.mhsDownload = function(uid) {
     if (cacheStatus[uid] === 'retrying') { manager.retryNow(uid); return; }

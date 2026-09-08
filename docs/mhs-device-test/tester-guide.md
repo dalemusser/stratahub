@@ -65,8 +65,10 @@ The next page shows one card for Unit 2 and starts the download on its own.
 ## Step 4 — Launch
 
 When the download finishes, the card says **Ready to play** and a green
-**Launch Unit 2** button appears. Press it. The game loads for a short while
-(a loading bar with the current step under it), then the first scene appears.
+**Launch Unit 2** button appears. Press it. The game opens in a **new tab**
+and loads for a short while (a loading bar with the current step under it),
+then the first scene appears. Leave the first tab open: that is where you
+answer the questions afterwards.
 
 ## Step 5 — Play
 
@@ -86,8 +88,9 @@ the top of the run page.
 
 ## Step 6 — Answer a few questions
 
-When you leave the game (the back arrow at the top left, or the link on the
-Test complete screen), the run page asks five quick questions: whether the
+When you are done, close the game's tab (or use the back arrow at the top
+left, or the link on the Test complete screen) and return to the first tab.
+It asks five quick questions: whether the
 sound played, whether the keyboard and mouse or trackpad worked, whether the
 picture looked right, how the game ran, and how far you got, plus a box for
 anything else. The sound question is the one we need most. Press **Save

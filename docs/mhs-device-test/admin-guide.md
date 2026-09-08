@@ -89,14 +89,15 @@ so a first run that fails on this is still informative.
    give up: every failure schedules the next attempt with a visible
    countdown; "Retry now" only skips the wait. A **Send report** box lets the
    tester add a note.
-3. **Launch** — the play page. The current step shows under the loading bar;
-   if a launch step fails the panel opens with the log and a Copy report
-   button.
+3. **Launch** — the play page opens in a new tab (in place when installed
+   as an app), and the run page stays open behind it with the questionnaire
+   revealed. The current step shows under the loading bar; if a launch step
+   fails the panel opens with the log and a Copy report button.
 4. **Test complete** — when the game reports the unit finished, the page
    shows the test code and a link back to the run page.
-5. **Post-play questions** — once the game has been launched, the run page
-   (reached through the game's back arrow or the Test complete link) shows a
-   short questionnaire: did the sound play, did the keyboard and pointer
+5. **Post-play questions** — once Launch is pressed the run page shows a
+   short questionnaire (it is also there on any later visit to the run page,
+   which the game's back arrow and the Test complete link lead to): did the sound play, did the keyboard and pointer
    work, did the picture look right, how did it run, how far they got, and
    notes. Answers can be updated later. These cover what the page cannot
    observe by itself; the sound answer is required.

@@ -164,7 +164,7 @@
     </script>
 
     <div id="unity-container">
-      <a id="back-btn" href="{{ if .PlayBackURL }}{{ .PlayBackURL }}{{ else }}/missionhydrosci/units{{ end }}" title="Back to Mission HydroSci" aria-label="Back to Mission HydroSci"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" style="vertical-align: middle;" aria-hidden="true"><path d="M13 4 L7 10 L13 16" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
+      <a id="back-btn" href="{{ if .PlayBackURL }}{{ .PlayBackURL }}{{ else }}/missionhydrosci/units{{ end }}" title="{{ if .DeviceTest }}Done testing — back to the test page to answer the questions{{ else }}Back to Mission HydroSci{{ end }}" aria-label="{{ if .DeviceTest }}Done testing — back to the test page{{ else }}Back to Mission HydroSci{{ end }}"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" style="vertical-align: middle;" aria-hidden="true"><path d="M13 4 L7 10 L13 16" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
       <button id="fullscreen-btn" onclick="toggleFullscreen()" title="Fullscreen" aria-label="Toggle fullscreen">⛶</button>
       <div id="loading-overlay">
         <h2>Loading {{ .UnitTitle }}...</h2>
