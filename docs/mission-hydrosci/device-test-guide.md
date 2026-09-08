@@ -69,6 +69,13 @@ under Mission HydroSci):
 - Filters: date range, stage, kind (device test, or a member's stored load
   record), device, school, test id. Chips: runs, reached gameplay, completed,
   failed now, last run.
+- **Member load records** (Kind filter): a signed-in student's page stores
+  its own step log when a download completes or fails (at most every ten
+  minutes while retries continue) and when a launch fails, succeeds, or
+  crashes while loading. The row shows the member's name, organization and
+  the outcome; the detail has the same step timeline. This is how a field
+  report like "connection error in room 12" is read without asking the
+  student for anything.
 - Click a row for the detail: the form, detected device and network, the
   download and launch summaries, the game telemetry for the run (events,
   first and last event, scenes seen, progress points from the grader), the

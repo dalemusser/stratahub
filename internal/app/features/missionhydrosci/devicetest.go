@@ -555,12 +555,56 @@ func (h *Handler) HandleDeviceTestSteps(w http.ResponseWriter, r *http.Request) 
 		req.Entries = req.Entries[:deviceTestMaxSteps]
 	}
 	now := time.Now().UTC()
-	reached := run.ReachedStage
-	if reached == "" {
-		reached = run.Stage
+	initial := run.ReachedStage
+	if initial == "" {
+		initial = run.Stage
 	}
-	failed := run.Stage == models.MHSDeviceTestStageFailed
-	failedStep, failedReason := run.FailedStep, run.FailedReason
+	steps, derived := deriveFromStepsWith(req, initial, run.Stage == models.MHSDeviceTestStageFailed,
+		run.FailedStep, run.FailedReason, run.GameplayReachedAt != nil, now)
+	set := bson.M{"reached_stage": derived.reached}
+	if run.UnitCompletedAt == nil {
+		set["stage"] = derived.stage
+	}
+	if derived.failedStep != "" {
+		set["failed_step"] = derived.failedStep
+		set["failed_reason"] = derived.failedReason
+	}
+	if derived.gameplayAt != nil {
+		set["gameplay_reached_at"] = *derived.gameplayAt
+	}
+	if len(req.Context) > 0 {
+		set["diagnostics.steplog_context"] = boundDiagnostics(req.Context)
+	}
+	if err := h.DeviceTestStore.AppendSteps(ctx, run.WorkspaceID, run.ID, steps, set); err != nil {
+		h.deviceTestWriteError(w, err)
+		return
+	}
+	writeDeviceTestJSON(w, http.StatusOK, map[string]any{"ok": true, "stored": len(steps)})
+}
+
+// derivedStages is what a batch of step entries says about a run.
+type derivedStages struct {
+	reached      string // furthest stage reached
+	stage        string // reached, or "failed" while the latest step is a failure
+	failedStep   string
+	failedReason string
+	gameplayAt   *time.Time // first time gameplay was reached in this batch (nil if earlier or never)
+}
+
+// deriveFromSteps converts and bounds a batch of entries and derives the
+// stages from a fresh starting point.
+func deriveFromSteps(req deviceTestStepsRequest, initial string, now time.Time) ([]models.MHSDeviceTestStep, derivedStages) {
+	return deriveFromStepsWith(req, initial, false, "", "", false, now)
+}
+
+// deriveFromStepsWith is deriveFromSteps continuing from a run's stored
+// state (its reached stage, whether it is currently failed and why, and
+// whether gameplay was already reached).
+func deriveFromStepsWith(req deviceTestStepsRequest, initial string, failed bool, failedStep, failedReason string, gameplayKnown bool, now time.Time) ([]models.MHSDeviceTestStep, derivedStages) {
+	reached := initial
+	if reached == "" {
+		reached = models.MHSDeviceTestStageRun
+	}
 	var gameplayAt *time.Time
 	steps := make([]models.MHSDeviceTestStep, 0, len(req.Entries))
 	for _, e := range req.Entries {
@@ -590,7 +634,7 @@ func (h *Handler) HandleDeviceTestSteps(w http.ResponseWriter, r *http.Request) 
 
 		if s := stageFromStep(st.Step, st.State); s != "" && deviceTestStageRank[s] > deviceTestStageRank[reached] {
 			reached = s
-			if s == models.MHSDeviceTestStageGameplay && run.GameplayReachedAt == nil && gameplayAt == nil {
+			if s == models.MHSDeviceTestStageGameplay && !gameplayKnown && gameplayAt == nil {
 				t := st.At
 				gameplayAt = &t
 			}
@@ -603,29 +647,11 @@ func (h *Handler) HandleDeviceTestSteps(w http.ResponseWriter, r *http.Request) 
 			failed = false
 		}
 	}
-	set := bson.M{"reached_stage": reached}
-	if run.UnitCompletedAt == nil {
-		if failed {
-			set["stage"] = models.MHSDeviceTestStageFailed
-		} else {
-			set["stage"] = reached
-		}
+	d := derivedStages{reached: reached, stage: reached, failedStep: failedStep, failedReason: failedReason, gameplayAt: gameplayAt}
+	if failed {
+		d.stage = models.MHSDeviceTestStageFailed
 	}
-	if failedStep != "" {
-		set["failed_step"] = failedStep
-		set["failed_reason"] = failedReason
-	}
-	if gameplayAt != nil {
-		set["gameplay_reached_at"] = *gameplayAt
-	}
-	if len(req.Context) > 0 {
-		set["diagnostics.steplog_context"] = boundDiagnostics(req.Context)
-	}
-	if err := h.DeviceTestStore.AppendSteps(ctx, run.WorkspaceID, run.ID, steps, set); err != nil {
-		h.deviceTestWriteError(w, err)
-		return
-	}
-	writeDeviceTestJSON(w, http.StatusOK, map[string]any{"ok": true, "stored": len(steps)})
+	return steps, d
 }
 
 // deviceTestSummaryRequest carries the structured summaries the pages

@@ -48,6 +48,8 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 		pr.Post("/api/save-data/settings/delete", h.HandleDeleteSavedSettings)
 		pr.Post("/api/device-status", h.HandleDeviceStatus)
 		pr.Post("/api/download-error", h.HandleDownloadError)
+		// A member page's step log on a download/launch outcome (plan step A2).
+		pr.Post("/api/steplog", h.HandleMemberStepLog)
 		pr.Post("/api/auth/start", h.HandleStaffAuthStart)
 		pr.Post("/api/auth/verify", h.HandleStaffAuthVerify)
 		pr.Post("/api/auth/resend", h.HandleStaffAuthResend)

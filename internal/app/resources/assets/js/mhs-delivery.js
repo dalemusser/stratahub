@@ -44,6 +44,8 @@
     this.manifestLoaded = false; // true only after a fresh, successful manifest fetch
     this._csrfToken = opts.csrfToken || ''; // required to POST download-error telemetry
     this._downloadErrorUrl = opts.downloadErrorUrl || '/missionhydrosci/api/download-error';
+    this._stepLogReportUrl = opts.stepLogReportUrl || '/missionhydrosci/api/steplog'; // member step-log outcomes (needs csrfToken)
+    this._stepLogReported = {}; // unitId|outcome -> last sent time (dedupe)
     this._reportedErrors = {}; // dedupe telemetry: unitId|errorClass -> true (per manager lifetime)
     this.swRegistration = null;
     this.channel = null;
@@ -892,6 +894,31 @@
     this._steplog = log || null;
   };
 
+  /**
+   * Sends the step log to the server on a download outcome (plan step A2):
+   * once per unit for a completed download, and for failures the first time
+   * plus at most every 10 minutes while retries continue. Only when the
+   * page opted in with a CSRF token (member pages do; the device test has
+   * its own stream). Best effort, never throws.
+   */
+  MHSDeliveryManager.prototype.reportStepLog = function(outcome, unitId, version, opts) {
+    if (!this._steplog || !this._csrfToken || !this._stepLogReportUrl) return;
+    var key = unitId + '|' + outcome;
+    var minGap = (opts && opts.minGapMs) || 0;
+    var last = this._stepLogReported[key] || 0;
+    if (last && (minGap === 0 || Date.now() - last < minGap)) return;
+    this._stepLogReported[key] = Date.now();
+    var entries = this._steplog.entries.slice(-300);
+    try {
+      fetch(this._stepLogReportUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': this._csrfToken },
+        body: JSON.stringify({ outcome: outcome, unit: unitId, version: version || '', context: this._steplog.context, entries: entries }),
+        keepalive: true
+      }).catch(function() {});
+    } catch (e) { /* best effort */ }
+  };
+
   // Records a step; never lets logging break delivery.
   MHSDeliveryManager.prototype._step = function(step, state, msg, detail) {
     if (!this._steplog) return;
@@ -1018,6 +1045,7 @@
         this._step('download', 'fail', title + ': ' + (detail.error || 'Download failed') +
           (detail.errorClass ? ' [' + detail.errorClass + (detail.failureReason ? ':' + detail.failureReason : '') + ']' : '') +
           (detail.rawError ? ' — ' + detail.rawError : ''), { path: detail.path || '' });
+        this.reportStepLog('download-failed', unitId, unit ? unit.version : '', { minGapMs: 10 * 60 * 1000 });
         return;
       case 'cached': {
         if (!wasActive) return; // an init-time cache check, not a download we ran
@@ -1032,7 +1060,10 @@
           if (total) msg += ' (' + ((total / 1048576) / (took / 1000)).toFixed(1) + ' MB/s)';
         }
         this._step('download', 'ok', msg);
-        this._verifyForLog(unitId).catch(function() {});
+        var mgr = this;
+        this._verifyForLog(unitId).catch(function() {}).then(function() {
+          mgr.reportStepLog('download-complete', unitId, unit ? unit.version : '');
+        });
         return;
       }
       default:

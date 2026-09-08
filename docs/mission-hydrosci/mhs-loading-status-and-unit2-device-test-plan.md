@@ -139,7 +139,17 @@ Goal: every load, on every surface, produces a human-readable, timestamped step 
 
 Verification: the smoke checklist in `issues/README.md`, plus: reload mid-download keeps the log; Copy report yields the full text on Chromebook and iPad (clipboard API with a textarea fallback); both themes.
 
-### A2. Also keep students' step logs on the server (about 1 day) — approved 2026-09-07
+### A2. Also keep students' step logs on the server (about 1 day) — implemented 2026-09-07
+
+> **Status (2026-09-07): implemented.** `POST /missionhydrosci/api/steplog`
+> (session-gated) stores a member's step log as a kind "member" record in
+> `mhs_device_tests`: the delivery manager sends it when a download completes
+> (once per unit) or fails (first time, then at most every 10 minutes while
+> the automatic retries continue), and the play page sends it when a launch
+> fails, when the game renders its first frame, or on a crash while loading.
+> The Device Tests view shows these rows under Kind = "Member load record",
+> with the member's name and organization and the outcome. With this, every
+> step of the plan is in place; device verification remains.
 
 **What this means.** After A1, every student's units and play pages build the same step log the device test builds, but for students it only lives in the browser (they can copy it). A2 makes the page send that log to StrataHub when a download or launch *fails* or *finishes*, and stores it beside the device-test runs (same collection, `kind: "member"`, same viewer with a kind filter). The result is that a field report like "connection error on a Chromebook in room 12" can be looked up by member, device and time and read step by step, without asking the student to copy anything and without a device test. It is bounded (one record per failure or completion, at most 300 entries, 16 KB) and needs no new UI beyond the viewer filter.
 
@@ -294,7 +304,7 @@ About 7–8 working days sequential, or about 6 with B's server side in parallel
 - **Test-id marker:** `ffffffff` (4.4).
 - **Device-test switch:** the public URL only works in a workspace whose admin has ticked "Enable device test" in Site Settings (default off). Without the switch the URL would be live in every workspace that has an active collection, including ones that never run device tests; the checkbox keeps it explicit and is also the way to turn it off after a school's testing window.
 - **Unit 2 starts cleanly with no Unit 1 save:** confirmed by Dale. Every unit starts cleanly; Mission HydroSci already supports switching between units on demand with proper authorization.
-- **A2** (storing students' step logs on failure or completion for review): approved as a standing diagnostic tool.
+- **A2** (storing students' step logs on failure or completion for review): approved as a standing diagnostic tool; implemented 2026-09-07.
 - One fixed route per workspace, no links to manage; no accounts or sessions; the Unit 2 build is chosen in workspace settings from builds already on the CDN; the game-service keys are rendered into the launch page as today; everything is kept.
 
 The plan is complete and ready to implement in the order in §5.

@@ -937,8 +937,10 @@ make css-watch
   pages, fed by delivery-manager hooks; B implemented 2026-09-07 (guide:
   `docs/mission-hydrosci/device-test-guide.md`): standalone, account-free Unit 2
   device test at `/missionhydrosci/devicetest` per workspace (test ids are
-  `ffffffff` + 16 random hex, never a real user id); A2: students' step logs
-  stored on failure/completion for review in a viewer
+  `ffffffff` + 16 random hex, never a real user id); A2 implemented
+  2026-09-07: members' step logs stored on download/launch failure or
+  completion (`POST /missionhydrosci/api/steplog`, kind "member" rows in the
+  Device Tests view). All plan steps are in place; device verification pending
 
 ### Data Viewers Framework (2026-08)
 - `internal/app/features/viewers`: one mechanism for role-gated, scoped,

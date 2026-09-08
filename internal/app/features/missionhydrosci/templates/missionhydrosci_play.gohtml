@@ -674,6 +674,23 @@
           }).catch(function() {});
         } catch (e) { /* best effort */ }
       }
+      function memberReport() { /* device test: the log streams to the run instead */ }
+      {{ else }}
+      // Member launches: store the step log on a launch outcome (plan step A2)
+      // so a field report can be read step by step in the Device Tests view.
+      var memberReported = {};
+      function memberReport(outcome) {
+        if (memberReported[outcome]) return;
+        memberReported[outcome] = true;
+        try {
+          fetch('/missionhydrosci/api/steplog', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{ .CSRFToken }}' },
+            body: JSON.stringify({ outcome: outcome, unit: unitId, version: unitVersion, context: stepLog.context, entries: stepLog.entries.slice(-300) }),
+            keepalive: true
+          }).catch(function() {});
+        } catch (e) { /* best effort */ }
+      }
       {{ end }}
       var loadingStepEl = document.getElementById('loading-step');
       stepLog.onChange(function(entry) {
@@ -726,6 +743,7 @@
           String(message || '').slice(0, 200));
         if ((phase || crashPhase) !== 'running') showStepLogOnFailure();
         {{ if .DeviceTest }}deviceTestSummary({ crash: true });{{ end }}
+        memberReport('crash');
 
         var logUrl = '{{ .LogSubmitURL }}';
         var logAuth = '{{ .LogAuth }}';
@@ -907,6 +925,7 @@
           requestAnimationFrame(function() {
             requestAnimationFrame(function() {
               stepLog.record('game', 'ok', 'Game is rendering');
+              memberReport('launch-ok');
               {{ if .DeviceTest }}
               deviceTestSummary({
                 launch: { loader_ms: deviceTestLoaderMs, unity_ms: Date.now() - launchStartedAt, first_frame_ms: Date.now() - launchStartedAt },
@@ -919,6 +938,7 @@
           loadingText.textContent = 'Error: ' + err.message;
           stepLog.record('launch', 'fail', 'Unity failed to start: ' + err.message);
           showStepLogOnFailure();
+          memberReport('launch-failed');
           loadingBar.style.width = '100%';
           loadingBar.style.background = '#ef4444';
           console.error('Unity load error:', err);
@@ -929,6 +949,7 @@
         loadingText.textContent = 'Failed to load game. Is this unit downloaded?';
         stepLog.record('launch', 'fail', 'The game loader failed to load — the unit may not be downloaded, or the content server is unreachable');
         showStepLogOnFailure();
+        memberReport('launch-failed');
         loadingBar.style.width = '100%';
         reportCrash('load_error', 'Failed to load Unity loader script: ' + loaderUrl, '', 'loading');
         loadingBar.style.background = '#ef4444';

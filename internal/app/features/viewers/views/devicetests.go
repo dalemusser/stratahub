@@ -19,6 +19,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // DeviceTestsSlug is the viewer's URL segment: /views/device-tests.
@@ -154,9 +155,10 @@ func (v *DeviceTests) Query(ctx context.Context, scope *viewscope.Scope, f viewe
 	if err != nil {
 		return viewers.Page{}, err
 	}
+	names := v.memberNames(ctx, runs)
 	page := viewers.Page{}
 	for _, t := range runs {
-		page.Rows = append(page.Rows, v.row(t))
+		page.Rows = append(page.Rows, v.row(t, names))
 	}
 	if more && len(runs) > 0 {
 		last := runs[len(runs)-1]
@@ -219,7 +221,50 @@ func joinNonEmpty(sep string, parts ...string) string {
 	return strings.Join(out, sep)
 }
 
-func (v *DeviceTests) row(t models.MHSDeviceTest) viewers.Row {
+// memberNames resolves member load records to display names (full name and
+// organization) in one batch; device-test runs need none.
+func (v *DeviceTests) memberNames(ctx context.Context, runs []models.MHSDeviceTest) map[primitive.ObjectID]string {
+	names := map[primitive.ObjectID]string{}
+	var userIDs, orgIDs []primitive.ObjectID
+	for _, t := range runs {
+		if t.UserID != nil {
+			userIDs = append(userIDs, *t.UserID)
+		}
+		if t.OrganizationID != nil {
+			orgIDs = append(orgIDs, *t.OrganizationID)
+		}
+	}
+	lookup := func(coll string, ids []primitive.ObjectID, field string) {
+		if len(ids) == 0 {
+			return
+		}
+		cur, err := v.db.Collection(coll).Find(ctx, bson.M{"_id": bson.M{"$in": ids}},
+			options.Find().SetProjection(bson.M{field: 1}))
+		if err != nil {
+			return
+		}
+		defer cur.Close(ctx)
+		for cur.Next(ctx) {
+			var doc struct {
+				ID   primitive.ObjectID `bson:"_id"`
+				Name string             `bson:"full_name"`
+				Org  string             `bson:"name"`
+			}
+			if cur.Decode(&doc) == nil {
+				if doc.Name != "" {
+					names[doc.ID] = doc.Name
+				} else if doc.Org != "" {
+					names[doc.ID] = doc.Org
+				}
+			}
+		}
+	}
+	lookup("users", userIDs, "full_name")
+	lookup("organizations", orgIDs, "name")
+	return names
+}
+
+func (v *DeviceTests) row(t models.MHSDeviceTest, names map[primitive.ObjectID]string) viewers.Row {
 	started := viewers.Cell{
 		Text:  t.StartedAt.UTC().Format(deviceTestsTimeLayout) + " UTC",
 		Title: t.StartedAt.UTC().Format(time.RFC3339) + " · test " + t.ID.Hex(),
@@ -228,8 +273,21 @@ func (v *DeviceTests) row(t models.MHSDeviceTest) viewers.Row {
 	tester := viewers.Cell{Text: joinNonEmpty(" · ", t.Form.TesterName, t.Form.TesterRole)}
 	if t.Kind == models.MHSDeviceTestKindMember {
 		school = viewers.Cell{Text: "Member", Class: viewers.PillGray, Title: "A member's stored load record"}
+		if t.OrganizationID != nil {
+			if org := names[*t.OrganizationID]; org != "" {
+				school = viewers.Cell{Text: org, Class: viewers.PillGray, Title: "A member's stored load record (organization)"}
+			}
+		}
 		if t.UserID != nil {
-			tester = viewers.Cell{Text: t.UserID.Hex(), Title: "Member id"}
+			name := names[*t.UserID]
+			if name == "" {
+				name = t.UserID.Hex()
+			}
+			outcome := ""
+			if o, ok := t.Diagnostics["outcome"].(string); ok {
+				outcome = " · " + o
+			}
+			tester = viewers.Cell{Text: name + outcome, Title: "Member " + t.UserID.Hex()}
 		}
 	}
 	device := viewers.Cell{Text: joinNonEmpty(" · ", t.DeviceType, t.Platform, t.Browser)}

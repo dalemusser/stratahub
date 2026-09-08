@@ -2,6 +2,7 @@ package missionhydrosci
 
 import (
 	"testing"
+	"time"
 
 	"github.com/dalemusser/stratahub/internal/domain/models"
 )
@@ -57,5 +58,43 @@ func TestBoundDiagnostics(t *testing.T) {
 func TestDeviceTestShortID(t *testing.T) {
 	if got := deviceTestShortID("ffffffff0123456789abcdef"); got != "ABCDEF" {
 		t.Fatalf("got %q", got)
+	}
+}
+
+func TestDeriveFromSteps(t *testing.T) {
+	now := time.Now().UTC()
+	req := deviceTestStepsRequest{}
+	add := func(step, state, msg string) {
+		req.Entries = append(req.Entries, struct {
+			T      int64             `json:"t"`
+			At     string            `json:"at"`
+			Step   string            `json:"step"`
+			State  string            `json:"state"`
+			Msg    string            `json:"msg"`
+			Detail map[string]string `json:"detail"`
+		}{T: 1, At: now.Format(time.RFC3339Nano), Step: step, State: state, Msg: msg})
+	}
+	add("sw", "ok", "registered")
+	add("download", "running", "10%")
+	add("download", "ok", "complete")
+	add("launch", "fail", "loader failed")
+	steps, d := deriveFromSteps(req, models.MHSDeviceTestStageRun, now)
+	if len(steps) != 4 {
+		t.Fatalf("steps=%d", len(steps))
+	}
+	if d.reached != models.MHSDeviceTestStageLaunching || d.stage != models.MHSDeviceTestStageFailed || d.failedStep != "launch" {
+		t.Fatalf("after failure: %+v", d)
+	}
+	// A later success moves the run on again and records gameplay.
+	req2 := deviceTestStepsRequest{}
+	req = req2
+	add("launch", "ok", "unity started")
+	add("game", "running", "running")
+	_, d2 := deriveFromStepsWith(req, d.reached, true, d.failedStep, d.failedReason, false, now)
+	if d2.stage != models.MHSDeviceTestStageGameplay || d2.reached != models.MHSDeviceTestStageGameplay || d2.gameplayAt == nil {
+		t.Fatalf("after recovery: %+v", d2)
+	}
+	if d2.failedStep != "launch" {
+		t.Fatalf("last problem should be kept: %+v", d2)
 	}
 }
