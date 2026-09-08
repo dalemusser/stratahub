@@ -305,6 +305,15 @@ rows are filled on every run. A final flush (tab hidden, then closed) no
 longer resends what an in-flight request already carries, and the steps
 endpoint drops any entry the record already holds.
 
+**Renewable CSRF token (2026-09-08).** A device-test page can outlive the
+CSRF cookie behind its token (twelve-hour lifetime; also cleared by a
+sign-out in the same browser), after which every post from the page is
+refused with 403. `MHSStepLog.csrf` keeps the token, renews it by
+re-reading the page's own HTML, and retries a refused post once; the
+status-log flush renews on 403 and resends on its next tick; the
+questionnaire form renews right before submitting. Both the run page and
+the play page use it for every post.
+
 ### 4.8 Security and privacy
 
 - **Game-service keys.** The play page renders the static stratalog and stratasave Bearer keys server-side, exactly as it does for students today; the URL never contains them. Anyone who reaches the play page can read them from the HTML, which is already true of every student browser. The enable switch turns the route off for workspaces that do not use it.

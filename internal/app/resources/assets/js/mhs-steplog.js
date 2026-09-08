@@ -322,8 +322,10 @@
    * in-flight request already carries, and the server's confirmations are
    * joined in order, so no entry goes out twice.
    */
-  MHSStepLog.prototype.enableServerFlush = function(url, csrfToken, intervalMs) {
+  MHSStepLog.prototype.enableServerFlush = function(url, csrfToken, intervalMs, opts) {
     var self = this;
+    opts = opts || {};
+    var token = typeof csrfToken === 'function' ? csrfToken : function() { return csrfToken || ''; };
     var inflight = 0;        // requests in flight
     var inflightThrough = 0; // index just past the last entry any in-flight request carries
     var acked = {};          // start index -> end index of ranges the server has confirmed
@@ -344,16 +346,22 @@
       if (!pending.length) { acked[start] = through; advance(); return Promise.resolve(true); }
       inflight++;
       inflightThrough = Math.max(inflightThrough, through);
-      var opts = {
+      var init = {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken || '' },
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': token() },
         body: JSON.stringify({ context: self.context, entries: pending }),
         keepalive: !!final
       };
       var p;
-      try { p = fetch(url, opts); } catch (e) { p = Promise.reject(e); }
+      try { p = fetch(url, init); } catch (e) { p = Promise.reject(e); }
       return p.then(function(resp) {
         if (resp && resp.ok) { acked[start] = through; advance(); return true; }
+        // A stale CSRF token (the cookie was re-issued under the page) is
+        // refused with 403; let the page fetch a fresh one. The entries
+        // stay unacknowledged and go out on the next tick with it.
+        if (resp && resp.status === 403 && typeof opts.onForbidden === 'function') {
+          try { opts.onForbidden(); } catch (e) { /* ignore */ }
+        }
         return false;
       }).catch(function() { return false; }).then(function(ok) {
         inflight--;
@@ -370,6 +378,90 @@
     });
     flush(false);
   };
+
+  // ---- CSRF token keeper ---------------------------------------------------
+  // A page's CSRF token is minted at load time against a cookie the server
+  // may re-issue later (it expires after some hours, or a sign-out clears
+  // it). A device-test page can be open long past that, so its posts need a
+  // token that can be renewed: MHSStepLog.csrf() keeps the current token,
+  // renews it by re-reading the page's own HTML, and retries a refused post
+  // once with the new one.
+  // The token in the page is HTML-escaped ('+' becomes '&#43;'), so it is
+  // read through an HTML parser, never straight out of the text.
+  function tokenFromHTML(html) {
+    if (!html) return '';
+    try {
+      if (typeof DOMParser !== 'undefined') {
+        var doc = new DOMParser().parseFromString(html, 'text/html');
+        var meta = doc.querySelector('meta[name="csrf-token"]');
+        if (meta && meta.content) return meta.content;
+        var input = doc.querySelector('input[name="csrf_token"]');
+        if (input && input.value) return input.value;
+      }
+    } catch (e) { /* fall through */ }
+    var m = /name="csrf-token"\s+content="([^"]+)"/.exec(html) || /name="csrf_token"\s+value="([^"]+)"/.exec(html);
+    if (!m) return '';
+    return m[1].replace(/&#(\d+);/g, function(_, n) { return String.fromCharCode(parseInt(n, 10)); })
+      .replace(/&#x([0-9a-f]+);/gi, function(_, h) { return String.fromCharCode(parseInt(h, 16)); })
+      .replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  }
+
+  MHSStepLog.csrf = function(initialToken, pageUrl) {
+    var current = initialToken || '';
+    var refreshing = null;
+    var lastRefresh = 0;
+    function apply(t) {
+      current = t;
+      try {
+        var meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta) meta.content = t;
+        var inputs = document.querySelectorAll('input[name="csrf_token"]');
+        for (var i = 0; i < inputs.length; i++) inputs[i].value = t;
+      } catch (e) { /* ignore */ }
+    }
+    function refresh() {
+      if (refreshing) return refreshing;
+      refreshing = fetch(pageUrl || window.location.href, { credentials: 'same-origin', cache: 'no-store', headers: { 'Accept': 'text/html' } })
+        .then(function(r) { return r.ok ? r.text() : ''; })
+        .then(function(html) {
+          var t = tokenFromHTML(html);
+          if (t) { apply(t); lastRefresh = Date.now(); return true; }
+          return false;
+        })
+        .catch(function() { return false; })
+        .then(function(ok) { refreshing = null; return ok; });
+      return refreshing;
+    }
+    // fetch() with the current token; on 403, renew it and try once more.
+    function send(url, init) {
+      init = init || {};
+      function go() {
+        var headers = {};
+        for (var k in (init.headers || {})) headers[k] = init.headers[k];
+        headers['X-CSRF-Token'] = current;
+        var i2 = {};
+        for (var k2 in init) i2[k2] = init[k2];
+        i2.headers = headers;
+        if (!i2.credentials) i2.credentials = 'same-origin';
+        return fetch(url, i2);
+      }
+      return go().then(function(resp) {
+        if (resp.status !== 403) return resp;
+        return refresh().then(function(ok) { return ok ? go() : resp; });
+      });
+    }
+    return {
+      get: function() { return current; },
+      refresh: refresh,
+      // Renew when the token is older than maxAgeMs (used on tab return).
+      refreshIfStale: function(maxAgeMs) {
+        if (Date.now() - (lastRefresh || pageLoadedAt) < (maxAgeMs || 0)) return Promise.resolve(true);
+        return refresh();
+      },
+      fetch: send
+    };
+  };
+  var pageLoadedAt = Date.now();
 
   /** Copies text to the clipboard; resolves true on success. */
   MHSStepLog.copyText = function(text) {

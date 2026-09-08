@@ -255,6 +255,15 @@ usual menu, and no session activity tracking, so a long test cannot end in a
 sign-out. The run page never removes or interrupts other units on the device,
 so a teacher testing on a student's Chromebook does no harm.
 
+**A tester pressed Send report or Send answers on a page that had been
+open for hours.** The page's security token is minted when the page loads,
+against a browser cookie the server re-issues after about twelve hours (or
+when someone signs out in that browser). The run and play pages renew the
+token by themselves when the server refuses a post, and again just before
+the questionnaire is sent, so nothing is lost; the status log keeps
+retrying until it gets through. If a tester still sees "Could not send",
+the reason is shown next to the button, and Copy report keeps their notes.
+
 **Two testers on the same network started at once. Are they separate?**
 Yes; each run has its own id and record. They share the start quota.
 

@@ -297,6 +297,8 @@
     (function() {
       var unitId = '{{ .UnitID }}';
       var csrfToken = '{{ .CSRFToken }}';
+      // Renewable token for the posts this page makes while it is open (see MHSStepLog.csrf).
+      var csrf = MHSStepLog.csrf(csrfToken, window.location.pathname);
       var nextUnitId = '{{ .NextUnitID }}';
       var nextUnitVersion = '{{ .NextUnitVersion }}';
       var completionHandled = false;
@@ -667,14 +669,14 @@
       var stepPanel = MHSStepLog.mount(stepLog, document.getElementById('mhs-steplog'), {});
       {{ if .DeviceTest }}
       // Device test: stream the log and the launch timings to the run record.
-      stepLog.enableServerFlush('{{ .DeviceTestBase }}/steps', '{{ .CSRFToken }}', 5000);
+      stepLog.enableServerFlush('{{ .DeviceTestBase }}/steps', csrf.get, 5000, { onForbidden: csrf.refresh });
       stepLog.relayTo(MHSStepLog.relayChannel('{{ .DeviceTestID }}'), 'game tab'); // the run page's panel follows along
       var deviceTestLoaderMs = 0;
       function deviceTestSummary(body) {
         try {
-          fetch('{{ .DeviceTestBase }}/summary', {
+          csrf.fetch('{{ .DeviceTestBase }}/summary', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{ .CSRFToken }}' },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(body),
             keepalive: true
           }).catch(function() {});
@@ -689,9 +691,9 @@
         if (memberReported[outcome]) return;
         memberReported[outcome] = true;
         try {
-          fetch('/missionhydrosci/api/steplog', {
+          csrf.fetch('/missionhydrosci/api/steplog', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{ .CSRFToken }}' },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ outcome: outcome, unit: unitId, version: unitVersion, context: stepLog.context, entries: stepLog.entries.slice(-300) }),
             keepalive: true
           }).then(function(resp) { return resp.ok ? resp.json() : null; }).then(function(data) {
@@ -752,9 +754,9 @@
       function sendHeartbeat(closing) {
         if (!heartbeatUrl) return;
         try {
-          fetch(heartbeatUrl, {
+          csrf.fetch(heartbeatUrl, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{ .CSRFToken }}' },
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(heartbeatBody(closing)),
             keepalive: !!closing
           }).catch(function() {});

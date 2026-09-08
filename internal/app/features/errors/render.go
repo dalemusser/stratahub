@@ -28,17 +28,21 @@ type pageData struct {
 	BackURL    string
 
 	// Layout fields (required by layout/menu templates)
-	SiteName      string
-	LogoURL       string
-	FooterHTML    string
-	IsApex        bool
-	CSRFToken     string
-	LoginID       string
-	UserOrg       string
-	CurrentPath   string
+	SiteName       string
+	LogoURL        string
+	FooterHTML     string
+	IsApex         bool
+	CSRFToken      string
+	LoginID        string
+	UserOrg        string
+	CurrentPath    string
 	EnabledApps    map[string]bool
 	Announcements  []viewdata.AnnouncementVM
 	LoginActionsJS string
+
+	// Bare (required by the layout): error pages always carry the normal
+	// chrome, so this stays false; see viewdata.BaseVM.Bare.
+	Bare bool
 
 	// Maintenance mode (required by layout banner)
 	MaintenanceMode    bool

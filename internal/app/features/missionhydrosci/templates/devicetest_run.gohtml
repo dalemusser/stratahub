@@ -133,7 +133,9 @@
   var testId = '{{ .TestID }}';
   var unitId = '{{ .UnitID }}';
   var unitTitle = '{{ .UnitTitle }}';
-  var csrfToken = '{{ .CSRFToken }}';
+  // The token can go stale while this page stays open (the cookie behind
+  // it is re-issued after some hours); csrf renews it and retries on 403.
+  var csrf = MHSStepLog.csrf('{{ .CSRFToken }}', window.location.pathname);
   var completed = {{ if .Completed }}true{{ else }}false{{ end }};
   var expired = {{ if .Expired }}true{{ else }}false{{ end }};
   var cacheStatus = {};
@@ -143,9 +145,9 @@
 
   function post(path, body, keepalive) {
     try {
-      return fetch(base + path, {
+      return csrf.fetch(base + path, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body || {}),
         keepalive: !!keepalive
       }).catch(function() {});
@@ -154,9 +156,9 @@
   // Like post, but for something the tester is waiting on: rejects on a
   // network failure or any non-2xx reply, with the server's message.
   function postChecked(path, body) {
-    return fetch(base + path, {
+    return csrf.fetch(base + path, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body || {})
     }).then(function(resp) {
       if (resp.ok) return resp;
@@ -265,7 +267,24 @@
   });
   manager.setStepLog(stepLog);
   var stepPanel = MHSStepLog.mount(stepLog, el('mhs-steplog'), { open: true });
-  stepLog.enableServerFlush(base + '/steps', csrfToken, 5000);
+  stepLog.enableServerFlush(base + '/steps', csrf.get, 5000, { onForbidden: csrf.refresh });
+  // Coming back to this tab after a long time: renew the token before the
+  // questionnaire or a report is sent with a stale one.
+  document.addEventListener('visibilitychange', function() {
+    if (document.visibilityState === 'visible') csrf.refreshIfStale(10 * 60 * 1000);
+  });
+  // The questionnaire is a plain form post: renew the token right before it
+  // goes, so answers are never lost to a stale one.
+  var qForm = document.querySelector('form[action$="/questionnaire"]');
+  if (qForm) {
+    var qRenewed = false;
+    qForm.addEventListener('submit', function(e) {
+      if (qRenewed) return; // second pass: let it go
+      e.preventDefault();
+      qRenewed = true;
+      csrf.refresh().then(function() { qForm.requestSubmit ? qForm.requestSubmit() : qForm.submit(); });
+    });
+  }
   // The game tab relays its launch and game entries here, so the panel keeps
   // following after Launch and Copy report has the whole story.
   stepLog.listenTo(MHSStepLog.relayChannel(testId));
