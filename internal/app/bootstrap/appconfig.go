@@ -111,6 +111,11 @@ type AppConfig struct {
 	MHSFallbackStallMs int // direct (SW) download quiet this long before one auto-resume, then Stalled
 	MHSKeepaliveMs     int // how often pages nudge the service worker to keep progress reporting alive
 
+	// Unit 2 device test: how many new runs one client IP may start per
+	// window. A whole school behind one address shares the budget.
+	MHSDeviceTestStartLimit  int
+	MHSDeviceTestStartWindow time.Duration
+
 	// MHS S3 storage (separate from materials storage — may use a different bucket/credentials)
 	MHSS3Region          string // AWS region for MHS CDN S3 bucket
 	MHSS3Bucket          string // S3 bucket name (e.g., "adroit-cdn")

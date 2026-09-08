@@ -4,6 +4,7 @@ package missionhydrosci
 import (
 	"net/url"
 	"strings"
+	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/store/mhsbuilds"
@@ -53,6 +54,21 @@ type Handler struct {
 	UnlockStore       *staffauth.UnlockStore
 	authThrottle      *authThrottle      // per-member backoff on failed member-auth attempts
 	startLimiter      *ratelimit.Limiter // per-IP quota on starting device-test runs
+	startWindow       time.Duration      // the quota's window (for Retry-After)
+}
+
+// SetDeviceTestStartLimit replaces the per-IP quota on starting device-test
+// runs (config keys mhs_device_test_start_limit / _window). Non-positive
+// values keep the defaults.
+func (h *Handler) SetDeviceTestStartLimit(limit int, window time.Duration) {
+	if limit <= 0 {
+		limit = deviceTestStartLimit
+	}
+	if window <= 0 {
+		window = deviceTestStartWindow
+	}
+	h.startLimiter = ratelimit.New(limit, window)
+	h.startWindow = window
 }
 
 // ProbesFromServices derives reachability probes (the services' /health
@@ -91,5 +107,6 @@ func NewHandler(db *mongo.Database, errLog *uierrors.ErrorLogger, cdnBaseURL str
 		UnlockStore:       staffauth.NewUnlockStore(db),
 		authThrottle:      newAuthThrottle(),
 		startLimiter:      ratelimit.New(deviceTestStartLimit, deviceTestStartWindow),
+		startWindow:       deviceTestStartWindow,
 	}
 }

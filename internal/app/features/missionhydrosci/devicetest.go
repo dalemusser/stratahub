@@ -38,7 +38,9 @@ import (
 const DeviceTestPathPrefix = "/missionhydrosci/devicetest"
 
 const (
-	deviceTestStartLimit  = 10 // runs one client IP may start per window
+	// Defaults for the per-IP quota on starting runs; config keys
+	// mhs_device_test_start_limit / mhs_device_test_start_window override them.
+	deviceTestStartLimit  = 10
 	deviceTestStartWindow = 10 * time.Minute
 	deviceTestRunTTL      = 24 * time.Hour // a run stops accepting writes after this
 
@@ -207,7 +209,7 @@ func (h *Handler) HandleDeviceTestStart(w http.ResponseWriter, r *http.Request) 
 	ip := ratelimit.ClientIP(r)
 	if !h.startLimiter.Allow(ip) {
 		h.Log.Warn("device test: start rate limited", zap.String("ip", ip))
-		w.Header().Set("Retry-After", fmt.Sprint(int(deviceTestStartWindow.Seconds())))
+		w.Header().Set("Retry-After", fmt.Sprint(int(h.startWindow.Seconds())))
 		h.renderDeviceTestLanding(w, r, ctx, form, "Too many test runs have been started from this network in the last few minutes. Please wait a little and try again.")
 		return
 	}

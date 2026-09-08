@@ -109,10 +109,12 @@ or until the unit is completed.
 
 ## Limits
 
-- Starting runs is limited to 10 per 10 minutes per client IP. A whole
-  school behind one address shares that budget; tell a large group to
-  stagger starts or ask us to raise it (`deviceTestStartLimit` in
-  `internal/app/features/missionhydrosci/devicetest.go`).
+- Starting runs is limited per client IP: `mhs_device_test_start_limit`
+  runs per `mhs_device_test_start_window` in `config.toml` (defaults 10 per
+  10 minutes; a change needs a restart). Only the "Start the Unit 2 test"
+  button counts; downloads, retries, launches and reporting never do. A
+  whole school behind one address shares the budget, so raise it before a
+  large group tests at once.
 - The play page renders the game-service keys as it does for students;
   anyone with the URL can read them from the page source, which was already
   true of every student browser. Keep the test disabled when not in use.

@@ -318,6 +318,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		KeepaliveMs:     appCfg.MHSKeepaliveMs,
 	}
 	missionHydroSciHandler.Probes = missionhydroscifeature.ProbesFromServices(missionHydroSciHandler.Services)
+	missionHydroSciHandler.SetDeviceTestStartLimit(appCfg.MHSDeviceTestStartLimit, appCfg.MHSDeviceTestStartWindow)
 	r.Get("/sw.js", missionHydroSciHandler.ServeServiceWorker)
 	r.Get("/manifest.json", missionHydroSciHandler.ServeManifest)
 	r.Handle("/missionhydrosci/content/*", missionHydroSciHandler.ContentFallback())
