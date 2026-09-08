@@ -942,6 +942,12 @@ make css-watch
   completion (`POST /missionhydrosci/api/steplog`, kind "member" rows in the
   Device Tests view). All plan steps are in place; device verification pending
 
+### Game log first-event rejection (2026-09-08, open, game-side)
+- `docs/mission-hydrosci/game-first-log-event-rejected.md`: the game's first
+  log event of a session has no `user_id` and the log service rejects it
+  (739 rejections in a week, real Chromebooks included); pre-existing, not
+  caused by the device test; for the game developers
+
 ### Data Viewers Framework (2026-08)
 - `internal/app/features/viewers`: one mechanism for role-gated, scoped,
   filterable, pageable lists at `/views/{slug}` (`/table` partial,
