@@ -27,6 +27,7 @@ const (
 	memberStepLogLaunchFailed     = "launch-failed"
 	memberStepLogLaunchOK         = "launch-ok"
 	memberStepLogCrash            = "crash"
+	memberStepLogReport           = "report" // the student pressed Send report (note attached)
 )
 
 // memberStepLogRequest is the page's body: the outcome, the unit, the log's
@@ -35,6 +36,7 @@ type memberStepLogRequest struct {
 	Outcome string `json:"outcome"`
 	Unit    string `json:"unit"`
 	Version string `json:"version"`
+	Note    string `json:"note"` // outcome "report" only
 	deviceTestStepsRequest
 }
 
@@ -51,7 +53,7 @@ func (h *Handler) HandleMemberStepLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch req.Outcome {
-	case memberStepLogDownloadFailed, memberStepLogDownloadComplete, memberStepLogLaunchFailed, memberStepLogLaunchOK, memberStepLogCrash:
+	case memberStepLogDownloadFailed, memberStepLogDownloadComplete, memberStepLogLaunchFailed, memberStepLogLaunchOK, memberStepLogCrash, memberStepLogReport:
 	default:
 		writeDeviceTestJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bad_outcome"})
 		return
@@ -103,6 +105,9 @@ func (h *Handler) HandleMemberStepLog(w http.ResponseWriter, r *http.Request) {
 	}
 	if derived.gameplayAt != nil {
 		rec.GameplayReachedAt = derived.gameplayAt
+	}
+	if note := models.ClipRunes(strings.TrimSpace(req.Note), deviceTestMaxNotes); note != "" {
+		rec.ProblemReports = []models.MHSDeviceTestReport{{At: now, Note: note}}
 	}
 	if user.OrganizationID != "" {
 		if oid, err := primitive.ObjectIDFromHex(user.OrganizationID); err == nil {

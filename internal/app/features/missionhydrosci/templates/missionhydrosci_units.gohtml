@@ -463,7 +463,16 @@
     steplogVersion: '{{ mhsSteplogVersion }}'
   });
   manager.setStepLog(stepLog);
-  MHSStepLog.mount(stepLog, document.getElementById('mhs-steplog'), {});
+  MHSStepLog.mount(stepLog, document.getElementById('mhs-steplog'), {
+    report: function(note) {
+      return fetch('/missionhydrosci/api/steplog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({ outcome: 'report', note: note, unit: currentUnit, version: unitVersions[currentUnit] || '',
+          context: stepLog.context, entries: stepLog.entries.slice(-300) })
+      }).then(function(resp) { return resp.ok; });
+    }
+  });
 
   // Status callback: update UI for each unit
   manager.onStatus(function(unitId, status, detail) {

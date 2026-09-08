@@ -331,6 +331,7 @@
     var q = function(suffix) { return root.querySelector('[data-steplog="' + suffix + '"]'); };
     var toggle = q('toggle'), body = q('body'), rows = q('rows'), live = q('live'), summary = q('summary');
     var chevron = q('chevron'), copyBtn = q('copy'), copied = q('copied'), full = q('full'), fullText = q('text');
+    var reportWrap = q('report-wrap'), noteEl = q('note'), sendBtn = q('send'), sentEl = q('sent');
     var rowTpl = root.querySelector('template[data-steplog="row"]');
     var isOpen = false;
     var autoOpened = false;
@@ -404,6 +405,23 @@
           copied.classList.remove('hidden');
           setTimeout(function() { copied.classList.add('hidden'); }, 4000);
         });
+      });
+    }
+    // Optional "Send report": the page supplies a function(note) returning a
+    // promise; the log itself travels with it (see the page's callback).
+    if (typeof opts.report === 'function' && reportWrap && sendBtn) {
+      reportWrap.classList.remove('hidden');
+      sendBtn.addEventListener('click', function() {
+        var note = ((noteEl && noteEl.value) || '').trim();
+        if (!note) { if (sentEl) sentEl.textContent = 'Type a few words first.'; return; }
+        sendBtn.disabled = true;
+        log.record('page', 'info', 'Report sent: ' + note.slice(0, 200));
+        Promise.resolve(opts.report(note)).then(function(ok) {
+          if (sentEl) sentEl.textContent = ok === false ? 'Could not send right now. Use Copy report instead.' : 'Sent — thank you.';
+          if (ok !== false && noteEl) noteEl.value = '';
+        }).catch(function() {
+          if (sentEl) sentEl.textContent = 'Could not send right now. Use Copy report instead.';
+        }).then(function() { sendBtn.disabled = false; });
       });
     }
     log.onChange(function() { refresh(); });

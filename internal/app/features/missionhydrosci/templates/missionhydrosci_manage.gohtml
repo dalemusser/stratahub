@@ -508,6 +508,35 @@
     csrfToken: csrfToken // enables download-error telemetry
   });
 
+  // Per-load step log: the "Status details" panel and Send/Copy report.
+  var mhsUnitVersions = { {{ range $i, $u := .Units }}{{ if $i }}, {{ end }}'{{ $u.ID }}': '{{ $u.Version }}'{{ end }} };
+  var mhsUnitTitles = { {{ range $i, $u := .Units }}{{ if $i }}, {{ end }}'{{ $u.ID }}': '{{ $u.Title }}'{{ end }} };
+  var stepLog = new MHSStepLog();
+  stepLog.start({
+    page: 'manage',
+    host: location.host,
+    workspace: location.hostname.split('.')[0],
+    unit: currentUnit,
+    version: mhsUnitVersions[currentUnit] || '',
+    unitTitle: mhsUnitTitles[currentUnit] || '',
+    collection: '{{ .ActiveCollectionName }}',
+    deviceId: (function() { try { return localStorage.getItem('mhs-device-id') || ''; } catch (e) { return ''; } })(),
+    userAgent: navigator.userAgent,
+    deliveryVersion: '{{ mhsDeliveryVersion }}',
+    steplogVersion: '{{ mhsSteplogVersion }}'
+  });
+  manager.setStepLog(stepLog);
+  MHSStepLog.mount(stepLog, document.getElementById('mhs-steplog'), {
+    report: function(note) {
+      return fetch('/missionhydrosci/api/steplog', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        body: JSON.stringify({ outcome: 'report', note: note, unit: currentUnit, version: mhsUnitVersions[currentUnit] || '',
+          context: stepLog.context, entries: stepLog.entries.slice(-300) })
+      }).then(function(resp) { return resp.ok; });
+    }
+  });
+
   // Status callback: update the unit rows. This page runs the SAME
   // auto-download pipeline as the launcher — downloads must keep advancing
   // (current unit, then next) no matter which MHS page the user is on;
