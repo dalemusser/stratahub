@@ -236,9 +236,11 @@ Device Tests view is the place to look.
 ## 10. Questions that come up
 
 **A logged-in user opened the link. Does that matter?** No. The run is
-anonymous either way; the person's account, progress and saves are untouched.
-The run page never removes or interrupts other units on the device, so a
-teacher testing on a student's Chromebook does no harm.
+anonymous either way; the person's account, progress and saves are untouched,
+and the pages look the same for everyone: a slim site header instead of the
+usual menu, and no session activity tracking, so a long test cannot end in a
+sign-out. The run page never removes or interrupts other units on the device,
+so a teacher testing on a student's Chromebook does no harm.
 
 **Two testers on the same network started at once. Are they separate?**
 Yes; each run has its own id and record. They share the start quota.

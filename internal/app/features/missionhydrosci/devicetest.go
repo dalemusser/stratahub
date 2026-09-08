@@ -159,7 +159,7 @@ func (h *Handler) renderDeviceTestLanding(w http.ResponseWriter, r *http.Request
 		h.Log.Info("device test: not available", zap.String("workspace_id", wsID.Hex()), zap.String("reason", cfg.Reason))
 	}
 	data := deviceTestLandingData{
-		BaseVM:      viewdata.NewBaseVM(r, h.DB, "Unit 2 Device Test", "/"),
+		BaseVM:      viewdata.NewBaseVM(r, h.DB, "Unit 2 Device Test", "/").AsBare(),
 		Enabled:     cfg.Enabled,
 		UnitTitle:   cfg.Unit.Title,
 		UnitVersion: cfg.Unit.Version,
@@ -321,7 +321,7 @@ func (h *Handler) ServeDeviceTestRun(w http.ResponseWriter, r *http.Request) {
 	}
 	base := DeviceTestPathPrefix + "/run/" + run.ID.Hex()
 	data := deviceTestRunData{
-		BaseVM:      viewdata.NewBaseVM(r, h.DB, "Unit 2 Device Test", DeviceTestPathPrefix),
+		BaseVM:      viewdata.NewBaseVM(r, h.DB, "Unit 2 Device Test", DeviceTestPathPrefix).AsBare(),
 		TestID:      run.ID.Hex(),
 		ShortID:     deviceTestShortID(run.ID.Hex()),
 		Base:        base,

@@ -281,13 +281,23 @@
     </script>
 
     <div class="flex h-screen">
+      {{ if not .Bare }}
       <!-- Sidebar (scrolls independently) -->
       <aside id="sidebar" class="w-44 bg-white dark:bg-gray-800 shadow-md p-4 flex flex-col overflow-y-auto">
         {{ template "menu" . }}
       </aside>
+      {{ end }}
 
       <!-- Main Content (footer stays at bottom of this area) -->
       <main class="flex-1 h-screen overflow-hidden bg-gray-100 dark:bg-gray-900 flex flex-col">
+        {{ if .Bare }}
+        <!-- Bare pages: a slim site header instead of the sidebar -->
+        <header class="bg-white dark:bg-gray-800 shadow-sm px-4 py-2 flex items-center gap-3">
+          {{ if .LogoURL }}<img src="{{ .LogoURL }}" alt="{{ .SiteName }}" class="h-8 w-auto object-contain">{{ end }}
+          <span class="text-lg font-bold text-indigo-600 dark:text-indigo-400">{{ if .SiteName }}{{ .SiteName }}{{ else }}StrataHub{{ end }}</span>
+          {{ if .Title }}<span class="text-sm text-gray-500 dark:text-gray-400">{{ .Title }}</span>{{ end }}
+        </header>
+        {{ end }}
         <!-- Maintenance Mode Banner (admin/superadmin only) -->
         {{ if .MaintenanceMode }}
         <div class="bg-orange-500 text-white px-4 py-2 text-sm">
@@ -339,6 +349,8 @@
         var sidebar = document.getElementById('sidebar');
         var toggleBtn = document.getElementById('menu-toggle');
         var storageKey = 'sidebar-collapsed';
+
+        if (!sidebar) return; // bare pages have no sidebar
 
         // Restore state from localStorage
         if (localStorage.getItem(storageKey) === 'true') {
@@ -426,7 +438,7 @@
         });
       })();
 
-      {{ if .IsLoggedIn }}
+      {{ if and .IsLoggedIn (not .Bare) }}
       // Activity heartbeat - sends pulse every 60 seconds and on page navigation
       // Also tracks user interaction for idle logout feature
       (function() {

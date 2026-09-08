@@ -368,7 +368,9 @@ Plan and status: `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test
 - **Step log.** `mhs-steplog.js` + hooks throughout the delivery manager
   (`setStepLog`); the panel is on the units, manage and play pages.
 - **Device test.** See `devicetest.go` above: landing form, run page with
-  the status panel and Send report, the play page in device-test mode,
+  the status panel and Send report (both rendered bare via
+  `viewdata.BaseVM.AsBare()`: no sidebar, banners or session heartbeat, so
+  they look the same signed in or out), the play page in device-test mode,
   heartbeats every 30 s while the game runs (a crashed tab shows as "page
   stopped responding"), and a post-play questionnaire (sound, controls,
   picture, performance, how far). Results in the **Device Tests** viewer.

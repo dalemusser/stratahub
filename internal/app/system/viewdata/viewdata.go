@@ -84,6 +84,25 @@ type BaseVM struct {
 	// Maintenance mode (shown as banner for admin/superadmin)
 	MaintenanceMode    bool
 	MaintenanceMessage string
+
+	// Bare renders the page without the signed-in chrome: no sidebar menu,
+	// no announcement or maintenance banners, no session heartbeat. Set via
+	// AsBare() for pages that must look the same for everyone, signed in or
+	// not (the Mission HydroSci device test).
+	Bare bool
+}
+
+// AsBare returns a copy of the view model that renders without the signed-in
+// chrome. The site name, logo, footer and CSRF token stay, so the page still
+// belongs to the workspace; only the parts that depend on who is signed in
+// go. The session heartbeat is dropped on purpose: it redirects to /logout
+// when a session has ended, which must never yank a tester off the page.
+func (vm BaseVM) AsBare() BaseVM {
+	vm.Bare = true
+	vm.Announcements = nil
+	vm.MaintenanceMode = false
+	vm.MaintenanceMessage = ""
+	return vm
 }
 
 // storageProvider is set by Init and used to generate logo URLs.
@@ -170,16 +189,16 @@ func NewBaseVM(r *http.Request, db *mongo.Database, title, backDefault string) B
 	isApex := ws != nil && ws.IsApex
 
 	vm := BaseVM{
-		SiteName:     models.DefaultSiteName,
-		IsLoggedIn:   signedIn,
-		Role:         effectiveRole,
-		UserName:     name,
-		IsApex:       isApex,
-		Title:        title,
-		BackURL:      httpnav.ResolveBackURL(r, backDefault),
-		CurrentPath:  httpnav.CurrentPath(r),
-		CSRFToken:    csrf.Token(r),
-		BuildTime:    buildTime,
+		SiteName:    models.DefaultSiteName,
+		IsLoggedIn:  signedIn,
+		Role:        effectiveRole,
+		UserName:    name,
+		IsApex:      isApex,
+		Title:       title,
+		BackURL:     httpnav.ResolveBackURL(r, backDefault),
+		CurrentPath: httpnav.CurrentPath(r),
+		CSRFToken:   csrf.Token(r),
+		BuildTime:   buildTime,
 	}
 
 	// Get LoginID, organization name, and enabled apps from session if logged in
