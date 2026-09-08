@@ -12,6 +12,15 @@ integration to Abt. Companion to the [Admin Guide](admin-guide.md) and the
 > `stratahub_update/aws_update.sh`, outside this repo). Remote paths are
 > relative to the service user's home (`~`).
 
+**Status (2026-09-08):**
+
+- **Browser calls added** (plan §9): Abt calls the API from JavaScript in the
+  survey page, so the API now answers CORS for origins listed per workspace.
+  Deployed 2026-09-08 (build `20260908-203329`) to both hosts. **Open:** list
+  Abt's page origin under Settings → Member Status API → Allowed browser
+  origins on Dev MHS and MHS (§2), run the check script with
+  `MEMBER_STATUS_ORIGIN` (§5), then tell Abt's developer to proceed (§4).
+
 **Status (2026-09-07 — paused until Abt reports back or a problem arises):**
 
 - Deployed 2026-08-29 (build `20260829-205653`) to both workspace hosts;
