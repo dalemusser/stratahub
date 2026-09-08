@@ -702,6 +702,23 @@ func surveyHTML(q *models.MHSDeviceTestQuestionnaire) string {
 	return b.String()
 }
 
+// reportsHTML renders the tester's Send report notes as their own titled
+// section, newest last, or says that none were sent.
+func reportsHTML(reports []models.MHSDeviceTestReport) string {
+	var b strings.Builder
+	b.WriteString(`<div><div class="font-medium text-gray-700 dark:text-gray-300">Tester reports (` + fmt.Sprint(len(reports)) + `)</div>`)
+	if len(reports) == 0 {
+		b.WriteString(`<div class="text-xs text-gray-500 dark:text-gray-400">None sent — the tester did not press Send report on the run page.</div></div>`)
+		return b.String()
+	}
+	b.WriteString(`<ul class="list-disc ml-5 text-xs text-gray-700 dark:text-gray-300">`)
+	for _, r := range reports {
+		b.WriteString(`<li><span class="tabular-nums text-gray-500 dark:text-gray-400">` + esc(r.At.UTC().Format(time.RFC3339)) + ` UTC</span> — <span class="whitespace-pre-wrap">` + esc(r.Note) + `</span></li>`)
+	}
+	b.WriteString(`</ul></div>`)
+	return b.String()
+}
+
 func managedLabel(m string) string {
 	switch m {
 	case "yes":
@@ -783,14 +800,8 @@ func (v *DeviceTests) detailHTML(t *models.MHSDeviceTest, g gameplay) string {
 		b.WriteString(`</tbody></table></div></div>`)
 	}
 
-	// Reports
-	if len(t.ProblemReports) > 0 {
-		b.WriteString(`<div><div class="font-medium text-gray-700 dark:text-gray-300">Tester reports</div><ul class="list-disc ml-5 text-xs text-gray-700 dark:text-gray-300">`)
-		for _, r := range t.ProblemReports {
-			b.WriteString(`<li>` + esc(r.At.UTC().Format(time.RFC3339)) + ` — ` + esc(r.Note) + `</li>`)
-		}
-		b.WriteString(`</ul></div>`)
-	}
+	// Reports (always shown, so "none" is visible as such)
+	b.WriteString(reportsHTML(t.ProblemReports))
 
 	// Steps
 	b.WriteString(`<div><div class="font-medium text-gray-700 dark:text-gray-300">Steps (` + fmt.Sprint(len(t.Steps)) + `)</div>`)

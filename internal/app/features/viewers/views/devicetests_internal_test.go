@@ -34,3 +34,17 @@ func TestSurveyHTML(t *testing.T) {
 		t.Errorf("unanswered picture question should show a dash: %s", got)
 	}
 }
+
+func TestReportsHTML(t *testing.T) {
+	if got := reportsHTML(nil); !strings.Contains(got, "Tester reports (0)") || !strings.Contains(got, "None sent") {
+		t.Fatalf("no reports: %s", got)
+	}
+	got := reportsHTML([]models.MHSDeviceTestReport{
+		{At: time.Date(2026, 9, 8, 8, 30, 0, 0, time.UTC), Note: "Sound cut out <twice>"},
+	})
+	for _, want := range []string{"Tester reports (1)", "2026-09-08T08:30:00Z UTC", "Sound cut out &lt;twice&gt;"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("missing %q in %s", want, got)
+		}
+	}
+}

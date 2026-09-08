@@ -151,6 +151,20 @@
       }).catch(function() {});
     } catch (e) { return Promise.resolve(); }
   }
+  // Like post, but for something the tester is waiting on: rejects on a
+  // network failure or any non-2xx reply, with the server's message.
+  function postChecked(path, body) {
+    return fetch(base + path, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      body: JSON.stringify(body || {})
+    }).then(function(resp) {
+      if (resp.ok) return resp;
+      return resp.json().catch(function() { return {}; }).then(function(j) {
+        throw new Error((j && j.message) || ('HTTP ' + resp.status));
+      });
+    });
+  }
 
   function getOrCreateDeviceId() {
     var key = 'mhs-device-id';
@@ -516,12 +530,13 @@
       reportBtn.disabled = true;
       stepLog.record('page', 'info', 'Tester report: ' + note.slice(0, 200));
       Promise.resolve(stepLog.flush ? stepLog.flush(false) : null).then(function() {
-        return post('/report', { note: note });
+        return postChecked('/report', { note: note });
       }).then(function() {
         st.textContent = 'Sent — thank you. Your test code is ' + '{{ .ShortID }}' + '.';
         el('report-note').value = '';
-      }).catch(function() {
-        st.textContent = 'Could not send right now; it will be retried with the status log.';
+      }).catch(function(err) {
+        // The note is also in the status log, which keeps trying to reach the server on its own.
+        st.textContent = 'Could not send (' + ((err && err.message) || 'no connection') + '). Your note stays in the status log; use Copy report to keep a copy.';
       }).then(function() { reportBtn.disabled = false; });
     });
   }

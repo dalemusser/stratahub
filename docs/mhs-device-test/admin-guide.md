@@ -154,7 +154,8 @@ second click closes it. It shows:
 - **Game telemetry for this run**: the number of log events the game sent,
   first and last event times, scenes seen, the grader's progress points and
   current unit;
-- the tester's reports;
+- **Tester reports**: every note sent with Send report on the run page,
+  with its time, or "None sent";
 - the full step timeline; and the diagnostics snapshot (browser
   capabilities, WebGL renderer, storage, cache inventory, client hints,
   battery, page timing).
