@@ -211,6 +211,13 @@ func mmss(d time.Duration) string {
 
 func mb(bytes int64) string { return fmt.Sprintf("%d MB", bytes/1048576) }
 
+func mbOrDash(n int) string {
+	if n <= 0 {
+		return "—"
+	}
+	return fmt.Sprintf("%d MB", n)
+}
+
 func joinNonEmpty(sep string, parts ...string) string {
 	out := parts[:0:0]
 	for _, p := range parts {
@@ -332,6 +339,18 @@ func (v *DeviceTests) row(t models.MHSDeviceTest, names map[primitive.ObjectID]s
 		}
 		failed = viewers.Cell{Text: stepLabel(t.FailedStep) + ": " + reason, Title: t.FailedReason, Class: viewers.TextRed}
 	}
+	if t.StoppedResponding(time.Now()) {
+		// The game page's heartbeats stopped without a closing beat: the
+		// renderer most likely died. Show it in place of a step failure.
+		failed = viewers.Cell{
+			Text:  "Page stopped responding at " + t.LastHeartbeatAt.UTC().Format("3:04 PM") + " UTC" + heartbeatMemory(t.LastHeartbeat),
+			Title: "Heartbeats stopped without the page saying it was leaving — usually a crashed tab. Last beat: " + heartbeatText(t.LastHeartbeat),
+			Class: viewers.TextRed,
+		}
+		stage.Title = "Page stopped responding; last heartbeat " + t.LastHeartbeatAt.UTC().Format(time.RFC3339)
+	} else if t.EndReason == models.MHSDeviceTestEndClosed && t.EndedAt != nil {
+		stage.Title = "Left the game at " + t.EndedAt.UTC().Format(time.RFC3339)
+	}
 	end := t.LastSeenAt
 	if t.EndedAt != nil {
 		end = *t.EndedAt
@@ -339,6 +358,48 @@ func (v *DeviceTests) row(t models.MHSDeviceTest, names map[primitive.ObjectID]s
 	duration := viewers.Cell{Text: mmss(end.Sub(t.StartedAt)), Title: "From start to the last activity seen"}
 
 	return viewers.Row{ID: t.ID.Hex(), Cells: []viewers.Cell{started, school, tester, device, network, path, download, stage, failed, duration}}
+}
+
+// heartbeatMemory renders the memory figures of a beat for a column.
+func heartbeatMemory(b *models.MHSDeviceTestHeartbeat) string {
+	if b == nil {
+		return ""
+	}
+	parts := []string{}
+	if b.WasmHeapMB > 0 {
+		parts = append(parts, fmt.Sprintf("game %d MB", b.WasmHeapMB))
+	}
+	if b.JSHeapMB > 0 {
+		parts = append(parts, fmt.Sprintf("JS %d MB", b.JSHeapMB))
+	}
+	if len(parts) == 0 {
+		return ""
+	}
+	return " (" + strings.Join(parts, ", ") + ")"
+}
+
+// heartbeatText renders one beat for the detail.
+func heartbeatText(b *models.MHSDeviceTestHeartbeat) string {
+	if b == nil {
+		return ""
+	}
+	parts := []string{b.At.UTC().Format(time.RFC3339)}
+	if b.ElapsedMs > 0 {
+		parts = append(parts, mmss(time.Duration(b.ElapsedMs)*time.Millisecond)+" into the launch")
+	}
+	if b.WasmHeapMB > 0 {
+		parts = append(parts, fmt.Sprintf("game memory %d MB", b.WasmHeapMB))
+	}
+	if b.JSHeapMB > 0 {
+		parts = append(parts, fmt.Sprintf("JS heap %d of %d MB", b.JSHeapMB, b.JSHeapTotalMB))
+	}
+	if b.FPS > 0 {
+		parts = append(parts, fmt.Sprintf("%.0f fps", b.FPS))
+	}
+	if b.Visibility != "" {
+		parts = append(parts, b.Visibility)
+	}
+	return strings.Join(parts, " · ")
 }
 
 // stepLabel mirrors mhs-steplog.js's step names.
@@ -526,6 +587,17 @@ func (v *DeviceTests) Detail(ctx context.Context, scope *viewscope.Scope, id str
 	if t.CrashCount > 0 {
 		fields = add(fields, "Crashes", fmt.Sprint(t.CrashCount), false)
 	}
+	switch {
+	case t.StoppedResponding(time.Now()):
+		fields = add(fields, "Ended", "Page stopped responding — heartbeats ended "+t.LastHeartbeatAt.UTC().Format(time.RFC3339)+" UTC without the page saying it was leaving (usually a crashed tab)", false)
+	case t.EndReason == models.MHSDeviceTestEndCompleted && t.EndedAt != nil:
+		fields = add(fields, "Ended", "Completed the unit at "+t.EndedAt.UTC().Format(time.RFC3339)+" UTC", false)
+	case t.EndReason == models.MHSDeviceTestEndClosed && t.EndedAt != nil:
+		fields = add(fields, "Ended", "Left the game at "+t.EndedAt.UTC().Format(time.RFC3339)+" UTC", false)
+	}
+	if t.LastHeartbeat != nil {
+		fields = add(fields, "Last heartbeat", heartbeatText(t.LastHeartbeat)+fmt.Sprintf(" (%d beats)", t.HeartbeatCount), false)
+	}
 
 	g := v.loadGameplay(ctx, t.ID.Hex())
 	html := v.detailHTML(t, g)
@@ -600,6 +672,25 @@ func (v *DeviceTests) detailHTML(t *models.MHSDeviceTest, g gameplay) string {
 		b.WriteString(`</div>`)
 	}
 	b.WriteString(`</div>`)
+
+	// Heartbeats (newest last; the memory trend before a crash)
+	if len(t.Heartbeats) > 0 {
+		b.WriteString(`<div><div class="font-medium text-gray-700 dark:text-gray-300">Heartbeats (` + fmt.Sprint(len(t.Heartbeats)) + `, newest last)</div>`)
+		b.WriteString(`<div class="overflow-auto max-h-64"><table class="text-xs w-full"><thead><tr class="text-gray-500 dark:text-gray-400"><th class="text-left pr-2">Time (UTC)</th><th class="text-left pr-2">Into launch</th><th class="text-left pr-2">Game memory</th><th class="text-left pr-2">JS heap</th><th class="text-left pr-2">FPS</th><th class="text-left">Tab</th></tr></thead><tbody>`)
+		start := 0
+		if len(t.Heartbeats) > 40 {
+			start = len(t.Heartbeats) - 40
+		}
+		for _, hb := range t.Heartbeats[start:] {
+			b.WriteString(`<tr><td class="pr-2 whitespace-nowrap tabular-nums">` + esc(hb.At.UTC().Format("15:04:05")) + `</td>`)
+			b.WriteString(`<td class="pr-2 whitespace-nowrap tabular-nums">` + esc(mmss(time.Duration(hb.ElapsedMs)*time.Millisecond)) + `</td>`)
+			b.WriteString(`<td class="pr-2 whitespace-nowrap tabular-nums">` + esc(mbOrDash(hb.WasmHeapMB)) + `</td>`)
+			b.WriteString(`<td class="pr-2 whitespace-nowrap tabular-nums">` + esc(mbOrDash(hb.JSHeapMB)) + `</td>`)
+			b.WriteString(`<td class="pr-2 whitespace-nowrap tabular-nums">` + esc(fmt.Sprintf("%.0f", hb.FPS)) + `</td>`)
+			b.WriteString(`<td class="whitespace-nowrap">` + esc(hb.Visibility) + `</td></tr>`)
+		}
+		b.WriteString(`</tbody></table></div></div>`)
+	}
 
 	// Reports
 	if len(t.ProblemReports) > 0 {

@@ -114,6 +114,35 @@ type MHSDeviceTestLaunch struct {
 	FirstFrameMs int64 `bson:"first_frame_ms,omitempty" json:"first_frame_ms,omitempty"`
 }
 
+// MHSDeviceTestHeartbeat is one periodic sample from the page: memory, frame
+// rate and visibility while the game runs (phase "game"), or just liveness
+// during the download (phase "download"). A renderer crash kills the page
+// with nothing left to report, so the trend up to the last beat is the
+// evidence; see MHSDeviceTest.StoppedResponding.
+type MHSDeviceTestHeartbeat struct {
+	At            time.Time `bson:"at" json:"at"`
+	ElapsedMs     int64     `bson:"elapsed_ms,omitempty" json:"elapsed_ms,omitempty"` // since the launch (or the run page's load)
+	Phase         string    `bson:"phase,omitempty" json:"phase,omitempty"`
+	JSHeapMB      int       `bson:"js_heap_mb,omitempty" json:"js_heap_mb,omitempty"`
+	JSHeapTotalMB int       `bson:"js_heap_total_mb,omitempty" json:"js_heap_total_mb,omitempty"`
+	WasmHeapMB    int       `bson:"wasm_heap_mb,omitempty" json:"wasm_heap_mb,omitempty"`
+	FPS           float64   `bson:"fps,omitempty" json:"fps,omitempty"`
+	Visibility    string    `bson:"visibility,omitempty" json:"visibility,omitempty"`
+}
+
+// MHSDeviceTestMaxHeartbeats caps the stored trend (two hours at 30 s).
+const MHSDeviceTestMaxHeartbeats = 240
+
+// MHSDeviceTestHeartbeatGrace is how long after the last beat a run that has
+// not ended cleanly counts as "page stopped responding".
+const MHSDeviceTestHeartbeatGrace = 2 * time.Minute
+
+// How a run ended.
+const (
+	MHSDeviceTestEndCompleted = "completed" // the game reported the unit complete
+	MHSDeviceTestEndClosed    = "closed"    // the page said it was leaving (back, tab closed)
+)
+
 // MHSDeviceTestReport is a note the tester sent from the page.
 type MHSDeviceTestReport struct {
 	At   time.Time `bson:"at" json:"at"`
@@ -155,7 +184,7 @@ type MHSDeviceTest struct {
 	Network     string                 `bson:"network,omitempty" json:"network,omitempty"`
 	Diagnostics map[string]interface{} `bson:"diagnostics,omitempty" json:"diagnostics,omitempty"`
 
-	Stage        string `bson:"stage" json:"stage"`                                   // current: the furthest stage reached, or "failed" while the latest step is a failure
+	Stage        string `bson:"stage" json:"stage"`                                     // current: the furthest stage reached, or "failed" while the latest step is a failure
 	ReachedStage string `bson:"reached_stage,omitempty" json:"reached_stage,omitempty"` // furthest stage reached, kept while Stage is "failed"
 	FailedStep   string `bson:"failed_step,omitempty" json:"failed_step,omitempty"`
 	FailedReason string `bson:"failed_reason,omitempty" json:"failed_reason,omitempty"`
@@ -168,4 +197,26 @@ type MHSDeviceTest struct {
 
 	Steps          []MHSDeviceTestStep   `bson:"steps,omitempty" json:"steps,omitempty"`
 	ProblemReports []MHSDeviceTestReport `bson:"problem_reports,omitempty" json:"problem_reports,omitempty"`
+
+	// Heartbeats from the page (see MHSDeviceTestHeartbeat). LastHeartbeat
+	// is kept apart from the capped trend so list views need not load it.
+	EndReason       string                   `bson:"end_reason,omitempty" json:"end_reason,omitempty"`
+	LastHeartbeatAt *time.Time               `bson:"last_heartbeat_at,omitempty" json:"last_heartbeat_at,omitempty"`
+	LastHeartbeat   *MHSDeviceTestHeartbeat  `bson:"last_heartbeat,omitempty" json:"last_heartbeat,omitempty"`
+	HeartbeatCount  int                      `bson:"heartbeat_count,omitempty" json:"heartbeat_count,omitempty"`
+	Heartbeats      []MHSDeviceTestHeartbeat `bson:"heartbeats,omitempty" json:"heartbeats,omitempty"`
+}
+
+// StoppedResponding reports whether the page went silent without ending
+// cleanly: it was sending heartbeats, the last one is older than the grace
+// period, and neither a completion nor a closing beat arrived. That is what
+// a renderer crash ("Aw, Snap") looks like from the server.
+func (t *MHSDeviceTest) StoppedResponding(now time.Time) bool {
+	if t.LastHeartbeatAt == nil || t.EndedAt != nil || t.UnitCompletedAt != nil {
+		return false
+	}
+	if t.LastHeartbeat == nil || t.LastHeartbeat.Phase != "game" {
+		return false // only the game page beats; silence elsewhere is not a crash
+	}
+	return now.Sub(*t.LastHeartbeatAt) > MHSDeviceTestHeartbeatGrace
 }

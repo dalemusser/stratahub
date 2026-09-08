@@ -137,6 +137,14 @@ last run.
 - the full step timeline; and the diagnostics snapshot (browser
   capabilities, WebGL renderer, storage, cache inventory, client hints,
   battery, page timing).
+- **Ended** and **Last heartbeat**: while the game runs, the page sends a
+  heartbeat every 30 seconds (game memory, JavaScript heap, frame rate, tab
+  visibility) and a final one when the tester leaves. A run whose beats stop
+  without that final one is shown as **Page stopped responding at …** in the
+  Last problem column, with the last memory figures; that is what a crashed
+  tab ("Aw, Snap") looks like from the server, since a crashed page can
+  report nothing itself. The detail lists the beats, newest last, so a
+  memory climb before a crash is visible.
 - **Download this run as JSON** for the complete record.
 
 **Exports.** *Export CSV* gives the table for the current filter. *Export

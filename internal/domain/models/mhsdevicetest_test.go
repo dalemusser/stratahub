@@ -2,6 +2,7 @@ package models
 
 import (
 	"testing"
+	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
@@ -38,5 +39,28 @@ func TestIsMHSDeviceTestUserID(t *testing.T) {
 	}
 	if !IsMHSDeviceTestUserID("ffffffff0123456789abcdef") {
 		t.Fatalf("marked id must be recognized")
+	}
+}
+
+func TestStoppedResponding(t *testing.T) {
+	now := time.Now().UTC()
+	old := now.Add(-5 * time.Minute)
+	game := &MHSDeviceTestHeartbeat{At: old, Phase: "game"}
+	cases := []struct {
+		name string
+		run  MHSDeviceTest
+		want bool
+	}{
+		{"no beats", MHSDeviceTest{}, false},
+		{"recent beat", MHSDeviceTest{LastHeartbeatAt: &now, LastHeartbeat: &MHSDeviceTestHeartbeat{At: now, Phase: "game"}}, false},
+		{"old game beat, no end", MHSDeviceTest{LastHeartbeatAt: &old, LastHeartbeat: game}, true},
+		{"old beat but closed", MHSDeviceTest{LastHeartbeatAt: &old, LastHeartbeat: game, EndedAt: &old, EndReason: MHSDeviceTestEndClosed}, false},
+		{"old beat but completed", MHSDeviceTest{LastHeartbeatAt: &old, LastHeartbeat: game, UnitCompletedAt: &old}, false},
+		{"old download-phase beat", MHSDeviceTest{LastHeartbeatAt: &old, LastHeartbeat: &MHSDeviceTestHeartbeat{At: old, Phase: "download"}}, false},
+	}
+	for _, c := range cases {
+		if got := c.run.StoppedResponding(now); got != c.want {
+			t.Errorf("%s: got %v want %v", c.name, got, c.want)
+		}
 	}
 }

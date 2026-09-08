@@ -175,6 +175,17 @@ Endpoint: `POST /missionhydrosci/api/steplog` (session-gated, CSRF token as toda
 > viewers, feature helpers, id marker), template parse, a local server run
 > (landing renders, bogus run id 404, viewer and settings behind login).
 > Device verification pending with the rest.
+>
+> **Addendum (2026-09-08): heartbeats.** A real run on a Mac crashed the tab
+> ("Aw, Snap", error code 5) on Unit 2's second screen, and a crashed page
+> can report nothing, so the run only showed "Gameplay". The play page now
+> sends a heartbeat every 30 s while the game runs (Unity WebAssembly heap,
+> JavaScript heap, frame rate, tab visibility) and a closing beat on
+> pagehide; the store keeps the last 240 beats per run. A run whose beats
+> stop for two minutes without a closing beat or a completion is shown as
+> "Page stopped responding at …" with its last memory figures, and the
+> detail lists the trend. Members' launches get the same through their
+> launch record (`/api/steplog/{id}/heartbeat`).
 
 ### 4.1 Goals and non-goals
 

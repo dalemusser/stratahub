@@ -940,7 +940,10 @@ make css-watch
   `ffffffff` + 16 random hex, never a real user id); A2 implemented
   2026-09-07: members' step logs stored on download/launch failure or
   completion (`POST /missionhydrosci/api/steplog`, kind "member" rows in the
-  Device Tests view). All plan steps are in place; device verification pending
+  Device Tests view); heartbeats from the game page (memory, fps,
+  visibility every 30 s + closing beat) make a crashed tab show as "Page
+  stopped responding" with a memory trend. All plan steps are in place;
+  device verification pending
 
 ### Game log first-event rejection (2026-09-08, open, game-side)
 - `docs/mission-hydrosci/game-first-log-event-rejected.md`: the game's first

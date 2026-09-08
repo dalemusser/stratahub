@@ -16,6 +16,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
+	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.uber.org/zap"
 )
@@ -95,7 +96,7 @@ func (h *Handler) HandleMemberStepLog(w http.ResponseWriter, r *http.Request) {
 		RemoteIP:     clientIPForLog(r),
 		UserAgent:    models.ClipRunes(r.UserAgent(), 400),
 		StartedAt:    now,
-		ExpiresAt:    now, // a stored record accepts no further writes
+		ExpiresAt:    now.Add(6 * time.Hour), // heartbeats may follow a launch record
 		Stage:        derived.stage,
 		ReachedStage: derived.reached,
 		FailedStep:   derived.failedStep,
@@ -114,11 +115,13 @@ func (h *Handler) HandleMemberStepLog(w http.ResponseWriter, r *http.Request) {
 			rec.OrganizationID = &oid
 		}
 	}
-	if _, err := h.DeviceTestStore.Create(ctx, rec); err != nil {
+	created, err := h.DeviceTestStore.Create(ctx, rec)
+	if err != nil {
 		h.Log.Error("member step log: store failed", zap.Error(err))
 		writeDeviceTestJSON(w, http.StatusInternalServerError, map[string]any{"ok": false, "error": "server_error"})
 		return
 	}
+	rec.ID = created.ID
 	h.Log.Info("member step log stored",
 		zap.String("workspace_id", rec.WorkspaceID.Hex()),
 		zap.String("user_id", user.ID),
@@ -126,7 +129,40 @@ func (h *Handler) HandleMemberStepLog(w http.ResponseWriter, r *http.Request) {
 		zap.String("unit", rec.UnitID+" v"+rec.UnitVersion),
 		zap.String("stage", rec.Stage),
 		zap.String("failed_step", rec.FailedStep))
-	writeDeviceTestJSON(w, http.StatusOK, map[string]any{"ok": true})
+	writeDeviceTestJSON(w, http.StatusOK, map[string]any{"ok": true, "id": rec.ID.Hex()})
+}
+
+// HandleMemberHeartbeat records a heartbeat against a member's own launch
+// record (the id the step-log endpoint returned).
+func (h *Handler) HandleMemberHeartbeat(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.CurrentUser(r)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	id, err := primitive.ObjectIDFromHex(chi.URLParam(r, "id"))
+	if err != nil {
+		writeDeviceTestJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "not_found"})
+		return
+	}
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
+	defer cancel()
+	wsID := workspace.IDFromRequest(r)
+	rec, err := h.DeviceTestStore.Get(ctx, wsID, id)
+	if err != nil || rec.Kind != models.MHSDeviceTestKindMember || rec.UserID == nil || rec.UserID.Hex() != user.ID {
+		writeDeviceTestJSON(w, http.StatusNotFound, map[string]any{"ok": false, "error": "not_found"})
+		return
+	}
+	var req deviceTestHeartbeatRequest
+	if err := decodeDeviceTestBody(r, &req); err != nil {
+		writeDeviceTestJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bad_json"})
+		return
+	}
+	if err := h.DeviceTestStore.Heartbeat(ctx, wsID, id, req.beat(), req.Closing); err != nil {
+		h.deviceTestWriteError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 func clientIPForLog(r *http.Request) string {

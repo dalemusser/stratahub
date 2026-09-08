@@ -693,6 +693,12 @@
             headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{ .CSRFToken }}' },
             body: JSON.stringify({ outcome: outcome, unit: unitId, version: unitVersion, context: stepLog.context, entries: stepLog.entries.slice(-300) }),
             keepalive: true
+          }).then(function(resp) { return resp.ok ? resp.json() : null; }).then(function(data) {
+            // The launch record is where this launch's heartbeats go.
+            if (outcome === 'launch-ok' && data && data.id) {
+              heartbeatUrl = '/missionhydrosci/api/steplog/' + data.id + '/heartbeat';
+              startHeartbeat();
+            }
           }).catch(function() {});
         } catch (e) { /* best effort */ }
       }
@@ -709,6 +715,56 @@
       }
       var launchStartedAt = Date.now();
       var lastMilestone = -1;
+
+      // Heartbeat: memory, frame rate and visibility every 30 s while the
+      // game runs, and a final "closing" beat on pagehide. A renderer crash
+      // ("Aw, Snap") kills the page with nothing left to report, so the trend
+      // up to the last beat is the evidence; the server marks a run whose
+      // beats stop without a closing beat as "page stopped responding".
+      var hbFrames = 0, hbLastAt = Date.now(), hbTimer = null;
+      var heartbeatUrl = {{ if .DeviceTest }}'{{ .DeviceTestBase }}/heartbeat'{{ else }}''{{ end }}; // members: set once the launch record exists
+      (function countFrames() { hbFrames++; requestAnimationFrame(countFrames); })();
+      function heartbeatBody(closing) {
+        var now = Date.now();
+        var secs = Math.max(0.001, (now - hbLastAt) / 1000);
+        var body = {
+          phase: 'game',
+          elapsed_ms: now - launchStartedAt,
+          visibility: document.visibilityState,
+          fps: Math.round((hbFrames / secs) * 10) / 10,
+          closing: !!closing
+        };
+        hbFrames = 0; hbLastAt = now;
+        try {
+          if (performance.memory) {
+            body.js_heap_mb = Math.round(performance.memory.usedJSHeapSize / 1048576);
+            body.js_heap_total_mb = Math.round(performance.memory.totalJSHeapSize / 1048576);
+          }
+        } catch (e) { /* not available */ }
+        try {
+          var M = window.__unityInstance && window.__unityInstance.Module;
+          var buf = M && ((M.HEAPU8 && M.HEAPU8.buffer) || (M.wasmMemory && M.wasmMemory.buffer));
+          if (buf) body.wasm_heap_mb = Math.round(buf.byteLength / 1048576);
+        } catch (e) { /* not available */ }
+        return body;
+      }
+      function sendHeartbeat(closing) {
+        if (!heartbeatUrl) return;
+        try {
+          fetch(heartbeatUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': '{{ .CSRFToken }}' },
+            body: JSON.stringify(heartbeatBody(closing)),
+            keepalive: !!closing
+          }).catch(function() {});
+        } catch (e) { /* best effort */ }
+      }
+      function startHeartbeat() {
+        if (hbTimer || !heartbeatUrl) return;
+        hbTimer = setInterval(function() { sendHeartbeat(false); }, 30000);
+        sendHeartbeat(false);
+      }
+      window.addEventListener('pagehide', function() { if (hbTimer) sendHeartbeat(true); });
       function loaderSource() {
         try {
           var abs = new URL(loaderUrl, location.href).href;
@@ -936,6 +992,7 @@
                 launch: { loader_ms: deviceTestLoaderMs, unity_ms: Date.now() - launchStartedAt, first_frame_ms: Date.now() - launchStartedAt },
                 gameplay_reached: true
               });
+              startHeartbeat();
               {{ end }}
             });
           });

@@ -66,6 +66,7 @@ func (h *Handler) MountDeviceTestRoutes(r chi.Router) {
 		rr.Post("/summary", h.HandleDeviceTestSummary)
 		rr.Post("/report", h.HandleDeviceTestReport)
 		rr.Post("/complete", h.HandleDeviceTestComplete)
+		rr.Post("/heartbeat", h.HandleDeviceTestHeartbeat)
 	})
 }
 
@@ -709,6 +710,52 @@ func (h *Handler) HandleDeviceTestSummary(w http.ResponseWriter, r *http.Request
 		return
 	}
 	if err := h.DeviceTestStore.Apply(ctx, run.WorkspaceID, run.ID, update); err != nil {
+		h.deviceTestWriteError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// deviceTestHeartbeatRequest is one liveness/memory sample from a page.
+type deviceTestHeartbeatRequest struct {
+	Phase         string  `json:"phase"`
+	ElapsedMs     int64   `json:"elapsed_ms"`
+	JSHeapMB      int     `json:"js_heap_mb"`
+	JSHeapTotalMB int     `json:"js_heap_total_mb"`
+	WasmHeapMB    int     `json:"wasm_heap_mb"`
+	FPS           float64 `json:"fps"`
+	Visibility    string  `json:"visibility"`
+	Closing       bool    `json:"closing"`
+}
+
+func (r deviceTestHeartbeatRequest) beat() models.MHSDeviceTestHeartbeat {
+	return models.MHSDeviceTestHeartbeat{
+		At:            time.Now().UTC(),
+		ElapsedMs:     r.ElapsedMs,
+		Phase:         models.ClipRunes(r.Phase, 16),
+		JSHeapMB:      r.JSHeapMB,
+		JSHeapTotalMB: r.JSHeapTotalMB,
+		WasmHeapMB:    r.WasmHeapMB,
+		FPS:           r.FPS,
+		Visibility:    models.ClipRunes(r.Visibility, 16),
+	}
+}
+
+// HandleDeviceTestHeartbeat records a periodic sample from the run or play
+// page (every 30 s while the game runs; a closing beat on pagehide).
+func (h *Handler) HandleDeviceTestHeartbeat(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
+	defer cancel()
+	run, ok := h.loadDeviceTestRun(w, r, ctx, false)
+	if !ok {
+		return
+	}
+	var req deviceTestHeartbeatRequest
+	if err := decodeDeviceTestBody(r, &req); err != nil {
+		writeDeviceTestJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bad_json"})
+		return
+	}
+	if err := h.DeviceTestStore.Heartbeat(ctx, run.WorkspaceID, run.ID, req.beat(), req.Closing); err != nil {
 		h.deviceTestWriteError(w, err)
 		return
 	}

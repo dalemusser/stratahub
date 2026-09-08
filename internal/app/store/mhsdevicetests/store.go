@@ -141,11 +141,54 @@ func (s *Store) AddReport(ctx context.Context, workspaceID, id primitive.ObjectI
 	}}})
 }
 
+// Heartbeat records one liveness/memory sample. A non-closing beat from a
+// run that had been marked "closed" reopens it (the tester came back or
+// relaunched); a closing beat marks the run ended unless the unit was
+// already completed. Beats are accepted until the run expires, completed
+// or not, so a tester who keeps playing after finishing is still observed.
+func (s *Store) Heartbeat(ctx context.Context, workspaceID, id primitive.ObjectID, beat models.MHSDeviceTestHeartbeat, closing bool) error {
+	now := time.Now().UTC()
+	if beat.At.IsZero() {
+		beat.At = now
+	}
+	beat.At = beat.At.UTC()
+	base := bson.M{"_id": id, "workspace_id": workspaceID, "expires_at": bson.M{"$gt": now}}
+
+	if !closing {
+		// Reopen a run the page had said it was leaving.
+		reopen := bson.M{"_id": id, "workspace_id": workspaceID, "end_reason": models.MHSDeviceTestEndClosed}
+		if _, err := s.c.UpdateOne(ctx, reopen, bson.M{"$unset": bson.M{"ended_at": "", "end_reason": ""}}); err != nil {
+			return err
+		}
+	}
+	update := bson.M{
+		"$push": bson.M{"heartbeats": bson.M{"$each": []models.MHSDeviceTestHeartbeat{beat}, "$slice": -models.MHSDeviceTestMaxHeartbeats}},
+		"$set":  bson.M{"last_heartbeat_at": beat.At, "last_heartbeat": beat, "last_seen_at": now},
+		"$inc":  bson.M{"heartbeat_count": 1},
+	}
+	res, err := s.c.UpdateOne(ctx, base, update)
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 0 {
+		if _, gerr := s.Get(ctx, workspaceID, id); gerr != nil {
+			return gerr
+		}
+		return ErrClosed
+	}
+	if closing {
+		// Completion wins over a later "closed": only stamp an open run.
+		closeFilter := bson.M{"_id": id, "workspace_id": workspaceID, "unit_completed_at": bson.M{"$exists": false}}
+		_, err = s.c.UpdateOne(ctx, closeFilter, bson.M{"$set": bson.M{"ended_at": now, "end_reason": models.MHSDeviceTestEndClosed}})
+	}
+	return err
+}
+
 // Complete stamps unit completion and the completed stage. Idempotent.
 func (s *Store) Complete(ctx context.Context, workspaceID, id primitive.ObjectID) error {
 	now := time.Now().UTC()
 	res, err := s.c.UpdateOne(ctx, bson.M{"_id": id, "workspace_id": workspaceID}, bson.M{
-		"$set":         bson.M{"stage": models.MHSDeviceTestStageCompleted, "last_seen_at": now, "ended_at": now},
+		"$set":         bson.M{"stage": models.MHSDeviceTestStageCompleted, "last_seen_at": now, "ended_at": now, "end_reason": models.MHSDeviceTestEndCompleted},
 		"$setOnInsert": bson.M{},
 		"$min":         bson.M{"unit_completed_at": now},
 	})
@@ -238,7 +281,7 @@ func regexQuote(s string) string {
 }
 
 // listProjection leaves out the bulky embedded arrays for the table.
-var listProjection = bson.M{"steps": 0, "diagnostics": 0, "problem_reports": 0}
+var listProjection = bson.M{"steps": 0, "diagnostics": 0, "problem_reports": 0, "heartbeats": 0}
 
 // List returns up to Limit runs newest first (started_at desc, _id desc)
 // without their step logs and diagnostics, and whether more follow.
