@@ -47,10 +47,10 @@
     // manifest: no pruning of other units' caches and no aborting of other
     // units' downloads, which may belong to a student using the same device.
     this._isolated = !!opts.isolated;
-    // probeCached (the device test): a unit found already downloaded gets the
-    // step-log rows a fresh download would have filled — the files are
-    // verified and the content server and game services are probed — so the
-    // panel and the run record never show "—" for them.
+    // probeCached (the units, manage and device-test pages): a unit found
+    // already downloaded gets the step-log rows a fresh download would have
+    // filled — the files are verified and the content server and game
+    // services are probed — so the panel never shows "—" for them.
     this._probeCached = !!opts.probeCached;
     this._cachedNoted = {}; // unitId -> true once noted this page load
     this._downloadErrorUrl = opts.downloadErrorUrl || '/missionhydrosci/api/download-error';
@@ -487,9 +487,13 @@
   MHSDeliveryManager.prototype._noteCached = async function(unit) {
     if (!this._probeCached || !this._steplog || !unit || this._cachedNoted[unit.id]) return;
     this._cachedNoted[unit.id] = true;
-    this._step('download', 'ok', (unit.title || unit.id) + ': already on this device (downloaded earlier)');
+    var title = unit.title || unit.id;
+    this._step('method', 'info', 'Not needed — ' + title + ' is already on this device');
+    this._step('download', 'ok', title + ': already on this device (downloaded earlier)');
     await this._verifyForLog(unit.id);
-    await this.preflight(unit);
+    // Soft: the unit can be played without the content server, so an
+    // unreachable one is a warning here, not the failure a download gets.
+    await this.preflight(unit, { soft: true });
   };
 
   /**
@@ -697,7 +701,8 @@
    * A successful CDN result is cached for the manager's lifetime; a failed one
    * is not, so Retry re-checks. Never throws.
    */
-  MHSDeliveryManager.prototype.preflight = async function(unit) {
+  MHSDeliveryManager.prototype.preflight = async function(unit, opts) {
+    opts = opts || {};
     if (this.preflightResult && this.preflightResult.cdn && this.preflightResult.cdn.ok) {
       return this.preflightResult;
     }
@@ -711,9 +716,10 @@
       this._step('cdn', 'running', 'Checking the content server (' + hostOf(base) + ')…');
       result.cdn = await probeURL(base + '/' + smallest.path, 'cors');
       result.cdn.host = hostOf(base);
-      this._step('cdn', result.cdn.ok ? 'ok' : 'fail', result.cdn.ok
+      this._step('cdn', result.cdn.ok ? 'ok' : (opts.soft ? 'warn' : 'fail'), result.cdn.ok
         ? 'Content server reachable (' + result.cdn.ms + ' ms)'
-        : 'Cannot reach the content server ' + result.cdn.host + ': ' + result.cdn.error);
+        : 'Cannot reach the content server ' + result.cdn.host + ': ' + result.cdn.error +
+          (opts.soft ? ' — not needed right now, the unit is already on this device' : ''));
     }
     var probes = (this.manifest && this.manifest.probes) || [];
     var checks = [];

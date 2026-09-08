@@ -505,7 +505,8 @@
     unitCachePrefix: 'missionhydrosci-unit-',
     fetchIdPrefix: 'missionhydrosci-',
     appShellCachePrefix: 'missionhydrosci-app-shell-',
-    csrfToken: csrfToken // enables download-error telemetry
+    csrfToken: csrfToken, // enables download-error telemetry
+    probeCached: true // units already on the device still get their verify and server rows
   });
 
   // Per-load step log: the "Status details" panel and Send/Copy report.

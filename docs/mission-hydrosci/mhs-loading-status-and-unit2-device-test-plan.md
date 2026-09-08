@@ -298,10 +298,12 @@ Admin:
 its step entries to the run page over a BroadcastChannel
 (`MHSStepLog.relayTo` / `listenTo`, channel per test id); relayed entries are
 tagged "game tab", shown in the panel and in Copy report, and never flushed
-to the server by the run page. With the manager's `probeCached` option a
-unit already on the device is noted in the download row, its files verified
-and the servers probed, so the content-server, services, download and verify
-rows are filled on every run. A final flush (tab hidden, then closed) no
+to the server by the run page. With the manager's `probeCached` option
+(on for the units, manage and device-test pages) a unit already on the
+device is noted in the download-method and download rows, its files
+verified and the servers probed softly (an unreachable content server is a
+warning, since the unit can still be played), so those rows are filled on
+every visit. A final flush (tab hidden, then closed) no
 longer resends what an in-flight request already carries, and the steps
 endpoint drops any entry the record already holds.
 
