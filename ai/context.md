@@ -106,7 +106,7 @@ Handles application initialization and lifecycle:
 | **gameconfig** | Game/activity configuration (MHS) |
 | **uploadcsv** | CSV import for MHS data |
 | **memberstatusapi** | Inbound `POST /api/member-status` (+ `/ping`): the survey provider reports a member's survey started/completed; shared key in the body, no session/CSRF; feeds the dashboard's Surveys tab (`docs/member-status-api/`) |
-| **missionhydrosci/devicetest** | Public `/missionhydrosci/devicetest` (no session; workspace from host): a school downloads and plays Unit 2 as a student would; runs recorded in `mhs_device_tests` with `ffffffff`-marked game ids; enable + build in Site Settings; results in the **Device Tests** viewer (`docs/mission-hydrosci/device-test-guide.md`) |
+| **missionhydrosci/devicetest** | Public `/missionhydrosci/devicetest` (no session; workspace from host): a school downloads and plays Unit 2 as a student would; runs recorded in `mhs_device_tests` with `ffffffff`-marked game ids; enable + build in Site Settings; results in the **Device Tests** viewer (`docs/mhs-device-test/`: admin guide + tester guide) |
 
 **Utility & System:**
 
@@ -935,7 +935,7 @@ make css-watch
   A1 implemented 2026-09-07: `mhs-steplog.js` + shared `mhs_steplog_panel`
   snippet ("Status details" panel, Copy report) on the units/play/manage
   pages, fed by delivery-manager hooks; B implemented 2026-09-07 (guide:
-  `docs/mission-hydrosci/device-test-guide.md`): standalone, account-free Unit 2
+  `docs/mhs-device-test/admin-guide.md` + tester guide): standalone, account-free Unit 2
   device test at `/missionhydrosci/devicetest` per workspace (test ids are
   `ffffffff` + 16 random hex, never a real user id); A2 implemented
   2026-09-07: members' step logs stored on download/launch failure or

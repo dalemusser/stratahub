@@ -1,0 +1,223 @@
+# Mission HydroSci Device Test — Admin Guide
+
+**Audience:** StrataHub admins and MHS staff who set up the test for a school and read the results.
+**Companion:** `tester-guide.md` / `tester-guide.html` is what you give the person at the school.
+**Design background:** `../mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md`.
+
+## 1. What the device test is
+
+A public web page, one per workspace, that lets a school check whether a
+device will run Mission HydroSci before the study starts. It downloads and
+launches **Unit 2**, the largest and historically most troublesome unit, the
+same way a student's launcher does: same service worker and cache, same
+content server, same game log and save services, same play page. If a device
+gets through Unit 2 it will handle the rest of the game.
+
+The tester needs **no account and no login**. They open the link, fill in a
+short form, and the page does the rest. Every step of the run is recorded and
+shown to you in the **Device Tests** view.
+
+## 2. Prerequisites
+
+- A Unit 2 build has been uploaded through **MHS Builds** (it must be on the
+  CDN).
+- Either the workspace has an **active collection** that includes Unit 2, or
+  you will pick a specific Unit 2 build in the settings below.
+- Admin access to the workspace's Site Settings.
+
+## 3. Turning it on
+
+1. Sign in to the workspace as an admin and open **Site Settings**.
+2. Find the section **Mission HydroSci — Device Test**.
+3. Tick **Enable the device test**.
+4. Choose the **Unit 2 build to run**:
+   - **Use the active collection's Unit 2** (the default) runs whatever
+     Unit 2 the workspace's active collection uses, which is what students
+     get. This is the right choice for a readiness check.
+   - Or pick a specific build from the list. Only builds already uploaded to
+     the CDN are listed, each with its version, build identifier, size and
+     upload date.
+5. Save the settings.
+
+The **Link to give a school** field in the same section shows the URL:
+
+```
+https://<workspace-host>/missionhydrosci/devicetest
+```
+
+For example `https://mhs.adroit.games/missionhydrosci/devicetest`. The
+address is fixed per workspace; there is nothing to create per school.
+
+While the test is disabled the page says "The device test is not enabled for
+this site right now." Turn it off again after the school's testing window;
+the recorded runs stay.
+
+## 4. Giving the link to a school
+
+Send the school the link and the tester guide. Ask them to:
+
+- test on the **actual devices and network** students will use (a Chromebook
+  in the classroom on the school Wi-Fi, not a laptop at home);
+- keep the tab open while the download runs;
+- play into the game at least until the first scene is on screen, and
+  finish the unit if they can;
+- quote the six-character **test code** shown at the end (or on the run
+  page) when they report anything.
+
+If the school has a content filter, it helps to tell their IT staff in
+advance which hosts the game needs: the StrataHub workspace host, the content
+server (`cdn.adroit.games`), and the game log and save service hosts. The
+run page detects a blocked host within seconds and names it, so a first run
+that fails on this is still informative.
+
+## 5. What the tester sees
+
+1. **Landing page** — what the test does, what is recorded, and the form:
+   school or district and name (required); role, email, device type,
+   school-managed or not, network type, notes (optional).
+2. **Run page** — one Unit 2 card. The download starts by itself. The
+   **Status details** panel is open and shows every step with timings:
+   service worker, game list, storage, content server and game-service
+   checks, download method, download progress with rate and time left,
+   waiting countdowns, automatic retries, file verification. Downloads never
+   give up: every failure schedules the next attempt with a visible
+   countdown; "Retry now" only skips the wait. A **Send report** box lets the
+   tester add a note.
+3. **Launch** — the play page. The current step shows under the loading bar;
+   if a launch step fails the panel opens with the log and a Copy report
+   button.
+4. **Test complete** — when the game reports the unit finished, the page
+   shows the test code and a link back to the run page.
+
+## 6. Reading the results
+
+Open **Device Tests** from the menu (admins and analysts), or go to
+`/views/device-tests`.
+
+**The table.** One row per run:
+
+| Column | Meaning |
+|---|---|
+| Started | When the run began (UTC) |
+| School | From the form (or the organization, for member records) |
+| Tester | Name and role from the form |
+| Device | Detected device type, platform and browser |
+| Network | Detected connection type, speed and latency |
+| Path | **Background** (Chrome's background download) or **Direct** (inside the service worker; the tab must stay open). A ↻ means the page had to switch from background to direct |
+| Download | Size and time, with speed and stall/retry counts in the tooltip |
+| Stage | How far the run got (below) |
+| Last problem | The most recent failing step and its message |
+| Duration | From start to the last activity seen |
+
+**Stages**, in order: Started → Downloading → Downloaded → Launching →
+Gameplay → Completed. **Failed** means the most recent step is a failure.
+Because the page keeps retrying, a run can move out of Failed again; the
+"Last problem" column keeps the latest failure either way.
+
+**Filters:** date range, stage, kind, device, school (prefix), test id.
+**Chips** above the table: runs, reached gameplay, completed, failed now,
+last run.
+
+**The detail.** Click a row. It shows:
+
+- the form answers, the detected device and network, device id, IP address
+  and user agent;
+- the download summary (path, size, time, speed, stalls, retries, whether it
+  switched) and the launch timings (loader, Unity start, first frame);
+- **Game telemetry for this run**: the number of log events the game sent,
+  first and last event times, scenes seen, the grader's progress points and
+  current unit;
+- the tester's reports;
+- the full step timeline; and the diagnostics snapshot (browser
+  capabilities, WebGL renderer, storage, cache inventory, client hints,
+  battery, page timing).
+- **Download this run as JSON** for the complete record.
+
+**Exports.** *Export CSV* gives the table for the current filter. *Export
+JSON* gives every matching run in full, for analysis.
+
+### What counts as a pass
+
+- **Reached gameplay** (stage Gameplay or later): the device downloaded the
+  unit, started Unity, and rendered the game. This is the check that
+  matters most.
+- **Completed**: the tester finished Unit 2. This confirms the device holds
+  up through a full unit.
+- A run stuck at Downloading with many retries, or Failed with a content
+  server or storage problem, points at the network or the device rather
+  than the game; the Last problem column and the step timeline say which.
+
+### Member load records
+
+The same view holds a second kind of record, under the **Kind** filter:
+**Member load record**. A signed-in student's launcher stores its own step
+log when a download completes or fails (at most every ten minutes while
+retries continue), when a launch fails, succeeds, or crashes while loading,
+and when the student presses **Send report** in the Status details panel.
+The row shows the member's name, organization and outcome; the detail has
+the same step timeline. This is how a field report like "connection error in
+room 12" can be read step by step without asking the student for anything.
+
+## 7. How runs are identified
+
+Each run gets a 24-character id that is also the `user_id` the game sends to
+the log and save services. It starts with `ffffffff` followed by 16 random
+hex characters. A real user id is a MongoDB ObjectID whose first eight
+characters are its creation time; `ffffffff` decodes to the year 2106, so no
+real id can ever start with it. Anything in the game services' data with such
+an id is device-test data, and the `mhs_device_tests` collection says which
+run. In code: `models.IsMHSDeviceTestUserID`.
+
+No account is created and nothing is written to users, organizations,
+groups or progress. The MHS dashboard therefore does not list test runs; the
+Device Tests view is the place to look.
+
+## 8. Data, privacy and retention
+
+- Run records hold the form, the detected device details, the step log
+  (newest 300 entries), the summaries, the tester's reports and timestamps.
+  They are kept indefinitely.
+- Tester name, email and IP address are visible only in the admin/analyst
+  view. Nothing about the tester reaches the game services; the game only
+  ever sees the run id.
+- A run accepts new data for 24 hours after it starts, or until the unit is
+  completed. After that its page still works but nothing more is recorded.
+- The full list of what is recorded is in the tester guide, so the school
+  sees the same description you do.
+
+## 9. Limits and settings
+
+- **Start quota.** Starting runs is limited per client IP address:
+  `mhs_device_test_start_limit` runs per `mhs_device_test_start_window` in
+  `config.toml` (defaults 10 per 10 minutes; a change needs a service
+  restart). Only pressing "Start the Unit 2 test" counts; downloads,
+  retries, launches and reporting never do. A whole school behind one
+  address shares the budget, so raise it before a large group tests at once.
+- **Download timing** values the pages use are also in `config.toml`
+  (`mhs_frozen_switch_ms`, `mhs_fallback_stall_ms`, `mhs_keepalive_ms`).
+- **Game-service keys.** The play page renders the log and save service
+  keys as it does for students; anyone with the URL can read them from the
+  page source, which was already true of every student browser. Keep the
+  test disabled when not in use.
+- **Maintenance mode** does not block the device test or the content route.
+
+## 10. Questions that come up
+
+**A logged-in user opened the link. Does that matter?** No. The run is
+anonymous either way; the person's account, progress and saves are untouched.
+The run page never removes or interrupts other units on the device, so a
+teacher testing on a student's Chromebook does no harm.
+
+**Two testers on the same network started at once. Are they separate?**
+Yes; each run has its own id and record. They share the start quota.
+
+**I changed the build while someone was mid-test.** Their run keeps the
+version it started with. The next run uses the new choice.
+
+**The landing page says "not enabled" but the switch is on.** The workspace
+has no active collection with a Unit 2 and no build was chosen, or the chosen
+build no longer exists. The server log gives the exact reason.
+
+**Where do I see what the game itself logged?** In the run's detail under
+"Game telemetry for this run", pulled live from the log service and the
+grader by the run's id.

@@ -86,7 +86,7 @@ container wired up in `bootstrap/routes.go`.
 | `manifest.go` | Serves the PWA `manifest.json`. |
 | `device_status.go` | Receives device/storage/telemetry reports (`mhs_device_status`). |
 | `appcheck.go` | `RequireApp` middleware — members only reach MHS if it is in their `EnabledApps`; staff always pass. |
-| `devicetest.go` | The public **Unit 2 Device Test** (`/missionhydrosci/devicetest`, no session): landing form, run page, one-unit manifest, play in device-test mode, and the run's telemetry endpoints; records in `mhs_device_tests`. Guide: `docs/mission-hydrosci/device-test-guide.md`. |
+| `devicetest.go` | The public **Unit 2 Device Test** (`/missionhydrosci/devicetest`, no session): landing form, run page, one-unit manifest, play in device-test mode, and the run's telemetry endpoints; records in `mhs_device_tests`. Guides: `docs/mhs-device-test/` (admin and tester). |
 
 **Manifest resolution is per user, most-specific wins** (`resolveCollection`):
 

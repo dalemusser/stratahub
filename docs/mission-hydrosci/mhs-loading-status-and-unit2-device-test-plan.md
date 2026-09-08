@@ -171,7 +171,7 @@ Endpoint: `POST /missionhydrosci/api/steplog` (session-gated, CSRF token as toda
 > analyst) shows runs with the step timeline, diagnostics and the run's game
 > telemetry, plus CSV, JSON and per-run JSON export (the JSON export is a new
 > optional capability of the viewers framework). Admin guide:
-> `device-test-guide.md`. Verified: build, vet, Go tests (settings render,
+> `../mhs-device-test/admin-guide.md` (with a tester guide beside it). Verified: build, vet, Go tests (settings render,
 > viewers, feature helpers, id marker), template parse, a local server run
 > (landing renders, bogus run id 404, viewer and settings behind login).
 > Device verification pending with the rest.
@@ -278,7 +278,7 @@ Admin:
 2. Public handlers: landing/form, start (throttle), run page, manifest (one-unit build + tuning), diagnostics/steps/report/complete; root-router registration; maintenance exemption.
 3. Play template `DeviceTest` mode (identity, endpoints, completion screen); the run template; the shared step-log panel from A1.
 4. Viewer with the gameplay lookup, JSON export, menu entry.
-5. Docs: `docs/mission-hydrosci/device-test-guide.md` (how to enable it, the URL to give a school, what the school sees, how to read a run, the id marker); refresh the feature `README.md` and `issues/README.md` (DOC-1, DOC-2); note the marker in the stratalog and stratasave READMEs.
+5. Docs: `docs/mhs-device-test/admin-guide.md` and `tester-guide.md`/`.html` (how to enable it, the URL to give a school, what the school sees, how to read a run, the id marker); refresh the feature `README.md` and `issues/README.md` (DOC-1, DOC-2); note the marker in the stratalog and stratasave READMEs.
 
 Verification: Go tests for the id format and helper, the settings resolution (configured build vs active collection), throttle, manifest filtering, expiry, and the completion stamp. End to end on dev: enable the test, open the URL in a fresh browser profile with no cookies, fill the form, download, launch, reach gameplay, complete, and confirm the run shows every stage and the gameplay section shows events and points; the disabled state; writes to a completed or expired test id are rejected; a coordinator cannot open the viewer; CSV and JSON export. Then real devices: a Chromebook in a real profile and a guest profile, an iPad, a Windows laptop, and one deliberately blocked network (block the CDN host in the hosts file) to see the fast, specific failure.
 
@@ -324,6 +324,6 @@ The plan is complete and ready to implement in the order in §5.
 
 ## 8. Files (expected)
 
-New: `features/missionhydrosci/devicetest.go` (public handlers), `store/devicetests/`, `domain/models/devicetest.go` (record, id marker, helper), `resources/assets/js/mhs-steplog.js`, templates `devicetest_landing.gohtml`, `devicetest_run.gohtml`, `mhs_steplog_panel.gohtml`, `viewers/views/devicetests.go`, `docs/mission-hydrosci/device-test-guide.md`.
+New: `features/missionhydrosci/devicetest.go` (public handlers), `store/devicetests/`, `domain/models/devicetest.go` (record, id marker, helper), `resources/assets/js/mhs-steplog.js`, templates `devicetest_landing.gohtml`, `devicetest_run.gohtml`, `mhs_steplog_panel.gohtml`, `viewers/views/devicetests.go`, `docs/mhs-device-test/` (admin guide, tester guide as Markdown and HTML).
 
 Modified: `mhs-delivery.js` (constants, hooks, probes, configurable manifest and telemetry URLs); `sw.go` (precache the new asset) and `static/sw.js` (`getVersion` message); `missionhydrosci_units.gohtml`, `missionhydrosci_play.gohtml` (DeviceTest mode), `missionhydrosci_manage.gohtml`; `api_manifest.go` (one-unit manifest helper, tuning block); `types.go`; `domain/models/sitesettings.go` and the settings feature (two fields, form controls); `bootstrap/routes.go` (public registration, viewer registration); `system/maintenance/maintenance.go` (exempt path); `system/indexes/indexes.go`; `resources/templates/menu.gohtml`; `issues/README.md`; feature `README.md`; stratalog and stratasave READMEs (id marker note).

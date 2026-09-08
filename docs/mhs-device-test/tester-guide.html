@@ -1,0 +1,212 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mission HydroSci — Device Test: Tester Guide</title>
+<style>
+  :root {
+    --bg: #ffffff;
+    --fg: #1e293b;
+    --muted: #64748b;
+    --border: #e2e8f0;
+    --accent: #2563eb;
+    --accent-light: #eff6ff;
+    --green: #16a34a;
+    --green-light: #f0fdf4;
+    --red: #dc2626;
+    --red-light: #fef2f2;
+    --amber: #d97706;
+    --amber-light: #fffbeb;
+    --heading: #0f172a;
+    --card-bg: #f8fafc;
+    --step-bg: #dbeafe;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    color: var(--fg);
+    background: var(--bg);
+    line-height: 1.7;
+    max-width: 780px;
+    margin: 0 auto;
+    padding: 2.5rem 1.5rem 4rem;
+  }
+  h1 { font-size: 1.75rem; color: var(--heading); margin-bottom: 0.5rem; }
+  .subtitle { font-size: 1rem; color: var(--muted); margin-bottom: 2rem; }
+  h2 {
+    font-size: 1.3rem; color: var(--heading);
+    margin-top: 2.5rem; margin-bottom: 1rem;
+    padding-bottom: 0.35rem; border-bottom: 2px solid var(--accent);
+  }
+  h3 { font-size: 1.05rem; color: var(--heading); margin-top: 1.75rem; margin-bottom: 0.6rem; }
+  p { margin-bottom: 0.85rem; }
+  strong { color: var(--heading); }
+  ul { margin: 0 0 1rem 1.4rem; }
+  li { margin-bottom: 0.4rem; }
+  code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 0.9em; background: var(--card-bg); border: 1px solid var(--border);
+    border-radius: 4px; padding: 0.1em 0.35em;
+  }
+  .url {
+    display: block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: 6px;
+    padding: 0.6rem 0.9rem; margin: 0.5rem 0 1rem; word-break: break-all;
+  }
+  .step {
+    display: flex; gap: 1rem; align-items: flex-start;
+    background: var(--card-bg); border: 1px solid var(--border); border-radius: 10px;
+    padding: 1.1rem 1.25rem; margin: 1rem 0;
+  }
+  .step .num {
+    flex: 0 0 2.2rem; height: 2.2rem; border-radius: 50%;
+    background: var(--step-bg); color: var(--accent); font-weight: 700;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .step h3 { margin-top: 0.15rem; }
+  .step p:last-child, .step ul:last-child { margin-bottom: 0; }
+  .callout {
+    border-left: 4px solid var(--accent); background: var(--accent-light);
+    border-radius: 0 8px 8px 0; padding: 0.85rem 1rem; margin: 1rem 0;
+  }
+  .callout.ok { border-color: var(--green); background: var(--green-light); }
+  .callout.warn { border-color: var(--amber); background: var(--amber-light); }
+  .callout.stop { border-color: var(--red); background: var(--red-light); }
+  .callout p:last-child { margin-bottom: 0; }
+  .btn {
+    display: inline-block; font-weight: 600; font-size: 0.9em; border-radius: 6px;
+    padding: 0.1em 0.55em; color: #fff; background: var(--accent); white-space: nowrap;
+  }
+  .btn.green { background: var(--green); }
+  .btn.gray { background: #475569; }
+  .code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-weight: 700; letter-spacing: 0.08em; color: var(--heading);
+  }
+  table { width: 100%; border-collapse: collapse; margin: 1rem 0 1.5rem; font-size: 0.93rem; }
+  th, td { text-align: left; vertical-align: top; padding: 0.55rem 0.6rem; border-bottom: 1px solid var(--border); }
+  th { background: var(--card-bg); color: var(--heading); font-weight: 600; }
+  td em { color: var(--heading); font-style: italic; }
+  .faq dt { font-weight: 600; color: var(--heading); margin-top: 1rem; }
+  .faq dd { margin: 0.25rem 0 0 0; }
+  footer { margin-top: 3rem; padding-top: 1rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.85rem; }
+  @media print {
+    body { padding: 0; max-width: none; }
+    .step, .callout { break-inside: avoid; }
+  }
+</style>
+</head>
+<body>
+
+<h1>Mission HydroSci — Device Test</h1>
+<p class="subtitle">Tester guide · a ten-to-twenty-minute check that a device can run the game</p>
+
+<p>Thank you for helping us check that Mission HydroSci will run on your school's devices. Most of the time is spent waiting for a download; the page does the work and tells you what it is doing.</p>
+
+<h2>What this test does</h2>
+<p>Mission HydroSci is a science adventure game that runs in the web browser. The test downloads the game's largest chapter, <strong>Unit 2</strong>, and starts it, exactly the way it will happen for students. If Unit 2 runs on a device, the rest of the game will too.</p>
+<p>You do not need an account, and nothing is installed except the game's own files in the browser.</p>
+
+<h2>Before you start</h2>
+<ul>
+  <li><strong>Use the real thing.</strong> Test on the same kind of device students will use, on the school's own network. A Chromebook on the classroom Wi-Fi tells us more than a laptop at home.</li>
+  <li><strong>Give it space.</strong> The download is a few hundred megabytes. If the device is nearly full, the page will tell you how much room it needs.</li>
+  <li><strong>Keep the tab open.</strong> On some devices the download only runs while the page is open. The page will say if that applies to you.</li>
+  <li><strong>Sound and a keyboard help</strong>, but are not required for the test.</li>
+</ul>
+
+<h2>The steps</h2>
+
+<div class="step">
+  <div class="num">1</div>
+  <div>
+    <h3>Open the link</h3>
+    <p>Open the link you were given in the device's normal browser (Chrome on a Chromebook, Windows or Mac; Safari on an iPad). It looks like:</p>
+    <span class="url">https://&lt;school-site&gt;/missionhydrosci/devicetest</span>
+  </div>
+</div>
+
+<div class="step">
+  <div class="num">2</div>
+  <div>
+    <h3>Fill in the form</h3>
+    <p>Tell us your school or district and your name (both required) and, if you like, your role, an email address in case we need to follow up, the device and network you are using, and any notes: a content filter, a shared device, how many students will use this kind of device. Then press <span class="btn">Start the Unit 2 test</span>.</p>
+  </div>
+</div>
+
+<div class="step">
+  <div class="num">3</div>
+  <div>
+    <h3>Let it download</h3>
+    <p>The next page shows one card for Unit 2 and starts the download on its own.</p>
+    <ul>
+      <li>The <strong>progress bar</strong> shows how far along it is, how much has arrived, and how long it has taken.</li>
+      <li><strong>Status details</strong> below it lists every step the page takes, with the time each took. This is how we see exactly where something went wrong, so leave it open.</li>
+      <li>If nothing arrives for a while, the page says so and counts down to its next attempt. <strong>You do not need to do anything.</strong> The download keeps trying by itself until it succeeds; the <span class="btn gray">Retry now</span> button only skips the wait.</li>
+      <li>If the page says <strong>"Keep this tab open"</strong>, do that: on this device the download pauses if the tab is closed or hidden. Otherwise you can switch tabs while it downloads.</li>
+    </ul>
+  </div>
+</div>
+
+<div class="step">
+  <div class="num">4</div>
+  <div>
+    <h3>Launch</h3>
+    <p>When the download finishes, the card says <strong>Ready to play</strong> and a green <span class="btn green">Launch Unit 2</span> button appears. Press it. The game loads for a short while (a loading bar with the current step under it), then the first scene appears.</p>
+  </div>
+</div>
+
+<div class="step">
+  <div class="num">5</div>
+  <div>
+    <h3>Play</h3>
+    <p>Play at least until you are moving around in the game. That is the important check. If you have time, play through Unit 2 to the end; that confirms the device holds up for a whole chapter.</p>
+    <p>When you finish the unit, the page shows <strong>Test complete</strong> and a six-character <strong>test code</strong> such as <span class="code">A1B2C3</span>. Please note it down. If you stop earlier, the same code is at the top of the run page.</p>
+  </div>
+</div>
+
+<div class="callout ok">
+  <p><strong>What a pass looks like:</strong> the download finishes, the game starts, and you can move around in it. Finishing the unit is the full check.</p>
+</div>
+
+<h2>If something goes wrong</h2>
+<ul>
+  <li><strong>Send report.</strong> On the run page, under Status details, type what you saw and press <span class="btn gray">Send report</span>. Your note and the full step list are sent to us.</li>
+  <li><strong>Copy report.</strong> Also under Status details. It copies the step list as text so you can paste it into an email or message.</li>
+  <li><strong>Tell us the test code.</strong> It lets us find your run straight away.</li>
+</ul>
+
+<h3>Messages you might see</h3>
+<table>
+  <thead><tr><th>Message</th><th>What it means</th><th>What to do</th></tr></thead>
+  <tbody>
+    <tr><td><em>Cannot reach the game content server (…)</em></td><td>The school network or a content filter is blocking the server that holds the game files.</td><td>Ask your IT staff to allow the host named in the message. The page keeps checking and continues on its own once it is allowed.</td></tr>
+    <tr><td><em>Not enough free space on this device</em></td><td>The device does not have room for the unit.</td><td>Free up space or clear other downloads; the download resumes by itself.</td></tr>
+    <tr><td><em>No data received for N s … switching to the direct download method</em></td><td>The browser's background download stopped. The page is switching to a different method.</td><td>Nothing; keep the tab open.</td></tr>
+    <tr><td><em>Retrying automatically in N s (attempt N)</em></td><td>The last attempt failed, usually because of the network.</td><td>Nothing; wait, or press Retry now.</td></tr>
+    <tr><td><em>Keep this tab open</em></td><td>On this device the download runs only while the page is open.</td><td>Leave the tab open and visible until the download finishes.</td></tr>
+    <tr><td><em>Too many test runs have been started from this network</em></td><td>The school's address reached the limit for new runs.</td><td>Wait a few minutes and start again, or spread starts out.</td></tr>
+    <tr><td><em>The game loader failed to load</em></td><td>The game files could not be read.</td><td>Go back to the run page; it will re-download what is missing.</td></tr>
+  </tbody>
+</table>
+
+<div class="callout warn">
+  <p><strong>On an iPad</strong> the download always runs inside the open page. Keep Safari on the test page until it finishes, and don't lock the screen.</p>
+</div>
+
+<h2>Questions</h2>
+<dl class="faq">
+  <dt>Can I close the tab and come back?</dt>
+  <dd>If the page said the download runs in the background, yes; otherwise the download pauses until you return. Your run page link works for 24 hours.</dd>
+  <dt>Do I need to install anything?</dt>
+  <dd>No. The game runs in the browser.</dd>
+  <dt>Will this use up the device's storage?</dt>
+  <dd>The unit's files stay in the browser's storage after the test, the same as they would for a student. They can be removed by clearing the browser's site data.</dd>
+  <dt>Does the test collect personal information?</dt>
+  <dd>It records what you type in the form, details about the device, browser, storage and network, every step of the download and launch with timings and any errors, and the game's own progress data for this run. No account is created. Your name and email are seen only by the Mission HydroSci team.</dd>
+</dl>
+
+<footer>Mission HydroSci · Device Test tester guide</footer>
+</body>
+</html>
