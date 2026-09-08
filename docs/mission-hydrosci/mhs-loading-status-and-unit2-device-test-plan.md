@@ -294,6 +294,17 @@ Admin:
 - Site Settings: the enable checkbox, the Unit 2 build selector, and the link to give a school (4.3).
 - Viewer `/views/device-tests` (roles admin, analyst, superadmin). Columns: started, school, tester, device, network, path, download, stage, sound, last problem, duration. Filters: started (date range), stage, kind, device, school, sound, test id. Chips: runs, reached gameplay, completed, failed now, last run. The detail (an expandable row): the form, detected device and network, download and launch summaries, how it ended and the last heartbeat, the tester's answers and notes, the game telemetry for the run, tester reports, the heartbeat table, the step timeline, the diagnostics snapshot, and a per-run JSON download. Exports: CSV (the table) and JSON (every matching run in full), both new optional capabilities of the viewers framework.
 
+**Panel after Launch and on a cache hit (2026-09-08).** The game tab relays
+its step entries to the run page over a BroadcastChannel
+(`MHSStepLog.relayTo` / `listenTo`, channel per test id); relayed entries are
+tagged "game tab", shown in the panel and in Copy report, and never flushed
+to the server by the run page. With the manager's `probeCached` option a
+unit already on the device is noted in the download row, its files verified
+and the servers probed, so the content-server, services, download and verify
+rows are filled on every run. A final flush (tab hidden, then closed) no
+longer resends what an in-flight request already carries, and the steps
+endpoint drops any entry the record already holds.
+
 ### 4.8 Security and privacy
 
 - **Game-service keys.** The play page renders the static stratalog and stratasave Bearer keys server-side, exactly as it does for students today; the URL never contains them. Anyone who reaches the play page can read them from the HTML, which is already true of every student browser. The enable switch turns the route off for workspaces that do not use it.

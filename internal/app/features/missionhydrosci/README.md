@@ -366,7 +366,10 @@ Plan and status: `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test
   A per-unit space check compares the bytes still missing with the free
   quota.
 - **Step log.** `mhs-steplog.js` + hooks throughout the delivery manager
-  (`setStepLog`); the panel is on the units, manage and play pages.
+  (`setStepLog`); the panel is on the units, manage and play pages. The
+  device test also uses `relayTo`/`listenTo` (BroadcastChannel) so the game
+  tab's entries show on the run page, and the manager's `probeCached` option
+  so a unit already on the device still gets its verify and server rows.
 - **Device test.** See `devicetest.go` above: landing form, run page with
   the status panel and Send report (both rendered bare via
   `viewdata.BaseVM.AsBare()`: no sidebar, banners or session heartbeat, so

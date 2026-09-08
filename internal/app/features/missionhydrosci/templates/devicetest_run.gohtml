@@ -227,7 +227,8 @@
     unitCachePrefix: 'missionhydrosci-unit-',
     fetchIdPrefix: 'missionhydrosci-',
     appShellCachePrefix: 'missionhydrosci-app-shell-',
-    isolated: true // never prune or abort other units — a student may use this device
+    isolated: true, // never prune or abort other units — a student may use this device
+    probeCached: true // a unit already on the device still gets its files verified and the servers probed
   });
 
   // Step log: shown open, streamed to the server every 5 s. A log left in
@@ -251,6 +252,9 @@
   manager.setStepLog(stepLog);
   var stepPanel = MHSStepLog.mount(stepLog, el('mhs-steplog'), { open: true });
   stepLog.enableServerFlush(base + '/steps', csrfToken, 5000);
+  // The game tab relays its launch and game entries here, so the panel keeps
+  // following after Launch and Copy report has the whole story.
+  stepLog.listenTo(MHSStepLog.relayChannel(testId));
 
   // Download summary for the run record.
   var dl = { startedAt: 0, stalls: 0, retries: 0, switched: false, path: '', done: false };

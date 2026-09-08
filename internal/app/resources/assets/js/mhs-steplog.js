@@ -9,7 +9,10 @@
  * MHSStepLog.mount (the "Status details" panel), and "Copy report" turns it
  * into plain text a user can paste into a message. The log is mirrored to
  * sessionStorage so it survives reloads and the units → play → units moves
- * of one tab. Nothing here talks to the network.
+ * of one tab. The only network use is opt-in: enableServerFlush streams a
+ * device-test run's entries to its record, and relayTo/listenTo pass one
+ * tab's entries to another over a BroadcastChannel (the device test's game
+ * tab reporting back to its run page).
  */
 (function() {
   'use strict';
@@ -131,8 +134,15 @@
       msg: String(msg || '')
     };
     if (detail && typeof detail === 'object') entry.detail = compactDetail(detail);
+    return this._push(entry);
+  };
+
+  // Appends an entry (collapsing a repeat of the last one), trims the log,
+  // saves and notifies. Shared by record() and the cross-tab relay.
+  MHSStepLog.prototype._push = function(entry) {
     var last = this.entries[this.entries.length - 1];
-    if (last && last.step === entry.step && last.state === entry.state && last.msg === entry.msg) {
+    if (last && last.step === entry.step && last.state === entry.state && last.msg === entry.msg &&
+        (last.from || '') === (entry.from || '')) {
       last.t = entry.t;
       last.at = entry.at;
       last.repeats = (last.repeats || 1) + 1;
@@ -144,11 +154,66 @@
         var removed = this.entries.length - MAX_ENTRIES;
         this.entries.splice(0, removed);
         this._flushed = Math.max(0, this._flushed - removed);
+        if (this._acked) for (var k in this._acked) delete this._acked[k]; // indexes shifted; a resend is deduped server-side
       }
     }
     this._save();
     this._notify(entry);
     return entry;
+  };
+
+  // ---- Cross-tab relay ----------------------------------------------------
+  // The device test opens the game in a second tab. That tab relays each
+  // entry it records to the run page, whose panel then follows the launch
+  // and the game live and whose Copy report includes them. Relayed entries
+  // carry `from` (the sending tab's name) and are never flushed to the server
+  // by the receiving page: the tab that made them already stores them.
+
+  /** Channel name for a device-test run's relay. */
+  MHSStepLog.relayChannel = function(testId) {
+    return 'mhs-steplog-relay-' + String(testId || '');
+  };
+
+  /** Sends every entry this log records to `channelName`. Returns true when supported. */
+  MHSStepLog.prototype.relayTo = function(channelName, from) {
+    if (typeof BroadcastChannel === 'undefined' || !channelName) return false;
+    var ch;
+    try { ch = new BroadcastChannel(channelName); } catch (e) { return false; }
+    var tag = String(from || 'other tab');
+    this.onChange(function(entry) {
+      if (!entry || entry.from) return; // never echo what was itself received
+      try { ch.postMessage({ entry: entry, from: tag }); } catch (e) { /* closed channel */ }
+    });
+    return true;
+  };
+
+  /** Records entries arriving on `channelName` as if they were this tab's, tagged with their origin. */
+  MHSStepLog.prototype.listenTo = function(channelName) {
+    if (typeof BroadcastChannel === 'undefined' || !channelName) return false;
+    var self = this, ch;
+    try { ch = new BroadcastChannel(channelName); } catch (e) { return false; }
+    ch.onmessage = function(ev) {
+      var d = ev && ev.data;
+      if (!d || !d.entry || typeof d.entry !== 'object') return;
+      self._receive(d.entry, d.from);
+    };
+    return true;
+  };
+
+  // Stores a relayed entry on this log's timeline (t from its wall clock,
+  // so the run page's panel shows when it happened relative to this page).
+  MHSStepLog.prototype._receive = function(e, from) {
+    var atMs = Date.parse(e.at);
+    var entry = {
+      t: isNaN(atMs) ? Date.now() - this.startedAt : Math.max(0, atMs - this.startedAt),
+      at: typeof e.at === 'string' ? e.at : new Date().toISOString(),
+      step: String(e.step || 'info'),
+      state: STATE_RANK.hasOwnProperty(e.state) ? e.state : 'info',
+      msg: String(e.msg || ''),
+      from: String(from || 'other tab')
+    };
+    if (e.detail && typeof e.detail === 'object') entry.detail = compactDetail(e.detail);
+    return this._push(entry);
   };
 
   MHSStepLog.prototype.latest = function(stepId) {
@@ -237,7 +302,7 @@
     for (var i = 0; i < this.entries.length; i++) {
       var e = this.entries[i];
       lines.push('[' + elapsed(e.t) + '] ' + (STEP_LABELS[e.step] || e.step) + ' · ' + e.state + ' · ' + e.msg +
-        (e.repeats > 1 ? ' (x' + e.repeats + ')' : '') + detailText(e.detail));
+        (e.repeats > 1 ? ' (x' + e.repeats + ')' : '') + (e.from ? ' [' + e.from + ']' : '') + detailText(e.detail));
     }
     return lines.join('\n');
   };
@@ -249,17 +314,36 @@
    * every intervalMs (default 5 s), whenever the tab is hidden, and on
    * pagehide (keepalive). The count already sent travels with the log in
    * sessionStorage, so a page move never resends history; a failed post is
-   * simply retried on the next tick. Used by the device test.
+   * simply retried on the next tick. Relayed entries (from another tab) are
+   * skipped: the tab that made them stores them. Used by the device test.
+   *
+   * Hiding and then closing a tab fires two final flushes while the first
+   * may still be in flight; a final flush therefore sends only what no
+   * in-flight request already carries, and the server's confirmations are
+   * joined in order, so no entry goes out twice.
    */
   MHSStepLog.prototype.enableServerFlush = function(url, csrfToken, intervalMs) {
     var self = this;
-    var inflight = false;
+    var inflight = 0;        // requests in flight
+    var inflightThrough = 0; // index just past the last entry any in-flight request carries
+    var acked = {};          // start index -> end index of ranges the server has confirmed
+    self._acked = acked;     // _push empties it when old entries are dropped
+    function advance() {
+      var f = self._flushed;
+      while (acked.hasOwnProperty(f)) { var next = acked[f]; delete acked[f]; f = next; }
+      if (f > self._flushed) { self._flushed = f; self._save(); }
+    }
     function flush(final) {
       if (inflight && !final) return Promise.resolve(false);
-      var pending = self.entries.slice(self._flushed, self._flushed + FLUSH_MAX_ENTRIES);
-      if (!pending.length) return Promise.resolve(true);
-      inflight = true;
-      var sentThrough = self._flushed + pending.length;
+      var start = inflight ? Math.max(self._flushed, inflightThrough) : self._flushed;
+      var through = Math.min(self.entries.length, start + FLUSH_MAX_ENTRIES);
+      for (var k in acked) { var ks = +k; if (ks > start && ks < through) through = ks; } // stop short of a confirmed range
+      if (through <= start) return Promise.resolve(true);
+      var pending = [];
+      for (var i = start; i < through; i++) if (!self.entries[i].from) pending.push(self.entries[i]);
+      if (!pending.length) { acked[start] = through; advance(); return Promise.resolve(true); }
+      inflight++;
+      inflightThrough = Math.max(inflightThrough, through);
       var opts = {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken || '' },
@@ -269,14 +353,11 @@
       var p;
       try { p = fetch(url, opts); } catch (e) { p = Promise.reject(e); }
       return p.then(function(resp) {
-        if (resp && resp.ok) {
-          self._flushed = Math.max(self._flushed, sentThrough);
-          self._save();
-          return true;
-        }
+        if (resp && resp.ok) { acked[start] = through; advance(); return true; }
         return false;
       }).catch(function() { return false; }).then(function(ok) {
-        inflight = false;
+        inflight--;
+        if (!inflight) inflightThrough = self._flushed;
         return ok;
       });
     }
@@ -366,7 +447,7 @@
       if (icon) { icon.textContent = STATE_ICON[state] || STATE_ICON.info; icon.className = 'inline-block w-4 text-center font-bold ' + (STATE_CLASS[state] || STATE_CLASS.info); }
       if (label) label.textContent = step.label;
       if (msg) { msg.textContent = entry ? entry.msg : '—'; msg.className = 'ml-1 ' + (entry ? 'text-gray-700 dark:text-gray-300' : 'text-gray-400 dark:text-gray-500'); }
-      if (time) time.textContent = entry ? elapsed(entry.t) : '';
+      if (time) time.textContent = entry ? elapsed(entry.t) + (entry.from ? ' · ' + entry.from : '') : '';
       return node;
     }
 

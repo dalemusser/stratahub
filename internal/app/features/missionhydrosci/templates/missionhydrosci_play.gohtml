@@ -668,6 +668,7 @@
       {{ if .DeviceTest }}
       // Device test: stream the log and the launch timings to the run record.
       stepLog.enableServerFlush('{{ .DeviceTestBase }}/steps', '{{ .CSRFToken }}', 5000);
+      stepLog.relayTo(MHSStepLog.relayChannel('{{ .DeviceTestID }}'), 'game tab'); // the run page's panel follows along
       var deviceTestLoaderMs = 0;
       function deviceTestSummary(body) {
         try {

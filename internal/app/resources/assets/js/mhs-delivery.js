@@ -47,6 +47,12 @@
     // manifest: no pruning of other units' caches and no aborting of other
     // units' downloads, which may belong to a student using the same device.
     this._isolated = !!opts.isolated;
+    // probeCached (the device test): a unit found already downloaded gets the
+    // step-log rows a fresh download would have filled — the files are
+    // verified and the content server and game services are probed — so the
+    // panel and the run record never show "—" for them.
+    this._probeCached = !!opts.probeCached;
+    this._cachedNoted = {}; // unitId -> true once noted this page load
     this._downloadErrorUrl = opts.downloadErrorUrl || '/missionhydrosci/api/download-error';
     this._stepLogReportUrl = opts.stepLogReportUrl || '/missionhydrosci/api/steplog'; // member step-log outcomes (needs csrfToken)
     this._stepLogReported = {}; // unitId|outcome -> last sent time (dedupe)
@@ -469,8 +475,21 @@
       var status = await this._checkUnitCache(unit);
       summary.push(unit.id + ' ' + (status === 'cached' ? 'downloaded' : status === 'partial' ? 'partial' : 'not downloaded'));
       this._fireStatus(unit.id, status, {});
+      if (status === 'cached') this._noteCached(unit).catch(function() {});
     }
     if (summary.length) this._step('storage', 'info', 'Cache check: ' + summary.join(', '));
+  };
+
+  // With probeCached, a unit already on the device (downloaded by an earlier
+  // visit or run) is noted once per page load in the download row, its files
+  // are verified, and the servers are probed — in the background, so the
+  // cache check itself is not held up by a slow or blocked server.
+  MHSDeliveryManager.prototype._noteCached = async function(unit) {
+    if (!this._probeCached || !this._steplog || !unit || this._cachedNoted[unit.id]) return;
+    this._cachedNoted[unit.id] = true;
+    this._step('download', 'ok', (unit.title || unit.id) + ': already on this device (downloaded earlier)');
+    await this._verifyForLog(unit.id);
+    await this.preflight(unit);
   };
 
   /**
@@ -980,7 +999,8 @@
     } catch (e) { /* ignore */ }
   };
 
-  // After a completed download, confirm the files really are all there.
+  // After a completed download (or on a cache hit with probeCached), confirm
+  // the files really are all there.
   MHSDeliveryManager.prototype._verifyForLog = async function(unitId) {
     if (!this._steplog) return;
     var unit = this._findUnit(unitId);
@@ -990,7 +1010,7 @@
       if (state === 'cached') {
         this._step('verify', 'ok', 'All ' + unit.files.length + ' files present; largest file size verified');
       } else {
-        this._step('verify', 'warn', 'Files missing or a size mismatch after download (' + state + ')');
+        this._step('verify', 'warn', 'Files missing or a size mismatch (' + state + ')');
       }
     } catch (e) {
       this._step('verify', 'warn', 'Could not verify files: ' + ((e && e.message) || e));

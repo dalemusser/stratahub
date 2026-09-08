@@ -54,7 +54,9 @@ The next page shows one card for Unit 2 and starts the download on its own.
   how long it has taken.
 - **Status details** below it lists every step the page takes, with the time
   each took. This is how we see exactly where something went wrong, so leave
-  it open.
+  it open. If Unit 2 is already on this device from an earlier test, the
+  download row says so and the page still checks the files and the servers.
+  After you launch, the game tab reports its own steps back to this panel.
 - If nothing arrives for a while, the page says so and counts down to its
   next attempt. **You do not need to do anything.** The download keeps trying
   by itself until it succeeds; the **Retry now** button only skips the wait.

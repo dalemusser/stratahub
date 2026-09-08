@@ -88,11 +88,17 @@ so a first run that fails on this is still informative.
    waiting countdowns, automatic retries, file verification. Downloads never
    give up: every failure schedules the next attempt with a visible
    countdown; "Retry now" only skips the wait. A **Send report** box lets the
-   tester add a note.
+   tester add a note. When Unit 2 is already on the device from an earlier
+   run (same device, same build), the download row says so, the files are
+   verified and the content server and game services are probed anyway, so
+   no row is left blank.
 3. **Launch** — the play page opens in a new tab (in place when installed
    as an app), and the run page stays open behind it with the questionnaire
-   revealed. The current step shows under the loading bar; if a launch step
-   fails the panel opens with the log and a Copy report button.
+   revealed. The game tab relays its Launch and Game entries back to the run
+   page (marked "game tab" in the panel and in Copy report), so the panel
+   there keeps following the loader, Unity start and rendering. The current
+   step also shows under the game tab's own loading bar; if a launch step
+   fails that panel opens with the log and a Copy report button.
 4. **Test complete** — when the game reports the unit finished, the page
    shows the test code and a link back to the run page.
 5. **Post-play questions** — once Launch is pressed the run page shows a
@@ -199,7 +205,8 @@ Device Tests view is the place to look.
 ## 8. Data, privacy and retention
 
 - Run records hold the form, the detected device, browser, storage and
-  network details, the step log (newest 300 entries), the download and
+  network details, the step log (newest 300 entries, each stored once: a
+  batch resent by a closing tab is dropped), the download and
   launch summaries, the heartbeats from the game page (newest 240, about
   two hours), the tester's post-play answers and notes, the tester's Send
   report notes, and timestamps. They are kept indefinitely.

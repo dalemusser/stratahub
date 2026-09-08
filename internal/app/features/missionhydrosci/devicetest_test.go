@@ -98,3 +98,29 @@ func TestDeriveFromSteps(t *testing.T) {
 		t.Fatalf("last problem should be kept: %+v", d2)
 	}
 }
+
+func TestDropStoredSteps(t *testing.T) {
+	at := time.Date(2026, 9, 8, 7, 44, 9, 882000000, time.UTC)
+	mk := func(tm int64, step, msg string, when time.Time) models.MHSDeviceTestStep {
+		return models.MHSDeviceTestStep{T: tm, At: when, Step: step, State: "running", Msg: msg}
+	}
+	stored := []models.MHSDeviceTestStep{
+		mk(0, "page", "Opened the devicetest-play page", at),
+		mk(1, "launch", "Loading the game loader", at.Add(time.Millisecond)),
+	}
+	batch := []models.MHSDeviceTestStep{
+		mk(1, "launch", "Loading the game loader", at.Add(time.Millisecond)), // resent
+		mk(1, "launch", "Loading the game loader", at.Add(2*time.Second)),    // same text, later: a real repeat
+		mk(2400, "game", "Game is rendering", at.Add(2400*time.Millisecond)),
+	}
+	got := dropStoredSteps(batch, stored)
+	if len(got) != 2 || got[0].At != at.Add(2*time.Second) || got[1].Step != "game" {
+		t.Fatalf("dropStoredSteps = %+v, want the later repeat and the game entry", got)
+	}
+	if out := dropStoredSteps(batch, nil); len(out) != len(batch) {
+		t.Fatalf("no stored steps: got %d entries, want %d", len(out), len(batch))
+	}
+	if out := dropStoredSteps(nil, stored); len(out) != 0 {
+		t.Fatalf("empty batch: got %d entries", len(out))
+	}
+}

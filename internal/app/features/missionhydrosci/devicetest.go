@@ -587,6 +587,7 @@ func (h *Handler) HandleDeviceTestSteps(w http.ResponseWriter, r *http.Request) 
 	}
 	steps, derived := deriveFromStepsWith(req, initial, run.Stage == models.MHSDeviceTestStageFailed,
 		run.FailedStep, run.FailedReason, run.GameplayReachedAt != nil, now)
+	steps = dropStoredSteps(steps, run.Steps)
 	set := bson.M{"reached_stage": derived.reached}
 	if run.UnitCompletedAt == nil {
 		set["stage"] = derived.stage
@@ -606,6 +607,36 @@ func (h *Handler) HandleDeviceTestSteps(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 	writeDeviceTestJSON(w, http.StatusOK, map[string]any{"ok": true, "stored": len(steps)})
+}
+
+// dropStoredSteps returns the entries of a batch that the run does not already
+// hold. A page that is hidden and then closed used to send its final batch
+// twice (both events flush with keepalive); the page no longer does, but the
+// record must stay clean whatever a client sends. Identity is the whole
+// entry: wall clock, page time, step, state and message.
+func dropStoredSteps(steps, stored []models.MHSDeviceTestStep) []models.MHSDeviceTestStep {
+	if len(steps) == 0 || len(stored) == 0 {
+		return steps
+	}
+	tail := stored
+	if len(tail) > 2*deviceTestMaxSteps {
+		tail = tail[len(tail)-2*deviceTestMaxSteps:]
+	}
+	out := make([]models.MHSDeviceTestStep, 0, len(steps))
+	for _, s := range steps {
+		dup := false
+		for i := len(tail) - 1; i >= 0; i-- {
+			t := tail[i]
+			if t.T == s.T && t.Step == s.Step && t.State == s.State && t.Msg == s.Msg && t.At.Equal(s.At) {
+				dup = true
+				break
+			}
+		}
+		if !dup {
+			out = append(out, s)
+		}
+	}
+	return out
 }
 
 // derivedStages is what a batch of step entries says about a run.
