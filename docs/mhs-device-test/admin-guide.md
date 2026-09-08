@@ -45,8 +45,9 @@ The **Link to give a school** field in the same section shows the URL:
 https://<workspace-host>/missionhydrosci/devicetest
 ```
 
-For example `https://mhs.adroit.games/missionhydrosci/devicetest`. The
-address is fixed per workspace; there is nothing to create per school.
+The workspace host is the address the workspace is served from; the exact
+link is shown ready to copy in Site Settings. The address is fixed per
+workspace; there is nothing to create per school.
 
 While the test is disabled the page says "The device test is not enabled for
 this site right now." Turn it off again after the school's testing window;
@@ -66,9 +67,10 @@ Send the school the link and the tester guide. Ask them to:
 
 If the school has a content filter, it helps to tell their IT staff in
 advance which hosts the game needs: the StrataHub workspace host, the content
-server (`cdn.adroit.games`), and the game log and save service hosts. The
-run page detects a blocked host within seconds and names it, so a first run
-that fails on this is still informative.
+server, and the game log and save service hosts. Their names are in the
+deployment configuration, and the run page's Status details panel shows each
+one as it is checked; a blocked host is detected within seconds and named,
+so a first run that fails on this is still informative.
 
 ## 5. What the tester sees
 
