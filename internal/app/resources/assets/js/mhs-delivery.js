@@ -727,13 +727,21 @@
     if (checks.length) {
       try { result.services = await Promise.all(checks); } catch (e) { /* individual probes never reject */ }
     }
+    // One row entry for all services: the panel shows a step's latest entry,
+    // so per-service entries would let a green save line hide a failed log
+    // probe.
+    var okList = [], badList = [];
     for (var s = 0; s < result.services.length; s++) {
       var sv = result.services[s];
-      if (!sv.ok) {
-        console.warn('MHS preflight: game service "' + sv.name + '" (' + sv.host + ') unreachable: ' + sv.error);
-      }
-      this._step('services', sv.ok ? 'ok' : 'warn', 'Game ' + sv.name + ' service (' + sv.host + ') ' +
-        (sv.ok ? 'reachable (' + sv.ms + ' ms)' : 'unreachable: ' + sv.error + ' — the game may report a connection error'));
+      if (sv.ok) { okList.push(sv.name + ' (' + sv.host + ') ' + sv.ms + ' ms'); continue; }
+      console.warn('MHS preflight: game service "' + sv.name + '" (' + sv.host + ') unreachable: ' + sv.error);
+      badList.push(sv.name + ' (' + sv.host + ') unreachable: ' + sv.error);
+    }
+    if (result.services.length) {
+      this._step('services', badList.length ? 'warn' : 'ok', badList.length
+        ? 'Game service' + (badList.length > 1 ? 's' : '') + ' ' + badList.join('; ') +
+          ' — the game may report a connection error' + (okList.length ? ' · reachable: ' + okList.join(', ') : '')
+        : 'Game services reachable: ' + okList.join(', '));
     }
     this.preflightResult = result;
     return result;
