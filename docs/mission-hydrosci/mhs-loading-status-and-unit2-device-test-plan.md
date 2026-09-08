@@ -255,7 +255,7 @@ Site settings: `mhs_device_test_enabled` and `mhs_device_test_unit` (4.3).
 | Area | Fields | Source |
 |---|---|---|
 | Who | school or district, name, role, email (optional), device type, school-managed or not, network type, notes | the form before the test |
-| Tester's answers | did the sound play (required), did the keyboard and pointer work, did the picture look right, how did it run, how far they got, notes, when answered | the questionnaire on the run page after launch |
+| Survey answers | did the sound play (required), did the keyboard and pointer work, did the picture look right, how did it run, how far they got, notes, when answered | the questionnaire on the run page after launch |
 | Where and when | workspace, client IP, user agent, start / last activity / end / expiry times; time zone, languages | server and page |
 | Device | user agent and client hints (platform and version, model, architecture, bitness, brands, full versions), screen size and pixel ratio, viewport, orientation, touch points, CPU cores, device memory, battery level and charging when available | run page snapshot |
 | Browser | installed-app mode, service worker supported and controlling, Background Fetch API, Cache API, cookies enabled, cross-origin isolation, SharedArrayBuffer, WebAssembly, BroadcastChannel, WebGL 2 / 1 / none with GPU vendor and renderer, maximum texture size, page load and time-to-first-byte | run page snapshot |

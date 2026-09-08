@@ -641,17 +641,12 @@ func (v *DeviceTests) Detail(ctx context.Context, scope *viewscope.Scope, id str
 	if t.LastHeartbeat != nil {
 		fields = add(fields, "Last heartbeat", heartbeatText(t.LastHeartbeat)+fmt.Sprintf(" (%d beats)", t.HeartbeatCount), false)
 	}
+	// The answers themselves are the "Survey answers" section below, one
+	// question per line; this line only says whether there are any.
 	if q := t.Questionnaire; q != nil {
-		fields = add(fields, "Tester's answers", joinNonEmpty(" · ",
-			prefixed("Sound: ", qLabel("sound", q.Sound)),
-			prefixed("Controls: ", qLabel("controls", q.Controls)),
-			prefixed("Picture: ", qLabel("display", q.Display)),
-			prefixed("Ran: ", qLabel("performance", q.Performance)),
-			prefixed("Got: ", qLabel("progress", q.Progress)))+
-			" (answered "+q.AnsweredAt.UTC().Format(time.RFC3339)+" UTC)", false)
-		fields = add(fields, "Tester's notes", q.Notes, false)
+		fields = add(fields, "Survey", "Answered "+q.AnsweredAt.UTC().Format(time.RFC3339)+" UTC — see Survey answers below", false)
 	} else {
-		fields = add(fields, "Tester's answers", "Not answered", false)
+		fields = add(fields, "Survey", "Not answered — the tester has not submitted the post-play questions", false)
 	}
 
 	g := v.loadGameplay(ctx, t.ID.Hex())
@@ -667,6 +662,44 @@ func (v *DeviceTests) Detail(ctx context.Context, scope *viewscope.Scope, id str
 		title = t.Form.School + " · " + title
 	}
 	return &viewers.Detail{Title: title, Subtitle: stageLabel(t.Stage), Fields: fields, RawJSON: string(raw), HTML: template.HTML(html)}, nil
+}
+
+// surveyQuestions is the post-play questionnaire in the order it is asked,
+// with the run page's wording, keyed by the answer field they read.
+var surveyQuestions = []struct {
+	key, text string
+	answer    func(q *models.MHSDeviceTestQuestionnaire) string
+}{
+	{"sound", "Did the sound play?", func(q *models.MHSDeviceTestQuestionnaire) string { return q.Sound }},
+	{"controls", "Did the keyboard and the mouse or trackpad work in the game?", func(q *models.MHSDeviceTestQuestionnaire) string { return q.Controls }},
+	{"display", "Did the picture look right?", func(q *models.MHSDeviceTestQuestionnaire) string { return q.Display }},
+	{"performance", "How did it run?", func(q *models.MHSDeviceTestQuestionnaire) string { return q.Performance }},
+	{"progress", "How far did you get?", func(q *models.MHSDeviceTestQuestionnaire) string { return q.Progress }},
+}
+
+// surveyHTML renders the post-play questionnaire as its own titled section:
+// one line per question with the tester's answer, then their notes and when
+// they answered. Escaped here because Detail.HTML is emitted raw.
+func surveyHTML(q *models.MHSDeviceTestQuestionnaire) string {
+	var b strings.Builder
+	b.WriteString(`<div><div class="font-medium text-gray-700 dark:text-gray-300">Survey answers</div>`)
+	if q == nil {
+		b.WriteString(`<div class="text-xs text-gray-500 dark:text-gray-400">Not answered — the tester has not submitted the post-play questions.</div></div>`)
+		return b.String()
+	}
+	b.WriteString(`<dl class="text-xs grid gap-x-4 gap-y-0.5" style="grid-template-columns: max-content 1fr;">`)
+	for _, sq := range surveyQuestions {
+		label := qLabel(sq.key, sq.answer(q))
+		if label == "" {
+			label = "—"
+		}
+		b.WriteString(`<dt class="text-gray-500 dark:text-gray-400">` + esc(sq.text) + `</dt><dd class="text-gray-800 dark:text-gray-100">` + esc(label) + `</dd>`)
+	}
+	if q.Notes != "" {
+		b.WriteString(`<dt class="text-gray-500 dark:text-gray-400">Anything else you noticed?</dt><dd class="text-gray-800 dark:text-gray-100 whitespace-pre-wrap">` + esc(q.Notes) + `</dd>`)
+	}
+	b.WriteString(`</dl><div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Answered ` + esc(q.AnsweredAt.UTC().Format(time.RFC3339)) + ` UTC</div></div>`)
+	return b.String()
 }
 
 func managedLabel(m string) string {
@@ -701,6 +734,9 @@ func (v *DeviceTests) detailHTML(t *models.MHSDeviceTest, g gameplay) string {
 	b.WriteString(`<div class="space-y-3 text-sm">`)
 	b.WriteString(`<div><a class="text-xs underline text-indigo-600 dark:text-indigo-400" href="/views/` + DeviceTestsSlug +
 		`/rows/` + esc(t.ID.Hex()) + `/export.json">Download this run as JSON</a></div>`)
+
+	// Survey answers (first: the one thing the page cannot observe itself)
+	b.WriteString(surveyHTML(t.Questionnaire))
 
 	// Gameplay
 	b.WriteString(`<div><div class="font-medium text-gray-700 dark:text-gray-300">Game telemetry for this run</div>`)

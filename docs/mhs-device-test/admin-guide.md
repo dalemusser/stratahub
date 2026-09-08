@@ -143,9 +143,14 @@ last run.
 second click closes it. It shows:
 
 - the form answers, the detected device and network, device id, IP address
-  and user agent;
+  and user agent, and a **Survey** line saying whether the post-play
+  questions were answered and when;
 - the download summary (path, size, time, speed, stalls, retries, whether it
   switched) and the launch timings (loader, Unity start, first frame);
+- **Survey answers**: the post-play questions one per line with the
+  tester's answer, their notes, and when they answered. It reads "Not
+  answered" until the tester presses Send answers on the run page; a run
+  that never launched has none;
 - **Game telemetry for this run**: the number of log events the game sent,
   first and last event times, scenes seen, the grader's progress points and
   current unit;
@@ -153,7 +158,6 @@ second click closes it. It shows:
 - the full step timeline; and the diagnostics snapshot (browser
   capabilities, WebGL renderer, storage, cache inventory, client hints,
   battery, page timing).
-- **Tester's answers** and notes from the post-play questionnaire.
 - **Ended** and **Last heartbeat**: while the game runs, the page sends a
   heartbeat every 30 seconds (game memory, JavaScript heap, frame rate, tab
   visibility) and a final one when the tester leaves. A run whose beats stop
