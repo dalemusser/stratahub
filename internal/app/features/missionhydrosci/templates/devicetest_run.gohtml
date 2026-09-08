@@ -57,6 +57,70 @@
     </div>
   </div>
 
+  {{ if .Launched }}
+  <div id="questionnaire" class="mt-4 bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+    <h2 class="text-base font-semibold text-gray-900 dark:text-gray-100">How did it go?</h2>
+    {{ if .Thanks }}
+    <div class="mt-2 rounded-md bg-green-50 dark:bg-green-900/30 px-3 py-2 text-sm text-green-800 dark:text-green-200">Thank you — your answers are saved with test code <strong class="font-mono">{{ .ShortID }}</strong>.</div>
+    {{ end }}
+    {{ if .QError }}
+    <div class="mt-2 rounded-md bg-red-50 dark:bg-red-900/30 px-3 py-2 text-sm text-red-700 dark:text-red-300">{{ .QError }}</div>
+    {{ end }}
+    {{ if .ShowQuestionnaire }}
+    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1 mb-3">A few questions about things the page cannot see for itself. Answer what you can; the first one matters most.</p>
+    <form method="post" action="{{ .Base }}/questionnaire" class="space-y-4 text-sm">
+      <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+      {{ $q := .Questionnaire }}
+      <fieldset>
+        <legend class="font-medium text-gray-800 dark:text-gray-200 mb-1">Did the sound play? <span class="text-red-500">*</span></legend>
+        <div class="flex flex-wrap gap-x-5 gap-y-1 text-gray-700 dark:text-gray-300">
+          <label class="flex items-center gap-2"><input type="radio" name="sound" value="worked" {{ if and $q (eq $q.Sound "worked") }}checked{{ end }}> Yes, normally</label>
+          <label class="flex items-center gap-2"><input type="radio" name="sound" value="none" {{ if and $q (eq $q.Sound "none") }}checked{{ end }}> No sound at all</label>
+          <label class="flex items-center gap-2"><input type="radio" name="sound" value="problems" {{ if and $q (eq $q.Sound "problems") }}checked{{ end }}> It played but with problems</label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend class="font-medium text-gray-800 dark:text-gray-200 mb-1">Did the keyboard and the mouse or trackpad work in the game?</legend>
+        <div class="flex flex-wrap gap-x-5 gap-y-1 text-gray-700 dark:text-gray-300">
+          <label class="flex items-center gap-2"><input type="radio" name="controls" value="worked" {{ if and $q (eq $q.Controls "worked") }}checked{{ end }}> Yes</label>
+          <label class="flex items-center gap-2"><input type="radio" name="controls" value="problems" {{ if and $q (eq $q.Controls "problems") }}checked{{ end }}> There were problems</label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend class="font-medium text-gray-800 dark:text-gray-200 mb-1">Did the picture look right?</legend>
+        <div class="flex flex-wrap gap-x-5 gap-y-1 text-gray-700 dark:text-gray-300">
+          <label class="flex items-center gap-2"><input type="radio" name="display" value="fine" {{ if and $q (eq $q.Display "fine") }}checked{{ end }}> Yes</label>
+          <label class="flex items-center gap-2"><input type="radio" name="display" value="problems" {{ if and $q (eq $q.Display "problems") }}checked{{ end }}> Something looked wrong</label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend class="font-medium text-gray-800 dark:text-gray-200 mb-1">How did it run?</legend>
+        <div class="flex flex-wrap gap-x-5 gap-y-1 text-gray-700 dark:text-gray-300">
+          <label class="flex items-center gap-2"><input type="radio" name="performance" value="smooth" {{ if and $q (eq $q.Performance "smooth") }}checked{{ end }}> Smoothly</label>
+          <label class="flex items-center gap-2"><input type="radio" name="performance" value="choppy" {{ if and $q (eq $q.Performance "choppy") }}checked{{ end }}> Choppy or slow</label>
+          <label class="flex items-center gap-2"><input type="radio" name="performance" value="froze" {{ if and $q (eq $q.Performance "froze") }}checked{{ end }}> It froze or crashed</label>
+        </div>
+      </fieldset>
+      <fieldset>
+        <legend class="font-medium text-gray-800 dark:text-gray-200 mb-1">How far did you get?</legend>
+        <div class="flex flex-wrap gap-x-5 gap-y-1 text-gray-700 dark:text-gray-300">
+          <label class="flex items-center gap-2"><input type="radio" name="progress" value="into-game" {{ if and $q (eq $q.Progress "into-game") }}checked{{ end }}> Into the game</label>
+          <label class="flex items-center gap-2"><input type="radio" name="progress" value="part-way" {{ if and $q (eq $q.Progress "part-way") }}checked{{ end }}> Part way through Unit 2</label>
+          <label class="flex items-center gap-2"><input type="radio" name="progress" value="finished" {{ if and $q (eq $q.Progress "finished") }}checked{{ end }}> Finished Unit 2</label>
+        </div>
+      </fieldset>
+      <div>
+        <label for="q-notes" class="block font-medium text-gray-800 dark:text-gray-200 mb-1">Anything else you noticed?</label>
+        <textarea id="q-notes" name="notes" rows="3" maxlength="2000" class="w-full border dark:border-gray-600 dark:bg-gray-700 dark:text-gray-100 p-2 rounded text-sm">{{ if $q }}{{ $q.Notes }}{{ end }}</textarea>
+      </div>
+      <button type="submit" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Save answers</button>
+    </form>
+    {{ else if .QuestionnaireDone }}
+    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Answered {{ .Questionnaire.AnsweredAt.Format "Jan 2, 2006 3:04 PM" }} UTC. <a class="underline" href="{{ .Base }}?edit=1#questionnaire">Update your answers</a></p>
+    {{ end }}
+  </div>
+  {{ end }}
+
   <p class="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center">Keep this tab open while the download runs. Getting into the game is the important check; finishing the unit is the full one.</p>
 </div>
 

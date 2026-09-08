@@ -94,6 +94,12 @@ so a first run that fails on this is still informative.
    button.
 4. **Test complete** — when the game reports the unit finished, the page
    shows the test code and a link back to the run page.
+5. **Post-play questions** — once the game has been launched, the run page
+   (reached through the game's back arrow or the Test complete link) shows a
+   short questionnaire: did the sound play, did the keyboard and pointer
+   work, did the picture look right, how did it run, how far they got, and
+   notes. Answers can be updated later. These cover what the page cannot
+   observe by itself; the sound answer is required.
 
 ## 6. Reading the results
 
@@ -112,6 +118,7 @@ Open **Device Tests** from the menu (admins and analysts), or go to
 | Path | **Background** (Chrome's background download) or **Direct** (inside the service worker; the tab must stay open). A ↻ means the page had to switch from background to direct |
 | Download | Size and time, with speed and stall/retry counts in the tooltip |
 | Stage | How far the run got (below) |
+| Sound | The tester's answer on whether sound played (Worked / No sound / Problems), or — if not answered |
 | Last problem | The most recent failing step and its message |
 | Duration | From start to the last activity seen |
 
@@ -120,7 +127,8 @@ Gameplay → Completed. **Failed** means the most recent step is a failure.
 Because the page keeps retrying, a run can move out of Failed again; the
 "Last problem" column keeps the latest failure either way.
 
-**Filters:** date range, stage, kind, device, school (prefix), test id.
+**Filters:** date range, stage, kind, device, school (prefix), sound
+answer, test id.
 **Chips** above the table: runs, reached gameplay, completed, failed now,
 last run.
 
@@ -137,6 +145,7 @@ last run.
 - the full step timeline; and the diagnostics snapshot (browser
   capabilities, WebGL renderer, storage, cache inventory, client hints,
   battery, page timing).
+- **Tester's answers** and notes from the post-play questionnaire.
 - **Ended** and **Last heartbeat**: while the game runs, the page sends a
   heartbeat every 30 seconds (game memory, JavaScript heap, frame rate, tab
   visibility) and a final one when the tester leaves. A run whose beats stop

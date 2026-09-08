@@ -84,6 +84,15 @@ When you finish the unit, the page shows **Test complete** and a six-character
 **test code**. Please note it down. If you stop earlier, the same code is at
 the top of the run page.
 
+## Step 6 — Answer a few questions
+
+When you leave the game (the back arrow at the top left, or the link on the
+Test complete screen), the run page asks five quick questions: whether the
+sound played, whether the keyboard and mouse or trackpad worked, whether the
+picture looked right, how the game ran, and how far you got, plus a box for
+anything else. The sound question is the one we need most. Press **Save
+answers**; you can come back and update them.
+
 ## If something goes wrong
 
 - **Send report.** On the run page, under Status details, type what you saw

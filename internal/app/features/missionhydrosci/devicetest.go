@@ -67,6 +67,7 @@ func (h *Handler) MountDeviceTestRoutes(r chi.Router) {
 		rr.Post("/report", h.HandleDeviceTestReport)
 		rr.Post("/complete", h.HandleDeviceTestComplete)
 		rr.Post("/heartbeat", h.HandleDeviceTestHeartbeat)
+		rr.Post("/questionnaire", h.HandleDeviceTestQuestionnaire)
 	})
 }
 
@@ -293,6 +294,15 @@ type deviceTestRunData struct {
 	SizeLabel   string
 	ManifestURL string
 	PlayURL     string
+
+	// Post-play questionnaire: shown once the game was launched and not yet
+	// answered (or when the tester asks to edit); answered shows a thank-you.
+	Launched          bool
+	ShowQuestionnaire bool
+	Questionnaire     *models.MHSDeviceTestQuestionnaire
+	QuestionnaireDone bool
+	Thanks            bool
+	QError            string
 }
 
 // ServeDeviceTestRun renders the run page: one Unit 2 card with the status
@@ -324,6 +334,19 @@ func (h *Handler) ServeDeviceTestRun(w http.ResponseWriter, r *http.Request) {
 		SizeLabel:   format.Bytes(build.TotalSize),
 		ManifestURL: base + "/manifest",
 		PlayURL:     base + "/play",
+	}
+	q := r.URL.Query()
+	data.Launched = run.Launched()
+	data.Questionnaire = run.Questionnaire
+	data.QuestionnaireDone = run.Questionnaire != nil
+	data.Thanks = q.Get("thanks") == "1"
+	data.ShowQuestionnaire = data.Launched && (run.Questionnaire == nil || q.Get("edit") == "1")
+	switch q.Get("qerror") {
+	case "sound":
+		data.QError = "Please tell us whether the sound played."
+		data.ShowQuestionnaire = data.Launched
+	case "closed":
+		data.QError = "This test run no longer accepts answers (it is more than a day old)."
 	}
 	w.Header().Set("Cache-Control", "no-store")
 	templates.Render(w, r, "devicetest_run", data)
@@ -383,7 +406,7 @@ func (h *Handler) ServeDeviceTestPlay(w http.ResponseWriter, r *http.Request) {
 		Unit:      buildToManifestUnit(run.UnitID, deviceTestUnitTitle(run), run.UnitVersion, "", build),
 		UserName:  "Device Test",
 		UserIDHex: run.ID.Hex(),
-		BackURL:   base,
+		BackURL:   base + "#questionnaire", // returning testers land on the post-play questions
 		DeviceTest: &deviceTestPlay{
 			ID:      run.ID.Hex(),
 			ShortID: deviceTestShortID(run.ID.Hex()),
@@ -714,6 +737,58 @@ func (h *Handler) HandleDeviceTestSummary(w http.ResponseWriter, r *http.Request
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// HandleDeviceTestQuestionnaire stores the tester's post-play answers
+// (a normal form post) and returns to the run page.
+func (h *Handler) HandleDeviceTestQuestionnaire(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
+	defer cancel()
+	run, ok := h.loadDeviceTestRun(w, r, ctx, true)
+	if !ok {
+		return
+	}
+	base := DeviceTestPathPrefix + "/run/" + run.ID.Hex()
+	if err := r.ParseForm(); err != nil {
+		http.Redirect(w, r, base+"?qerror=sound#questionnaire", http.StatusSeeOther)
+		return
+	}
+	q := models.MHSDeviceTestQuestionnaire{
+		Sound:       questionnaireAnswer(r, "sound"),
+		Controls:    questionnaireAnswer(r, "controls"),
+		Display:     questionnaireAnswer(r, "display"),
+		Performance: questionnaireAnswer(r, "performance"),
+		Progress:    questionnaireAnswer(r, "progress"),
+		Notes:       models.ClipRunes(strings.TrimSpace(r.FormValue("notes")), deviceTestMaxNotes),
+		AnsweredAt:  time.Now().UTC(),
+	}
+	if q.Sound == "" {
+		http.Redirect(w, r, base+"?qerror=sound#questionnaire", http.StatusSeeOther)
+		return
+	}
+	if err := h.DeviceTestStore.SetQuestionnaire(ctx, run.WorkspaceID, run.ID, q); err != nil {
+		if errors.Is(err, mhsdevicetests.ErrClosed) {
+			http.Redirect(w, r, base+"?qerror=closed#questionnaire", http.StatusSeeOther)
+			return
+		}
+		h.ErrLog.LogServerError(w, r, "device test: store questionnaire failed", err, "Couldn't save your answers. Please try again.", base)
+		return
+	}
+	h.Log.Info("device test: questionnaire answered",
+		zap.String("test_id", run.ID.Hex()), zap.String("sound", q.Sound), zap.String("performance", q.Performance), zap.String("progress", q.Progress))
+	http.Redirect(w, r, base+"?thanks=1#questionnaire", http.StatusSeeOther)
+}
+
+// questionnaireAnswer returns the submitted code for a question if it is
+// one of the accepted values, else "".
+func questionnaireAnswer(r *http.Request, name string) string {
+	v := strings.TrimSpace(r.FormValue(name))
+	for _, opt := range models.MHSDeviceTestQuestionnaireOptions[name] {
+		if v == opt {
+			return v
+		}
+	}
+	return ""
 }
 
 // deviceTestHeartbeatRequest is one liveness/memory sample from a page.

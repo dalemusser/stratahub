@@ -184,6 +184,28 @@ func (s *Store) Heartbeat(ctx context.Context, workspaceID, id primitive.ObjectI
 	return err
 }
 
+// SetQuestionnaire stores (or replaces) the tester's post-play answers.
+// Accepted until the run expires, completed or not.
+func (s *Store) SetQuestionnaire(ctx context.Context, workspaceID, id primitive.ObjectID, q models.MHSDeviceTestQuestionnaire) error {
+	now := time.Now().UTC()
+	if q.AnsweredAt.IsZero() {
+		q.AnsweredAt = now
+	}
+	res, err := s.c.UpdateOne(ctx,
+		bson.M{"_id": id, "workspace_id": workspaceID, "expires_at": bson.M{"$gt": now}},
+		bson.M{"$set": bson.M{"questionnaire": q, "last_seen_at": now}})
+	if err != nil {
+		return err
+	}
+	if res.MatchedCount == 0 {
+		if _, gerr := s.Get(ctx, workspaceID, id); gerr != nil {
+			return gerr
+		}
+		return ErrClosed
+	}
+	return nil
+}
+
 // Complete stamps unit completion and the completed stage. Idempotent.
 func (s *Store) Complete(ctx context.Context, workspaceID, id primitive.ObjectID) error {
 	now := time.Now().UTC()
@@ -220,6 +242,7 @@ type ListQuery struct {
 	Stage      string
 	DeviceType string
 	School     string // case-insensitive prefix
+	Sound      string // questionnaire.sound code
 	ID         *primitive.ObjectID
 
 	After *Position
@@ -253,6 +276,9 @@ func (q ListQuery) filter() bson.M {
 	}
 	if s := strings.TrimSpace(q.School); s != "" {
 		f["form.school"] = bson.M{"$regex": "^" + regexQuote(s), "$options": "i"}
+	}
+	if q.Sound != "" {
+		f["questionnaire.sound"] = q.Sound
 	}
 	if q.ID != nil {
 		f["_id"] = *q.ID

@@ -67,8 +67,27 @@ const (
 	dtKind   = "kind"
 	dtDevice = "device"
 	dtSchool = "school"
+	dtSound  = "sound"
 	dtID     = "id"
 )
+
+var questionnaireLabels = map[string]map[string]string{
+	"sound":       {"worked": "Worked", "none": "No sound", "problems": "Problems"},
+	"controls":    {"worked": "Worked", "problems": "Problems"},
+	"display":     {"fine": "Looked right", "problems": "Problems"},
+	"performance": {"smooth": "Smooth", "choppy": "Choppy", "froze": "Froze / crashed"},
+	"progress":    {"into-game": "Into the game", "part-way": "Part way", "finished": "Finished Unit 2"},
+}
+
+func qLabel(question, code string) string {
+	if code == "" {
+		return ""
+	}
+	if l := questionnaireLabels[question][code]; l != "" {
+		return l
+	}
+	return code
+}
 
 var deviceTypeOptions = []string{"Chromebook", "iPad", "macOS", "Windows", "Android", "Linux", "Other"}
 
@@ -94,6 +113,11 @@ func (v *DeviceTests) Filters() []viewers.FilterSpec {
 		}},
 		{Key: dtDevice, Label: "Device", Type: viewers.FilterSelect, Options: devices},
 		{Key: dtSchool, Label: "School", Type: viewers.FilterText, Placeholder: "school or district"},
+		{Key: dtSound, Label: "Sound", Type: viewers.FilterSelect, Options: []viewers.Option{
+			{Value: "worked", Label: "Worked"},
+			{Value: "none", Label: "No sound"},
+			{Value: "problems", Label: "Problems"},
+		}},
 		{Key: dtID, Label: "Test id", Type: viewers.FilterID, Placeholder: "24-char test id"},
 	}
 }
@@ -108,6 +132,7 @@ func (v *DeviceTests) Columns() []viewers.ColumnSpec {
 		{Key: "path", Label: "Path"},
 		{Key: "download", Label: "Download", Class: "whitespace-nowrap"},
 		{Key: "stage", Label: "Stage", Class: "whitespace-nowrap"},
+		{Key: "sound", Label: "Sound", Class: "whitespace-nowrap"},
 		{Key: "failed", Label: "Last problem"},
 		{Key: "duration", Label: "Duration", Class: "whitespace-nowrap"},
 	}
@@ -125,6 +150,7 @@ func (v *DeviceTests) listQuery(ctx context.Context, scope *viewscope.Scope, f v
 		Kind:        f.Get(dtKind),
 		DeviceType:  f.Get(dtDevice),
 		School:      strings.TrimSpace(f.Get(dtSchool)),
+		Sound:       f.Get(dtSound),
 	}
 	if from, to, ok := f.DateRange(dtWhen, time.Now().UTC()); ok {
 		q.From, q.To = from, to
@@ -210,6 +236,13 @@ func mmss(d time.Duration) string {
 }
 
 func mb(bytes int64) string { return fmt.Sprintf("%d MB", bytes/1048576) }
+
+func prefixed(label, value string) string {
+	if value == "" {
+		return ""
+	}
+	return label + value
+}
 
 func mbOrDash(n int) string {
 	if n <= 0 {
@@ -357,7 +390,17 @@ func (v *DeviceTests) row(t models.MHSDeviceTest, names map[primitive.ObjectID]s
 	}
 	duration := viewers.Cell{Text: mmss(end.Sub(t.StartedAt)), Title: "From start to the last activity seen"}
 
-	return viewers.Row{ID: t.ID.Hex(), Cells: []viewers.Cell{started, school, tester, device, network, path, download, stage, failed, duration}}
+	sound := viewers.Cell{Text: "—", Class: viewers.TextMuted, Title: "Not answered"}
+	if q := t.Questionnaire; q != nil && q.Sound != "" {
+		sound = viewers.Cell{Text: qLabel("sound", q.Sound), Class: viewers.PillGreen, Title: "Tester's answer"}
+		if q.Sound == "none" {
+			sound.Class = viewers.PillRed
+		} else if q.Sound == "problems" {
+			sound.Class = viewers.PillAmber
+		}
+	}
+
+	return viewers.Row{ID: t.ID.Hex(), Cells: []viewers.Cell{started, school, tester, device, network, path, download, stage, sound, failed, duration}}
 }
 
 // heartbeatMemory renders the memory figures of a beat for a column.
@@ -597,6 +640,18 @@ func (v *DeviceTests) Detail(ctx context.Context, scope *viewscope.Scope, id str
 	}
 	if t.LastHeartbeat != nil {
 		fields = add(fields, "Last heartbeat", heartbeatText(t.LastHeartbeat)+fmt.Sprintf(" (%d beats)", t.HeartbeatCount), false)
+	}
+	if q := t.Questionnaire; q != nil {
+		fields = add(fields, "Tester's answers", joinNonEmpty(" · ",
+			prefixed("Sound: ", qLabel("sound", q.Sound)),
+			prefixed("Controls: ", qLabel("controls", q.Controls)),
+			prefixed("Picture: ", qLabel("display", q.Display)),
+			prefixed("Ran: ", qLabel("performance", q.Performance)),
+			prefixed("Got: ", qLabel("progress", q.Progress)))+
+			" (answered "+q.AnsweredAt.UTC().Format(time.RFC3339)+" UTC)", false)
+		fields = add(fields, "Tester's notes", q.Notes, false)
+	} else {
+		fields = add(fields, "Tester's answers", "Not answered", false)
 	}
 
 	g := v.loadGameplay(ctx, t.ID.Hex())

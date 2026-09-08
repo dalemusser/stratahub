@@ -186,6 +186,14 @@ Endpoint: `POST /missionhydrosci/api/steplog` (session-gated, CSRF token as toda
 > "Page stopped responding at …" with its last memory figures, and the
 > detail lists the trend. Members' launches get the same through their
 > launch record (`/api/steplog/{id}/heartbeat`).
+>
+> **Addendum (2026-09-08): post-play questionnaire.** Once the game has been
+> launched, the run page shows five questions (sound, controls, picture,
+> performance, how far) plus notes; answers are stored on the run record
+> (`questionnaire`), can be updated, and appear as a Sound column and filter
+> and in the detail and exports. State is server-side only: the run URL
+> identifies the run, and the page renders the questionnaire from the
+> record's stage and answers.
 
 ### 4.1 Goals and non-goals
 

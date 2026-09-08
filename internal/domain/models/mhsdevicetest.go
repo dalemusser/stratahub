@@ -143,6 +143,28 @@ const (
 	MHSDeviceTestEndClosed    = "closed"    // the page said it was leaving (back, tab closed)
 )
 
+// MHSDeviceTestQuestionnaire is what the tester answered after playing:
+// the things the page cannot observe by itself. Values are the short codes
+// in MHSDeviceTestQuestionnaireOptions; empty means not answered.
+type MHSDeviceTestQuestionnaire struct {
+	Sound       string    `bson:"sound,omitempty" json:"sound,omitempty"`             // worked | none | problems
+	Controls    string    `bson:"controls,omitempty" json:"controls,omitempty"`       // worked | problems
+	Display     string    `bson:"display,omitempty" json:"display,omitempty"`         // fine | problems
+	Performance string    `bson:"performance,omitempty" json:"performance,omitempty"` // smooth | choppy | froze
+	Progress    string    `bson:"progress,omitempty" json:"progress,omitempty"`       // into-game | part-way | finished
+	Notes       string    `bson:"notes,omitempty" json:"notes,omitempty"`
+	AnsweredAt  time.Time `bson:"answered_at" json:"answered_at"`
+}
+
+// MHSDeviceTestQuestionnaireOptions lists the accepted codes per question.
+var MHSDeviceTestQuestionnaireOptions = map[string][]string{
+	"sound":       {"worked", "none", "problems"},
+	"controls":    {"worked", "problems"},
+	"display":     {"fine", "problems"},
+	"performance": {"smooth", "choppy", "froze"},
+	"progress":    {"into-game", "part-way", "finished"},
+}
+
 // MHSDeviceTestReport is a note the tester sent from the page.
 type MHSDeviceTestReport struct {
 	At   time.Time `bson:"at" json:"at"`
@@ -198,6 +220,9 @@ type MHSDeviceTest struct {
 	Steps          []MHSDeviceTestStep   `bson:"steps,omitempty" json:"steps,omitempty"`
 	ProblemReports []MHSDeviceTestReport `bson:"problem_reports,omitempty" json:"problem_reports,omitempty"`
 
+	// The tester's post-play answers (nil until answered).
+	Questionnaire *MHSDeviceTestQuestionnaire `bson:"questionnaire,omitempty" json:"questionnaire,omitempty"`
+
 	// Heartbeats from the page (see MHSDeviceTestHeartbeat). LastHeartbeat
 	// is kept apart from the capped trend so list views need not load it.
 	EndReason       string                   `bson:"end_reason,omitempty" json:"end_reason,omitempty"`
@@ -205,6 +230,20 @@ type MHSDeviceTest struct {
 	LastHeartbeat   *MHSDeviceTestHeartbeat  `bson:"last_heartbeat,omitempty" json:"last_heartbeat,omitempty"`
 	HeartbeatCount  int                      `bson:"heartbeat_count,omitempty" json:"heartbeat_count,omitempty"`
 	Heartbeats      []MHSDeviceTestHeartbeat `bson:"heartbeats,omitempty" json:"heartbeats,omitempty"`
+}
+
+// Launched reports whether the game page was reached at least once, which
+// is when the post-play questionnaire becomes relevant.
+func (t *MHSDeviceTest) Launched() bool {
+	switch t.ReachedStage {
+	case MHSDeviceTestStageLaunching, MHSDeviceTestStageGameplay, MHSDeviceTestStageCompleted:
+		return true
+	}
+	switch t.Stage {
+	case MHSDeviceTestStageLaunching, MHSDeviceTestStageGameplay, MHSDeviceTestStageCompleted:
+		return true
+	}
+	return t.GameplayReachedAt != nil || t.UnitCompletedAt != nil || t.LastHeartbeat != nil
 }
 
 // StoppedResponding reports whether the page went silent without ending
