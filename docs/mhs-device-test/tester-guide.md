@@ -126,7 +126,9 @@ browser's storage after the test, the same as they would for a student. They
 can be removed by clearing the browser's site data.
 
 **Does the test collect personal information?** It records what you type in
-the form, details about the device, browser, storage and network, every step
-of the download and launch with timings and any errors, and the game's own
-progress data for this run. No account is created. Your name and email are
-seen only by the Mission HydroSci team.
+the form and your answers to the questions afterwards, details about the
+device, browser, storage and network, every step of the download and launch
+with timings and any errors, a check every half minute while the game runs
+of how much memory it is using and how smoothly it is drawing, and the
+game's own progress data for this run. No account is created. Your name and
+email are seen only by the Mission HydroSci team.

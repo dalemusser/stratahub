@@ -942,7 +942,9 @@ make css-watch
   completion (`POST /missionhydrosci/api/steplog`, kind "member" rows in the
   Device Tests view); heartbeats from the game page (memory, fps,
   visibility every 30 s + closing beat) make a crashed tab show as "Page
-  stopped responding" with a memory trend. All plan steps are in place;
+  stopped responding" with a memory trend; a post-play questionnaire (sound
+  required, controls, picture, performance, how far, notes) is stored on the
+  run and shown as a Sound column/filter. All plan steps are in place;
   device verification pending
 
 ### Game log first-event rejection (2026-09-08, open, game-side)

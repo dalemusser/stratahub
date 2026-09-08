@@ -197,14 +197,22 @@ Device Tests view is the place to look.
 
 ## 8. Data, privacy and retention
 
-- Run records hold the form, the detected device details, the step log
-  (newest 300 entries), the summaries, the tester's reports and timestamps.
-  They are kept indefinitely.
-- Tester name, email and IP address are visible only in the admin/analyst
-  view. Nothing about the tester reaches the game services; the game only
-  ever sees the run id.
-- A run accepts new data for 24 hours after it starts, or until the unit is
-  completed. After that its page still works but nothing more is recorded.
+- Run records hold the form, the detected device, browser, storage and
+  network details, the step log (newest 300 entries), the download and
+  launch summaries, the heartbeats from the game page (newest 240, about
+  two hours), the tester's post-play answers and notes, the tester's Send
+  report notes, and timestamps. They are kept indefinitely.
+- Tester name, email, IP address and the questionnaire notes are visible
+  only in the admin/analyst view. Nothing about the tester reaches the game
+  services; the game only ever sees the run id.
+- Steps, diagnostics, summaries and reports are accepted until the unit is
+  completed or for 24 hours after the start; heartbeats and the
+  questionnaire are accepted for the full 24 hours, so a tester who keeps
+  playing after finishing, or answers the questions later, is still
+  recorded. After that the run's page still works but nothing more is
+  stored.
+- Members' load records (kind "member") hold the same kinds of data minus
+  the form and questionnaire, plus the member and organization ids.
 - The full list of what is recorded is in the tester guide, so the school
   sees the same description you do.
 

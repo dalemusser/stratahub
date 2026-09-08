@@ -232,63 +232,73 @@ The run page's manifest is built from that one build with `collectionToManifest`
 - No `users` row. The MHS dashboard will not list these ids (it joins by member). That is intended; the device-test viewer shows the same gameplay data by querying `logdata` and the grades directly by id (4.6).
 - A fresh id means an empty save, so Unit 2 starts clean every time, the same as a staff "jump to unit". Because the test has no progress record, "Reset all MHS data" or a re-run cannot land anyone in Unit 1: the run page is the only entry point and its manifest has one unit.
 
-### 4.5 Data model
+### 4.5 Data model (as built)
 
-`mhs_device_tests`, one doc per run (also used by A2 with `kind: "member"`):
+`mhs_device_tests`, one doc per device-test run (kind `devicetest`) or per member load record (kind `member`, plan step A2):
 
-- identity: `_id (24-hex test id = game user_id), workspace_id, kind: "devicetest", unit_id, unit_version, build_identifier, collection_name?, device_id`
+- identity: `_id` (the 24-hex test id, also the game's `user_id`), `workspace_id`, `kind`; member records add `user_id` and `organization_id`; `unit_id`, `unit_version`, `build_identifier`, `collection_name`, `device_id`
 - form: `school, tester_name, tester_role, tester_email?, device_type, managed_device?, network_type, notes`
-- server context: `remote_ip, user_agent, started_at, last_seen_at, ended_at?`
-- diagnostics: the 4.6 snapshot, posted once at start and refreshed at each terminal step
-- outcome: `stage_reached (form | run | downloading | downloaded | launching | gameplay | completed | failed), failed_step?, failed_reason?, download {path, bytes, seconds, avg_bps, switched, stalls, retries}, launch {loader_ms, unity_ms, first_frame_ms}, gameplay_reached_at?, unit_completed_at?, crash_count`
-- `steps`: the A1 entries, capped at 300, appended with `$push` / `$each` / `$slice` (DocumentDB-safe)
-- `problem_reports`: tester notes sent through "Send report"
+- server context: `remote_ip, user_agent, started_at, last_seen_at, ended_at?, expires_at` (24 h for a run; 6 h for a member launch record)
+- device summary columns `device_type, platform, browser, network` plus the full `diagnostics` snapshot (bounded: 120 keys, 500-character values; also holds `steplog_context` and, for member records, `outcome`)
+- outcome: `stage` (run | downloading | downloaded | launching | gameplay | completed | failed), `reached_stage` (the furthest stage, kept while `stage` is failed), `failed_step`, `failed_reason`, `download {path, bytes, seconds, avg_bps, switched, stalls, retries}`, `launch {loader_ms, unity_ms, first_frame_ms}`, `gameplay_reached_at`, `unit_completed_at`, `crash_count`, `end_reason` (completed | closed)
+- `steps`: the step-log entries, newest 300 kept (`$push` / `$each` / `$slice`, DocumentDB-safe)
+- `problem_reports`: notes sent through Send report (newest 50)
+- `questionnaire {sound, controls, display, performance, progress, notes, answered_at}`: the post-play answers, replaced on update
+- `heartbeats` (newest 240), `last_heartbeat`, `last_heartbeat_at`, `heartbeat_count`: the play page's 30-second samples
 
-Indexes: `{workspace_id, started_at: -1, _id: -1}` for the viewer cursor; `{workspace_id, school}` for the filter. No TTL: everything is kept.
+Indexes: `{workspace_id, started_at: -1, _id: -1}` for the viewer cursor; `{workspace_id, form.school}` for the school filter; `{workspace_id, user_id, started_at: -1}` for member records. No TTL: everything is kept.
 
-Site settings: the two fields from 4.3.
+Site settings: `mhs_device_test_enabled` and `mhs_device_test_unit` (4.3).
 
-### 4.6 Data collected (aim: everything obtainable without game changes)
+### 4.6 Data collected (as built)
 
 | Area | Fields | Source |
 |---|---|---|
-| Who | school, name, role, email (optional), notes | form |
-| Where | workspace, remote IP, timestamps, timezone, locale | server and page |
-| Device | user agent, UA-CH high-entropy values (platform, platformVersion, model, architecture, bitness, fullVersionList), cores, deviceMemory, screen size, DPR, orientation, viewport, touch points, battery level and charging when available | page (existing `collectDeviceDetails` plus additions) |
-| Browser | standalone/PWA, SW supported, controlling and version, Background Fetch API present, Cache API, cookies enabled, private-mode heuristic (tiny quota), `crossOriginIsolated`, SharedArrayBuffer, WebAssembly, WebGL2 with renderer and vendor (`WEBGL_debug_renderer_info`), max texture size | page |
-| Storage | estimate usage and quota, `persisted()`, cache inventory (names, file counts, bytes), low-storage verdict | page |
-| Network | `navigator.connection` type, effectiveType, downlink, rtt, saveData; online; CDN probe latency; log and save service probe results | page |
-| Download | path chosen and why, start and end, bytes, 5 s samples (rate), frozen and switch events, stalls, auto-resumes, retries, per-file failures from SW broadcasts, error class, raw error and failureReason, verify result | step log |
-| Launch | loader fetch source (cache or network), Unity progress timeline, instance created, `OnPWAReady` sent, first frame, a 10 s requestAnimationFrame frame-rate sample after start, `performance.memory` on Chrome | play page |
-| Gameplay | first stratalog event time, event count, scenes seen, progress points from mhsgrader, unit completed, crash reports, visibility changes during the run | viewer queries `logdata` and grades by test id |
-| Run | stage reached, failed step, duration, tester problem reports | server |
+| Who | school or district, name, role, email (optional), device type, school-managed or not, network type, notes | the form before the test |
+| Tester's answers | did the sound play (required), did the keyboard and pointer work, did the picture look right, how did it run, how far they got, notes, when answered | the questionnaire on the run page after launch |
+| Where and when | workspace, client IP, user agent, start / last activity / end / expiry times; time zone, languages | server and page |
+| Device | user agent and client hints (platform and version, model, architecture, bitness, brands, full versions), screen size and pixel ratio, viewport, orientation, touch points, CPU cores, device memory, battery level and charging when available | run page snapshot |
+| Browser | installed-app mode, service worker supported and controlling, Background Fetch API, Cache API, cookies enabled, cross-origin isolation, SharedArrayBuffer, WebAssembly, BroadcastChannel, WebGL 2 / 1 / none with GPU vendor and renderer, maximum texture size, page load and time-to-first-byte | run page snapshot |
+| Storage | usage and quota, persisted or not, inventory of the Mission HydroSci caches with file counts, the space check against the unit's missing bytes | run page snapshot and step log |
+| Network | connection type, effective type, downlink, round-trip time, data-saver flag, online state; content-server probe latency or failure; log and save service reachability | run page snapshot and step log |
+| Download | path chosen and why; progress samples (every 5 s or 10 %) with rate and time left; waiting countdowns; the switch to the direct path; stalls; every automatic retry with reason, delay and attempt; errors with class, raw text and failure reason; completion with size, duration and speed; file verification; and the summary (path, bytes, seconds, average speed, switched, stall and retry counts) | step log and summary |
+| Launch | loader fetched and from where, Unity milestones, Unity start time, identity hand-off, first frame; loader / Unity-start / first-frame timings; the moment gameplay was reached | play page |
+| While playing | every 30 s: Unity WebAssembly heap, JavaScript heap used and total, frame rate over the interval, tab visibility, time since launch; a closing beat on leaving; from these, "page stopped responding" when beats stop without a closing beat or completion | play page heartbeats |
+| Game events on the page | crash reports (type, phase, message) and the crash count; unit completion; tester reports | play and run pages |
+| Game telemetry (not stored on the run; shown in the detail by id) | stratalog event count, first and last event, scenes seen; grader progress points and current unit; save and settings data live under the id in stratasave | viewer queries the game services by test id |
+| Run | stage and furthest stage, last problem, how it ended (completed, closed, stopped responding), duration | server |
 
-### 4.7 Routes, pages and the viewer
+### 4.7 Routes, pages and the viewer (as built)
 
-All device-test routes are public, registered at the root router beside `/missionhydrosci/content/*`, outside the session-gated mount, under `/missionhydrosci/devicetest/`. Pages render with the normal CSRF token; POSTs send `X-CSRF-Token`; every body is bounded; the start POST is throttled per IP (`ratelimit.New(10, 10*time.Minute)`), and the route is exempt from maintenance mode like the member-status API.
+All device-test routes are public, registered at the root router beside `/missionhydrosci/content/*`, outside the session-gated mount, under `/missionhydrosci/devicetest/`. Pages render with the normal CSRF token; POSTs send `X-CSRF-Token`; every body is bounded (64 KB); the start POST is throttled per IP (`mhs_device_test_start_limit` per `mhs_device_test_start_window`, defaults 10 per 10 minutes); the path is exempt from maintenance mode, as is the content route.
 
 - `GET  /missionhydrosci/devicetest` — landing page and form (or the "not enabled" page).
-- `POST /missionhydrosci/devicetest/start` — validate the form, create the test record, redirect to the run page.
-- `GET  /missionhydrosci/devicetest/run/{testId}` — the run page: one Unit 2 card, Download/Retry/Launch, the status panel, the banner "Device test · <school> · <short id>". A small new template (`devicetest_run.gohtml`); it constructs `MHSDeliveryManager` with the device-test manifest URL and telemetry endpoints and shares the step-log panel snippet with the member pages.
-- `GET  /missionhydrosci/devicetest/run/{testId}/manifest` — the one-unit manifest for the configured build, plus the A0 tuning block.
-- `GET  /missionhydrosci/devicetest/run/{testId}/play` — the existing play template with a `DeviceTest` mode: identity = the test id and `UserName: "Device Test"`, the same `GameServices` URLs and keys, completion posted to the device-test endpoint, no next-unit overlay, the "Test complete" screen.
-- `POST /missionhydrosci/devicetest/run/{testId}/diagnostics` — the 4.6 snapshot, bounded to 32 KB.
-- `POST /missionhydrosci/devicetest/run/{testId}/steps` — batched step entries; the run and play pages flush every 5 s and on `pagehide` with `keepalive: true`.
-- `POST /missionhydrosci/devicetest/run/{testId}/report` — a tester note plus the current log.
-- `POST /missionhydrosci/devicetest/run/{testId}/complete` — called from the page's `mhsUnitComplete` bridge callback; stamps `unit_completed_at`.
+- `POST /missionhydrosci/devicetest/start` — validate the form, create the run with a marked id, redirect to the run page.
+- `GET  /missionhydrosci/devicetest/run/{testId}` — the run page (`devicetest_run.gohtml`): one Unit 2 card, Download / Retry now / Launch, the status panel open, the download-mode notice and storage bar, Send report, and, once launched, the post-play questionnaire. The delivery manager runs in isolated mode (no pruning or aborting of other units) with the run's manifest URL; the step log streams every 5 s.
+- `GET  …/run/{testId}/manifest` — the one-unit manifest pinned to the run's build, with the tuning and probes blocks.
+- `GET  …/run/{testId}/play` — the play template in `DeviceTest` mode: identity = the test id and "Device Test", the same game-service URLs and keys, no next unit, the back arrow and the Test complete link return to the run page's questionnaire, completion posted to the run.
+- `POST …/run/{testId}/diagnostics` — the device / browser / storage / network snapshot and summary columns.
+- `POST …/run/{testId}/steps` — batched step entries; the stage, furthest stage, last problem and gameplay time are derived from them.
+- `POST …/run/{testId}/summary` — download and launch summaries, gameplay reached, crash count.
+- `POST …/run/{testId}/report` — a tester note.
+- `POST …/run/{testId}/complete` — the game's unit-complete callback; stamps completion.
+- `POST …/run/{testId}/heartbeat` — the play page's 30-second sample or closing beat.
+- `POST …/run/{testId}/questionnaire` — the post-play answers (a normal form post; the sound answer is required).
 
-Service worker: no change. The pages are same-origin and in scope, so downloads and content interception work as for members; the run and play pages themselves are not cached for offline use (not needed for a test).
+Members (session-gated, in the existing MHS route group): `POST /missionhydrosci/api/steplog` stores a launcher or play page's step log on a download or launch outcome, a crash, or Send report, and returns the record id; `POST /missionhydrosci/api/steplog/{id}/heartbeat` adds heartbeats to a launch record.
+
+Service worker: unchanged apart from the `getVersion` reply. The pages are same-origin and in scope, so downloads and content interception work as for members; the run and play pages themselves are not cached for offline use.
 
 Admin:
 
-- Site Settings (existing `/settings` page, admin): the enable checkbox and the Unit 2 build selector from 4.3.
-- Viewer `/views/device-tests` (roles admin, analyst, superadmin). Columns: started, school, tester, device (platform · model · browser), network, path, download time and rate, stage reached, failed step, duration. Filters: school, stage, device type, kind (after A2), date range. Summary chips: runs, reached-gameplay %, completed %, top failed steps. Detail modal: form, diagnostics, step timeline, and a gameplay section loaded by test id from `logdata` (event count, first/last event, scenes) and the grades collection (progress points), plus `…/rows/{id}/export.json`. CSV export comes from the framework; `GET /views/device-tests/export.json?from&to` gives a full-fidelity bulk download for analysis.
+- Site Settings: the enable checkbox, the Unit 2 build selector, and the link to give a school (4.3).
+- Viewer `/views/device-tests` (roles admin, analyst, superadmin). Columns: started, school, tester, device, network, path, download, stage, sound, last problem, duration. Filters: started (date range), stage, kind, device, school, sound, test id. Chips: runs, reached gameplay, completed, failed now, last run. The detail (an expandable row): the form, detected device and network, download and launch summaries, how it ended and the last heartbeat, the tester's answers and notes, the game telemetry for the run, tester reports, the heartbeat table, the step timeline, the diagnostics snapshot, and a per-run JSON download. Exports: CSV (the table) and JSON (every matching run in full), both new optional capabilities of the viewers framework.
 
 ### 4.8 Security and privacy
 
 - **Game-service keys.** The play page renders the static stratalog and stratasave Bearer keys server-side, exactly as it does for students today; the URL never contains them. Anyone who reaches the play page can read them from the HTML, which is already true of every student browser. The enable switch turns the route off for workspaces that do not use it.
-- **PII.** Tester name, email and IP live only in `mhs_device_tests`, are shown only in the admin/analyst viewer, and never appear in `users` or in `logdata`. The landing page states what is collected. No members report or dashboard is affected because no members are created.
-- **Bounds.** Every POST has a bounded body (the SEC-4 lesson); step batches are capped server-side; the start POST is throttled per IP; a test id stops accepting writes 24 h after it started or once completed. Test ids are unguessable (64 random bits).
+- **PII.** Tester name, email, IP and the questionnaire notes live only in `mhs_device_tests`, are shown only in the admin/analyst viewer, and never appear in `users` or in `logdata`. The landing page states what is collected. No members report or dashboard is affected because no members are created.
+- **Bounds.** Every POST has a bounded body (the SEC-4 lesson); steps, reports and heartbeats are capped server-side; the start POST is throttled per IP. Steps, diagnostics, summaries and reports stop being accepted once the unit is completed or 24 h after the start; heartbeats and the questionnaire are accepted until the 24-hour expiry, completed or not. Test ids are unguessable (64 random bits).
 - **Authenticity.** The test runs on the workspace's own host with its own settings, CDN and services, so what a school sees is what its students will get.
 
 ### 4.9 Implementation order

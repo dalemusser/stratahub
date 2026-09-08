@@ -367,5 +367,13 @@ Plan and status: `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test
   quota.
 - **Step log.** `mhs-steplog.js` + hooks throughout the delivery manager
   (`setStepLog`); the panel is on the units, manage and play pages.
-- **Device test.** See `devicetest.go` above. `SW_VERSION` is 1.0.13 (adds
-  the `getVersion` reply).
+- **Device test.** See `devicetest.go` above: landing form, run page with
+  the status panel and Send report, the play page in device-test mode,
+  heartbeats every 30 s while the game runs (a crashed tab shows as "page
+  stopped responding"), and a post-play questionnaire (sound, controls,
+  picture, performance, how far). Results in the **Device Tests** viewer.
+  `SW_VERSION` is 1.0.13 (adds the `getVersion` reply).
+- **Members' load records.** Launcher and play pages store their step log on
+  a download or launch outcome, a crash, or Send report
+  (`POST /missionhydrosci/api/steplog`), with heartbeats for launches; they
+  appear in the same viewer under Kind = Member load record.
