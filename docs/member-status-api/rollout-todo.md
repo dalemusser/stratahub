@@ -17,9 +17,8 @@ integration to Abt. Companion to the [Admin Guide](admin-guide.md) and the
 - **Browser calls added** (plan §9): Abt calls the API from JavaScript in the
   survey page, so the API now answers CORS for origins listed per workspace.
   Deployed 2026-09-08 (build `20260908-203329`) to both hosts; Abt's page
-  origin listed on **MHS** and the handshake verified the same day (§2).
-  **Open:** tell Abt's developer to proceed (§4); list the origin on Dev MHS
-  too if Abt ever tests there.
+  origin listed on **Dev MHS and MHS** and the handshake verified on both
+  the same day (§2). **Open:** tell Abt's developer to proceed (§4).
 
 **Status (2026-09-07 — paused until Abt reports back or a problem arises):**
 
@@ -125,15 +124,15 @@ are per workspace.)
         -H 'Content-Type: application/json' -d "{\"key\":\"$KEY\"}"
       ```
       Expect `{"ok":true,"workspace":"mhs","entities":["Pre","MHS Engagement","EWS Engagement","Post"]}`.
-- [x] **Browser calls (added 2026-09-08).** _Done on MHS 2026-09-08; Dev MHS
-      not listed (Abt tests against MHS only)._ Abt calls from the survey page,
+- [x] **Browser calls (added 2026-09-08).** _Done on Dev MHS and MHS
+      2026-09-08._ Abt calls from the survey page,
       not from a server, so list the page's origin: Settings → **Member
       Status API** → **Allowed browser origins** → the origin Abt's
       developer gave (scheme and host only, exactly as their browser reports
       it) → **Save**. Dev MHS first, then MHS. The change appears in
       **Audit Log** as `member_status_origins_changed`.
-- [x] Confirm the browser handshake (no key involved in this one) — _MHS
-      verified 2026-09-08: allow-origin echoed, POST, max-age 3600, no
+- [x] Confirm the browser handshake (no key involved in this one) — _both
+      hosts verified 2026-09-08: allow-origin echoed, POST, max-age 3600, no
       credentials header; an unlisted origin gets no allow header_:
       ```bash
       ORIGIN='https://<provider-origin>'
