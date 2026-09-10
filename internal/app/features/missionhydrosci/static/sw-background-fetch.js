@@ -366,6 +366,13 @@ async function fetchAndCacheFile(cache, cacheKey, url, expectedSize, onBytes, si
       received += chunk.byteLength;
       onBytes(received);
       controller.enqueue(chunk);
+    },
+    flush: function(controller) {
+      // A stream that ends early without an error (a proxy closing the
+      // connection, a truncated object) must not become a short file under
+      // a full-length header: fail the final entry; the parts stay and the
+      // next attempt resumes from them.
+      if (received !== expectedSize) controller.error(new Error('short body: ' + received + ' of ' + expectedSize + ' bytes'));
     }
   });
   var branches = response.body.tee();
