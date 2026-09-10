@@ -2,7 +2,7 @@
 
 _Audience: the Abt survey/data team. This document describes the two
 configurations StrataHub offers for identifying respondents on Abt survey
-links. Last updated: 2026-08-17._
+links. Last updated: 2026-09-10._
 
 When a student opens one of the Abt survey resources in StrataHub, StrataHub
 appends three query parameters to the survey link:
@@ -81,7 +81,8 @@ side:
 
 - **ABT-identifiable** — the preloaded IDs are student logins (emails).
 - **ABT-deidentified** — the preloaded IDs are 24-character hex user IDs.
-  StrataHub provides these for a study roster via its Members Report export.
+  StrataHub provides these for a study roster via its Members Report's
+  de-identified export (hex IDs only, no names).
 
 The `group` and `org` values are captured as open-ended strings either way, so
 no change is needed there in either direction.

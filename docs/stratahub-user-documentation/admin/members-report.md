@@ -19,6 +19,12 @@ Work left to right across the panels:
    for the whole organization, or a single group to narrow further.
 3. **Member status** — include **All** members, or only **Active** or **Disabled**
    ones.
+4. **Identity in export** — choose what identifies each member in the file:
+   **De-identified** (hex IDs only: `workspace_id`, `user_id`, `organization_id`,
+   `group_id`), **Identified** (names, logins, and emails), or **Both** — the
+   default, with every column. Pick **De-identified** when the file is going to
+   someone who must not receive names, such as a research partner working with
+   de-identified data.
 
 ## Checking the totals
 
@@ -29,8 +35,14 @@ contain:
 - **Members in all groups** — how many belong to groups.
 - **Members in export** — how many the current filters will include.
 - **Records in export** — the number of rows the file will contain.
+- **Identity in export** and **Columns** — what identifies each member in the
+  file and the exact column list. An amber note means the file will carry
+  personal information; a green note means it holds hex IDs only and is safe
+  to share with someone who works with de-identified data.
 
 ## Downloading
 
 Optionally type a **CSV filename** (the `.csv` extension is added automatically if
-you leave it off), then select **Download** to save the file.
+you leave it off), then select **Download** to save the file. The suggested
+filename includes `_deidentified` or `_identified` when you pick one of those,
+so a file's contents are recognizable by name.

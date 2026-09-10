@@ -308,8 +308,9 @@ J='Content-Type: application/json'
 - **Abt's identity-mode decision** (identifiable vs de-identified links). The
   callback only works when Abt holds the hex `user_id` — i.e. the resources
   are on `abt-deidentified` (or Abt has been given the hex ids another way).
-  Don't hand Abt the Members Report CSV for this; it is the re-identification
-  key.
+  If Abt needs the hex ids, export the Members Report with **Identity in
+  export: De-identified** (hex ids only, no names); never the default export,
+  which is the re-identification key.
 - The Survey Events view shows student names to analysts (as the Members
   Report does). Fine for staff; give an outside developer an analyst login
   only on a test workspace.

@@ -29,8 +29,11 @@ create or edit actions.
 
 Select **Members Report** to export member data as a CSV file. Scope the report
 using the panels left to right: pick an **Organization**, then optionally narrow to
-a single **Group**, and choose a **Member status** (All, Active, or Disabled). The
-summary on the right shows how many members and records the export will contain.
+a single **Group**, choose a **Member status** (All, Active, or Disabled), and an
+**Identity in export** — **De-identified** (hex IDs only), **Identified** (names,
+logins, and emails), or **Both** (the default). The summary on the right shows
+how many members and records the export will contain and which columns it will
+have.
 Give the file a name if you like — `.csv` is added automatically — and select
 **Download**.
 

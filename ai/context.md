@@ -72,7 +72,7 @@ Handles application initialization and lifecycle:
 | **systemusers** | Admin and analyst user management |
 | **resources** | Resource management (admin + coordinator) + member resource views |
 | **materials** | Material management (admin + coordinator) + leader/member views |
-| **reports** | Reporting features (members report, activity logs) |
+| **reports** | Members Report page + CSV (`/reports/members`, `/reports/members.csv`); the **Identity in export** select (`identity=deidentified\|identified\|both`, default both) picks the hex-ID columns, the name columns, or all twelve (`reports/identity.go`) |
 | **settings** | Site settings (name, logo, footer) |
 | **workspaces** | Multi-workspace management (admin feature) |
 
@@ -925,6 +925,23 @@ make css-watch
 - **mhsgrading** — Grading system integrated with StrataHub
 
 ## Recent Work Completed
+
+### Members Report identity selector (2026-09-10)
+- `/reports/members` has an **Identity in export** select next to Member
+  status: **De-identified** (`workspace_id`, `user_id`, `organization_id`,
+  `group_id`, `status`), **Identified** (`workspace`, `full_name`, `login_id`,
+  `email`, `organization`, `group`, `leaders`, `status`), or **Both** (all
+  twelve columns; the default, identical to the previous export). Query param
+  `identity` on the page and the CSV, carried on every page link and by the
+  download form; the offered filename gets `_deidentified` / `_identified`;
+  the summary panel lists the columns with an amber (PII) or green (safe to
+  share) note. Column sets mirror the URL identity schemes (hex / human /
+  both). A de-identified export never reads names: the user projection drops
+  them and the org/workspace/group/leader lookups are skipped. Code:
+  `features/reports/identity.go`; tests `identity_test.go`,
+  `memberscsv_test.go` (MongoDB); e2e in `tests/e2e/test_analyst_journey.py`.
+  Docs: `docs/resource-identification/members-report.md` (crosswalk + the
+  three selections) and the admin/analyst/coordinator user guides
 
 ### Unit loading status + Unit 2 Device Test (2026-09; built, on dev, not yet in production)
 - Plan: `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md`

@@ -33,6 +33,10 @@ import (
 // of members (and their group memberships) based on the current
 // filters. It mirrors the semantics of the old strata_hub handler
 // but uses the new Handler shape and authz.UserCtx.
+//
+// The "identity" query parameter selects which columns the file carries:
+// the hex ID columns (de-identified), the name/login/email columns
+// (identified), or both (the default; the full crosswalk). See identity.go.
 func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 	_, userName, _, ok := authz.UserCtx(r)
 	if !ok {
@@ -60,6 +64,10 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 		// accept member_status from the page form
 		status = query.Get(r, "member_status")
 	}
+
+	// Which identity the export carries: hex IDs, names, or both.
+	identity := normalizeIdentity(query.Get(r, "identity"))
+	cols := selectColumns(identity)
 
 	// Determine scope based on policy
 	var scopeOrg *primitive.ObjectID
@@ -100,17 +108,22 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	userProjection := bson.M{
+		"full_name_ci":    1,
+		"status":          1,
+		"organization_id": 1,
+		"workspace_id":    1,
+	}
+	if cols.Human {
+		// Names and logins are read only when the export includes them.
+		userProjection["full_name"] = 1
+		userProjection["login_id"] = 1
+		userProjection["email"] = 1
+	}
+
 	uCur, err := db.Collection("users").Find(ctx, userFilter, options.Find().
 		SetSort(bson.D{{Key: "full_name_ci", Value: 1}, {Key: "_id", Value: 1}}).
-		SetProjection(bson.M{
-			"full_name":       1,
-			"full_name_ci":    1,
-			"login_id":        1,
-			"email":           1,
-			"status":          1,
-			"organization_id": 1,
-			"workspace_id":    1,
-		}))
+		SetProjection(userProjection))
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "find users for CSV failed", err, "A database error occurred.", "/")
 		return
@@ -172,159 +185,175 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 
 	if len(userIDs) == 0 {
 		// No users in scope: stream an empty CSV with headers.
-		writeEmptyCSV(w, r)
+		writeEmptyCSV(w, r, cols)
 		return
 	}
 
-	// Preload org names (batch query to avoid N+1)
-	orgIDs := make([]primitive.ObjectID, 0, len(userByID))
-	for _, ui := range userByID {
-		if ui.OrgID != primitive.NilObjectID {
-			orgIDs = append(orgIDs, ui.OrgID)
-		}
-	}
-	orgName, err := orgutil.FetchOrgNames(ctx, db, orgIDs)
-	if err != nil {
-		h.ErrLog.LogServerError(w, r, "find organizations for CSV failed", err, "A database error occurred.", "/")
-		return
-	}
-
-	// Preload workspace subdomains (batch). The report is workspace-scoped, so
-	// this is typically a single workspace, but resolving per-member keeps the
-	// columns correct if the scope ever spans workspaces.
-	wsIDSet := make(map[primitive.ObjectID]struct{})
-	for _, ui := range userByID {
-		if ui.WorkspaceID != primitive.NilObjectID {
-			wsIDSet[ui.WorkspaceID] = struct{}{}
-		}
-	}
-	wsSubByID := make(map[primitive.ObjectID]string)
-	if len(wsIDSet) > 0 {
-		wsIDs := make([]primitive.ObjectID, 0, len(wsIDSet))
-		for id := range wsIDSet {
-			wsIDs = append(wsIDs, id)
-		}
-		wcur, err := db.Collection("workspaces").Find(ctx, bson.M{"_id": bson.M{"$in": wsIDs}}, options.Find().SetProjection(bson.M{"subdomain": 1}))
-		if err != nil {
-			h.ErrLog.LogServerError(w, r, "find workspaces for CSV failed", err, "A database error occurred.", "/")
-			return
-		}
-		defer wcur.Close(ctx)
-		for wcur.Next(ctx) {
-			var wrow struct {
-				ID        primitive.ObjectID `bson:"_id"`
-				Subdomain string             `bson:"subdomain"`
-			}
-			if err := wcur.Decode(&wrow); err != nil {
-				h.Log.Warn("decode workspace row for CSV", zap.Error(err))
-				continue
-			}
-			wsSubByID[wrow.ID] = wrow.Subdomain
-		}
-	}
-
-	// Preload group names
-	groupFilter := bson.M{}
-	workspace.Filter(r, groupFilter)
-	if scopeOrg != nil {
-		groupFilter["organization_id"] = *scopeOrg
-	}
+	// A selected group scopes the membership rows below, whatever the export
+	// includes.
 	var scopedGroupID *primitive.ObjectID
 	if groupHex != "" {
 		if gid, err := primitive.ObjectIDFromHex(groupHex); err == nil {
-			groupFilter["_id"] = gid
 			scopedGroupID = &gid
 		}
 	}
 
-	groupNames := make(map[primitive.ObjectID]string)
-	var groupIDs []primitive.ObjectID
-	gcur, err := db.Collection("groups").Find(ctx, groupFilter, options.Find().SetProjection(bson.M{"name": 1}))
-	if err != nil {
-		h.ErrLog.LogServerError(w, r, "find groups for CSV failed", err, "A database error occurred.", "/")
-		return
-	}
-	defer gcur.Close(ctx)
-
-	for gcur.Next(ctx) {
-		var g struct {
-			ID   primitive.ObjectID `bson:"_id"`
-			Name string             `bson:"name"`
+	// Human-readable columns: organization names, workspace subdomains, group
+	// names, and each group's leaders. A de-identified export never reads
+	// them; the maps stay nil and cols.Row drops the columns.
+	var (
+		orgName        map[primitive.ObjectID]string
+		wsSubByID      map[primitive.ObjectID]string
+		groupNames     map[primitive.ObjectID]string
+		leadersByGroup map[primitive.ObjectID]string
+	)
+	if cols.Human {
+		// Preload org names (batch query to avoid N+1)
+		orgIDs := make([]primitive.ObjectID, 0, len(userByID))
+		for _, ui := range userByID {
+			if ui.OrgID != primitive.NilObjectID {
+				orgIDs = append(orgIDs, ui.OrgID)
+			}
 		}
-		if err := gcur.Decode(&g); err != nil {
-			h.Log.Warn("decode group row for CSV", zap.Error(err))
-			continue
-		}
-		groupNames[g.ID] = g.Name
-		groupIDs = append(groupIDs, g.ID)
-	}
-
-	// Preload leaders per group (pipe-separated full names)
-	leadersByGroup := make(map[primitive.ObjectID]string)
-	if len(groupIDs) > 0 {
-		groupLeaderIDs := make(map[primitive.ObjectID][]primitive.ObjectID)
-		leaderIDSet := make(map[primitive.ObjectID]struct{})
-
-		lmFilter := bson.M{"role": "leader", "group_id": bson.M{"$in": groupIDs}}
-		if scopeOrg != nil {
-			lmFilter["org_id"] = *scopeOrg
-		}
-
-		lmCur, err := db.Collection("group_memberships").Find(ctx, lmFilter, options.Find().SetProjection(bson.M{"group_id": 1, "user_id": 1}))
+		orgName, err = orgutil.FetchOrgNames(ctx, db, orgIDs)
 		if err != nil {
-			h.ErrLog.LogServerError(w, r, "find group memberships for leaders failed", err, "A database error occurred.", "/")
+			h.ErrLog.LogServerError(w, r, "find organizations for CSV failed", err, "A database error occurred.", "/")
 			return
 		}
-		defer lmCur.Close(ctx)
 
-		for lmCur.Next(ctx) {
-			var row struct {
-				GroupID primitive.ObjectID `bson:"group_id"`
-				UserID  primitive.ObjectID `bson:"user_id"`
+		// Preload workspace subdomains (batch). The report is workspace-scoped, so
+		// this is typically a single workspace, but resolving per-member keeps the
+		// columns correct if the scope ever spans workspaces.
+		wsIDSet := make(map[primitive.ObjectID]struct{})
+		for _, ui := range userByID {
+			if ui.WorkspaceID != primitive.NilObjectID {
+				wsIDSet[ui.WorkspaceID] = struct{}{}
 			}
-			if err := lmCur.Decode(&row); err != nil {
-				h.Log.Warn("decode leader membership row for CSV", zap.Error(err))
-				continue
-			}
-			groupLeaderIDs[row.GroupID] = append(groupLeaderIDs[row.GroupID], row.UserID)
-			leaderIDSet[row.UserID] = struct{}{}
 		}
-
-		if len(leaderIDSet) > 0 {
-			ids := make([]primitive.ObjectID, 0, len(leaderIDSet))
-			for id := range leaderIDSet {
-				ids = append(ids, id)
+		wsSubByID = make(map[primitive.ObjectID]string)
+		if len(wsIDSet) > 0 {
+			wsIDs := make([]primitive.ObjectID, 0, len(wsIDSet))
+			for id := range wsIDSet {
+				wsIDs = append(wsIDs, id)
 			}
-
-			nameByID := make(map[primitive.ObjectID]string)
-			uCur2, err := db.Collection("users").Find(ctx, bson.M{"_id": bson.M{"$in": ids}}, options.Find().SetProjection(bson.M{"full_name": 1}))
+			wcur, err := db.Collection("workspaces").Find(ctx, bson.M{"_id": bson.M{"$in": wsIDs}}, options.Find().SetProjection(bson.M{"subdomain": 1}))
 			if err != nil {
-				h.ErrLog.LogServerError(w, r, "find leader users failed", err, "A database error occurred.", "/")
+				h.ErrLog.LogServerError(w, r, "find workspaces for CSV failed", err, "A database error occurred.", "/")
 				return
 			}
-			defer uCur2.Close(ctx)
-
-			for uCur2.Next(ctx) {
-				var urow struct {
-					ID       primitive.ObjectID `bson:"_id"`
-					FullName string             `bson:"full_name"`
+			defer wcur.Close(ctx)
+			for wcur.Next(ctx) {
+				var wrow struct {
+					ID        primitive.ObjectID `bson:"_id"`
+					Subdomain string             `bson:"subdomain"`
 				}
-				if err := uCur2.Decode(&urow); err != nil {
-					h.Log.Warn("decode leader user row for CSV", zap.Error(err))
+				if err := wcur.Decode(&wrow); err != nil {
+					h.Log.Warn("decode workspace row for CSV", zap.Error(err))
 					continue
 				}
-				nameByID[urow.ID] = urow.FullName
+				wsSubByID[wrow.ID] = wrow.Subdomain
+			}
+		}
+
+		// Preload group names
+		groupFilter := bson.M{}
+		workspace.Filter(r, groupFilter)
+		if scopeOrg != nil {
+			groupFilter["organization_id"] = *scopeOrg
+		}
+		if scopedGroupID != nil {
+			groupFilter["_id"] = *scopedGroupID
+		}
+
+		groupNames = make(map[primitive.ObjectID]string)
+		var groupIDs []primitive.ObjectID
+		gcur, err := db.Collection("groups").Find(ctx, groupFilter, options.Find().SetProjection(bson.M{"name": 1}))
+		if err != nil {
+			h.ErrLog.LogServerError(w, r, "find groups for CSV failed", err, "A database error occurred.", "/")
+			return
+		}
+		defer gcur.Close(ctx)
+
+		for gcur.Next(ctx) {
+			var g struct {
+				ID   primitive.ObjectID `bson:"_id"`
+				Name string             `bson:"name"`
+			}
+			if err := gcur.Decode(&g); err != nil {
+				h.Log.Warn("decode group row for CSV", zap.Error(err))
+				continue
+			}
+			groupNames[g.ID] = g.Name
+			groupIDs = append(groupIDs, g.ID)
+		}
+
+		// Preload leaders per group (pipe-separated full names)
+		leadersByGroup = make(map[primitive.ObjectID]string)
+		if len(groupIDs) > 0 {
+			groupLeaderIDs := make(map[primitive.ObjectID][]primitive.ObjectID)
+			leaderIDSet := make(map[primitive.ObjectID]struct{})
+
+			lmFilter := bson.M{"role": "leader", "group_id": bson.M{"$in": groupIDs}}
+			if scopeOrg != nil {
+				lmFilter["org_id"] = *scopeOrg
 			}
 
-			for gid, uids := range groupLeaderIDs {
-				var names []string
-				for _, id := range uids {
-					if n, ok := nameByID[id]; ok {
-						names = append(names, n)
-					}
+			lmCur, err := db.Collection("group_memberships").Find(ctx, lmFilter, options.Find().SetProjection(bson.M{"group_id": 1, "user_id": 1}))
+			if err != nil {
+				h.ErrLog.LogServerError(w, r, "find group memberships for leaders failed", err, "A database error occurred.", "/")
+				return
+			}
+			defer lmCur.Close(ctx)
+
+			for lmCur.Next(ctx) {
+				var row struct {
+					GroupID primitive.ObjectID `bson:"group_id"`
+					UserID  primitive.ObjectID `bson:"user_id"`
 				}
-				if len(names) > 0 {
-					leadersByGroup[gid] = strings.Join(names, "|")
+				if err := lmCur.Decode(&row); err != nil {
+					h.Log.Warn("decode leader membership row for CSV", zap.Error(err))
+					continue
+				}
+				groupLeaderIDs[row.GroupID] = append(groupLeaderIDs[row.GroupID], row.UserID)
+				leaderIDSet[row.UserID] = struct{}{}
+			}
+
+			if len(leaderIDSet) > 0 {
+				ids := make([]primitive.ObjectID, 0, len(leaderIDSet))
+				for id := range leaderIDSet {
+					ids = append(ids, id)
+				}
+
+				nameByID := make(map[primitive.ObjectID]string)
+				uCur2, err := db.Collection("users").Find(ctx, bson.M{"_id": bson.M{"$in": ids}}, options.Find().SetProjection(bson.M{"full_name": 1}))
+				if err != nil {
+					h.ErrLog.LogServerError(w, r, "find leader users failed", err, "A database error occurred.", "/")
+					return
+				}
+				defer uCur2.Close(ctx)
+
+				for uCur2.Next(ctx) {
+					var urow struct {
+						ID       primitive.ObjectID `bson:"_id"`
+						FullName string             `bson:"full_name"`
+					}
+					if err := uCur2.Decode(&urow); err != nil {
+						h.Log.Warn("decode leader user row for CSV", zap.Error(err))
+						continue
+					}
+					nameByID[urow.ID] = urow.FullName
+				}
+
+				for gid, uids := range groupLeaderIDs {
+					var names []string
+					for _, id := range uids {
+						if n, ok := nameByID[id]; ok {
+							names = append(names, n)
+						}
+					}
+					if len(names) > 0 {
+						leadersByGroup[gid] = strings.Join(names, "|")
+					}
 				}
 			}
 		}
@@ -357,7 +386,7 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// CSV setup
-	filename := csvFilenameFromQuery(r)
+	filename := csvFilenameFromQuery(r, identity)
 
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, url.PathEscape(filename)))
@@ -372,7 +401,7 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 	cw.UseCRLF = true
 	defer cw.Flush()
 
-	if err := cw.Write([]string{"workspace", "workspace_id", "user_id", "full_name", "login_id", "email", "organization", "organization_id", "group", "group_id", "leaders", "status"}); err != nil {
+	if err := cw.Write(cols.Header()); err != nil {
 		h.Log.Error("CSV write failed (header)", zap.Error(err), zap.String("user", userName))
 		return
 	}
@@ -403,7 +432,8 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 			wsIDHex = ui.WorkspaceID.Hex()
 		}
 
-		if writeErr = cw.Write([]string{
+		// Full-width row in csvColumns order; cols.Row keeps the selected columns.
+		if writeErr = cw.Write(cols.Row([]string{
 			wsSubByID[ui.WorkspaceID],
 			wsIDHex,
 			m.UserID.Hex(),
@@ -416,7 +446,7 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 			m.GroupID.Hex(),
 			sanitizeCSVField(leaders),
 			ui.Status,
-		}); writeErr != nil {
+		})); writeErr != nil {
 			h.Log.Error("CSV write failed (row)", zap.Error(writeErr), zap.String("user", userName), zap.Int("rows_written", rowCount))
 			return
 		}
@@ -435,7 +465,7 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 			if ui.WorkspaceID != primitive.NilObjectID {
 				wsIDHex = ui.WorkspaceID.Hex()
 			}
-			if writeErr = cw.Write([]string{
+			if writeErr = cw.Write(cols.Row([]string{
 				wsSubByID[ui.WorkspaceID],
 				wsIDHex,
 				id.Hex(),
@@ -448,7 +478,7 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 				"",
 				"",
 				ui.Status,
-			}); writeErr != nil {
+			})); writeErr != nil {
 				h.Log.Error("CSV write failed (row)", zap.Error(writeErr), zap.String("user", userName), zap.Int("rows_written", rowCount))
 				return
 			}
@@ -456,15 +486,16 @@ func (h *Handler) ServeMembersCSV(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	h.Log.Info("members CSV exported", zap.String("user", userName), zap.Int("rows", rowCount))
+	h.Log.Info("members CSV exported", zap.String("user", userName), zap.String("identity", identity), zap.Int("rows", rowCount))
 }
 
-// writeEmptyCSV streams an empty CSV file (headers only). It is used when
-// there are no members in scope for the current filters.
+// writeEmptyCSV streams an empty CSV file (headers only) for the selected
+// columns. It is used when there are no members in scope for the current
+// filters.
 // Note: Errors are not logged here since this function has no logger access.
 // In practice, write failures at this point indicate client disconnect.
-func writeEmptyCSV(w http.ResponseWriter, r *http.Request) {
-	filename := csvFilenameFromQuery(r)
+func writeEmptyCSV(w http.ResponseWriter, r *http.Request, cols columnSelection) {
+	filename := csvFilenameFromQuery(r, cols.Identity)
 
 	w.Header().Set("Content-Type", "text/csv; charset=utf-8")
 	w.Header().Set("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"`, url.PathEscape(filename)))
@@ -479,15 +510,17 @@ func writeEmptyCSV(w http.ResponseWriter, r *http.Request) {
 	defer cw.Flush()
 
 	// Error intentionally not checked - headers only, client likely disconnected
-	cw.Write([]string{"workspace", "workspace_id", "user_id", "full_name", "login_id", "email", "organization", "organization_id", "group", "group_id", "leaders", "status"})
+	cw.Write(cols.Header())
 }
 
 // csvFilenameFromQuery returns a sanitized CSV filename based on the
-// "filename" query param, or a default if none is provided.
-func csvFilenameFromQuery(r *http.Request) string {
+// "filename" query param, or a default if none is provided. The default
+// names the identity selection (e.g. members_deidentified_...) so a file
+// without names is recognizable on sight.
+func csvFilenameFromQuery(r *http.Request, identity string) string {
 	filename := r.URL.Query().Get("filename")
 	if filename == "" {
-		filename = "members_" + time.Now().UTC().Format("20060102_150405") + ".csv"
+		filename = "members" + identityFilenameSuffix(identity) + "_" + time.Now().UTC().Format("20060102_150405") + ".csv"
 	}
 	if !strings.HasSuffix(strings.ToLower(filename), ".csv") {
 		filename += ".csv"

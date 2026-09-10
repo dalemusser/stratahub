@@ -34,9 +34,9 @@
           value="{{ .OrgQuery }}"
           class="min-w-0 w-full px-3 py-2 border dark:border-gray-600 rounded focus:outline-none focus:ring-2 focus:ring-indigo-400 dark:bg-gray-700 dark:text-gray-100" />
         <a
-          href="/reports/members?org={{ .SelectedOrg }}&group={{ .SelectedGroup }}&member_status={{ .MemberStatus }}&org_q={{ "" }}{{ .ReturnQS }}"
+          href="/reports/members?org={{ .SelectedOrg }}&group={{ .SelectedGroup }}&member_status={{ .MemberStatus }}&identity={{ .Identity }}&org_q={{ "" }}{{ .ReturnQS }}"
           hx-get="/reports/members"
-          hx-vals='{"org":"{{ .SelectedOrg }}","group":"{{ .SelectedGroup }}","member_status":"{{ .MemberStatus }}","org_q":""{{ if .ShowBack }},"return":"{{ .BackURL }}"{{ end }}}'
+          hx-vals='{"org":"{{ .SelectedOrg }}","group":"{{ .SelectedGroup }}","member_status":"{{ .MemberStatus }}","identity":"{{ .Identity }}","org_q":""{{ if .ShowBack }},"return":"{{ .BackURL }}"{{ end }}}'
           hx-target="#content"
           hx-swap="innerHTML"
           hx-push-url="true"
@@ -50,16 +50,16 @@
         <span class="flex gap-2">
           {{ if .OrgHasPrev }}
             <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
-               href="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}&org_before={{ .OrgPrevCur }}&org_start={{ .OrgPrevStart }}{{ .ReturnQS }}"
-               hx-get="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}&org_before={{ .OrgPrevCur }}&org_start={{ .OrgPrevStart }}{{ .ReturnQS }}"
+               href="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}&identity={{ .Identity }}&org_before={{ .OrgPrevCur }}&org_start={{ .OrgPrevStart }}{{ .ReturnQS }}"
+               hx-get="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}&identity={{ .Identity }}&org_before={{ .OrgPrevCur }}&org_start={{ .OrgPrevStart }}{{ .ReturnQS }}"
                hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Prev</a>
           {{ else }}
             <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
           {{ end }}
           {{ if .OrgHasNext }}
             <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
-               href="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}&org_after={{ .OrgNextCur }}&org_start={{ .OrgNextStart }}{{ .ReturnQS }}"
-               hx-get="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}&org_after={{ .OrgNextCur }}&org_start={{ .OrgNextStart }}{{ .ReturnQS }}"
+               href="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}&identity={{ .Identity }}&org_after={{ .OrgNextCur }}&org_start={{ .OrgNextStart }}{{ .ReturnQS }}"
+               hx-get="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}&identity={{ .Identity }}&org_after={{ .OrgNextCur }}&org_start={{ .OrgNextStart }}{{ .ReturnQS }}"
                hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Next</a>
           {{ else }}
             <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
@@ -70,8 +70,8 @@
       <!-- All orgs -->
       <div class="mb-2 text-sm">
         <a
-          href="/reports/members?org=all{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}{{ .ReturnQS }}"
-          hx-get="/reports/members?org=all{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}{{ .ReturnQS }}"
+          href="/reports/members?org=all{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}&identity={{ .Identity }}{{ .ReturnQS }}"
+          hx-get="/reports/members?org=all{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}&identity={{ .Identity }}{{ .ReturnQS }}"
           hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
           class="flex items-center justify-between px-2 py-1 rounded {{ if eq .SelectedOrg "all" }}bg-indigo-50 dark:bg-indigo-900/40{{ end }} hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-300"
         >
@@ -84,8 +84,8 @@
       <div class="border dark:border-gray-700 rounded divide-y dark:divide-gray-700 text-sm">
         {{ range .OrgRows }}
         <a
-          href="/reports/members?org={{ .ID.Hex }}{{ if $.OrgQuery }}&org_q={{ $.OrgQuery | urlquery }}{{ end }}&member_status={{ $.MemberStatus }}{{ $.ReturnQS }}"
-          hx-get="/reports/members?org={{ .ID.Hex }}{{ if $.OrgQuery }}&org_q={{ $.OrgQuery | urlquery }}{{ end }}&member_status={{ $.MemberStatus }}{{ $.ReturnQS }}"
+          href="/reports/members?org={{ .ID.Hex }}{{ if $.OrgQuery }}&org_q={{ $.OrgQuery | urlquery }}{{ end }}&member_status={{ $.MemberStatus }}&identity={{ $.Identity }}{{ $.ReturnQS }}"
+          hx-get="/reports/members?org={{ .ID.Hex }}{{ if $.OrgQuery }}&org_q={{ $.OrgQuery | urlquery }}{{ end }}&member_status={{ $.MemberStatus }}&identity={{ $.Identity }}{{ $.ReturnQS }}"
           hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
           class="flex items-center justify-between px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-gray-700 {{ if eq $.SelectedOrg .ID.Hex }}bg-indigo-50 dark:bg-indigo-900/40{{ end }} dark:text-gray-300"
         >
@@ -110,7 +110,7 @@
           hx-target="#content"
           hx-swap="innerHTML"
           hx-push-url="true"
-          hx-trigger="change from:#member-status"
+          hx-trigger="change from:#member-status, change from:#identity"
           class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-[max-content_max-content] lg:items-end gap-3"
         >
           <input type="hidden" name="org" value="{{ .SelectedOrg }}">
@@ -127,6 +127,16 @@
               <option value="disabled" {{ if eq .MemberStatus "disabled" }}selected{{ end }}>Disabled</option>
             </select>
           </div>
+
+          <div>
+            <label for="identity" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Identity in export</label>
+            <select id="identity" name="identity"
+                    class="px-2 py-2 border dark:border-gray-600 rounded w-auto dark:bg-gray-700 dark:text-gray-100">
+              {{ range .IdentityOptions }}
+              <option value="{{ .Value }}" {{ if eq $.Identity .Value }}selected{{ end }}>{{ .Label }}</option>
+              {{ end }}
+            </select>
+          </div>
         </form>
 
         <!-- Filename + Download form (non-HTMX, no-loader prevents spinner on file download) -->
@@ -137,6 +147,7 @@
           <input type="hidden" name="org" value="{{ .SelectedOrg }}">
           <input type="hidden" name="group" value="{{ .SelectedGroup }}">
           <input type="hidden" name="member_status" value="{{ .MemberStatus }}">
+          <input type="hidden" name="identity" value="{{ .Identity }}">
 
           <label class="text-sm text-gray-700 dark:text-gray-300">
             <div class="flex items-baseline justify-between mb-1 gap-2">
@@ -176,16 +187,16 @@
             <span class="flex gap-2">
               {{ if .GroupsHasPrev }}
                 <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
-                   href="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&group={{ .SelectedGroup }}&member_status={{ .MemberStatus }}&groups_before={{ .GroupsPrevCur }}&groups_start={{ .GroupsPrevStart }}{{ .ReturnQS }}"
-                   hx-get="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&group={{ .SelectedGroup }}&member_status={{ .MemberStatus }}&groups_before={{ .GroupsPrevCur }}&groups_start={{ .GroupsPrevStart }}{{ .ReturnQS }}"
+                   href="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&group={{ .SelectedGroup }}&member_status={{ .MemberStatus }}&identity={{ .Identity }}&groups_before={{ .GroupsPrevCur }}&groups_start={{ .GroupsPrevStart }}{{ .ReturnQS }}"
+                   hx-get="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&group={{ .SelectedGroup }}&member_status={{ .MemberStatus }}&identity={{ .Identity }}&groups_before={{ .GroupsPrevCur }}&groups_start={{ .GroupsPrevStart }}{{ .ReturnQS }}"
                    hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Prev</a>
               {{ else }}
                 <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Prev</span>
               {{ end }}
               {{ if .GroupsHasNext }}
                 <a class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 whitespace-nowrap"
-                   href="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&group={{ .SelectedGroup }}&member_status={{ .MemberStatus }}&groups_after={{ .GroupsNextCur }}&groups_start={{ .GroupsNextStart }}{{ .ReturnQS }}"
-                   hx-get="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&group={{ .SelectedGroup }}&member_status={{ .MemberStatus }}&groups_after={{ .GroupsNextCur }}&groups_start={{ .GroupsNextStart }}{{ .ReturnQS }}"
+                   href="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&group={{ .SelectedGroup }}&member_status={{ .MemberStatus }}&identity={{ .Identity }}&groups_after={{ .GroupsNextCur }}&groups_start={{ .GroupsNextStart }}{{ .ReturnQS }}"
+                   hx-get="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&group={{ .SelectedGroup }}&member_status={{ .MemberStatus }}&identity={{ .Identity }}&groups_after={{ .GroupsNextCur }}&groups_start={{ .GroupsNextStart }}{{ .ReturnQS }}"
                    hx-target="#content" hx-swap="innerHTML" hx-push-url="true">Next</a>
               {{ else }}
                 <span class="inline-flex items-center justify-center h-7 leading-none text-xs px-2 border rounded text-gray-400 dark:text-gray-500 whitespace-nowrap">Next</span>
@@ -196,8 +207,8 @@
           <!-- All groups for org -->
           <div class="mb-2 text-sm">
             <a
-              href="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}{{ .ReturnQS }}"
-              hx-get="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}{{ .ReturnQS }}"
+              href="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}&identity={{ .Identity }}{{ .ReturnQS }}"
+              hx-get="/reports/members?org={{ .SelectedOrg }}{{ if .OrgQuery }}&org_q={{ .OrgQuery | urlquery }}{{ end }}&member_status={{ .MemberStatus }}&identity={{ .Identity }}{{ .ReturnQS }}"
               hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
               class="flex items-center justify-between px-2 py-1 rounded {{ if eq .SelectedGroup "" }}bg-indigo-50 dark:bg-indigo-900/40{{ end }} hover:bg-gray-50 dark:hover:bg-gray-700 dark:text-gray-300"
             >
@@ -210,8 +221,8 @@
           <div class="border dark:border-gray-700 rounded divide-y dark:divide-gray-700 text-sm">
             {{ range .GroupRows }}
               <a
-                href="/reports/members?org={{ $.SelectedOrg }}&group={{ .ID.Hex }}{{ if $.OrgQuery }}&org_q={{ $.OrgQuery | urlquery }}{{ end }}&member_status={{ $.MemberStatus }}{{ $.ReturnQS }}"
-                hx-get="/reports/members?org={{ $.SelectedOrg }}&group={{ .ID.Hex }}{{ if $.OrgQuery }}&org_q={{ $.OrgQuery | urlquery }}{{ end }}&member_status={{ $.MemberStatus }}{{ $.ReturnQS }}"
+                href="/reports/members?org={{ $.SelectedOrg }}&group={{ .ID.Hex }}{{ if $.OrgQuery }}&org_q={{ $.OrgQuery | urlquery }}{{ end }}&member_status={{ $.MemberStatus }}&identity={{ $.Identity }}{{ $.ReturnQS }}"
+                hx-get="/reports/members?org={{ $.SelectedOrg }}&group={{ .ID.Hex }}{{ if $.OrgQuery }}&org_q={{ $.OrgQuery | urlquery }}{{ end }}&member_status={{ $.MemberStatus }}&identity={{ $.Identity }}{{ $.ReturnQS }}"
                 hx-target="#content" hx-swap="innerHTML" hx-push-url="true"
                 class="flex items-center justify-between px-2 py-1 rounded hover:bg-gray-50 dark:hover:bg-gray-700 {{ if eq $.SelectedGroup .ID.Hex }}bg-indigo-50 dark:bg-indigo-900/40{{ end }} dark:text-gray-300"
               >
@@ -314,11 +325,31 @@
             {{ end }}
           {{ end }}
         </div>
+        <div class="mb-3 text-gray-700 dark:text-gray-300 space-y-1">
+          <div>
+            <span class="font-medium">Identity in export:</span>
+            <span>{{ .IdentityLabel }}</span>
+          </div>
+          <div class="text-gray-600 dark:text-gray-400">
+            Columns:
+            <span class="font-mono text-xs">{{ range $i, $c := .IdentityColumns }}{{ if $i }}, {{ end }}{{ $c }}{{ end }}</span>
+          </div>
+          {{ if .IdentityPII }}
+          <div class="mt-1 p-2 border border-amber-300 bg-amber-50 dark:bg-amber-900/30 dark:border-amber-700 text-amber-800 dark:text-amber-200 rounded text-xs">
+            ⚠ Contains names, logins, and emails (PII).
+            {{ if eq .Identity "both" }}Paired with the hex IDs, this file is the re-identification key for de-identified data: keep it on the authorized side.{{ else }}Handle it under your data-handling agreements.{{ end }}
+          </div>
+          {{ else }}
+          <div class="mt-1 p-2 border border-green-300 bg-green-50 dark:bg-green-900/30 dark:border-green-700 text-green-800 dark:text-green-200 rounded text-xs">
+            ✓ Hex IDs only: no names, logins, or emails. This file can go to a recipient who holds de-identified data.
+          </div>
+          {{ end }}
+        </div>
         <div class="flex items-start gap-2">
           <span class="mt-0.5 select-none">💡</span>
           <p class="leading-relaxed">
             Use the Organization list and optional Group filter to scope the report.
-            Adjust Member status above, then download.
+            Choose Member status and Identity in export above, then download.
             This report is exported as a CSV file.
           </p>
         </div>

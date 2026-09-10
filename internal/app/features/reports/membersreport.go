@@ -57,6 +57,8 @@ func (h *Handler) ServeMembersReport(w http.ResponseWriter, r *http.Request) {
 		memberStatus = query.Get(r, "status")
 	}
 	selectedGroup := query.Get(r, "group")
+	// Which identity the export carries: hex IDs, names, or both (identity.go).
+	identity := normalizeIdentity(query.Get(r, "identity"))
 
 	// Optional back link
 	ret := query.Get(r, "return")
@@ -151,7 +153,7 @@ func (h *Handler) ServeMembersReport(w http.ResponseWriter, r *http.Request) {
 		safeLabel = "All"
 	}
 	safeLabel = strings.ReplaceAll(safeLabel, " ", "_")
-	downloadFilename := fmt.Sprintf("%s_%s.csv", safeLabel, time.Now().UTC().Format("2006-01-02_1504"))
+	downloadFilename := fmt.Sprintf("%s%s_%s.csv", safeLabel, identityFilenameSuffix(identity), time.Now().UTC().Format("2006-01-02_1504"))
 
 	// Compute ranges for pagination display
 	orgRange := paging.ComputeRange(orgStart, len(orgPane.Rows))
@@ -162,34 +164,34 @@ func (h *Handler) ServeMembersReport(w http.ResponseWriter, r *http.Request) {
 		ShowBack: showBack,
 		ReturnQS: returnQS,
 
-		OrgQuery:      orgQ,
-		OrgShown:      len(orgPane.Rows),
-		OrgTotal:      orgPane.Total,
-		OrgRangeStart: orgRange.Start,
-		OrgRangeEnd:   orgRange.End,
-		OrgHasPrev:    orgPane.HasPrev,
-		OrgHasNext:    orgPane.HasNext,
-		OrgPrevCur:    orgPane.PrevCursor,
-		OrgNextCur:    orgPane.NextCursor,
-		OrgPrevStart:  orgRange.PrevStart,
-		OrgNextStart:  orgRange.NextStart,
+		OrgQuery:        orgQ,
+		OrgShown:        len(orgPane.Rows),
+		OrgTotal:        orgPane.Total,
+		OrgRangeStart:   orgRange.Start,
+		OrgRangeEnd:     orgRange.End,
+		OrgHasPrev:      orgPane.HasPrev,
+		OrgHasNext:      orgPane.HasNext,
+		OrgPrevCur:      orgPane.PrevCursor,
+		OrgNextCur:      orgPane.NextCursor,
+		OrgPrevStart:    orgRange.PrevStart,
+		OrgNextStart:    orgRange.NextStart,
 		SelectedOrg:     selectedOrg,
 		SelectedOrgName: groupsPane.OrgName,
 		OrgRows:         orgPane.Rows,
 		AllCount:        orgPane.AllCount,
 
-		SelectedGroup:    selectedGroup,
-		GroupRows:        groupsPane.Rows,
-		GroupsShown:      len(groupsPane.Rows),
-		GroupsTotal:      groupsPane.Total,
-		GroupsRangeStart: groupsRange.Start,
-		GroupsRangeEnd:   groupsRange.End,
-		GroupsHasPrev:    groupsPane.HasPrev,
-		GroupsHasNext:    groupsPane.HasNext,
-		GroupsPrevCur:    groupsPane.PrevCursor,
-		GroupsNextCur:    groupsPane.NextCursor,
-		GroupsPrevStart:  groupsRange.PrevStart,
-		GroupsNextStart:  groupsRange.NextStart,
+		SelectedGroup:        selectedGroup,
+		GroupRows:            groupsPane.Rows,
+		GroupsShown:          len(groupsPane.Rows),
+		GroupsTotal:          groupsPane.Total,
+		GroupsRangeStart:     groupsRange.Start,
+		GroupsRangeEnd:       groupsRange.End,
+		GroupsHasPrev:        groupsPane.HasPrev,
+		GroupsHasNext:        groupsPane.HasNext,
+		GroupsPrevCur:        groupsPane.PrevCursor,
+		GroupsNextCur:        groupsPane.NextCursor,
+		GroupsPrevStart:      groupsRange.PrevStart,
+		GroupsNextStart:      groupsRange.NextStart,
 		OrgMembersCount:      groupsPane.OrgMembersCount,
 		MembersInGroupsCount: exportCounts.MembersInGroupsCount,
 		ExportRecordCount:    exportCounts.ExportRecordCount,
@@ -197,6 +199,12 @@ func (h *Handler) ServeMembersReport(w http.ResponseWriter, r *http.Request) {
 		GroupStatus:      groupStatus,
 		MemberStatus:     memberStatus,
 		DownloadFilename: downloadFilename,
+
+		Identity:        identity,
+		IdentityLabel:   identityLabel(identity),
+		IdentityOptions: identityOptions,
+		IdentityColumns: selectColumns(identity).Header(),
+		IdentityPII:     identity != IdentityDeidentified,
 	}
 
 	templates.RenderAutoMap(w, r, "reports_members", nil, data)

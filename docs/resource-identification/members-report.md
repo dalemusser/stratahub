@@ -11,6 +11,9 @@ those same hex IDs back to names, organizations, groups, and logins.
 
 In other words: the launch URL sends out **de-identified** identifiers; the
 Members Report is how an authorized person turns them back into **identities**.
+The same report can also be exported **de-identified** (hex IDs only), which is
+how you give a party on the de-identified side a roster of those identifiers
+without any names.
 
 ---
 
@@ -35,22 +38,55 @@ The report is always scoped to one workspace (the one in the URL).
 
 ---
 
+## Choosing what the export carries
+
+The page has an **Identity in export** selector, next to **Member status**. It
+decides which identity columns the CSV contains; the rows (who is in the file)
+are the same whichever you pick.
+
+| Selection | Columns | Contains PII? | Use it for |
+|-----------|---------|---------------|------------|
+| **De-identified — hex IDs only** | `workspace_id`, `user_id`, `organization_id`, `group_id`, `status` | No | A roster for a party that holds de-identified data — for example the respondent-ID list a survey provider preloads. This is the one export from this report that can go to the de-identified side. |
+| **Identified — names, logins, emails** | `workspace`, `full_name`, `login_id`, `email`, `organization`, `group`, `leaders`, `status` | **Yes** | A human-readable roster with no join keys, such as a class list. |
+| **Both — hex IDs and names** *(default)* | All twelve columns | **Yes** | The crosswalk: resolving hex IDs back to people. |
+
+The selection stays put while you change organization, group, or status; it is
+sent with the download; and it is written into the offered filename
+(`..._deidentified_...`, `..._identified_...`) so a file's contents are
+recognizable by name. The summary panel lists the exact columns the file will
+contain, with a green note (safe to share with the de-identified side) or an
+amber note (contains PII).
+
+The column sets mirror the resource URL identity schemes: **De-identified** is
+the same four hex IDs a **De-identified hex IDs** launch URL sends, and
+**Identified** the same names a **Human-readable** URL sends. A de-identified
+export and a de-identified launch URL therefore speak the same identifiers.
+
+On the export URL the selection is the `identity` parameter
+(`deidentified`, `identified`, or `both`; anything else, or nothing, means
+`both`).
+
+---
+
 ## What the CSV provides
 
-| Column | Meaning | Type |
-|--------|---------|------|
-| `workspace` | Workspace subdomain | name |
-| `workspace_id` | Workspace ObjectID | **hex** |
-| `user_id` | Member ObjectID | **hex** |
-| `full_name` | Member's full name | PII |
-| `login_id` | Member's login | PII |
-| `email` | Member's email | PII |
-| `organization` | Organization name | name |
-| `organization_id` | Organization ObjectID | **hex** |
-| `group` | Group name | name |
-| `group_id` | Group ObjectID | **hex** |
-| `leaders` | Teacher(s) for the group, by name, `|`-separated | PII |
-| `status` | `active` / `disabled` | — |
+The full (**Both**) export has these columns; the other two selections keep the
+subset shown in the last column, in the same order.
+
+| Column | Meaning | Type | In export |
+|--------|---------|------|-----------|
+| `workspace` | Workspace subdomain | name | Identified, Both |
+| `workspace_id` | Workspace ObjectID | **hex** | De-identified, Both |
+| `user_id` | Member ObjectID | **hex** | De-identified, Both |
+| `full_name` | Member's full name | PII | Identified, Both |
+| `login_id` | Member's login | PII | Identified, Both |
+| `email` | Member's email | PII | Identified, Both |
+| `organization` | Organization name | name | Identified, Both |
+| `organization_id` | Organization ObjectID | **hex** | De-identified, Both |
+| `group` | Group name | name | Identified, Both |
+| `group_id` | Group ObjectID | **hex** | De-identified, Both |
+| `leaders` | Teacher(s) for the group, by name, `|`-separated | PII | Identified, Both |
+| `status` | `active` / `disabled` | — | all |
 
 The four **hex** columns are the join keys back to de-identified data. The other
 columns are the identity they resolve to.
@@ -104,7 +140,8 @@ ws_id    = 695f5a3fa323f290a63b3fce
 ```
 
 To resolve who that is, an authorized person runs the Members Report for that
-workspace, downloads the CSV, and finds the row where `user_id` equals
+workspace, downloads the CSV with **Identity in export** left on **Both**, and
+finds the row where `user_id` equals
 `68f138c495cdf54a392b20aa`:
 
 ```
@@ -134,17 +171,19 @@ For an analysis dataset, you'd typically join your hex-keyed table to this CSV o
 
 ## This report is identifiable data — handle it accordingly
 
-The Members Report CSV contains direct PII (names, logins, emails) and **is the
-re-identification key** for otherwise de-identified data. Treat it as the most
-sensitive artifact in this system:
+The **Both** export contains direct PII (names, logins, emails) next to the hex
+IDs and **is the re-identification key** for otherwise de-identified data; the
+**Identified** export contains the same PII without the keys. Treat both as the
+most sensitive artifacts in this system:
 
 - Keep it on the authorized/StrataHub side. Do **not** hand it to a party that is
   only supposed to hold de-identified data — that would defeat the
   de-identification.
 - Share or store it only as permitted by your data-handling agreements
   (FERPA / COPPA / IRB).
-- When you only need de-identified analysis, you do not need this report at all —
-  work from the hex IDs alone.
+- When you only need de-identified analysis, work from the hex IDs alone: use
+  the **De-identified** export, which carries no names, logins, or emails and is
+  the one file from this report that may be handed to the de-identified side.
 
 ---
 

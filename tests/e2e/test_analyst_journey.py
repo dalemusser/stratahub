@@ -157,6 +157,71 @@ class TestAnalystMembersReport:
         download_btn = analyst_page.locator('button:has-text("Download")')
         expect(download_btn).to_be_visible()
 
+    def test_analyst_can_select_identity_in_export(self, analyst_page: Page):
+        """Test that analyst can choose which identity the export carries."""
+        analyst_page.goto("/reports/members")
+        wait_for_htmx(analyst_page)
+
+        identity_select = analyst_page.locator('#identity')
+        expect(identity_select).to_be_visible()
+
+        # Change to de-identified (hex IDs only)
+        identity_select.select_option("deidentified")
+        analyst_page.wait_for_timeout(500)
+        wait_for_htmx(analyst_page)
+
+        # URL should carry the selection
+        assert "identity=deidentified" in analyst_page.url
+
+        # The download form carries it too, and the offered filename names it
+        download_form = analyst_page.locator('form[action="/reports/members.csv"]')
+        expect(download_form.locator('input[name="identity"]')).to_have_value("deidentified")
+        assert "_deidentified_" in download_form.locator('input[name="filename"]').input_value()
+
+        # The info card says what the file will carry
+        expect(analyst_page.locator("body")).to_contain_text("Hex IDs only")
+
+        # The selection survives choosing an organization
+        org_links = analyst_page.locator('aside .border.rounded.divide-y a')
+        if org_links.count() > 0:
+            org_links.first.click()
+            wait_for_htmx(analyst_page)
+            assert "identity=deidentified" in analyst_page.url
+            expect(analyst_page.locator('#identity')).to_have_value("deidentified")
+
+    def test_deidentified_csv_has_only_hex_columns(self, analyst_page: Page):
+        """Test that the de-identified export carries no name, login, or email columns."""
+        analyst_page.goto("/reports/members")
+        wait_for_htmx(analyst_page)
+
+        resp = analyst_page.request.get("/reports/members.csv?identity=deidentified")
+        assert resp.ok
+        header = resp.text().lstrip(chr(0xFEFF)).splitlines()[0].strip()
+        assert header == "workspace_id,user_id,organization_id,group_id,status"
+
+    def test_identified_csv_has_only_name_columns(self, analyst_page: Page):
+        """Test that the identified export carries no hex id columns."""
+        analyst_page.goto("/reports/members")
+        wait_for_htmx(analyst_page)
+
+        resp = analyst_page.request.get("/reports/members.csv?identity=identified")
+        assert resp.ok
+        header = resp.text().lstrip(chr(0xFEFF)).splitlines()[0].strip()
+        assert header == "workspace,full_name,login_id,email,organization,group,leaders,status"
+
+    def test_default_csv_has_all_columns(self, analyst_page: Page):
+        """Test that the default export is the full crosswalk (hex ids and names)."""
+        analyst_page.goto("/reports/members")
+        wait_for_htmx(analyst_page)
+
+        resp = analyst_page.request.get("/reports/members.csv")
+        assert resp.ok
+        header = resp.text().lstrip(chr(0xFEFF)).splitlines()[0].strip()
+        assert header == (
+            "workspace,workspace_id,user_id,full_name,login_id,email,"
+            "organization,organization_id,group,group_id,leaders,status"
+        )
+
     def test_analyst_sees_filename_input(self, analyst_page: Page):
         """Test that analyst sees the filename input for CSV download."""
         analyst_page.goto("/reports/members")

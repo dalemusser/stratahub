@@ -57,17 +57,17 @@ type pageData struct {
 	ReturnQS string
 
 	// Left org pane
-	OrgQuery      string
-	OrgShown      int
-	OrgTotal      int64
-	OrgRangeStart int
-	OrgRangeEnd   int
-	OrgHasPrev    bool
-	OrgHasNext    bool
-	OrgPrevCur    string
-	OrgNextCur    string
-	OrgPrevStart  int
-	OrgNextStart  int
+	OrgQuery        string
+	OrgShown        int
+	OrgTotal        int64
+	OrgRangeStart   int
+	OrgRangeEnd     int
+	OrgHasPrev      bool
+	OrgHasNext      bool
+	OrgPrevCur      string
+	OrgNextCur      string
+	OrgPrevStart    int
+	OrgNextStart    int
 	SelectedOrg     string // "all" or hex string
 	SelectedOrgName string
 	OrgRows         []orgutil.OrgRow
@@ -94,4 +94,11 @@ type pageData struct {
 	GroupStatus      string // kept for UI parity with template
 	MemberStatus     string
 	DownloadFilename string
+
+	// Identity in the export (identity.go)
+	Identity        string           // "deidentified" | "identified" | "both"
+	IdentityLabel   string           // selector label for the current selection
+	IdentityOptions []identityOption // selector choices
+	IdentityColumns []string         // column names the export will contain
+	IdentityPII     bool             // the export carries names, logins, or emails
 }
