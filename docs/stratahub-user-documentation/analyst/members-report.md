@@ -21,6 +21,11 @@ Work left to right across the panels:
    de-identified data; the summary shows a green note when the file is safe to
    share that way and an amber note when it carries personal information.
 
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/members-report-deidentified-dark.png">
+  <img alt="Analyst's Members Report with Identity in export set to De-identified, listing the hex-ID columns and a green safe-to-share note" src="images/members-report-deidentified-light.png">
+</picture>
+
 ## Checking the totals and downloading
 
 The summary shows how many **members** and **records** the export will contain

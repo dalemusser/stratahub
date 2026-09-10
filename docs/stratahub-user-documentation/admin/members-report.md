@@ -26,6 +26,14 @@ Work left to right across the panels:
    someone who must not receive names, such as a research partner working with
    de-identified data.
 
+With **De-identified** selected, the summary lists only the hex-ID columns and
+shows the green note that the file is safe to share:
+
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="images/members-report-deidentified-dark.png">
+  <img alt="Members Report with Identity in export set to De-identified, listing the hex-ID columns and a green safe-to-share note" src="images/members-report-deidentified-light.png">
+</picture>
+
 ## Checking the totals
 
 As you adjust the filters, the summary updates to show exactly what the export will
