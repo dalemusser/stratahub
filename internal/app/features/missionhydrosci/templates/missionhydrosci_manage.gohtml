@@ -17,6 +17,10 @@
     <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Tools for troubleshooting, testing, and data management.</p>
   </div>
 
+  {{/* Shared modules for both branches below: the gate script and the
+       main script each build a renewable CSRF token keeper from them. */}}
+<script src="/assets/js/mhs-steplog.js?v={{ mhsSteplogVersion }}"></script>
+<script src="/assets/js/mhs-delivery.js?v={{ mhsDeliveryVersion }}"></script>
   {{ if and .Gated (not .Unlocked) }}
   <!-- ══════════════════ Staff authorization gate ══════════════════ -->
   <section class="flex-1 min-w-0 flex flex-col">
@@ -79,8 +83,6 @@
   <div class="h-4 shrink-0" aria-hidden="true"></div>
   </section>
 
-<script src="/assets/js/mhs-steplog.js?v={{ mhsSteplogVersion }}"></script>
-<script src="/assets/js/mhs-delivery.js?v={{ mhsDeliveryVersion }}"></script>
 <script>
 (function() {
   var csrfToken = '{{ .CSRFToken }}';
