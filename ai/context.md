@@ -926,7 +926,7 @@ make css-watch
 
 ## Recent Work Completed
 
-### Unit loading status + Unit 2 Device Test (2026-09, in progress)
+### Unit loading status + Unit 2 Device Test (2026-09; built, on dev, not yet in production)
 - Plan: `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md`
   (approved 2026-09-07). A0 implemented and deployed 2026-09-07 (device
   test pending): faster switch to the direct download path, content-server
@@ -944,14 +944,25 @@ make css-watch
   visibility every 30 s + closing beat) make a crashed tab show as "Page
   stopped responding" with a memory trend; a post-play questionnaire (sound
   required, controls, picture, performance, how far, notes) is stored on the
-  run and shown as a Sound column/filter. All plan steps are in place;
-  device verification pending
+  run and shown as a Sound column/filter. Added while testing (2026-09-08
+  to 09-10): bare layout for device-test pages (`BaseVM.AsBare()`), cache-hit
+  status rows + game-tab relay, viewer row click + Survey answers / Tester
+  reports sections, renewable CSRF tokens (`MHSStepLog.csrf`) and a CSRF
+  cookie that lives as long as the session (30 d in prod), launch watchdog
+  with content-server fallback, SW install that survives a pre-cache 401
+  (never-signed-in devices), direct-path byte-range resume (SW 1.0.15),
+  background-switch telemetry (`download-switched`, `bgfetch-frozen`) with a
+  1 h direct preference, and a Reset this device button that winds the run
+  back under the same test code. Status, open items and headless
+  verification recipes: plan §0. Real-device verification still deferred;
+  production promotion not started
 
-### Game log first-event rejection (2026-09-08, open, game-side)
+### Game log first-event rejection (2026-09-08, handed to the game developers)
 - `docs/mission-hydrosci/game-first-log-event-rejected.md`: the game's first
   log event of a session has no `user_id` and the log service rejects it
   (739 rejections in a week, real Chromebooks included); pre-existing, not
-  caused by the device test; for the game developers
+  caused by the device test. Delivered to the game developers 2026-09-09;
+  the fix is on the game side, nothing further here
 
 ### Data Viewers Framework (2026-08)
 - `internal/app/features/viewers`: one mechanism for role-gated, scoped,

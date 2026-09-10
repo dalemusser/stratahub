@@ -1,11 +1,85 @@
 # Mission HydroSci — Unit Loading Status and Unit 2 Device Test — Plan
 
 **Date:** 2026-09-07 (revised twice the same day after review: the device test is standalone, one fixed route per workspace, no accounts, no sessions, no links to manage)
-**Status:** Approved 2026-09-07, not started
+**Status:** All steps built; everything through `46e452a` deployed to the dev workspace and verified there; `39dca35` (reset winds the run back) pushed, awaiting deploy + dev check. See §0 for the resume-later state.
 **Scope:** two related pieces of work in `stratahub`, feature `internal/app/features/missionhydrosci`:
 
 - **A. Unit loading.** Answer the field reports (connection errors, downloads sitting at 0%, the long wait before the backup download method takes over) and add a visible step-by-step status so a user can see, and report, where a load fails.
 - **B. Unit 2 Device Test.** One URL per workspace that a school can open, with no account and no login, that downloads and plays Unit 2 in the real Mission HydroSci context, collecting as much device, network, download and gameplay data as we can, with an admin view to inspect and download it.
+
+---
+
+## 0. Status and how to resume (written 2026-09-10)
+
+**Where things stand.** A0, A1, B and A2 are built and live on the dev
+workspace, plus everything added while testing (2026-09-08/09): bare
+layout for the device-test pages, cache-hit status rows and the game-tab
+relay, survey/report sections in the viewer, renewable CSRF tokens and a
+CSRF cookie that lives as long as the session, the launch watchdog with a
+content-server fallback, the service-worker install fix for devices that
+never signed in, direct-path byte-range resume, background-switch
+telemetry with a one-hour direct preference, and the Reset this device
+button. Nothing is in production yet; the device test is enabled only on
+the dev workspace.
+
+**Pending when this was written.** `39dca35` (reset winds the run back to
+the pre-launch view under the same test code; §4.7 "Reset this device")
+is pushed but not deployed and not verified on dev. Check after deploying:
+run a device test through download and launch, press Reset, confirm the
+page returns to the download view with the same test code, the post-play
+questions stay hidden until the next launch, and the Device Tests detail
+shows "Resets: 1" and an "Ended … reset" line.
+
+**Open items (owner: project lead).**
+1. Real-device verification of the device test on an iPad and a
+   Chromebook (deferred). The never-signed-in install fix and the play-page
+   scope fix were verified headless only.
+2. One unexplained hang on the units page (2026-09-09, Unit 2 v2.7.0 stuck
+   at "Initializing…" on a Mac; never reproduced). If it recurs the play
+   page now logs the stuck step, retries from the content server at 90 s
+   and stores a `launch-stalled` record.
+3. Test data on the dev workspace: device-test runs named "Automated check
+   1–9", two member load records with "Automated renewal check" notes, and
+   one probe report plus one step on a real run (Test School 6). Remove with
+   a direct database update if the view should be clean.
+4. Watch the new `download-switched` records and `bgfetch-frozen` log lines
+   for a few weeks; the attached device state says whether Chrome pauses on
+   battery saver, a metered network, or something else, and the 25-second
+   switch window can then be tuned from evidence.
+5. Promotion to production: the usual tag-based release; the device test
+   stays off in each workspace until enabled in Site Settings.
+
+**How the pieces stay in sync.** The delivery manager
+(`mhs-delivery.js`), the service worker and the play template are one
+implementation shared by the units page, the manage page and the device
+test; the device test only passes page options (one-unit manifest,
+`isolated`, log streaming). Put every download/launch change in the
+shared code. The one divergence point is the play template's
+`{{ if .DeviceTest }}` branch — after any change there, verify BOTH a
+member launch and a device-test launch (that gap caused the 2026-09-08
+regression).
+
+**Verification recipes (headless Chromium via `playwright-cli`).** Use the
+dev workspace host; sign in through the dev login form (email only) as the
+dev admin account. Pass `--profile=<fresh dir>` to `open` for a "new
+device": profiles are otherwise shared across session names. `--raw eval`
+returns JSON strings — strip the quotes before reusing a URL.
+- Device test end to end: landing → form → run page (poll `#unit-status`
+  for "Ready to play") → open the Launch link → `window.__mhsStepLog`
+  entries should end with "Unity started" and "Game is rendering".
+  Headless never runs Background Fetch, so the 25 s silence and the switch
+  to the direct path are expected there and say nothing about real devices.
+- Watchdog: hold the loader request open with `page.context().route(
+  '**/missionhydrosci/content/**/<unit>.loader.js', () => {})` (unregister
+  the worker first so the request reaches the network layer) — warn at 30 s,
+  content-server retry at 90 s, game renders.
+- Resume: fulfill the first request for the unit's `.data.unityweb` on the
+  CDN with `route.fetch()` cut to 40 MB, pass later requests through — the
+  panel logs "picked up at 40 MB", the file verifies, the game launches.
+- Token renewal: delete the `stratahub_csrf` cookie under an open page,
+  press Send report — it must still say "Sent" and store the note.
+- Local server (`./bin/stratahub`, stop with `pkill`): the local email
+  login does not sign in, so use dev for anything that needs a session.
 
 ---
 
