@@ -196,6 +196,32 @@ Add an admin filter / column "Identification mode" on the resources list so all
 4. **Gate `human`/`both`?** Decide whether to restrict to the `dev` workspace or
    require an explicit PII acknowledgment.
 
+## Members Report export identity (shipped 2026-09-10)
+
+The Members Report CSV is the crosswalk for every de-identified scheme above, so
+it needed the same choice a launch URL has: hex IDs, names, or both. The page's
+**Identity in export** select (query parameter `identity` on the page and on
+`/reports/members.csv`) picks the column set:
+
+| Selection | Columns | PII |
+|-----------|---------|-----|
+| `deidentified` | `workspace_id`, `user_id`, `organization_id`, `group_id`, `status` | No — the one export that may go to the de-identified side (e.g. Abt's respondent-ID roster) |
+| `identified` | `workspace`, `full_name`, `login_id`, `email`, `organization`, `group`, `leaders`, `status` | Yes |
+| `both` (default) | All twelve, unchanged from before | Yes — the re-identification key |
+
+The sets mirror `hex` / `human` / `both` above, so a de-identified export and a
+de-identified launch URL carry the same identifiers. Rows are identical across
+selections; only the columns differ. The default stays `both`, so existing
+exports are byte-identical. The selection rides on every page link and on the
+download form, suffixes the offered filename (`_deidentified` / `_identified`),
+and the summary panel lists the columns with an amber (PII) or green (safe to
+share) note. A de-identified export never reads names: the user projection drops
+them and the name lookups are skipped.
+
+Status: in production since 2026-09-10 and verified in use. Code in
+`internal/app/features/reports/identity.go`; the user-facing description is
+`members-report.md` in this folder.
+
 ## Possible future mode (not building now)
 
 `institutional` — human-readable institutional context with a de-identified user

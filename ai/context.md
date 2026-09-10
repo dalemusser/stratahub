@@ -926,7 +926,7 @@ make css-watch
 
 ## Recent Work Completed
 
-### Members Report identity selector (2026-09-10)
+### Members Report identity selector (2026-09-10; in production, verified in use)
 - `/reports/members` has an **Identity in export** select next to Member
   status: **De-identified** (`workspace_id`, `user_id`, `organization_id`,
   `group_id`, `status`), **Identified** (`workspace`, `full_name`, `login_id`,
@@ -938,10 +938,26 @@ make css-watch
   share) note. Column sets mirror the URL identity schemes (hex / human /
   both). A de-identified export never reads names: the user projection drops
   them and the org/workspace/group/leader lookups are skipped. Code:
-  `features/reports/identity.go`; tests `identity_test.go`,
-  `memberscsv_test.go` (MongoDB); e2e in `tests/e2e/test_analyst_journey.py`.
-  Docs: `docs/resource-identification/members-report.md` (crosswalk + the
-  three selections) and the admin/analyst/coordinator user guides
+  `features/reports/identity.go` (column sets, labels, filename suffix), used
+  by `memberscsv.go` and `membersreport.go`; tests `identity_test.go` (pure)
+  and `memberscsv_test.go` (MongoDB); e2e
+  `tests/e2e/test_analyst_journey.py::TestAnalystMembersReport`
+- Toolbar: a wrapping flex row with a 12 px gap; the download form takes the
+  rest of the row when it fits (`basis-[26rem]`) and otherwise drops to its
+  own full-width row (bf250c4)
+- Docs: `docs/resource-identification/members-report.md` (crosswalk + the
+  three selections), `plan.md` §"Members Report export identity", the
+  admin/analyst/coordinator user guides and `analyst-view.md` with
+  screenshots recaptured 2026-09-10 (67c1edf; the admin and analyst guides
+  also show the De-identified state); `member-status-api/rollout-todo.md` §7
+  and `abt-survey-url-options.md` point Abt's roster at the de-identified
+  export
+- **Status:** commits 1bda35e, bf250c4, 67c1edf; deployed 2026-09-10 (build
+  `20260910-082359`); Dale confirmed the report works in use the same day.
+  Nothing open. To extend (another column or selection): edit `csvColumns` /
+  `identityOptions` in `identity.go`, add the case to `identity_test.go`,
+  update the tables in `members-report.md`, and recapture the screenshots
+  with the `stratahub-docs` skill
 
 ### Unit loading status + Unit 2 Device Test (2026-09; built, on dev, not yet in production)
 - Plan: `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md`

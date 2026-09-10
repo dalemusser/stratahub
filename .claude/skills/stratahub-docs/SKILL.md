@@ -92,3 +92,13 @@ To show the teacher or student perspective, log in as that account in a **separa
 playwright-cli -s=teacher open https://project.adroit.games --profile=./.playwright/profile-teacher
 ```
 Have the user prime each role session by hand once (same as the admin prime, using the credentials recorded in `.playwright/secrets.env`), then capture its screens with the same build-once / flip-live dual-theme loop above. (`profile-*` directories are already gitignored.)
+
+**Expired role sessions.** Sessions last about 30 days, so a role window that lands on `/login` only needs signing back in. The demo accounts' credentials are the `ANALYST_*`, `COORDINATOR_*`, `LEADER_*`, and `MEMBER_*` entries in `.playwright/secrets.env` (the user does not have them memorized). Sign the window in from the shell with variable substitution so the values never reach the transcript, and discard the command's output (it echoes the code it ran):
+```
+set -a; source .playwright/secrets.env; set +a
+playwright-cli -s=analyst run-code "async (page) => { await page.goto('https://project.adroit.games/login'); await page.fill('input[name=\"email\"]', '$ANALYST_EMAIL'); await page.click('button[type=\"submit\"]'); await page.waitForURL(/login\/password/); await page.fill('input[type=\"password\"]', '$ANALYST_PASSWORD'); await page.click('button[type=\"submit\"]'); await page.waitForLoadState('networkidle'); }" >/dev/null 2>&1
+playwright-cli -s=analyst eval "() => location.href"
+```
+This applies to the demo role accounts only; the admin session is still primed by the user, and a superadmin login must never be left in a role profile. Quote any URL that contains `?` on the command line (zsh expands it otherwise).
+
+Profiles in use: `profile` (admin), `profile-analyst` (Avery Sinclair), `profile-coordinator` (Marisol Reyes), `profile-leader` (Marcus Webb), `profile-member` (Aisha Rahman). Check a session before capturing with `playwright-cli -s=<name> eval "() => location.href"`.
