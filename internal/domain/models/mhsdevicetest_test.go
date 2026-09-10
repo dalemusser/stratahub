@@ -64,3 +64,25 @@ func TestStoppedResponding(t *testing.T) {
 		}
 	}
 }
+
+func TestLaunchedSinceReset(t *testing.T) {
+	base := time.Date(2026, 9, 10, 4, 0, 0, 0, time.UTC)
+	at := func(m int) *time.Time { v := base.Add(time.Duration(m) * time.Minute); return &v }
+	run := MHSDeviceTest{ReachedStage: MHSDeviceTestStageGameplay, LastLaunchAt: at(10), LastHeartbeatAt: at(12)}
+	if !run.LaunchedSinceReset() {
+		t.Fatal("never reset: a launched run must count as launched")
+	}
+	run.LastResetAt = at(20)
+	if run.LaunchedSinceReset() {
+		t.Fatal("after a reset with no later launch, the run must not count as launched")
+	}
+	run.LastLaunchAt = at(25)
+	if !run.LaunchedSinceReset() {
+		t.Fatal("a launch after the reset must count")
+	}
+	run.LastLaunchAt = at(10)
+	run.LastHeartbeatAt = at(30)
+	if !run.LaunchedSinceReset() {
+		t.Fatal("a heartbeat after the reset must count as launched")
+	}
+}

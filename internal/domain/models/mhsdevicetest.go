@@ -141,6 +141,7 @@ const MHSDeviceTestHeartbeatGrace = 2 * time.Minute
 const (
 	MHSDeviceTestEndCompleted = "completed" // the game reported the unit complete
 	MHSDeviceTestEndClosed    = "closed"    // the page said it was leaving (back, tab closed)
+	MHSDeviceTestEndReset     = "reset"     // the tester pressed Reset this device (the run continues after the next launch)
 )
 
 // MHSDeviceTestQuestionnaire is what the tester answered after playing:
@@ -215,7 +216,14 @@ type MHSDeviceTest struct {
 	Launch            MHSDeviceTestLaunch   `bson:"launch" json:"launch"`
 	GameplayReachedAt *time.Time            `bson:"gameplay_reached_at,omitempty" json:"gameplay_reached_at,omitempty"`
 	UnitCompletedAt   *time.Time            `bson:"unit_completed_at,omitempty" json:"unit_completed_at,omitempty"`
-	CrashCount        int                   `bson:"crash_count,omitempty" json:"crash_count,omitempty"`
+	// LastLaunchAt is the most recent launch activity (a launch step from
+	// the run or play page, or a launch summary). LastResetAt and Resets
+	// record "Reset this device": the run keeps its id and history, and the
+	// run page treats it as not launched again until a launch after the reset.
+	LastLaunchAt *time.Time `bson:"last_launch_at,omitempty" json:"last_launch_at,omitempty"`
+	LastResetAt  *time.Time `bson:"last_reset_at,omitempty" json:"last_reset_at,omitempty"`
+	Resets       int        `bson:"resets,omitempty" json:"resets,omitempty"`
+	CrashCount   int        `bson:"crash_count,omitempty" json:"crash_count,omitempty"`
 
 	Steps          []MHSDeviceTestStep   `bson:"steps,omitempty" json:"steps,omitempty"`
 	ProblemReports []MHSDeviceTestReport `bson:"problem_reports,omitempty" json:"problem_reports,omitempty"`
@@ -234,6 +242,18 @@ type MHSDeviceTest struct {
 
 // Launched reports whether the game page was reached at least once, which
 // is when the post-play questionnaire becomes relevant.
+// LaunchedSinceReset reports whether the game was launched after the most
+// recent Reset this device (or at all, when never reset). The run page
+// shows the post-play questions only then.
+func (t *MHSDeviceTest) LaunchedSinceReset() bool {
+	if t.LastResetAt == nil {
+		return t.Launched()
+	}
+	after := func(p *time.Time) bool { return p != nil && p.After(*t.LastResetAt) }
+	return after(t.LastLaunchAt) || after(t.GameplayReachedAt) || after(t.UnitCompletedAt) || after(t.LastHeartbeatAt)
+}
+
+// Launched reports whether the game was ever launched in this run.
 func (t *MHSDeviceTest) Launched() bool {
 	switch t.ReachedStage {
 	case MHSDeviceTestStageLaunching, MHSDeviceTestStageGameplay, MHSDeviceTestStageCompleted:

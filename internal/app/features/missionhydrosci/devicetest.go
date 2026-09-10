@@ -66,6 +66,7 @@ func (h *Handler) MountDeviceTestRoutes(r chi.Router) {
 		rr.Post("/summary", h.HandleDeviceTestSummary)
 		rr.Post("/report", h.HandleDeviceTestReport)
 		rr.Post("/complete", h.HandleDeviceTestComplete)
+		rr.Post("/reset", h.HandleDeviceTestReset)
 		rr.Post("/heartbeat", h.HandleDeviceTestHeartbeat)
 		rr.Post("/questionnaire", h.HandleDeviceTestQuestionnaire)
 	})
@@ -297,7 +298,9 @@ type deviceTestRunData struct {
 
 	// Post-play questionnaire: shown once the game was launched and not yet
 	// answered (or when the tester asks to edit); answered shows a thank-you.
-	Launched          bool
+	Launched          bool // launched since the last reset
+	Resets            int
+	LastResetAt       *time.Time
 	ShowQuestionnaire bool
 	Questionnaire     *models.MHSDeviceTestQuestionnaire
 	QuestionnaireDone bool
@@ -336,7 +339,9 @@ func (h *Handler) ServeDeviceTestRun(w http.ResponseWriter, r *http.Request) {
 		PlayURL:     base + "/play",
 	}
 	q := r.URL.Query()
-	data.Launched = run.Launched()
+	data.Launched = run.LaunchedSinceReset()
+	data.Resets = run.Resets
+	data.LastResetAt = run.LastResetAt
 	data.Questionnaire = run.Questionnaire
 	data.QuestionnaireDone = run.Questionnaire != nil
 	data.Thanks = q.Get("thanks") == "1"
@@ -589,6 +594,12 @@ func (h *Handler) HandleDeviceTestSteps(w http.ResponseWriter, r *http.Request) 
 		run.FailedStep, run.FailedReason, run.GameplayReachedAt != nil, now)
 	steps = dropStoredSteps(steps, run.Steps)
 	set := bson.M{"reached_stage": derived.reached}
+	for _, e := range req.Entries {
+		if e.Step == "launch" { // any launch activity, from the run page or the game tab
+			set["last_launch_at"] = now
+			break
+		}
+	}
 	if run.UnitCompletedAt == nil {
 		set["stage"] = derived.stage
 	}
@@ -744,6 +755,9 @@ func (h *Handler) HandleDeviceTestSummary(w http.ResponseWriter, r *http.Request
 	if req.Launch != nil {
 		set["launch"] = *req.Launch
 	}
+	if req.Launch != nil || req.GameplayReached {
+		set["last_launch_at"] = time.Now().UTC()
+	}
 	if req.GameplayReached && run.GameplayReachedAt == nil {
 		set["gameplay_reached_at"] = time.Now().UTC()
 		if run.UnitCompletedAt == nil && deviceTestStageRank[run.ReachedStage] < deviceTestStageRank[models.MHSDeviceTestStageGameplay] {
@@ -892,6 +906,25 @@ func (h *Handler) HandleDeviceTestReport(w http.ResponseWriter, r *http.Request)
 		h.deviceTestWriteError(w, err)
 		return
 	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// HandleDeviceTestReset records "Reset this device": the page then removes
+// the unit's files, replaces the service worker and reloads; the run keeps
+// its id and history and shows the pre-launch view again. Save and log data
+// on the game services are not touched.
+func (h *Handler) HandleDeviceTestReset(w http.ResponseWriter, r *http.Request) {
+	ctx, cancel := context.WithTimeout(r.Context(), timeouts.Medium())
+	defer cancel()
+	run, ok := h.loadDeviceTestRun(w, r, ctx, false)
+	if !ok {
+		return
+	}
+	if err := h.DeviceTestStore.Reset(ctx, run.WorkspaceID, run.ID); err != nil {
+		h.deviceTestWriteError(w, err)
+		return
+	}
+	h.Log.Info("device test: reset by the tester", zap.String("test_id", run.ID.Hex()), zap.String("school", run.Form.School), zap.Int("resets_before", run.Resets))
 	w.WriteHeader(http.StatusNoContent)
 }
 

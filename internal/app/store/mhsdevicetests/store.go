@@ -141,6 +141,18 @@ func (s *Store) AddReport(ctx context.Context, workspaceID, id primitive.ObjectI
 	}}})
 }
 
+// Reset records "Reset this device": the run keeps its id and history, its
+// current stage goes back to the run page, the previous play (if any) is
+// ended with reason "reset", and the count of resets grows. A later launch
+// reopens it like a closed run.
+func (s *Store) Reset(ctx context.Context, workspaceID, id primitive.ObjectID) error {
+	now := time.Now().UTC()
+	return s.update(ctx, workspaceID, id, bson.M{
+		"$set": bson.M{"last_reset_at": now, "stage": models.MHSDeviceTestStageRun, "end_reason": models.MHSDeviceTestEndReset, "ended_at": now},
+		"$inc": bson.M{"resets": 1},
+	})
+}
+
 // Heartbeat records one liveness/memory sample. A non-closing beat from a
 // run that had been marked "closed" reopens it (the tester came back or
 // relaunched); a closing beat marks the run ended unless the unit was
@@ -156,7 +168,7 @@ func (s *Store) Heartbeat(ctx context.Context, workspaceID, id primitive.ObjectI
 
 	if !closing {
 		// Reopen a run the page had said it was leaving.
-		reopen := bson.M{"_id": id, "workspace_id": workspaceID, "end_reason": models.MHSDeviceTestEndClosed}
+		reopen := bson.M{"_id": id, "workspace_id": workspaceID, "end_reason": bson.M{"$in": []string{models.MHSDeviceTestEndClosed, models.MHSDeviceTestEndReset}}}
 		if _, err := s.c.UpdateOne(ctx, reopen, bson.M{"$unset": bson.M{"ended_at": "", "end_reason": ""}}); err != nil {
 			return err
 		}

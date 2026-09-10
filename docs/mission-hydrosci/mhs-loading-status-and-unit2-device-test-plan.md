@@ -354,8 +354,12 @@ server ignoring Range) byte-for-byte.
 **Reset this device (2026-09-09).** Run-page button: deletes the test
 unit's cache (isolated: other units untouched), clears the prefer-direct
 memory, unregisters the service worker, reloads; the reset is logged as a
-step and flushed before the reload. The play page's stalled-launch advice
-for the device test points to it.
+step and flushed before the reload. Server side, `POST …/reset` sets
+`last_reset_at`, `resets++`, stage "run", end reason "reset" (reopened by
+the next heartbeat); `LaunchedSinceReset()` (last_launch_at / gameplay /
+heartbeat after the reset) decides whether the run page shows the
+questionnaire. Save and log data are never touched (Dale). The play page's
+stalled-launch advice for the device test points to the button.
 
 ### 4.8 Security and privacy
 

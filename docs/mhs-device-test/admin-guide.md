@@ -91,8 +91,12 @@ so a first run that fails on this is still informative.
    tester add a note, and **Reset this device** removes the unit's files from
    the device, forgets a "prefer direct download" memory, replaces the
    service worker and reloads, so a stuck device starts the test again from
-   the download under the same test code (the reset is a step in the run's
-   record). Other units on a shared device are not touched. When Unit 2 is already on the device from an earlier
+   the download under the same test code. The record keeps everything from
+   before (steps, heartbeats, answers) plus the reset itself; the run page
+   shows the pre-launch view again and the post-play questions return only
+   after the next launch. The detail shows a **Resets** count. Save and log
+   data on the game services are never touched, so the game resumes where
+   the tester left off. Other units on a shared device are not touched. When Unit 2 is already on the device from an earlier
    run (same device, same build), the download row says so, the files are
    verified and the content server and game services are probed anyway, so
    no row is left blank.

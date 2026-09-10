@@ -637,6 +637,15 @@ func (v *DeviceTests) Detail(ctx context.Context, scope *viewscope.Scope, id str
 		fields = add(fields, "Ended", "Completed the unit at "+t.EndedAt.UTC().Format(time.RFC3339)+" UTC", false)
 	case t.EndReason == models.MHSDeviceTestEndClosed && t.EndedAt != nil:
 		fields = add(fields, "Ended", "Left the game at "+t.EndedAt.UTC().Format(time.RFC3339)+" UTC", false)
+	case t.EndReason == models.MHSDeviceTestEndReset && t.EndedAt != nil:
+		fields = add(fields, "Ended", "Reset by the tester at "+t.EndedAt.UTC().Format(time.RFC3339)+" UTC — the run continues after the next launch", false)
+	}
+	if t.Resets > 0 {
+		last := ""
+		if t.LastResetAt != nil {
+			last = ", last " + t.LastResetAt.UTC().Format(time.RFC3339) + " UTC"
+		}
+		fields = add(fields, "Resets", fmt.Sprintf("%d (Reset this device: the unit's files were removed and downloaded again%s)", t.Resets, last), false)
 	}
 	if t.LastHeartbeat != nil {
 		fields = add(fields, "Last heartbeat", heartbeatText(t.LastHeartbeat)+fmt.Sprintf(" (%d beats)", t.HeartbeatCount), false)
