@@ -186,6 +186,13 @@ JSON* gives every matching run in full, for analysis.
 ### Member load records
 
 The same view holds a second kind of record, under the **Kind** filter:
+**Outcomes on member load records** (the Kind = Member load record rows):
+download-complete, download-failed, download-switched (a background
+download went silent and the page switched to the direct download; the
+"Download method" step's detail holds the device state at that moment:
+Chrome's registration result, tab visibility, connection, battery),
+launch-ok, launch-stalled, launch-failed, crash, and report (Send report).
+
 **Member load record**. A signed-in student's launcher stores its own step
 log when a download completes or fails (at most every ten minutes while
 retries continue), when a launch fails, succeeds, or crashes while loading,

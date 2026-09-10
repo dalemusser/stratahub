@@ -25,6 +25,7 @@ import (
 const (
 	memberStepLogDownloadFailed   = "download-failed"
 	memberStepLogDownloadComplete = "download-complete"
+	memberStepLogDownloadSwitched = "download-switched" // a background download went silent and the page switched to direct (device state in the step detail)
 	memberStepLogLaunchFailed     = "launch-failed"
 	memberStepLogLaunchStalled    = "launch-stalled" // no loader progress for 30 s (the play page's watchdog)
 	memberStepLogLaunchOK         = "launch-ok"
@@ -55,7 +56,7 @@ func (h *Handler) HandleMemberStepLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch req.Outcome {
-	case memberStepLogDownloadFailed, memberStepLogDownloadComplete, memberStepLogLaunchFailed, memberStepLogLaunchStalled, memberStepLogLaunchOK, memberStepLogCrash, memberStepLogReport:
+	case memberStepLogDownloadFailed, memberStepLogDownloadComplete, memberStepLogDownloadSwitched, memberStepLogLaunchFailed, memberStepLogLaunchStalled, memberStepLogLaunchOK, memberStepLogCrash, memberStepLogReport:
 	default:
 		writeDeviceTestJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bad_outcome"})
 		return

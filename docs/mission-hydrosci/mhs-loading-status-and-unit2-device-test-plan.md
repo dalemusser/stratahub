@@ -339,6 +339,18 @@ and never lets a failure abort the install. Lesson recorded: verify the
 device-test play page, not only the member play page, after any play
 template change.
 
+**Download path review (2026-09-09).** Thirty days of telemetry: 0
+Background Fetch failures reported by Chrome; 9 of 10 Chromebooks only
+ever downloaded in the background; all 150 download errors were on the
+direct path, 135 of them a connection dropping mid-file. Changes, all in
+the shared code so the launcher pages and the device test behave the same:
+(1) the frozen-switch records its event with device state
+(`download-switched` record, `bgfetch-frozen` telemetry); (2) the "prefer
+direct" memory is 1 h and clears on a later background success; (3) the
+direct path resumes a broken file from 8 MB parts with a Range request
+(SW 1.0.15). Verified in a Node harness (clean, one break, two breaks,
+server ignoring Range) byte-for-byte.
+
 ### 4.8 Security and privacy
 
 - **Game-service keys.** The play page renders the static stratalog and stratasave Bearer keys server-side, exactly as it does for students today; the URL never contains them. Anyone who reaches the play page can read them from the HTML, which is already true of every student browser. The enable switch turns the route off for workspaces that do not use it.

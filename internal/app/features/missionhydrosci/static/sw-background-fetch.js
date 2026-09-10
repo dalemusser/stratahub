@@ -201,25 +201,166 @@ function listActiveFallbacks() {
   return keys;
 }
 
+// ---- Resumable single-file download (the direct path) ----
+//
+// A dropped connection used to cost the whole file: cache.put() only stores
+// a fully received body, so 190 of 200 MB were thrown away and the next
+// attempt started from zero — the #1 error in the field ("Cache.put()
+// encountered a network error", 135 of 150 errors in 30 days, all on this
+// path). Now the live body is tee'd: one branch feeds the final cache entry
+// exactly as before, the other is saved in 8 MB parts (plus a small meta
+// entry) as it arrives. If the stream breaks, the parts survive; the next
+// attempt asks the content server for the rest with a Range request, streams
+// parts + remainder into the final entry, and drops the parts on success.
+// Part keys carry a query string (a #fragment would be stripped by the Cache
+// API), so they never match the file's own key that pages and the fetch
+// handler look up. A server that ignores the Range (200 instead of 206), or
+// whose ETag changed (If-Range), restarts the file cleanly.
+var RESUME_PART_BYTES = 8 * 1024 * 1024;
+
+function partKey(cacheKey, i) { return cacheKey + '?part=' + i; }
+function partsMetaKey(cacheKey) { return cacheKey + '?parts'; }
+
+async function readPartsMeta(cache, cacheKey, expectedSize) {
+  try {
+    var r = await cache.match(partsMetaKey(cacheKey));
+    if (!r) return null;
+    var meta = await r.json();
+    if (!meta || meta.size !== expectedSize || !(meta.count > 0) || !(meta.bytes > 0)) return null;
+    return meta;
+  } catch (e) { return null; }
+}
+
+async function writePartsMeta(cache, cacheKey, meta) {
+  await cache.put(partsMetaKey(cacheKey), new Response(JSON.stringify(meta), { headers: { 'content-type': 'application/json' } }));
+}
+
+async function dropParts(cache, cacheKey) {
+  try {
+    var keys = await cache.keys();
+    var prefix = new URL(cacheKey, self.location.origin).href + '?part';
+    for (var i = 0; i < keys.length; i++) {
+      if (keys[i].url.indexOf(prefix) === 0) await cache.delete(keys[i]);
+    }
+  } catch (e) { /* best effort */ }
+}
+
+// A stream of the saved parts 0..count-1, read one at a time (8 MB each).
+function partsStream(cache, cacheKey, count) {
+  var i = 0;
+  return new ReadableStream({
+    pull: async function(controller) {
+      if (i >= count) { controller.close(); return; }
+      var r = await cache.match(partKey(cacheKey, i));
+      if (!r) throw new Error('resume part ' + i + ' missing');
+      controller.enqueue(new Uint8Array(await r.arrayBuffer()));
+      i++;
+    }
+  });
+}
+
+// Reads stream a to its end, then stream b.
+function concatStreams(a, b) {
+  var reader = a.getReader(), second = false;
+  return new ReadableStream({
+    pull: async function(controller) {
+      for (;;) {
+        var res = await reader.read();
+        if (!res.done) { controller.enqueue(res.value); return; }
+        if (second) { controller.close(); return; }
+        second = true; reader = b.getReader();
+      }
+    },
+    cancel: function(reason) { try { reader.cancel(reason); } catch (e) { /* ignore */ } }
+  });
+}
+
+// Saves the live stream in parts as it arrives, keeping the meta entry
+// current after every completed part so a broken stream loses at most one
+// part's worth of bytes. Resolves when the stream ends; rejects on error.
+async function writeParts(cache, cacheKey, stream, startIndex, startBytes, etag, expectedSize, contentType) {
+  var reader = stream.getReader();
+  var index = startIndex, bytes = startBytes;
+  var chunks = [], buffered = 0;
+  async function flush() {
+    if (!buffered) return;
+    var buf = new Uint8Array(buffered), off = 0;
+    for (var i = 0; i < chunks.length; i++) { buf.set(chunks[i], off); off += chunks[i].byteLength; }
+    chunks = []; buffered = 0;
+    await cache.put(partKey(cacheKey, index), new Response(buf));
+    index++; bytes += buf.byteLength;
+    await writePartsMeta(cache, cacheKey, { size: expectedSize, etag: etag, count: index, bytes: bytes, type: contentType || '' });
+  }
+  for (;;) {
+    var res = await reader.read();
+    if (res.done) break;
+    chunks.push(res.value); buffered += res.value.byteLength;
+    if (buffered >= RESUME_PART_BYTES) await flush();
+  }
+  await flush();
+  return bytes;
+}
+
 /**
  * Fetches one file and writes it to the cache, piping the body through a
  * byte counter so intra-file progress can be reported (a unit is dominated
  * by one large file, so per-file-boundary progress sits at 0% then jumps to
- * ~100%). The body is never buffered in SW memory; cache.put only stores a
- * fully-received response, so a mid-stream failure leaves no partial entry.
+ * ~100%). The body is never buffered in SW memory. Resumes a file whose
+ * earlier attempt broke mid-stream (see the notes above); onResume(offset)
+ * is called when that happens.
  */
-async function fetchAndCacheFile(cache, cacheKey, url, onBytes, signal) {
-  var response = await fetch(url, { mode: 'cors', signal: signal });
-  if (!response.ok) {
+async function fetchAndCacheFile(cache, cacheKey, url, expectedSize, onBytes, signal, onResume) {
+  var meta = expectedSize ? await readPartsMeta(cache, cacheKey, expectedSize) : null;
+  if (meta && meta.bytes >= expectedSize) {
+    // Every part arrived but the final write failed (a quota blip, a
+    // terminated worker): assemble from the parts, no request needed. A
+    // Range past the end would only earn a 416.
+    var hdrsAll = new Headers();
+    hdrsAll.set('content-type', meta.type || 'application/octet-stream');
+    hdrsAll.set('content-length', String(expectedSize));
+    if (onResume) { try { onResume(expectedSize); } catch (e) { /* ignore */ } }
+    await cache.put(cacheKey, new Response(partsStream(cache, cacheKey, meta.count), { status: 200, headers: hdrsAll }));
+    onBytes(expectedSize);
+    await dropParts(cache, cacheKey);
+    return;
+  }
+  var offset = meta ? meta.bytes : 0;
+  var init = { mode: 'cors', signal: signal };
+  if (offset > 0) {
+    init.headers = { 'Range': 'bytes=' + offset + '-' };
+    if (meta.etag) init.headers['If-Range'] = meta.etag;
+  }
+  var response = await fetch(url, init);
+  if (offset > 0 && response.status === 200) {
+    // The server ignored the range (or the file changed): start over.
+    await dropParts(cache, cacheKey); meta = null; offset = 0;
+  } else if (offset > 0 && response.status !== 206) {
+    throw new Error('Failed to resume ' + url + ': ' + response.status);
+  } else if (offset === 0 && !response.ok) {
     throw new Error('Failed to fetch ' + url + ': ' + response.status);
   }
+  if (offset > 0 && onResume) { try { onResume(offset); } catch (e) { /* ignore */ } }
 
-  if (!response.body || !response.body.pipeThrough || typeof TransformStream === 'undefined') {
-    await cache.put(cacheKey, response);
+  var canResume = !!(expectedSize && response.body && response.body.tee && typeof TransformStream !== 'undefined');
+  if (!canResume) {
+    // No streams (very old browser) or unknown size: the original atomic put.
+    if (!response.body || !response.body.pipeThrough || typeof TransformStream === 'undefined') {
+      await cache.put(cacheKey, response);
+      return;
+    }
+    var received0 = 0;
+    var counter0 = new TransformStream({
+      transform: function(chunk, controller) { received0 += chunk.byteLength; onBytes(received0); controller.enqueue(chunk); }
+    });
+    var headers0 = new Headers(response.headers);
+    if (headers0.get('content-encoding')) { headers0.delete('content-encoding'); headers0.delete('content-length'); }
+    await cache.put(cacheKey, new Response(response.body.pipeThrough(counter0), { status: response.status, statusText: response.statusText, headers: headers0 }));
     return;
   }
 
-  var received = 0;
+  var etag = response.headers.get('etag') || (meta && meta.etag) || '';
+  var startIndex = meta ? meta.count : 0;
+  var received = offset;
   var counter = new TransformStream({
     transform: function(chunk, controller) {
       received += chunk.byteLength;
@@ -227,34 +368,32 @@ async function fetchAndCacheFile(cache, cacheKey, url, onBytes, signal) {
       controller.enqueue(chunk);
     }
   });
-
-  var headers = new Headers(response.headers);
-  if (headers.get('content-encoding')) {
-    // response.body is the decoded stream — encoding headers no longer apply.
-    // Note: Content-Encoding is not a CORS-safelisted response header, so for
-    // cross-origin CDN responses this branch cannot see it; the page-side size
-    // verifier compensates by falling back to counting stored bytes on a
-    // header/manifest size mismatch (see mhs-delivery.js _verifyLargestFile).
-    headers.delete('content-encoding');
-    headers.delete('content-length');
-  }
-
-  await cache.put(cacheKey, new Response(response.body.pipeThrough(counter), {
-    status: response.status,
-    statusText: response.statusText,
-    headers: headers
-  }));
+  var branches = response.body.tee();
+  var finalBody = concatStreams(partsStream(cache, cacheKey, startIndex), branches[0].pipeThrough(counter));
+  var headers = new Headers();
+  headers.set('content-type', response.headers.get('content-type') || 'application/octet-stream');
+  headers.set('content-length', String(expectedSize));
+  var partWriter = writeParts(cache, cacheKey, branches[1], startIndex, offset, etag, expectedSize, headers.get('content-type'));
+  // Either promise rejecting (a broken stream) rejects the whole attempt; the
+  // parts written so far stay for the next one. Both are awaited so a
+  // failure in one cannot leave the other's stream dangling.
+  await Promise.all([
+    cache.put(cacheKey, new Response(finalBody, { status: 200, headers: headers })),
+    partWriter
+  ]);
+  await dropParts(cache, cacheKey);
 }
 
-// Retries a flaky file a couple of times with a short backoff before giving
-// up on the whole unit. Cancellation (aborted signal) is never retried, and
-// an abort that lands during the backoff sleep exits immediately — a
-// canceled loop must not hold its dedupe slot for extra seconds.
-async function fetchAndCacheFileWithRetry(cache, cacheKey, url, onBytes, signal) {
-  var maxAttempts = 3;
+// Retries a flaky file a few times with a short backoff before giving up on
+// the whole unit; every retry resumes from the last saved part. Cancellation
+// (aborted signal) is never retried, and an abort that lands during the
+// backoff sleep exits immediately — a canceled loop must not hold its dedupe
+// slot for extra seconds.
+async function fetchAndCacheFileWithRetry(cache, cacheKey, url, expectedSize, onBytes, signal, onResume) {
+  var maxAttempts = 5;
   for (var attempt = 1; ; attempt++) {
     try {
-      await fetchAndCacheFile(cache, cacheKey, url, onBytes, signal);
+      await fetchAndCacheFile(cache, cacheKey, url, expectedSize, onBytes, signal, onResume);
       return;
     } catch (err) {
       if ((signal && signal.aborted) || attempt >= maxAttempts) throw err;
@@ -338,13 +477,20 @@ async function runFallbackFetch(fallbackKey, unitId, version, files, cdnBaseUrl,
       }
 
       var url = cdnBaseUrl + '/' + file.path;
-      await fetchAndCacheFileWithRetry(cache, cacheKey, url, function(fileReceived) {
+      await fetchAndCacheFileWithRetry(cache, cacheKey, url, file.size, function(fileReceived) {
         // Throttle intra-file progress broadcasts
         var now = Date.now();
         if (now - lastBroadcast < 1000) return;
         lastBroadcast = now;
         broadcastProgress(downloaded + fileReceived);
-      }, aborter.signal);
+      }, aborter.signal, function(offset) {
+        // A file picked up where a broken attempt left it: tell the pages.
+        broadcastStatus(unitId, 'downloading', {
+          downloaded: downloaded + offset, downloadTotal: totalSize,
+          percent: totalSize > 0 ? Math.round(((downloaded + offset) / totalSize) * 100) : 0,
+          version: version, resumedFrom: downloaded + offset
+        });
+      });
 
       downloaded += file.size;
       broadcastProgress(downloaded);

@@ -61,6 +61,7 @@
     this._stepLogReportUrl = opts.stepLogReportUrl || '/missionhydrosci/api/steplog'; // member step-log outcomes (needs csrfToken)
     this._stepLogReported = {}; // unitId|outcome -> last sent time (dedupe)
     this._reportedErrors = {}; // dedupe telemetry: unitId|errorClass -> true (per manager lifetime)
+    this._resumeNoted = {}; // unitId|bytes -> true once a resume was logged
     this.swRegistration = null;
     this.channel = null;
     this.statusCallbacks = [];
@@ -628,6 +629,12 @@
   var RETRY_BACKOFF_S = [5, 10, 20, 30, 60];
   var QUOTA_RETRY_S = 60; // out-of-space re-check interval (someone has to free space first)
   var SPACE_HEADROOM_BYTES = 20 * 1024 * 1024; // slack on top of a unit's size for the space preflight
+  // How long one background-download silence keeps a device on the direct
+  // path. Was 24 h: one silence sentenced a device to the fragile path (tab
+  // must stay open, no resume across sleep) for a day. An hour is enough to
+  // ride out battery saver or a metered network, and a background download
+  // that later succeeds clears it at once.
+  var PREFER_FALLBACK_MS = 60 * 60 * 1000;
   var PREFER_FALLBACK_KEY = 'mhs-prefer-fallback-until'; // localStorage: skip BG fetch until this time
   MHSDeliveryManager.PREFER_FALLBACK_KEY = PREFER_FALLBACK_KEY; // exported so Reset can purge it
 
@@ -642,7 +649,8 @@
   MHSDeliveryManager.prototype._preferFallback = function(set) {
     try {
       if (set) {
-        localStorage.setItem(PREFER_FALLBACK_KEY, String(Date.now() + 24 * 60 * 60 * 1000));
+        if (set === 'clear') { localStorage.removeItem(PREFER_FALLBACK_KEY); return false; }
+        localStorage.setItem(PREFER_FALLBACK_KEY, String(Date.now() + PREFER_FALLBACK_MS));
         return true;
       }
       return Date.now() < parseInt(localStorage.getItem(PREFER_FALLBACK_KEY) || '0', 10);
@@ -757,6 +765,35 @@
     return result;
   };
 
+  // What the device looked like when a background download went silent:
+  // Chrome's own registration state, tab visibility, network, battery.
+  // Strings only (the step detail and server records store strings).
+  MHSDeliveryManager.prototype._switchContext = async function(reg, quietMs, bytes) {
+    var c = {
+      quiet_s: String(Math.round(quietMs / 1000)), bytes: String(bytes || 0),
+      visibility: document.visibilityState, online: String(navigator.onLine)
+    };
+    try {
+      c.bf_result = reg.result || ''; c.bf_failure = reg.failureReason || '';
+      c.bf_downloaded = String(reg.downloaded || 0); c.bf_total = String(reg.downloadTotal || 0);
+      c.bf_records = String(reg.recordsAvailable);
+    } catch (e) { /* ignore */ }
+    try {
+      var n = navigator.connection;
+      if (n) {
+        c.conn_type = n.type || ''; c.conn_effective = n.effectiveType || '';
+        c.conn_downlink = String(n.downlink || ''); c.conn_rtt = String(n.rtt || ''); c.save_data = String(!!n.saveData);
+      }
+    } catch (e) { /* ignore */ }
+    try {
+      if (navigator.getBattery) {
+        var b = await Promise.race([navigator.getBattery(), new Promise(function(r) { setTimeout(function() { r(null); }, 1500); })]);
+        if (b) { c.battery = String(Math.round((b.level || 0) * 100)); c.charging = String(!!b.charging); }
+      }
+    } catch (e) { /* ignore */ }
+    return c;
+  };
+
   // Compact one-line summary of the last preflight for telemetry.
   MHSDeliveryManager.prototype._preflightSummary = function() {
     var r = this.preflightResult;
@@ -807,7 +844,11 @@
     if (!est || !est.quota) return null;
     var missing = await this._missingBytes(unit);
     if (missing <= 0) return null;
-    var need = Math.round(missing * 1.05) + SPACE_HEADROOM_BYTES;
+    // The direct path keeps resume parts beside the file it is writing, so
+    // the largest file can briefly take twice its size.
+    var largest = 0;
+    for (var i = 0; i < unit.files.length; i++) largest = Math.max(largest, unit.files[i].size || 0);
+    var need = Math.round(missing * 1.05) + SPACE_HEADROOM_BYTES + largest;
     var free = est.quota - (est.usage || 0);
     if (free >= need) return { ok: true, freeBytes: free, needBytes: need };
     var mb = function(b) { return Math.round(b / 1048576); };
@@ -1059,6 +1100,10 @@
     var title = unit ? unit.title : unitId;
     switch (status) {
       case 'downloading': {
+        if (detail.resumedFrom && !this._resumeNoted[unitId + '|' + detail.resumedFrom]) {
+          this._resumeNoted[unitId + '|' + detail.resumedFrom] = true;
+          this._step('download', 'info', title + ': picked up at ' + fmtMB(detail.resumedFrom) + ' MB after a dropped connection');
+        }
         if (detail.note) { this._step('download', 'warn', detail.note); return; }
         if (detail.waitingMs >= 5000) {
           var wmsg = 'No data for ' + Math.round(detail.waitingMs / 1000) + ' s';
@@ -1102,6 +1147,12 @@
         if (!wasActive) return; // an init-time cache check, not a download we ran
         delete this._logSamples[unitId];
         var st = this._stallState[unitId];
+        if (st && !st.fallback && this._preferFallback()) {
+          // A background download just completed on a device that had been
+          // steered to the direct path: it works here again, forget that.
+          this._preferFallback('clear');
+          this._step('method', 'info', 'Background download completed on this device — it will be used first again');
+        }
         var total = unit ? (unit.totalSize || 0) : 0;
         var took = st ? Date.now() - st.startedAt : 0;
         var msg = title + ': download complete';
@@ -1490,12 +1541,22 @@
         Math.round(frozenMs / 1000) + 's (paused) — switching to fallback download:', fetchId);
       this._preferFallback(true);
       var frozenAt = state.maxDownloaded;
+      var switchCtx = await this._switchContext(fresh, quietMs, frozenAt);
       var switched = await this._startFallbackDownload(unitId, unit); // resets the stall monitor
       if (switched) {
         try { await fresh.abort(); } catch (abortErr) { /* best effort */ }
         this._logContext('downloadMode', 'direct');
+        // The switch is an event worth counting: the step carries the device
+        // state at that moment, the download-error telemetry makes it visible
+        // in the server log, and member pages store a load record for it.
         this._step('method', 'warn', 'Background download stopped receiving data for ' + Math.round(quietMs / 1000) +
-          ' s — switched to the direct download (keep this tab open)');
+          ' s — switched to the direct download (keep this tab open)', switchCtx);
+        this._reportDownloadError(unitId, {
+          errorClass: 'bgfetch-frozen', path: 'background', version: unit.version,
+          error: 'Background download silent for ' + Math.round(quietMs / 1000) + ' s at ' + fmtMB(frozenAt) + ' MB; switched to direct',
+          rawError: JSON.stringify(switchCtx)
+        });
+        this.reportStepLog('download-switched', unitId, unit.version);
         this._fireStatus(unitId, 'downloading', {
           downloaded: frozenAt,
           downloadTotal: unitTotal,

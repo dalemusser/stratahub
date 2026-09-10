@@ -391,6 +391,18 @@ Plan and status: `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test
   a probe of the loader file), stores a `launch-stalled` record, retries
   straight from the CDN at 90 s while the loader script never arrived
   (bypassing the service worker), and otherwise marks the launch failed.
+- **Direct-path resume.** The worker's direct download tees each file into
+  the final cache entry and 8 MB resume parts (`?part=N` keys plus a
+  `?parts` meta entry); a dropped connection resumes with a Range request
+  from the last saved part instead of restarting the file. A 200 to a Range
+  (or a changed ETag via If-Range) restarts cleanly. Pages log "picked up at
+  N MB". SW 1.0.15.
+- **Background-download switch telemetry.** When the frozen-switch fires,
+  the step carries the device state (Chrome's registration result,
+  visibility, connection, battery), the download-error telemetry logs it as
+  `bgfetch-frozen`, and member pages store a `download-switched` record.
+  The "prefer direct" memory is one hour (was 24 h) and clears as soon as a
+  background download completes on the device.
 - **Members' load records.** Launcher and play pages store their step log on
   a download or launch outcome, a crash, or Send report
   (`POST /missionhydrosci/api/steplog`), with heartbeats for launches; they
