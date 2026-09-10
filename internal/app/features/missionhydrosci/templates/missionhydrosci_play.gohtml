@@ -298,8 +298,6 @@
     (function() {
       var unitId = '{{ .UnitID }}';
       var csrfToken = '{{ .CSRFToken }}';
-      // Renewable token for the posts this page makes while it is open (see MHSStepLog.csrf).
-      var csrf = MHSStepLog.csrf(csrfToken, window.location.pathname);
       var nextUnitId = '{{ .NextUnitID }}';
       var nextUnitVersion = '{{ .NextUnitVersion }}';
       var completionHandled = false;
@@ -640,6 +638,10 @@
     (function() {
       var unitId = '{{ .UnitID }}';
       var unitVersion = '{{ .UnitVersion }}';
+      // Renewable CSRF token for every post this script makes (log streaming,
+      // summary, heartbeats, member launch records); see MHSStepLog.csrf.
+      // It must live in THIS scope: each <script> block is its own function.
+      var csrf = MHSStepLog.csrf('{{ .CSRFToken }}', window.location.pathname);
       // Files are served from /missionhydrosci/content/{unit}/v{version}/
       // The service worker intercepts these and serves from cache or falls through to CDN redirect.
       var contentUrl = '/missionhydrosci/content/' + unitId + '/v' + unitVersion;

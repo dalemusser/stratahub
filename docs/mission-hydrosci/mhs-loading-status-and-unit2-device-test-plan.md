@@ -326,6 +326,19 @@ already did. The play page gained a launch watchdog: 30 s without progress
 90 s → retry straight from the CDN if the loader script never arrived,
 else `launch` fail + `launch-failed` record with reset advice.
 
+**Regressions found and fixed 2026-09-09 evening.** (1) The play page's
+token keeper was defined in one `<script>` block and used in another, so
+every device-test play page died on load ("Initializing…" forever, nothing
+logged) from the 2026-09-08 deploy until this fix, and member launches
+stopped recording `launch-ok`. (2) The service worker's install pre-cached
+`/missionhydrosci/units` with `cache.addAll`, which rejects on the 401 a
+signed-out device tester gets, so on a device that had never signed in the
+worker never installed and the device test could not download at all
+("Service worker not ready"). SW 1.0.14 pre-caches each URL individually
+and never lets a failure abort the install. Lesson recorded: verify the
+device-test play page, not only the member play page, after any play
+template change.
+
 ### 4.8 Security and privacy
 
 - **Game-service keys.** The play page renders the static stratalog and stratasave Bearer keys server-side, exactly as it does for students today; the URL never contains them. Anyone who reaches the play page can read them from the HTML, which is already true of every student browser. The enable switch turns the route off for workspaces that do not use it.

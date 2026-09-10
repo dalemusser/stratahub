@@ -2,13 +2,22 @@
 // This file is concatenated with sw-cache.js and sw-background-fetch.js
 // by the Go handler before being served at /sw.js.
 
-const SW_VERSION = '1.0.13';
+const SW_VERSION = '1.0.14';
 
 // ---- Install ----
+// Pre-caches the app shell one URL at a time and never lets a failure abort
+// the install. cache.addAll() rejected the whole install when any URL was
+// not OK — and /missionhydrosci/units answers 401 to a visitor with no
+// session, so on a device that had never signed in (every fresh device-test
+// tester) the worker never installed and no download could start.
 self.addEventListener('install', function(event) {
   event.waitUntil(
     caches.open(APP_SHELL_CACHE).then(function(cache) {
-      return cache.addAll(APP_SHELL_URLS);
+      return Promise.all(APP_SHELL_URLS.map(function(url) {
+        return cache.add(url).catch(function(err) {
+          console.warn('MHS SW: app shell not pre-cached: ' + url + ' (' + (err && err.message) + ')');
+        });
+      }));
     }).then(function() {
       return self.skipWaiting();
     })

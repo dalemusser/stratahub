@@ -379,7 +379,7 @@ Plan and status: `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test
   heartbeats every 30 s while the game runs (a crashed tab shows as "page
   stopped responding"), and a post-play questionnaire (sound, controls,
   picture, performance, how far). Results in the **Device Tests** viewer.
-  `SW_VERSION` is 1.0.13 (adds the `getVersion` reply).
+  `SW_VERSION` is 1.0.14 (1.0.13 added the `getVersion` reply; 1.0.14 makes the install survive a pre-cache failure such as the 401 a signed-out device tester gets for the units page).
 - **Renewable CSRF token.** `MHSStepLog.csrf(token, pageUrl)` keeps a
   page's token, renews it by re-reading the page's own HTML (parsed, since
   the token is entity-escaped), and its `fetch` retries a refused post once.
