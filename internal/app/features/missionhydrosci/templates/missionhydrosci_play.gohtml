@@ -173,6 +173,7 @@
         </div>
         <p id="loading-text" role="status" aria-live="polite" style="margin-top:8px; font-size:14px; opacity:0.7;">Initializing...</p>
         <p id="loading-step" style="margin-top:4px; font-size:12px; opacity:0.6;"></p>
+        <p id="loading-hint" style="margin-top:8px; font-size:13px; opacity:0.85; max-width:min(560px, 92vw);"></p>
         <!-- The per-load step log; hidden until a launch step fails, then
              shown so the user can read and copy where it stopped. -->
         <div id="loading-steplog" style="display:none; margin-top:12px; width:min(560px, 92vw); text-align:left;">
@@ -794,6 +795,7 @@
       var canvas = document.getElementById('unity-canvas');
       var loadingBar = document.getElementById('loading-bar');
       var loadingText = document.getElementById('loading-text');
+      var loadingHint = document.getElementById('loading-hint');
       var loadingOverlay = document.getElementById('loading-overlay');
 
       // --- Crash reporting ---
@@ -935,11 +937,108 @@
         document.getElementsByTagName('head')[0].appendChild(meta);
       }
 
+      // Launch watchdog. A launch that stops making progress used to sit at
+      // "Initializing…" forever and report nothing. Now, 30 s without
+      // progress logs what the page was doing, probes whether the loader
+      // file can be fetched at all, shows the panel, stores a load record
+      // and tells the tester what to try. At 90 s, if the loader script
+      // itself never arrived (typically a wedged service worker), the page
+      // tries again straight from the content server, bypassing the
+      // worker; otherwise, or if that also stalls, it marks the launch
+      // failed with the reset steps. Never a reload loop.
+      var WATCHDOG_WARN_MS = 30000, WATCHDOG_ESCALATE_MS = 90000;
+      var launchPhase = 'loader';
+      var lastLaunchProgressAt = Date.now();
+      var watchdogWarned = false, watchdogFailed = false, watchdogTimer = null;
+      var fallbackStarted = false, activeScript = null;
+      var isDeviceTest = {{ if .DeviceTest }}true{{ else }}false{{ end }};
+      function launchProgress(phase) { if (phase) launchPhase = phase; lastLaunchProgressAt = Date.now(); }
+      function stopWatchdog() {
+        if (watchdogTimer) { clearInterval(watchdogTimer); watchdogTimer = null; }
+        if (loadingHint) loadingHint.textContent = '';
+      }
+      function phaseText() {
+        return { loader: 'loading the game loader (' + unitId + '.loader.js)', starting: 'starting Unity (no progress report yet)',
+          assets: 'loading assets', compiling: 'compiling', almost: 'almost ready' }[launchPhase] || launchPhase;
+      }
+      // Can the loader file be fetched at all right now? Separates "the
+      // service worker or network never answers" from "the page's own
+      // script request is stuck".
+      function probeLoader() {
+        var ctrl = typeof AbortController !== 'undefined' ? new AbortController() : null;
+        var timer = setTimeout(function() { if (ctrl) ctrl.abort(); }, 8000);
+        var started = Date.now();
+        var init = { cache: 'no-store', credentials: 'same-origin' };
+        if (ctrl) init.signal = ctrl.signal;
+        return fetch(loaderUrl, init).then(function(r) {
+          clearTimeout(timer);
+          return 'a fresh request for the loader file answered HTTP ' + r.status + ' in ' + (Date.now() - started) + ' ms';
+        }, function(e) {
+          clearTimeout(timer);
+          return 'a fresh request for the loader file got no answer within 8 s (' + ((e && e.name) || 'error') + ')';
+        });
+      }
+      function resetAdvice() {
+        return isDeviceTest
+          ? 'Go back to the test page and press Send report so we can see where it stopped, then try Launch again.'
+          : 'Go back, open Manage, choose Reset all local Mission HydroSci data, and download the unit again.';
+      }
+      // Bypass the service worker: load the loader, engine and data straight
+      // from the content server. Only while the loader script never arrived;
+      // once Unity is starting, a second instance on the same canvas is not
+      // an option.
+      function retryFromContentServer() {
+        var cdnBase = '{{ .CDNBaseURL }}';
+        if (!cdnBase || fallbackStarted || launchPhase !== 'loader') return false;
+        fallbackStarted = true;
+        contentUrl = cdnBase + '/' + unitId + '/v' + unitVersion;
+        buildUrl = contentUrl + '/Build';
+        loaderUrl = buildUrl + '/' + unitId + '.loader.js';
+        stepLog.record('launch', 'running', 'Trying again straight from the content server, bypassing the service worker…');
+        if (loadingHint) loadingHint.textContent = 'Trying another way to load the game…';
+        watchdogWarned = false;
+        launchProgress('loader');
+        var s2 = document.createElement('script');
+        s2.src = loaderUrl;
+        s2.onload = script.onload;
+        s2.onerror = script.onerror;
+        activeScript = s2;
+        document.body.appendChild(s2);
+        return true;
+      }
+      watchdogTimer = setInterval(function() {
+        var idle = Date.now() - lastLaunchProgressAt;
+        if (!watchdogWarned && idle >= WATCHDOG_WARN_MS) {
+          watchdogWarned = true;
+          probeLoader().then(function(probe) {
+            stepLog.record('launch', 'warn', 'No progress for ' + Math.round(idle / 1000) + ' s while ' + phaseText() + ' — ' + probe);
+            if (loadingHint) loadingHint.textContent = 'This is taking longer than usual. The page will try another way if it does not move soon. ' + resetAdvice();
+            showStepLogOnFailure();
+            memberReport('launch-stalled');
+          });
+        } else if (!watchdogFailed && idle >= WATCHDOG_ESCALATE_MS) {
+          if (retryFromContentServer()) return;
+          watchdogFailed = true;
+          stopWatchdog();
+          loadingText.textContent = 'Not loading';
+          if (loadingHint) loadingHint.textContent = 'The game is not loading on this device. ' + resetAdvice();
+          loadingBar.style.background = '#ef4444';
+          stepLog.record('launch', 'fail', 'Still no progress after ' + Math.round(idle / 1000) + ' s — stuck ' + phaseText() +
+            (fallbackStarted ? ', even straight from the content server' : '') + '. The game files are not reaching the page on this device.');
+          showStepLogOnFailure();
+          memberReport('launch-failed');
+          reportCrash('load_stalled', 'No launch progress after ' + Math.round(idle / 1000) + ' s: ' + phaseText(), '', crashPhase);
+        }
+      }, 5000);
+
       // Load the Unity loader script
       stepLog.record('launch', 'running', 'Loading the game loader (' + unitId + '.loader.js)…');
       var script = document.createElement('script');
       script.src = loaderUrl;
+      activeScript = script;
       script.onload = function() {
+        if (this !== activeScript) return; // the first request answered after the content-server retry took over
+        launchProgress('starting');
         loadingText.textContent = 'Starting Unity...';
         crashPhase = 'compiling';
         stepLog.record('launch', 'ok', 'Game loader loaded' + loaderSource());
@@ -956,6 +1055,7 @@
           productVersion: '1.0',
           autoSyncPersistentDataPath: true,
         }, function(progress) {
+          launchProgress(progress < 0.5 ? 'assets' : (progress < 0.9 ? 'compiling' : 'almost'));
           loadingBar.style.width = (progress * 100) + '%';
           var milestone = progress < 0.5 ? 0 : (progress < 0.9 ? 1 : 2);
           if (milestone !== lastMilestone) {
@@ -972,6 +1072,7 @@
             loadingText.textContent = 'Almost ready...';
           }
         }).then(function(instance) {
+          stopWatchdog();
           crashPhase = 'running';
           window.__unityInstance = instance;
           canvas = instance.Module.canvas;
@@ -1000,6 +1101,7 @@
             });
           });
         }).catch(function(err) {
+          stopWatchdog();
           loadingText.textContent = 'Error: ' + err.message;
           stepLog.record('launch', 'fail', 'Unity failed to start: ' + err.message);
           showStepLogOnFailure();
@@ -1011,6 +1113,8 @@
         });
       };
       script.onerror = function() {
+        if (this !== activeScript) return;
+        stopWatchdog();
         loadingText.textContent = 'Failed to load game. Is this unit downloaded?';
         stepLog.record('launch', 'fail', 'The game loader failed to load — the unit may not be downloaded, or the content server is unreachable');
         showStepLogOnFailure();

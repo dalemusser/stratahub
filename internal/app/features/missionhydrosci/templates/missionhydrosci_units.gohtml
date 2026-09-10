@@ -252,6 +252,7 @@
 
   // Device reporting: identify this device and report status to server
   var csrfToken = '{{ .CSRFToken }}';
+  var csrf = MHSStepLog.csrf(csrfToken, window.location.pathname); // renews on a 403 and retries once
 
   function getOrCreateDeviceId() {
     var key = 'mhs-device-id';
@@ -398,9 +399,9 @@
         background_fetch_available: !!(manager.swRegistration && manager.swRegistration.backgroundFetch)
       };
       function send() {
-        fetch('/missionhydrosci/api/device-status', {
+        csrf.fetch('/missionhydrosci/api/device-status', {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(report)
         }).catch(function(e) { console.warn('Device status report failed:', e); });
       }
@@ -442,7 +443,7 @@
     unitCachePrefix: 'missionhydrosci-unit-',
     fetchIdPrefix: 'missionhydrosci-',
     appShellCachePrefix: 'missionhydrosci-app-shell-',
-    csrfToken: csrfToken, // enables download-error telemetry
+    csrf: csrf, // download-error and load-record posts renew their token too
     probeCached: true // units already on the device still get their verify and server rows
   });
 
@@ -467,9 +468,9 @@
   manager.setStepLog(stepLog);
   MHSStepLog.mount(stepLog, document.getElementById('mhs-steplog'), {
     report: function(note) {
-      return fetch('/missionhydrosci/api/steplog', {
+      return csrf.fetch('/missionhydrosci/api/steplog', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ outcome: 'report', note: note, unit: currentUnit, version: unitVersions[currentUnit] || '',
           context: stepLog.context, entries: stepLog.entries.slice(-300) })
       }).then(function(resp) { return resp.ok; });
@@ -884,6 +885,7 @@
     if (queue.length === 0) return;
 
     var csrfToken = '{{ .CSRFToken }}';
+  var csrf = MHSStepLog.csrf(csrfToken, window.location.pathname); // renews on a 403 and retries once
     var remaining = [];
 
     function processNext(i) {
@@ -900,11 +902,10 @@
         return;
       }
 
-      fetch('/missionhydrosci/api/progress/complete', {
+      csrf.fetch('/missionhydrosci/api/progress/complete', {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'X-CSRF-Token': csrfToken
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({ unit: queue[i].unit })
       })

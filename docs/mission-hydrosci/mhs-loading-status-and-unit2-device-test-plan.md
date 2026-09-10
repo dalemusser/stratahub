@@ -316,6 +316,16 @@ status-log flush renews on 403 and resends on its next tick; the
 questionnaire form renews right before submitting. Both the run page and
 the play page use it for every post.
 
+**Cookie lifetime, renewal everywhere, launch watchdog (2026-09-09).** The
+CSRF cookie follows `session_max_age` (30 days in production; the library
+default was 12 h), so a signed-in browser never holds a stale secret. The
+units and manage pages, the delivery manager's telemetry, and the layout's
+heartbeat and HTMX requests renew a refused token as the device-test pages
+already did. The play page gained a launch watchdog: 30 s without progress
+→ warn entry with a loader probe, panel shown, `launch-stalled` record;
+90 s → retry straight from the CDN if the loader script never arrived,
+else `launch` fail + `launch-failed` record with reset advice.
+
 ### 4.8 Security and privacy
 
 - **Game-service keys.** The play page renders the static stratalog and stratasave Bearer keys server-side, exactly as it does for students today; the URL never contains them. Anyone who reaches the play page can read them from the HTML, which is already true of every student browser. The enable switch turns the route off for workspaces that do not use it.

@@ -256,13 +256,26 @@ sign-out. The run page never removes or interrupts other units on the device,
 so a teacher testing on a student's Chromebook does no harm.
 
 **A tester pressed Send report or Send answers on a page that had been
-open for hours.** The page's security token is minted when the page loads,
-against a browser cookie the server re-issues after about twelve hours (or
-when someone signs out in that browser). The run and play pages renew the
-token by themselves when the server refuses a post, and again just before
-the questionnaire is sent, so nothing is lost; the status log keeps
-retrying until it gets through. If a tester still sees "Could not send",
-the reason is shown next to the button, and Copy report keeps their notes.
+open for hours or days.** The page's security token is minted when the
+page loads, against a browser cookie. That cookie now lives as long as the
+sign-in session (30 days in production), so a Chromebook opened and closed
+over weeks keeps working. If the cookie is ever replaced anyway (a sign-out
+in that browser, a cleared session), the run, play, units and manage pages
+renew the token by themselves when the server refuses a post and retry,
+and the questionnaire renews just before it is sent, so nothing is lost. If
+a tester still sees "Could not send", the reason is shown next to the
+button, and Copy report keeps their notes.
+
+**The game page sits at "Initializing…" and nothing happens.** The play
+page watches its own launch. After 30 seconds without progress it logs
+what it was doing and whether the loader file can be fetched at all, opens
+the status panel, stores a load record (outcome "launch-stalled") and tells
+the tester what to try. After 90 seconds, if the loader script never
+arrived, it tries again straight from the content server, bypassing the
+browser's service worker; if that also stalls, or the stall is later in
+the launch, it marks the launch failed with the reset steps. Look for the
+"launch-stalled" and "launch-failed" records in the Device Tests view under
+Kind = Member load record, or the run's steps for a device test.
 
 **Two testers on the same network started at once. Are they separate?**
 Yes; each run has its own id and record. They share the start quota.

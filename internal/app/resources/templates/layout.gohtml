@@ -18,6 +18,30 @@
           evt.detail.headers['X-CSRF-Token'] = token.content;
         }
       });
+      // Renews the page's CSRF token from its own HTML when the server has
+      // re-issued the cookie underneath an open page (a sign-out in another
+      // tab, a cleared session, expiry). Updates the meta tag HTMX reads and
+      // any hidden csrf_token fields. Resolves true when a token was found.
+      window.refreshCsrfMeta = function() {
+        return fetch(window.location.pathname + window.location.search, { credentials: 'same-origin', cache: 'no-store', headers: { 'Accept': 'text/html' } })
+          .then(function(r) { return r.ok ? r.text() : ''; })
+          .then(function(html) {
+            if (!html) return false;
+            var fresh = new DOMParser().parseFromString(html, 'text/html').querySelector('meta[name="csrf-token"]');
+            if (!fresh || !fresh.content) return false;
+            var meta = document.querySelector('meta[name="csrf-token"]');
+            if (meta) meta.content = fresh.content;
+            var inputs = document.querySelectorAll('input[name="csrf_token"]');
+            for (var i = 0; i < inputs.length; i++) inputs[i].value = fresh.content;
+            return true;
+          })
+          .catch(function() { return false; });
+      };
+      // An HTMX post refused for a stale token: renew it so the next click
+      // works (the refused one is not replayed).
+      document.addEventListener('htmx:responseError', function(evt) {
+        if (evt.detail && evt.detail.xhr && evt.detail.xhr.status === 403) window.refreshCsrfMeta();
+      });
     </script>
     <script>
       // Unregister old service workers at wrong URLs (cleanup from PWA consolidation)
@@ -527,28 +551,37 @@
           if (currentPage === lastRecordedPage) return;
           lastRecordedPage = currentPage;
 
-          var headers = {'Content-Type': 'application/json'};
-          var csrfToken = document.querySelector('meta[name="csrf-token"]');
-          if (csrfToken) {
-            headers['X-CSRF-Token'] = csrfToken.content;
-          }
-          fetch(heartbeatUrl, {
-            method: 'POST',
-            credentials: 'same-origin',
-            headers: headers,
-            body: JSON.stringify({
-              page: currentPage,
-              had_user_activity: hadUserActivitySinceLastHeartbeat
-            })
-          }).then(function(response) {
-            if (response.status === 401) {
-              // Session was terminated (admin or idle timeout) - redirect to logout
-              stopHeartbeat();
-              window.location.href = '/logout';
-              return null;
+          function doSend(isRetry) {
+            var headers = {'Content-Type': 'application/json'};
+            var csrfToken = document.querySelector('meta[name="csrf-token"]');
+            if (csrfToken) {
+              headers['X-CSRF-Token'] = csrfToken.content;
             }
-            return response.json().catch(function() { return {}; });
-          }).then(function(data) {
+            return fetch(heartbeatUrl, {
+              method: 'POST',
+              credentials: 'same-origin',
+              headers: headers,
+              body: JSON.stringify({
+                page: currentPage,
+                had_user_activity: hadUserActivitySinceLastHeartbeat
+              })
+            }).then(function(response) {
+              if (response.status === 401) {
+                // Session was terminated (admin or idle timeout) - redirect to logout
+                stopHeartbeat();
+                window.location.href = '/logout';
+                return null;
+              }
+              // 403: the token this page was rendered with no longer matches
+              // the cookie. Renew it and send once more, so activity keeps
+              // reaching the server instead of the user looking idle.
+              if (response.status === 403 && !isRetry) {
+                return window.refreshCsrfMeta().then(function(ok) { return ok ? doSend(true) : null; });
+              }
+              return response.json().catch(function() { return {}; });
+            });
+          }
+          doSend(false).then(function(data) {
             if (data && data.idle_warning) {
               showIdleWarning(data.seconds_remaining);
             } else {

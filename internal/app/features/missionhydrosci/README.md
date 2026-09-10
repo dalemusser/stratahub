@@ -380,6 +380,17 @@ Plan and status: `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test
   stopped responding"), and a post-play questionnaire (sound, controls,
   picture, performance, how far). Results in the **Device Tests** viewer.
   `SW_VERSION` is 1.0.13 (adds the `getVersion` reply).
+- **Renewable CSRF token.** `MHSStepLog.csrf(token, pageUrl)` keeps a
+  page's token, renews it by re-reading the page's own HTML (parsed, since
+  the token is entity-escaped), and its `fetch` retries a refused post once.
+  The units, manage, run and play pages route every post through it, the
+  delivery manager takes it as `opts.csrf`, the layout renews its meta tag
+  on a 403 (heartbeat and HTMX), and the CSRF cookie itself now lives as
+  long as the session (`session_max_age`) instead of the library's 12 h.
+- **Launch watchdog.** The play page logs a stalled launch after 30 s (with
+  a probe of the loader file), stores a `launch-stalled` record, retries
+  straight from the CDN at 90 s while the loader script never arrived
+  (bypassing the service worker), and otherwise marks the launch failed.
 - **Members' load records.** Launcher and play pages store their step log on
   a download or launch outcome, a crash, or Send report
   (`POST /missionhydrosci/api/steplog`), with heartbeats for launches; they

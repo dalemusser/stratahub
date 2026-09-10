@@ -98,7 +98,8 @@ session_name = "stratahub-session"
 # This is auto-derived from primary_domain if not set in multi-workspace mode
 session_domain = ""
 
-# Session duration (e.g., 24h, 720h for 30 days)
+# Session duration (e.g., 24h, 720h for 30 days). The CSRF cookie lives just
+# as long, so a signed-in browser never holds a token the server refuses.
 session_max_age = "24h"
 
 # CSRF token signing key (MUST be changed in production, 32+ characters)

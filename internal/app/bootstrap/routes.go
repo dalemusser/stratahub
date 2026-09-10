@@ -233,6 +233,13 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		csrf.Secure(secure),
 		csrf.Path("/"),
 		csrf.CookieName("stratahub_csrf"),
+		// The CSRF secret lives as long as the sign-in session (session_max_age,
+		// 30 days in production), not the library's 12-hour default. A page
+		// rendered before the secret rolled over holds a token that no longer
+		// matches, and every post from it is refused; students who open and
+		// close a Chromebook over days, and the hours-long Mission HydroSci
+		// pages, must never hit that through no fault of their own.
+		csrf.MaxAge(int(appCfg.SessionMaxAge.Seconds())),
 		csrf.FieldName("csrf_token"),
 		csrf.SameSite(csrf.SameSiteLaxMode),
 		csrf.ErrorHandler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -267,6 +274,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		}))
 	}
 	csrfMiddleware := csrf.Protect([]byte(appCfg.CSRFKey), csrfOpts...)
+	logger.Info("CSRF cookie lifetime follows the session", zap.Duration("max_age", appCfg.SessionMaxAge))
 	// Key-authenticated, server-to-server API paths carry no session cookie
 	// and no CSRF token; flag them as exempt. Must run before csrf.Protect.
 	r.Use(memberstatusapifeature.CSRFExempt)

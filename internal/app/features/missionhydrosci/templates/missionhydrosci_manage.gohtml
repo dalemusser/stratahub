@@ -79,9 +79,12 @@
   <div class="h-4 shrink-0" aria-hidden="true"></div>
   </section>
 
+<script src="/assets/js/mhs-steplog.js?v={{ mhsSteplogVersion }}"></script>
+<script src="/assets/js/mhs-delivery.js?v={{ mhsDeliveryVersion }}"></script>
 <script>
 (function() {
   var csrfToken = '{{ .CSRFToken }}';
+  var csrf = MHSStepLog.csrf(csrfToken, window.location.pathname); // renews on a 403 and retries once
   var gateMode = '{{ .MHSMemberAuth }}';   // 'keyword' or 'staffauth'
   var gateStep = gateMode === 'keyword' ? 'keyword' : 'login';
   var gateChallengeID = '';
@@ -101,9 +104,9 @@
   // Exchange validated credentials for a staff unlock, then reload into the page.
   function gateUnlock(body) {
     gateLoading(true);
-    fetch('/missionhydrosci/api/manage/unlock', {
+    csrf.fetch('/missionhydrosci/api/manage/unlock', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body)
     }).then(function(resp) {
       return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
@@ -127,9 +130,9 @@
       var loginID = document.getElementById('gate-login-input').value.trim();
       if (!loginID) { gateError('Please enter a staff login ID.'); return; }
       gateLoading(true);
-      fetch('/missionhydrosci/api/auth/start', {
+      csrf.fetch('/missionhydrosci/api/auth/start', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ login_id: loginID })
       }).then(function(resp) {
         return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
@@ -168,9 +171,9 @@
       if (gateStep === 'email') credential = credential.trim();
       if (!credential) { gateError(gateStep === 'password' ? 'Please enter the password.' : 'Please enter the verification code.'); return; }
       gateLoading(true);
-      fetch('/missionhydrosci/api/auth/verify', {
+      csrf.fetch('/missionhydrosci/api/auth/verify', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ challenge_id: gateChallengeID, credential: credential })
       }).then(function(resp) {
         return resp.json().then(function(data) { return { ok: resp.ok, data: data }; });
@@ -190,9 +193,9 @@
     var btn = document.getElementById('gate-resend-btn');
     btn.textContent = 'Sending...';
     btn.disabled = true;
-    fetch('/missionhydrosci/api/auth/resend', {
+    csrf.fetch('/missionhydrosci/api/auth/resend', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ challenge_id: gateChallengeID })
     }).then(function(resp) {
       btn.textContent = resp.ok ? 'Code resent' : 'Resend failed';
@@ -430,11 +433,10 @@
     </div>
   </div>
 
-<script src="/assets/js/mhs-steplog.js?v={{ mhsSteplogVersion }}"></script>
-<script src="/assets/js/mhs-delivery.js?v={{ mhsDeliveryVersion }}"></script>
 <script>
 (function() {
   var csrfToken = '{{ .CSRFToken }}';
+  var csrf = MHSStepLog.csrf(csrfToken, window.location.pathname); // renews on a 403 and retries once
   var currentUnit = '{{ .CurrentUnit }}';
   var nextUnit = '{{ .NextUnitID }}';
   var isComplete = {{ if .IsComplete }}true{{ else }}false{{ end }};
@@ -505,7 +507,7 @@
     unitCachePrefix: 'missionhydrosci-unit-',
     fetchIdPrefix: 'missionhydrosci-',
     appShellCachePrefix: 'missionhydrosci-app-shell-',
-    csrfToken: csrfToken, // enables download-error telemetry
+    csrf: csrf, // download-error and load-record posts renew their token too
     probeCached: true // units already on the device still get their verify and server rows
   });
 
@@ -530,9 +532,9 @@
   manager.setStepLog(stepLog);
   MHSStepLog.mount(stepLog, document.getElementById('mhs-steplog'), {
     report: function(note) {
-      return fetch('/missionhydrosci/api/steplog', {
+      return csrf.fetch('/missionhydrosci/api/steplog', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ outcome: 'report', note: note, unit: currentUnit, version: mhsUnitVersions[currentUnit] || '',
           context: stepLog.context, entries: stepLog.entries.slice(-300) })
       }).then(function(resp) { return resp.ok; });
@@ -759,7 +761,7 @@
 
   function refreshUnlockStatus() {
     if (!gated) return;
-    fetch('/missionhydrosci/api/manage/status')
+    csrf.fetch('/missionhydrosci/api/manage/status')
       .then(function(r) { return r.json(); })
       .then(function(s) {
         if (s.unlocked && s.expires_at_ms) {
@@ -788,9 +790,9 @@
   }
 
   window.mhsLockNow = function() {
-    fetch('/missionhydrosci/api/manage/lock', {
+    csrf.fetch('/missionhydrosci/api/manage/lock', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      headers: { 'Content-Type': 'application/json' },
       body: '{}'
     }).then(function() {
       window.location.href = '/missionhydrosci/units';
@@ -925,9 +927,9 @@
   window.mhsSetCurrent = function(unit, unitTitle) {
     if (!confirm('Set progress to ' + unitTitle + '? This marks all earlier units as completed.')) return;
 
-    fetch('/missionhydrosci/api/progress/set-unit', {
+    csrf.fetch('/missionhydrosci/api/progress/set-unit', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ unit: unit })
     })
     .then(function(resp) {
@@ -952,9 +954,9 @@
 
   function doDeleteSaveData(target, label, confirmMsg) {
     if (!confirm(confirmMsg)) return;
-    fetch('/missionhydrosci/api/save-data/' + target + '/delete', {
+    csrf.fetch('/missionhydrosci/api/save-data/' + target + '/delete', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+      headers: { 'Content-Type': 'application/json' },
       body: '{}'
     })
     .then(function(resp) {
@@ -1009,7 +1011,7 @@
     if (f.length) f[f.length - 1].focus(); // the Close button
     list.innerHTML = '<div class="text-sm text-gray-500 dark:text-gray-400 p-2">Loading...</div>';
 
-    fetch('/missionhydrosci/api/collections')
+    csrf.fetch('/missionhydrosci/api/collections')
       .then(function(r) { return r.json(); })
       .then(function(collections) {
         var defaultActive = !hasOverride;
@@ -1043,9 +1045,9 @@
   window.mhsSelectCollection = function(id) {
     var form = new FormData();
     form.append('collection_id', id);
-    fetch('/missionhydrosci/api/collection-override', {
+    csrf.fetch('/missionhydrosci/api/collection-override', {
       method: 'POST',
-      headers: { 'X-CSRF-Token': csrfToken },
+      headers: {},
       body: form
     }).then(function(r) {
       if (r.ok) {

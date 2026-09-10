@@ -43,6 +43,10 @@
     this.manifest = null;
     this.manifestLoaded = false; // true only after a fresh, successful manifest fetch
     this._csrfToken = opts.csrfToken || ''; // required to POST download-error telemetry
+    // csrf (preferred): a renewable token keeper from MHSStepLog.csrf(); its
+    // fetch renews the token on a 403 and retries once, so telemetry from a
+    // page open past the cookie's rollover is not lost.
+    this._csrf = opts.csrf || null;
     // Isolated managers (the device test) touch only the units in their own
     // manifest: no pruning of other units' caches and no aborting of other
     // units' downloads, which may belong to a student using the same device.
@@ -938,22 +942,31 @@
    * page opted in with a CSRF token (member pages do; the device test has
    * its own stream). Best effort, never throws.
    */
+  // Whether the page opted in to server posts (a token or a token keeper).
+  MHSDeliveryManager.prototype._canPost = function() {
+    return !!(this._csrf || this._csrfToken);
+  };
+
+  // Best-effort JSON POST with the page's CSRF token (renewed on 403 when a
+  // keeper was given). Never throws; resolves to the response or undefined.
+  MHSDeliveryManager.prototype._post = function(url, body, keepalive) {
+    var init = { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), keepalive: !!keepalive };
+    try {
+      if (this._csrf) return this._csrf.fetch(url, init).catch(function() {});
+      init.headers['X-CSRF-Token'] = this._csrfToken;
+      return fetch(url, init).catch(function() {});
+    } catch (e) { return Promise.resolve(); }
+  };
+
   MHSDeliveryManager.prototype.reportStepLog = function(outcome, unitId, version, opts) {
-    if (!this._steplog || !this._csrfToken || !this._stepLogReportUrl) return;
+    if (!this._steplog || !this._canPost() || !this._stepLogReportUrl) return;
     var key = unitId + '|' + outcome;
     var minGap = (opts && opts.minGapMs) || 0;
     var last = this._stepLogReported[key] || 0;
     if (last && (minGap === 0 || Date.now() - last < minGap)) return;
     this._stepLogReported[key] = Date.now();
     var entries = this._steplog.entries.slice(-300);
-    try {
-      fetch(this._stepLogReportUrl, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': this._csrfToken },
-        body: JSON.stringify({ outcome: outcome, unit: unitId, version: version || '', context: this._steplog.context, entries: entries }),
-        keepalive: true
-      }).catch(function() {});
-    } catch (e) { /* best effort */ }
+    this._post(this._stepLogReportUrl, { outcome: outcome, unit: unitId, version: version || '', context: this._steplog.context, entries: entries }, true);
   };
 
   // Records a step; never lets logging break delivery.
@@ -2292,7 +2305,7 @@
    * CSRF token was provided (the page didn't opt in) or on any network error.
    */
   MHSDeliveryManager.prototype._reportDownloadError = function(unitId, detail) {
-    if (!this._csrfToken) return;
+    if (!this._canPost()) return;
     var cls = detail.errorClass || 'generic';
     var key = unitId + '|' + cls;
     if (this._reportedErrors[key]) return;
@@ -2315,14 +2328,7 @@
         user_agent: (navigator && navigator.userAgent) || '',
         preflight: self._preflightSummary().slice(0, 300)
       };
-      try {
-        fetch(self._downloadErrorUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': self._csrfToken },
-          body: JSON.stringify(body),
-          keepalive: true
-        }).catch(function() {});
-      } catch (e) { /* best effort */ }
+      self._post(self._downloadErrorUrl, body, true);
     }
 
     if (navigator.storage && navigator.storage.estimate) {
