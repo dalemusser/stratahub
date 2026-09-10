@@ -102,6 +102,11 @@ answers**; you can come back and update them.
 
 - **Send report.** On the run page, under Status details, type what you saw
   and press **Send report**. Your note and the full step list are sent to us.
+- **Reset this device.** Under Send report. If the download or the game is
+  stuck, press it: it removes Unit 2's downloaded files from this device and
+  starts the test again from the download. Your test code stays the same and
+  nothing else on the device is touched. Press Send report first so we can
+  see where it stopped.
 - **Copy report.** Also under Status details. It copies the step list as
   text so you can paste it into an email or message.
 - **Tell us the test code.** It lets us find your run straight away.

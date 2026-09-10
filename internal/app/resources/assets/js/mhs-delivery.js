@@ -765,6 +765,11 @@
     return result;
   };
 
+  // Forgets a "prefer the direct download" memory (a reset by the tester).
+  MHSDeliveryManager.prototype.clearDirectPreference = function() {
+    this._preferFallback('clear');
+  };
+
   // What the device looked like when a background download went silent:
   // Chrome's own registration state, tab visibility, network, battery.
   // Strings only (the step detail and server records store strings).

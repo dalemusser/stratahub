@@ -88,7 +88,11 @@ so a first run that fails on this is still informative.
    waiting countdowns, automatic retries, file verification. Downloads never
    give up: every failure schedules the next attempt with a visible
    countdown; "Retry now" only skips the wait. A **Send report** box lets the
-   tester add a note. When Unit 2 is already on the device from an earlier
+   tester add a note, and **Reset this device** removes the unit's files from
+   the device, forgets a "prefer direct download" memory, replaces the
+   service worker and reloads, so a stuck device starts the test again from
+   the download under the same test code (the reset is a step in the run's
+   record). Other units on a shared device are not touched. When Unit 2 is already on the device from an earlier
    run (same device, same build), the download row says so, the files are
    verified and the content server and game services are probed anyway, so
    no row is left blank.

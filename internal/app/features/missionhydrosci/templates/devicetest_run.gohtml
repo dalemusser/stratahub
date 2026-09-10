@@ -120,6 +120,12 @@
         <span id="sw-status" class="ml-auto text-xs text-gray-400 dark:text-gray-500"></span>
       </div>
     </div>
+
+    <div class="mt-4 border-t border-gray-200 dark:border-gray-700 pt-3 flex flex-wrap items-center gap-x-3 gap-y-1">
+      <button type="button" id="reset-btn" class="px-3 py-1.5 text-xs rounded border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">Reset this device</button>
+      <span class="text-xs text-gray-500 dark:text-gray-400">Stuck? This removes {{ .UnitTitle }}'s downloaded files from this device and starts the test again from the download. Your test code stays the same; nothing else on the device is touched.</span>
+      <span id="reset-status" class="text-xs text-gray-500 dark:text-gray-400"></span>
+    </div>
   </div>
 
   <p class="mt-3 text-xs text-gray-500 dark:text-gray-400 text-center">Keep this tab open while the download runs. Getting into the game is the important check; finishing the unit is the full one.</p>
@@ -539,6 +545,32 @@
     if (cacheStatus[uid] === 'stalled') { manager.retryDownload(uid); return; }
     manager.downloadUnit(uid);
   };
+
+  // Reset: the tester's way out when a download or launch is stuck on this
+  // device. Removes this unit's files (other units on a shared device are
+  // untouched), forgets a "prefer direct" memory, unregisters the service
+  // worker so the next load installs a fresh one, and reloads; the run keeps
+  // its id, so the record shows the reset and everything after it.
+  window.mhsDeviceTestReset = function(skipConfirm) {
+    if (!skipConfirm && !confirm('Remove ' + unitTitle + "'s downloaded files from this device and start the download again? Your test code stays the same.")) return;
+    var rst = el('reset-status'), btn = el('reset-btn');
+    if (btn) btn.disabled = true;
+    if (rst) rst.textContent = 'Resetting…';
+    stepLog.record('storage', 'info', 'Reset by the tester — removing ' + unitTitle + "'s files and the service worker, then reloading");
+    var flushed = stepLog.flush ? stepLog.flush(true) : Promise.resolve();
+    Promise.resolve(flushed)
+      .then(function() { return manager.deleteUnit(unitId); }).catch(function() {})
+      .then(function() { try { manager.clearDirectPreference(); } catch (e) {} })
+      .then(function() {
+        if (!navigator.serviceWorker || !navigator.serviceWorker.getRegistrations) return;
+        return navigator.serviceWorker.getRegistrations().then(function(regs) {
+          return Promise.all(regs.map(function(r) { return r.unregister().catch(function() {}); }));
+        });
+      }).catch(function() {})
+      .then(function() { window.location.reload(); });
+  };
+  var resetBtn = el('reset-btn');
+  if (resetBtn) resetBtn.addEventListener('click', function() { window.mhsDeviceTestReset(false); });
 
   var reportBtn = el('report-btn');
   if (reportBtn) {

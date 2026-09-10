@@ -351,6 +351,12 @@ direct path resumes a broken file from 8 MB parts with a Range request
 (SW 1.0.15). Verified in a Node harness (clean, one break, two breaks,
 server ignoring Range) byte-for-byte.
 
+**Reset this device (2026-09-09).** Run-page button: deletes the test
+unit's cache (isolated: other units untouched), clears the prefer-direct
+memory, unregisters the service worker, reloads; the reset is logged as a
+step and flushed before the reload. The play page's stalled-launch advice
+for the device test points to it.
+
 ### 4.8 Security and privacy
 
 - **Game-service keys.** The play page renders the static stratalog and stratasave Bearer keys server-side, exactly as it does for students today; the URL never contains them. Anyone who reaches the play page can read them from the HTML, which is already true of every student browser. The enable switch turns the route off for workspaces that do not use it.
