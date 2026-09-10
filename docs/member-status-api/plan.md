@@ -520,3 +520,30 @@ workspaces form preserves both, template render. Rollout: deploy, list the
 provider's origin on Dev MHS and MHS, run the check script with
 `MEMBER_STATUS_ORIGIN`, tell Abt's developer — steps in
 [rollout-todo.md](rollout-todo.md).
+
+**Status 2026-09-10.** Deployed 2026-09-08 (build `20260908-203329`, both
+hosts; full test suite green). Abt's page origin is listed on **Dev MHS and
+MHS** and the handshake was verified from outside on both (allow-origin
+echoed, POST, max-age 3600, no credentials header; an unlisted origin gets
+no allow header; a keyed ping carrying the Origin returns 200 with the
+header). Open: Abt's developer proceeds against MHS. Task 7's condition
+(first real events) still applies.
+
+### 9.5 If this is picked up again
+
+- **Abt reports a CORS error in the browser console.** The page's
+  `location.origin` does not exactly match a listed origin (host, `www.`,
+  scheme, port). Add the exact value under Settings → Member Status API →
+  Allowed browser origins and Save; a blocked request never reaches Survey
+  Events, so nothing to look for there.
+- **Abt's page moves to another host.** List the new origin (keep the old one
+  until the move is complete). Up to 20 entries.
+- **Key rotation** now also means updating the key inside Abt's page code,
+  not just their server config — agree the switch time first.
+- **Rejected events in Survey Events** are unrelated to CORS (the request
+  arrived); see the admin guide's troubleshooting table.
+- **Rollback** of this deploy: rename `~/stratahub-linux-386.prev` back on
+  the server and restart. The settings field is harmless to an older build
+  (unknown fields are ignored).
+- **Nothing to remove** if browser calls stop being needed: clear the field
+  (server-to-server calls are unaffected either way).

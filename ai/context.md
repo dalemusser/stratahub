@@ -1012,7 +1012,10 @@ make css-watch
   `CORSFromConfig`, which otherwise swallows every preflight; the global
   list allows credentials and must never carry the provider's origin. Key
   visibility in the page accepted by Dale. Check script: `MEMBER_STATUS_ORIGIN`
-  adds three CORS checks. Plan §9
+  adds three CORS checks. Plan §9. **Status (2026-09-10):** deployed
+  2026-09-08 (build `20260908-203329`); the provider's origin is listed on
+  Dev MHS and MHS and verified; waiting on Abt's implementation. Resume
+  notes in plan §9.5
 
 ### Custom ABT URL Identity Modes (2026-08, in production)
 - Two custom consumer modes for the Abt survey links: `abt-identifiable`
