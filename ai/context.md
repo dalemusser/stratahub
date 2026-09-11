@@ -106,7 +106,7 @@ Handles application initialization and lifecycle:
 | **gameconfig** | Game/activity configuration (MHS) |
 | **uploadcsv** | CSV import for MHS data |
 | **memberstatusapi** | Inbound `POST /api/member-status` (+ `/ping`): the survey provider reports a member's survey started/completed; shared key in the body, no session/CSRF; browser (CORS) calls allowed for the origins listed in Site Settings — its `CORS()` middleware sits ahead of the global one in bootstrap; feeds the dashboard's Surveys tab (`docs/member-status-api/`) |
-| **missionhydrosci/devicetest** | Public `/missionhydrosci/devicetest` (no session; workspace from host): a school downloads and plays Unit 2 as a student would; runs recorded in `mhs_device_tests` with `ffffffff`-marked game ids; enable + build in Site Settings; results in the **Device Tests** viewer (`docs/mhs-device-test/`: admin guide + tester guide) |
+| **missionhydrosci/devicetest** | Public `/missionhydrosci/devicetest` (no session; workspace from host): a school downloads and plays Unit 2 as a student would; runs recorded in `mhs_device_tests` with `ffffffff`-marked game ids; enable + build in Site Settings; results in the **Device Tests** viewer (`docs/mhs-device-test/`: admin guide + tester guide, the latter given to schools as its GitHub link on `main`) |
 
 **Utility & System:**
 
@@ -976,8 +976,13 @@ make css-watch
   Device Tests view); heartbeats from the game page (memory, fps,
   visibility every 30 s + closing beat) make a crashed tab show as "Page
   stopped responding" with a memory trend; a post-play questionnaire (sound
-  required, controls, picture, performance, how far, notes) is stored on the
-  run and shown as a Sound column/filter. Added while testing (2026-09-08
+  required, controls, picture, performance, the farthest point reached in
+  Unit 2 — Put topographic glyphs on wall / Met Anderson and her hoverboard
+  / Found Jasper / Finished the unit, codes `glyphs-on-wall`,
+  `met-anderson`, `found-jasper`, `finished` in
+  `models.MHSDeviceTestQuestionnaireOptions` — and notes) is stored on the
+  run and shown as a Sound column/filter; the viewer's `questionnaireLabels`
+  and `surveyQuestions` carry the labels and question text. Added while testing (2026-09-08
   to 09-10): bare layout for device-test pages (`BaseVM.AsBare()`), cache-hit
   status rows + game-tab relay, viewer row click + Survey answers / Tester
   reports sections, renewable CSRF tokens (`MHSStepLog.csrf`) and a CSRF
