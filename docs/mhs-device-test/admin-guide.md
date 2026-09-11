@@ -113,7 +113,7 @@ so a first run that fails on this is still informative.
    short questionnaire (it is also there on any later visit to the run page,
    which the game's back arrow and the Test complete link lead to): did the sound play, did the keyboard and pointer
    work, did the picture look right, how did it run, the farthest point in
-   the game they reached (did not reach the glyphs, glyphs on the wall,
+   the game they reached (started the game, glyphs on the wall,
    Anderson and her hoverboard, Jasper, or finished), and notes. Answers can be updated later. These cover what the page cannot
    observe by itself; no single answer is required (a chosen answer can be
    cleared with the clear link beside its question), though a form with

@@ -379,9 +379,9 @@ Plan and status: `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test
   heartbeats every 30 s while the game runs (a crashed tab shows as "page
   stopped responding"), and a post-play questionnaire: sound, controls,
   picture, performance, and "Identify the farthest point in the game that
-  you reached?" with Unit 2's checkpoints as a vertical list in order — Did
-  not reach the glyphs, Put topographic glyphs on wall, Met Anderson and
-  her hoverboard, Found Jasper, Finished the unit (codes `before-glyphs`,
+  you reached?" with Unit 2's checkpoints as a vertical list in order —
+  Started the game, Put topographic glyphs on wall, Met Anderson and her
+  hoverboard, Found Jasper, Finished the unit (codes `started`,
   `glyphs-on-wall`, `met-anderson`, `found-jasper`, `finished` in
   `models.MHSDeviceTestQuestionnaireOptions`; labels and question text in
   `viewers/views/devicetests.go`). No answer is required, and each question

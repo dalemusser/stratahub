@@ -977,9 +977,9 @@ make css-watch
   visibility every 30 s + closing beat) make a crashed tab show as "Page
   stopped responding" with a memory trend; a post-play questionnaire (sound,
   controls, picture, performance, the farthest point reached in
-  Unit 2 as a vertical list — Did not reach the glyphs / Put topographic
-  glyphs on wall / Met Anderson and her hoverboard / Found Jasper / Finished
-  the unit, codes `before-glyphs`, `glyphs-on-wall`, `met-anderson`,
+  Unit 2 as a vertical list — Started the game / Put topographic glyphs on
+  wall / Met Anderson and her hoverboard / Found Jasper / Finished the
+  unit, codes `started`, `glyphs-on-wall`, `met-anderson`,
   `found-jasper`, `finished` in `models.MHSDeviceTestQuestionnaireOptions`
   — and notes; nothing is required and each question gets a "clear"
   control once an option is chosen) is stored on the

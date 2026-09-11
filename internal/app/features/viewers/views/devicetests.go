@@ -77,15 +77,16 @@ var questionnaireLabels = map[string]map[string]string{
 	"display":     {"fine": "Looked right", "problems": "Problems"},
 	"performance": {"smooth": "Smooth", "choppy": "Choppy", "froze": "Froze / crashed"},
 	"progress": {
-		"before-glyphs":  "Did not reach the glyphs",
+		"started":        "Started the game",
 		"glyphs-on-wall": "Put topographic glyphs on wall",
 		"met-anderson":   "Met Anderson and her hoverboard",
 		"found-jasper":   "Found Jasper",
 		"finished":       "Finished the unit",
-		// Codes the form offered before the checkpoints were named; kept so
-		// rows recorded then still read.
-		"into-game": "Into the game",
-		"part-way":  "Part way through the unit",
+		// Codes the form offered earlier; kept so rows recorded then still
+		// read.
+		"into-game":     "Into the game",
+		"part-way":      "Part way through the unit",
+		"before-glyphs": "Did not reach the glyphs",
 	},
 }
 
