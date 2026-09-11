@@ -112,8 +112,9 @@ so a first run that fails on this is still informative.
 5. **Post-play questions** — once Launch is pressed the run page shows a
    short questionnaire (it is also there on any later visit to the run page,
    which the game's back arrow and the Test complete link lead to): did the sound play, did the keyboard and pointer
-   work, did the picture look right, how did it run, how far they got, and
-   notes. Answers can be updated later. These cover what the page cannot
+   work, did the picture look right, how did it run, the farthest point in
+   the game they reached (glyphs on the wall, Anderson and her hoverboard,
+   Jasper, or finished), and notes. Answers can be updated later. These cover what the page cannot
    observe by itself; the sound answer is required.
 
 ## 6. Reading the results

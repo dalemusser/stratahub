@@ -82,11 +82,12 @@
         </div>
       </fieldset>
       <fieldset>
-        <legend class="font-medium text-gray-800 dark:text-gray-200 mb-1">How far did you get?</legend>
+        <legend class="font-medium text-gray-800 dark:text-gray-200 mb-1">Identify the farthest point in the game that you reached?</legend>
         <div class="flex flex-wrap gap-x-5 gap-y-1 text-gray-700 dark:text-gray-300">
-          <label class="flex items-center gap-2"><input type="radio" name="progress" value="into-game" {{ if and $q (eq $q.Progress "into-game") }}checked{{ end }}> Into the game</label>
-          <label class="flex items-center gap-2"><input type="radio" name="progress" value="part-way" {{ if and $q (eq $q.Progress "part-way") }}checked{{ end }}> Part way through Unit 2</label>
-          <label class="flex items-center gap-2"><input type="radio" name="progress" value="finished" {{ if and $q (eq $q.Progress "finished") }}checked{{ end }}> Finished Unit 2</label>
+          <label class="flex items-center gap-2"><input type="radio" name="progress" value="glyphs-on-wall" {{ if and $q (eq $q.Progress "glyphs-on-wall") }}checked{{ end }}> Put topographic glyphs on wall</label>
+          <label class="flex items-center gap-2"><input type="radio" name="progress" value="met-anderson" {{ if and $q (eq $q.Progress "met-anderson") }}checked{{ end }}> Met Anderson and her hoverboard</label>
+          <label class="flex items-center gap-2"><input type="radio" name="progress" value="found-jasper" {{ if and $q (eq $q.Progress "found-jasper") }}checked{{ end }}> Found Jasper</label>
+          <label class="flex items-center gap-2"><input type="radio" name="progress" value="finished" {{ if and $q (eq $q.Progress "finished") }}checked{{ end }}> Finished the unit</label>
         </div>
       </fieldset>
       <div>

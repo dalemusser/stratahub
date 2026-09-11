@@ -76,7 +76,16 @@ var questionnaireLabels = map[string]map[string]string{
 	"controls":    {"worked": "Worked", "problems": "Problems"},
 	"display":     {"fine": "Looked right", "problems": "Problems"},
 	"performance": {"smooth": "Smooth", "choppy": "Choppy", "froze": "Froze / crashed"},
-	"progress":    {"into-game": "Into the game", "part-way": "Part way", "finished": "Finished Unit 2"},
+	"progress": {
+		"glyphs-on-wall": "Put topographic glyphs on wall",
+		"met-anderson":   "Met Anderson and her hoverboard",
+		"found-jasper":   "Found Jasper",
+		"finished":       "Finished the unit",
+		// Codes the form offered before the checkpoints were named; kept so
+		// rows recorded then still read.
+		"into-game": "Into the game",
+		"part-way":  "Part way through the unit",
+	},
 }
 
 func qLabel(question, code string) string {
@@ -683,7 +692,7 @@ var surveyQuestions = []struct {
 	{"controls", "Did the keyboard and the mouse or trackpad work in the game?", func(q *models.MHSDeviceTestQuestionnaire) string { return q.Controls }},
 	{"display", "Did the picture look right?", func(q *models.MHSDeviceTestQuestionnaire) string { return q.Display }},
 	{"performance", "How did it run?", func(q *models.MHSDeviceTestQuestionnaire) string { return q.Performance }},
-	{"progress", "How far did you get?", func(q *models.MHSDeviceTestQuestionnaire) string { return q.Progress }},
+	{"progress", "Identify the farthest point in the game that you reached?", func(q *models.MHSDeviceTestQuestionnaire) string { return q.Progress }},
 }
 
 // surveyHTML renders the post-play questionnaire as its own titled section:
