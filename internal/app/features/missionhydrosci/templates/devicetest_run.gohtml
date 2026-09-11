@@ -47,12 +47,12 @@
     <div class="mt-2 rounded-md bg-red-50 dark:bg-red-900/30 px-3 py-2 text-sm text-red-700 dark:text-red-300">{{ .QError }}</div>
     {{ end }}
     {{ if or .ShowQuestionnaire (not .Launched) }}
-    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1 mb-3">When you are done playing, a few questions about things the page cannot see for itself. Answer what you can; the first one matters most.</p>
+    <p class="text-sm text-gray-600 dark:text-gray-400 mt-1 mb-3">When you are done playing, a few questions about things the page cannot see for itself. Answer what you can.</p>
     <form method="post" action="{{ .Base }}/questionnaire" class="space-y-4 text-sm">
       <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
       {{ $q := .Questionnaire }}
       <fieldset>
-        <legend class="font-medium text-gray-800 dark:text-gray-200 mb-1">Did the sound play? <span class="text-red-500">*</span></legend>
+        <legend class="font-medium text-gray-800 dark:text-gray-200 mb-1">Did the sound play?</legend>
         <div class="flex flex-wrap gap-x-5 gap-y-1 text-gray-700 dark:text-gray-300">
           <label class="flex items-center gap-2"><input type="radio" name="sound" value="worked" {{ if and $q (eq $q.Sound "worked") }}checked{{ end }}> Yes, normally</label>
           <label class="flex items-center gap-2"><input type="radio" name="sound" value="none" {{ if and $q (eq $q.Sound "none") }}checked{{ end }}> No sound at all</label>

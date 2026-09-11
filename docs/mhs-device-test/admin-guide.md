@@ -115,7 +115,8 @@ so a first run that fails on this is still informative.
    work, did the picture look right, how did it run, the farthest point in
    the game they reached (glyphs on the wall, Anderson and her hoverboard,
    Jasper, or finished), and notes. Answers can be updated later. These cover what the page cannot
-   observe by itself; the sound answer is required.
+   observe by itself; no single answer is required, though a form with
+   nothing on it is not saved.
 
 ## 6. Reading the results
 

@@ -975,8 +975,8 @@ make css-watch
   completion (`POST /missionhydrosci/api/steplog`, kind "member" rows in the
   Device Tests view); heartbeats from the game page (memory, fps,
   visibility every 30 s + closing beat) make a crashed tab show as "Page
-  stopped responding" with a memory trend; a post-play questionnaire (sound
-  required, controls, picture, performance, the farthest point reached in
+  stopped responding" with a memory trend; a post-play questionnaire (sound,
+  controls, picture, performance, the farthest point reached in
   Unit 2 — Put topographic glyphs on wall / Met Anderson and her hoverboard
   / Found Jasper / Finished the unit, codes `glyphs-on-wall`,
   `met-anderson`, `found-jasper`, `finished` in

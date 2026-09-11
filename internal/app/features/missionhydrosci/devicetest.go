@@ -347,8 +347,11 @@ func (h *Handler) ServeDeviceTestRun(w http.ResponseWriter, r *http.Request) {
 	data.Thanks = q.Get("thanks") == "1"
 	data.ShowQuestionnaire = data.Launched && (run.Questionnaire == nil || q.Get("edit") == "1")
 	switch q.Get("qerror") {
-	case "sound":
-		data.QError = "Please tell us whether the sound played."
+	case "empty":
+		data.QError = "Nothing to save yet: pick an answer or add a note."
+		data.ShowQuestionnaire = data.Launched
+	case "form":
+		data.QError = "Couldn't read your answers. Please try again."
 		data.ShowQuestionnaire = data.Launched
 	case "closed":
 		data.QError = "This test run no longer accepts answers (it is more than a day old)."
@@ -795,7 +798,7 @@ func (h *Handler) HandleDeviceTestQuestionnaire(w http.ResponseWriter, r *http.R
 	}
 	base := DeviceTestPathPrefix + "/run/" + run.ID.Hex()
 	if err := r.ParseForm(); err != nil {
-		http.Redirect(w, r, base+"?qerror=sound#questionnaire", http.StatusSeeOther)
+		http.Redirect(w, r, base+"?qerror=form#questionnaire", http.StatusSeeOther)
 		return
 	}
 	q := models.MHSDeviceTestQuestionnaire{
@@ -807,8 +810,10 @@ func (h *Handler) HandleDeviceTestQuestionnaire(w http.ResponseWriter, r *http.R
 		Notes:       models.ClipRunes(strings.TrimSpace(r.FormValue("notes")), deviceTestMaxNotes),
 		AnsweredAt:  time.Now().UTC(),
 	}
-	if q.Sound == "" {
-		http.Redirect(w, r, base+"?qerror=sound#questionnaire", http.StatusSeeOther)
+	// No single question is required, but a form with nothing on it is
+	// not worth a record.
+	if q.Sound == "" && q.Controls == "" && q.Display == "" && q.Performance == "" && q.Progress == "" && q.Notes == "" {
+		http.Redirect(w, r, base+"?qerror=empty#questionnaire", http.StatusSeeOther)
 		return
 	}
 	if err := h.DeviceTestStore.SetQuestionnaire(ctx, run.WorkspaceID, run.ID, q); err != nil {
