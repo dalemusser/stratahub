@@ -83,7 +83,8 @@
       </fieldset>
       <fieldset>
         <legend class="font-medium text-gray-800 dark:text-gray-200 mb-1">Identify the farthest point in the game that you reached?</legend>
-        <div class="flex flex-wrap gap-x-5 gap-y-1 text-gray-700 dark:text-gray-300">
+        {{/* One per line, in the order they happen in the unit. */}}
+        <div class="flex flex-col gap-y-1 text-gray-700 dark:text-gray-300">
           <label class="flex items-center gap-2"><input type="radio" name="progress" value="glyphs-on-wall" {{ if and $q (eq $q.Progress "glyphs-on-wall") }}checked{{ end }}> Put topographic glyphs on wall</label>
           <label class="flex items-center gap-2"><input type="radio" name="progress" value="met-anderson" {{ if and $q (eq $q.Progress "met-anderson") }}checked{{ end }}> Met Anderson and her hoverboard</label>
           <label class="flex items-center gap-2"><input type="radio" name="progress" value="found-jasper" {{ if and $q (eq $q.Progress "found-jasper") }}checked{{ end }}> Found Jasper</label>
