@@ -1,7 +1,7 @@
 # Mission HydroSci Device Test — Admin Guide
 
 **Audience:** StrataHub admins and MHS staff who set up the test for a school and read the results.
-**Companion:** `tester-guide.md` / `tester-guide.html` is what you give the person at the school.
+**Companion:** [`tester-guide.md`](tester-guide.md) is what you give the person at the school. Send its GitHub link (the file on `main`), so they always read the current version; the guide never names a real site, so send the school's device test link separately.
 **Design background:** `../mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md`.
 
 ## 1. What the device test is
