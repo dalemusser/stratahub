@@ -379,11 +379,14 @@ Plan and status: `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test
   heartbeats every 30 s while the game runs (a crashed tab shows as "page
   stopped responding"), and a post-play questionnaire: sound, controls,
   picture, performance, and "Identify the farthest point in the game that
-  you reached?" with Unit 2's checkpoints in order — Put topographic glyphs
-  on wall, Met Anderson and her hoverboard, Found Jasper, Finished the unit
-  (codes `glyphs-on-wall`, `met-anderson`, `found-jasper`, `finished` in
+  you reached?" with Unit 2's checkpoints as a vertical list in order — Did
+  not reach the glyphs, Put topographic glyphs on wall, Met Anderson and
+  her hoverboard, Found Jasper, Finished the unit (codes `before-glyphs`,
+  `glyphs-on-wall`, `met-anderson`, `found-jasper`, `finished` in
   `models.MHSDeviceTestQuestionnaireOptions`; labels and question text in
-  `viewers/views/devicetests.go`). Results in the **Device Tests** viewer.
+  `viewers/views/devicetests.go`). No answer is required, and each question
+  grows a "clear" control once an option is chosen, since a radio cannot be
+  unselected. Results in the **Device Tests** viewer.
   `SW_VERSION` is 1.0.14 (1.0.13 added the `getVersion` reply; 1.0.14 makes the install survive a pre-cache failure such as the 401 a signed-out device tester gets for the units page).
 - **Renewable CSRF token.** `MHSStepLog.csrf(token, pageUrl)` keeps a
   page's token, renews it by re-reading the page's own HTML (parsed, since

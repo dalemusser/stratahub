@@ -85,6 +85,7 @@
         <legend class="font-medium text-gray-800 dark:text-gray-200 mb-1">Identify the farthest point in the game that you reached?</legend>
         {{/* One per line, in the order they happen in the unit. */}}
         <div class="flex flex-col gap-y-1 text-gray-700 dark:text-gray-300">
+          <label class="flex items-center gap-2"><input type="radio" name="progress" value="before-glyphs" {{ if and $q (eq $q.Progress "before-glyphs") }}checked{{ end }}> Did not reach the glyphs</label>
           <label class="flex items-center gap-2"><input type="radio" name="progress" value="glyphs-on-wall" {{ if and $q (eq $q.Progress "glyphs-on-wall") }}checked{{ end }}> Put topographic glyphs on wall</label>
           <label class="flex items-center gap-2"><input type="radio" name="progress" value="met-anderson" {{ if and $q (eq $q.Progress "met-anderson") }}checked{{ end }}> Met Anderson and her hoverboard</label>
           <label class="flex items-center gap-2"><input type="radio" name="progress" value="found-jasper" {{ if and $q (eq $q.Progress "found-jasper") }}checked{{ end }}> Found Jasper</label>
@@ -97,6 +98,36 @@
       </div>
       <button type="submit" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">Save answers</button>
     </form>
+    <script>
+    (function() {
+      // A radio cannot be unselected by clicking it again, and no answer is
+      // required, so each question gets a small "clear" control once an
+      // option is chosen (also when the form comes back pre-filled).
+      var form = document.querySelector('#questionnaire form');
+      if (!form) return;
+      form.querySelectorAll('fieldset').forEach(function(fs) {
+        var radios = fs.querySelectorAll('input[type="radio"]');
+        var legend = fs.querySelector('legend');
+        if (!radios.length || !legend) return;
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.textContent = 'clear';
+        btn.setAttribute('aria-label', 'Clear this answer');
+        btn.className = 'ml-2 text-xs font-normal text-blue-600 dark:text-blue-400 underline hidden';
+        legend.appendChild(btn);
+        function sync() {
+          var any = Array.prototype.some.call(radios, function(r) { return r.checked; });
+          btn.classList.toggle('hidden', !any);
+        }
+        radios.forEach(function(r) { r.addEventListener('change', sync); });
+        btn.addEventListener('click', function() {
+          radios.forEach(function(r) { r.checked = false; });
+          sync();
+        });
+        sync();
+      });
+    })();
+    </script>
     {{ else if .QuestionnaireDone }}
     <p class="text-sm text-gray-600 dark:text-gray-400 mt-1">Answered {{ .Questionnaire.AnsweredAt.Format "Jan 2, 2006 3:04 PM" }} UTC. <a class="underline" href="{{ .Base }}?edit=1#questionnaire">Update your answers</a></p>
     {{ end }}

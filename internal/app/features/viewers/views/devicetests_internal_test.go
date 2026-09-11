@@ -35,6 +35,18 @@ func TestSurveyHTML(t *testing.T) {
 	}
 }
 
+// Every code the form accepts must have a label, or the viewer would show
+// the raw code.
+func TestQuestionnaireLabelsCoverOptions(t *testing.T) {
+	for question, codes := range models.MHSDeviceTestQuestionnaireOptions {
+		for _, code := range codes {
+			if got := qLabel(question, code); got == "" || got == code {
+				t.Errorf("%s/%s: no label (got %q)", question, code, got)
+			}
+		}
+	}
+}
+
 func TestReportsHTML(t *testing.T) {
 	if got := reportsHTML(nil); !strings.Contains(got, "Tester reports (0)") || !strings.Contains(got, "None sent") {
 		t.Fatalf("no reports: %s", got)

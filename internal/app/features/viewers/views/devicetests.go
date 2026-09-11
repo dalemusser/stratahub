@@ -77,6 +77,7 @@ var questionnaireLabels = map[string]map[string]string{
 	"display":     {"fine": "Looked right", "problems": "Problems"},
 	"performance": {"smooth": "Smooth", "choppy": "Choppy", "froze": "Froze / crashed"},
 	"progress": {
+		"before-glyphs":  "Did not reach the glyphs",
 		"glyphs-on-wall": "Put topographic glyphs on wall",
 		"met-anderson":   "Met Anderson and her hoverboard",
 		"found-jasper":   "Found Jasper",

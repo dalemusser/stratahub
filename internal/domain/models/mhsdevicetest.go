@@ -152,7 +152,7 @@ type MHSDeviceTestQuestionnaire struct {
 	Controls    string    `bson:"controls,omitempty" json:"controls,omitempty"`       // worked | problems
 	Display     string    `bson:"display,omitempty" json:"display,omitempty"`         // fine | problems
 	Performance string    `bson:"performance,omitempty" json:"performance,omitempty"` // smooth | choppy | froze
-	Progress    string    `bson:"progress,omitempty" json:"progress,omitempty"`       // farthest point reached: glyphs-on-wall | met-anderson | found-jasper | finished
+	Progress    string    `bson:"progress,omitempty" json:"progress,omitempty"`       // farthest point reached: before-glyphs | glyphs-on-wall | met-anderson | found-jasper | finished
 	Notes       string    `bson:"notes,omitempty" json:"notes,omitempty"`
 	AnsweredAt  time.Time `bson:"answered_at" json:"answered_at"`
 }
@@ -163,7 +163,7 @@ var MHSDeviceTestQuestionnaireOptions = map[string][]string{
 	"controls":    {"worked", "problems"},
 	"display":     {"fine", "problems"},
 	"performance": {"smooth", "choppy", "froze"},
-	"progress":    {"glyphs-on-wall", "met-anderson", "found-jasper", "finished"},
+	"progress":    {"before-glyphs", "glyphs-on-wall", "met-anderson", "found-jasper", "finished"},
 }
 
 // MHSDeviceTestReport is a note the tester sent from the page.
