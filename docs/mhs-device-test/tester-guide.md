@@ -92,11 +92,10 @@ the top of the run page.
 
 When you are done, close the game's tab (or use the back arrow at the top
 left, or the link on the Test complete screen) and return to the first tab.
-It asks five quick questions: whether the
-sound played, whether the keyboard and mouse or trackpad worked, whether the
-picture looked right, how the game ran, and the farthest point in the game
-you reached, plus a box for anything else. The sound question is the one we need most. Press **Save
-answers**; you can come back and update them.
+It asks five quick questions: whether the sound played, whether the
+keyboard and mouse or trackpad worked, whether the picture looked right, how
+the game ran, and the farthest point in the game you reached, plus a box for
+anything else. Press **Save answers**; you can come back and update them.
 
 ## If something goes wrong
 
