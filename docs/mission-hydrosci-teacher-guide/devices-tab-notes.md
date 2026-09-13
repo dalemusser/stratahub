@@ -31,7 +31,7 @@ runs about three pages at the guide's density; the *Solving problems* table and 
 | Part | Purpose for the teacher |
 |---|---|
 | Opening + columns table | Orientation. Every column named and defined once. |
-| Reading the unit dots | The cells are the only non-obvious part of the view. Two caveats matter in practice (ring and check follow the account, not the device; dots are as of Last Seen). |
+| Reading the unit dots | The cells are the only non-obvious part of the view. Amber is the one state to act on; a faded dot under a check is normal. Two caveats matter in practice (ring and check follow the account, not the device; dots are as of Last Seen). |
 | Device details | Rarely needed, but turns "the Chromebook is weird" into a report tech support can act on. |
 | Storage | The one column teachers are likely to misread. Explains the 70/90% colors, the auto-download pause at 90%, and how to distinguish "device full" from "MHS full". |
 | Two-minute check before class | The highest-value routine: catches downloads, full devices, stale devices, and never-logged-in students before they cost class time. |
@@ -74,8 +74,10 @@ runs about three pages at the guide's density; the *Solving problems* table and 
   anything else (`not_cached`, `partial`, `error`, `retrying`, `stalled`) → gray. The
   wrapper carries the grade-derived progress: `current` (first unit not completed) →
   green ring, `completed` (every progress point's latest grade is `passed`) → green
-  check at the top right. Neither hides the other, so "current unit, not downloaded
-  here" is a gray dot in a green ring. (`dashboard.go` unit progress block;
+  check at the top right, with the dot under it faded. The one combination that
+  needs action — current unit and not `cached`/`downloading` on this device — turns
+  ring and dot amber. Amber is the tab's only "act on this" color, shared with stale
+  Last Seen dates and near-full Storage bars. (`dashboard.go` unit progress block;
   `mhsdashboard_grid.gohtml`; CSS `.mhs-device-cell*` in `mhsdashboard_view.gohtml`.)
 - **When a device reports.** Only from the Mission HydroSci launcher page: once after
   the initial cache check of all units, and again whenever a unit download completes

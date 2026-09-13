@@ -194,13 +194,18 @@
               {{ $unitProg := index $unitProgress .ID }}
               {{ $dlStatus := index $dev.UnitStatus .ID }}
               <td class="text-center px-2 py-1.5 border-b border-slate-100">
-                {{/* Fill = this device's download state; ring/check = the student's progress. Both always drawn. */}}
-                <span class="mhs-device-cell{{ if eq $unitProg "current" }} mhs-device-cell-current{{ else if eq $unitProg "completed" }} mhs-device-cell-completed{{ end }}"
-                      title="{{ if eq $dlStatus "cached" }}Downloaded{{ else if eq $dlStatus "downloading" }}Downloading{{ else }}Not downloaded{{ end }}{{ if eq $unitProg "current" }} · Current unit{{ else if eq $unitProg "completed" }} · Completed{{ end }}">
+                {{/* Fill = this device's download state; ring/check = the student's progress. Both always
+                     drawn. The current unit missing from this device is the one state a teacher must not
+                     miss, so that cell (ring and dot) goes amber. */}}
+                {{ $missing := and (eq $unitProg "current") (ne $dlStatus "cached") (ne $dlStatus "downloading") }}
+                <span class="mhs-device-cell{{ if $missing }} mhs-device-cell-missing{{ else if eq $unitProg "current" }} mhs-device-cell-current{{ else if eq $unitProg "completed" }} mhs-device-cell-completed{{ end }}"
+                      title="{{ if $missing }}Current unit · Not on this device{{ else }}{{ if eq $dlStatus "cached" }}Downloaded{{ else if eq $dlStatus "downloading" }}Downloading{{ else }}Not downloaded{{ end }}{{ if eq $unitProg "current" }} · Current unit{{ else if eq $unitProg "completed" }} · Completed{{ end }}{{ end }}">
                   {{ if eq $dlStatus "cached" }}
                   <span class="mhs-device-dot mhs-device-dot-cached"></span>
                   {{ else if eq $dlStatus "downloading" }}
                   <span class="mhs-device-dot mhs-device-dot-downloading"></span>
+                  {{ else if $missing }}
+                  <span class="mhs-device-dot mhs-device-dot-missing"></span>
                   {{ else }}
                   <span class="mhs-device-dot mhs-device-dot-none"></span>
                   {{ end }}
