@@ -49,7 +49,7 @@ Two things to keep in mind when reading the cells:
 
 **1. The ring and check come from gameplay, not from the device.** They show the student's progress, which is saved online with their account. Every device row for a student shows the same ring and checks; only the dots differ. When a student moves to a new device, its row shows the ring with a gray dot inside until the unit downloads there, and the student's own screen says **Ready to play** once it has.
 
-**2. The dots show the device as it was at "Last Seen."** A device reports to the dashboard when the student opens MHS and when a download finishes on the Mission HydroSci page. If a unit was downloaded or cleared after that, the dots do not change until the student opens MHS again. To get a fresh picture, ask the student to open MHS on their device and then click **Refresh**.
+**2. The dots show the device as it was at "Last Seen."** A device reports to the dashboard from the Mission HydroSci page when the student opens it, when a download finishes, and when a download runs into trouble. If a unit was downloaded or cleared after that, the dots do not change until the student opens MHS again. To get a fresh picture, ask the student to open MHS on their device and then click **Refresh**.
 
 > **Tip**
 > Green check circles are a quick way to count completed units for the whole class. For where a student is *within* a unit, and for flagged tasks, use the Progress view.

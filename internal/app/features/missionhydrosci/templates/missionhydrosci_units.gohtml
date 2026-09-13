@@ -200,6 +200,19 @@
   // Track cache status for pipeline decisions
   var cacheStatus = {};
 
+  // Device-status reports for download trouble ('error' / 'stalled') are
+  // spaced at least this far apart per unit — a persistent failure loop
+  // fires 'error' once per backoff period. See the onStatus callback.
+  var PROBLEM_REPORT_MIN_MS = 60000;
+  var lastProblemReport = {};
+  function snapshotStatuses(map) {
+    var copy = {};
+    for (var k in map) {
+      if (Object.prototype.hasOwnProperty.call(map, k)) copy[k] = map[k];
+    }
+    return copy;
+  }
+
   // Throttle for storage/button refresh during downloads (see onStatus tail)
   var lastStorageRefresh = 0;
 
@@ -679,10 +692,25 @@
       collectAndReport(unitId, status);
     }
 
-    // Report device status when a download completes
-    if (status === 'cached' && initialReportSent) {
-      cacheStatus[unitId] = status;
-      reportDeviceStatus(cacheStatus);
+    // Report device status when a download completes, and when one runs into
+    // trouble. Teachers read this on the dashboard's Devices tab: 'cached'
+    // clears a unit, 'error' / 'stalled' mark it as a download problem.
+    // Without the trouble reports a failing download only reached the tab
+    // when some other unit's completion happened to carry it along. The
+    // first problem report for a unit goes at once; later ones are spaced
+    // (PROBLEM_REPORT_MIN_MS). The map is copied because the report is sent
+    // after an async storage estimate, by which time the live map may have
+    // moved on to 'retrying'.
+    if (initialReportSent) {
+      if (status === 'cached') {
+        reportDeviceStatus(snapshotStatuses(cacheStatus));
+      } else if (status === 'error' || status === 'stalled') {
+        var problemNow = Date.now();
+        if (!lastProblemReport[unitId] || problemNow - lastProblemReport[unitId] >= PROBLEM_REPORT_MIN_MS) {
+          lastProblemReport[unitId] = problemNow;
+          reportDeviceStatus(snapshotStatuses(cacheStatus));
+        }
+      }
     }
 
     // Re-run pipeline when a unit becomes cached.

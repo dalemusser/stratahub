@@ -80,8 +80,10 @@ runs about three pages at the guide's density; the *Solving problems* table and 
   amber is only an actual download problem. (`dashboard.go` unit progress block;
   `mhsdashboard_grid.gohtml`; CSS `.mhs-device-cell*` in `mhsdashboard_view.gohtml`.)
 - **When a device reports.** Only from the Mission HydroSci launcher page: once after
-  the initial cache check of all units, and again whenever a unit download completes
-  on that page. The play page does not report, and the next-unit download that runs at
+  the initial cache check of all units, again whenever a unit download completes on
+  that page, and whenever a download hits `error` or `stalled` (first report at once,
+  then at most one per unit per minute while the failure loop continues; recovery is
+  not reported separately, the eventual `cached` report clears it). The play page does not report, and the next-unit download that runs at
   unit completion inside the play page is not reported until the launcher is next
   opened. `last_seen` is the server time of the latest report. Stale = more than 7 days.
 - **Storage.** `navigator.storage.estimate()` usage and quota. Dashboard bar: orange
@@ -108,13 +110,6 @@ runs about three pages at the guide's density; the *Solving problems* table and 
    unit completion (or a lightweight heartbeat) would make Last Seen mean "last
    played" and keep the download dots current. The text explains the refresh step
    instead.
-4. **Download problems reach the tab only by accident.** The launcher reports device
-   status on page load and when a download *completes*, never when one fails or
-   stalls. So the amber "Download Problem" dot only appears when a failing unit
-   happens to be in a report triggered by something else. A one-line change in the
-   launcher's status handler (`missionhydrosci_units.gohtml`, the `cached` report
-   branch) to also report on `error` and `stalled` would make amber reliable. That
-   change touches the student page, so it is listed here rather than made.
 3. **Dashboard and launcher storage thresholds differ** (70/90 versus 60/80/90). Not a
    problem for teachers, but the numbers in the guide are the dashboard's; keep them
    in sync if either changes.
