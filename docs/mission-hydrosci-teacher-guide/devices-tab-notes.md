@@ -31,7 +31,7 @@ runs about three pages at the guide's density; the *Solving problems* table and 
 | Part | Purpose for the teacher |
 |---|---|
 | Opening + columns table | Orientation. Every column named and defined once. |
-| Reading the unit dots | The dots are the only non-obvious part of the view. Two caveats matter in practice (green overrides download state; dots are as of Last Seen). |
+| Reading the unit dots | The cells are the only non-obvious part of the view. Two caveats matter in practice (ring and check follow the account, not the device; dots are as of Last Seen). |
 | Device details | Rarely needed, but turns "the Chromebook is weird" into a report tech support can act on. |
 | Storage | The one column teachers are likely to misread. Explains the 70/90% colors, the auto-download pause at 90%, and how to distinguish "device full" from "MHS full". |
 | Two-minute check before class | The highest-value routine: catches downloads, full devices, stale devices, and never-logged-in students before they cost class time. |
@@ -53,7 +53,7 @@ runs about three pages at the guide's density; the *Solving problems* table and 
 - **Verifying a fix.** Ask the student to open MHS, refresh, and confirm the dot or bar
   changed. The section explains why the refresh is needed (reports are sent on open
   and on download completion).
-- **A unit-level progress scan.** Not the view's main job, but solid green dots give a
+- **A unit-level progress scan.** Not the view's main job, but green check marks give a
   fast "who has finished which unit" count without reading the Progress grid.
 
 ## 4. Behavior verified in code (for whoever edits or updates the text)
@@ -69,11 +69,14 @@ runs about three pages at the guide's density; the *Solving problems* table and 
 - **PWA.** `display-mode: standalone` at report time, i.e. the student launched from
   the installed app on that visit. It is a fact about the visit, not a permanent
   install flag.
-- **Unit dots.** Per unit, in priority order: grade-derived `completed` (every
-  progress point's latest grade is `passed`) → solid green; `current` (first unit not
-  completed) → green outline; else the device's `unit_status`: `cached` → solid blue,
-  `downloading` → blue outline, anything else (`not_cached`, `partial`, `error`,
-  `retrying`, `stalled`) → gray. (`dashboard.go` unit progress block, grid template.)
+- **Unit cells.** Two independent signals drawn together. The dot's fill is the
+  device's `unit_status`: `cached` → solid blue, `downloading` → blue outline,
+  anything else (`not_cached`, `partial`, `error`, `retrying`, `stalled`) → gray. The
+  wrapper carries the grade-derived progress: `current` (first unit not completed) →
+  green ring, `completed` (every progress point's latest grade is `passed`) → green
+  check at the top right. Neither hides the other, so "current unit, not downloaded
+  here" is a gray dot in a green ring. (`dashboard.go` unit progress block;
+  `mhsdashboard_grid.gohtml`; CSS `.mhs-device-cell*` in `mhsdashboard_view.gohtml`.)
 - **When a device reports.** Only from the Mission HydroSci launcher page: once after
   the initial cache check of all units, and again whenever a unit download completes
   on that page. The play page does not report, and the next-unit download that runs at
@@ -92,24 +95,18 @@ runs about three pages at the guide's density; the *Solving problems* table and 
 
 ## 5. Things the text works around (candidates for product changes)
 
-1. **Green hides download state for the current unit.** Because `current` takes
-   priority over `cached`, a teacher cannot see from this view whether the unit a
-   student is playing is actually downloaded on that device. That is the single most
-   useful readiness fact, and the view cannot show it. A combined marker (green
-   outline with a blue or gray center, or a small second dot) would fix it. The text
-   currently tells teachers to rely on the student's screen saying "Ready to play".
-2. **Completed requires every point `passed`.** A `flagged` point keeps a unit from
-   ever showing Completed on this view, so a student two units ahead can still show
-   the earlier unit as Current. The Progress view treats flagged as completed-with-
-   concern. Either count `flagged` as complete for the unit-level dot, or use the
-   grader's `currentUnit` (already loaded for the Progress view) instead of deriving
-   it. The text has one sentence explaining the current behavior; drop it if this
-   changes.
-3. **Dots can be stale for a whole play session.** Reporting from the play page at
+1. **Completed requires every point `passed`.** A `flagged` point keeps a unit from
+   ever showing the Completed check on this view, so a student two units ahead can
+   still show the earlier unit's ring. The Progress view treats flagged as
+   completed-with-concern. Either count `flagged` as complete for the unit-level
+   mark, or use the grader's `currentUnit` (already loaded for the Progress view)
+   instead of deriving it. The text has one sentence explaining the current
+   behavior; drop it if this changes.
+2. **Dots can be stale for a whole play session.** Reporting from the play page at
    unit completion (or a lightweight heartbeat) would make Last Seen mean "last
    played" and keep the download dots current. The text explains the refresh step
    instead.
-4. **Dashboard and launcher storage thresholds differ** (70/90 versus 60/80/90). Not a
+3. **Dashboard and launcher storage thresholds differ** (70/90 versus 60/80/90). Not a
    problem for teachers, but the numbers in the guide are the dashboard's; keep them
    in sync if either changes.
 
@@ -130,6 +127,6 @@ the figure does not contradict the text.
   real first names and should not be used.
 - Keep the guide's boxed **Tip** style for the two tips.
 - The section does not repeat the dashboard URL; the appendix intro already gives it.
-- If items in section 5 are implemented, update: caveat 1 under *Reading the unit
-  dots*, the last paragraph of *What the Devices view tells you about progress*, and
-  caveat 2 about refreshing.
+- If items in section 5 are implemented, update: the last paragraph of *What the
+  Devices view tells you about progress* (item 1) and caveat 2 under *Reading the
+  unit dots* (item 2).

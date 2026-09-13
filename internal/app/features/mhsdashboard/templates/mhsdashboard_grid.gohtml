@@ -194,17 +194,17 @@
               {{ $unitProg := index $unitProgress .ID }}
               {{ $dlStatus := index $dev.UnitStatus .ID }}
               <td class="text-center px-2 py-1.5 border-b border-slate-100">
-                {{ if eq $unitProg "completed" }}
-                <span class="mhs-device-dot mhs-device-dot-completed" title="Completed"></span>
-                {{ else if eq $unitProg "current" }}
-                <span class="mhs-device-dot mhs-device-dot-current" title="Current unit"></span>
-                {{ else if eq $dlStatus "cached" }}
-                <span class="mhs-device-dot mhs-device-dot-cached" title="Downloaded"></span>
-                {{ else if eq $dlStatus "downloading" }}
-                <span class="mhs-device-dot mhs-device-dot-downloading" title="Downloading"></span>
-                {{ else }}
-                <span class="mhs-device-dot mhs-device-dot-none" title="Not downloaded"></span>
-                {{ end }}
+                {{/* Fill = this device's download state; ring/check = the student's progress. Both always drawn. */}}
+                <span class="mhs-device-cell{{ if eq $unitProg "current" }} mhs-device-cell-current{{ else if eq $unitProg "completed" }} mhs-device-cell-completed{{ end }}"
+                      title="{{ if eq $dlStatus "cached" }}Downloaded{{ else if eq $dlStatus "downloading" }}Downloading{{ else }}Not downloaded{{ end }}{{ if eq $unitProg "current" }} · Current unit{{ else if eq $unitProg "completed" }} · Completed{{ end }}">
+                  {{ if eq $dlStatus "cached" }}
+                  <span class="mhs-device-dot mhs-device-dot-cached"></span>
+                  {{ else if eq $dlStatus "downloading" }}
+                  <span class="mhs-device-dot mhs-device-dot-downloading"></span>
+                  {{ else }}
+                  <span class="mhs-device-dot mhs-device-dot-none"></span>
+                  {{ end }}
+                </span>
               </td>
             {{ end }}
             <td class="px-2 py-1.5 border-b border-slate-100">
