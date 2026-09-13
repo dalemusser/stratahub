@@ -31,7 +31,7 @@ runs about three pages at the guide's density; the *Solving problems* table and 
 | Part | Purpose for the teacher |
 |---|---|
 | Opening + columns table | Orientation. Every column named and defined once. |
-| Reading the unit dots | The cells are the only non-obvious part of the view. Amber is the one state to act on; a faded dot under a check is normal. Two caveats matter in practice (ring and check follow the account, not the device; dots are as of Last Seen). |
+| Reading the unit dots | The cells are the only non-obvious part of the view. Amber is the one state that means something is wrong; gray inside the ring is normal on a device the student is not using. Two caveats matter in practice (ring and check follow the account, not the device; dots are as of Last Seen). |
 | Device details | Rarely needed, but turns "the Chromebook is weird" into a report tech support can act on. |
 | Storage | The one column teachers are likely to misread. Explains the 70/90% colors, the auto-download pause at 90%, and how to distinguish "device full" from "MHS full". |
 | Two-minute check before class | The highest-value routine: catches downloads, full devices, stale devices, and never-logged-in students before they cost class time. |
@@ -53,7 +53,7 @@ runs about three pages at the guide's density; the *Solving problems* table and 
 - **Verifying a fix.** Ask the student to open MHS, refresh, and confirm the dot or bar
   changed. The section explains why the refresh is needed (reports are sent on open
   and on download completion).
-- **A unit-level progress scan.** Not the view's main job, but green check marks give a
+- **A unit-level progress scan.** Not the view's main job, but green check circles give a
   fast "who has finished which unit" count without reading the Progress grid.
 
 ## 4. Behavior verified in code (for whoever edits or updates the text)
@@ -69,15 +69,15 @@ runs about three pages at the guide's density; the *Solving problems* table and 
 - **PWA.** `display-mode: standalone` at report time, i.e. the student launched from
   the installed app on that visit. It is a fact about the visit, not a permanent
   install flag.
-- **Unit cells.** Two independent signals drawn together. The dot's fill is the
-  device's `unit_status`: `cached` → solid blue, `downloading` → blue outline,
-  anything else (`not_cached`, `partial`, `error`, `retrying`, `stalled`) → gray. The
-  wrapper carries the grade-derived progress: `current` (first unit not completed) →
-  green ring, `completed` (every progress point's latest grade is `passed`) → green
-  check at the top right, with the dot under it faded. The one combination that
-  needs action — current unit and not `cached`/`downloading` on this device — turns
-  ring and dot amber. Amber is the tab's only "act on this" color, shared with stale
-  Last Seen dates and near-full Storage bars. (`dashboard.go` unit progress block;
+- **Unit cells.** `completed` (every progress point's latest grade is `passed`) is a
+  solid green circle with a white check and no dot: the device a unit was finished on
+  does not matter. Otherwise the dot is the device's `unit_status`: `cached` → solid
+  blue, `downloading` → blue outline, `error`/`stalled`/`retrying` → amber (hover
+  text names which), `partial`/`not_cached` → gray (hover text distinguishes an
+  interrupted download, which resumes when MHS is next opened on that device). The
+  green ring marks `current` (first unit not completed). Rows are devices and
+  students move between them, so "not on this device" is normal and stays gray;
+  amber is only an actual download problem. (`dashboard.go` unit progress block;
   `mhsdashboard_grid.gohtml`; CSS `.mhs-device-cell*` in `mhsdashboard_view.gohtml`.)
 - **When a device reports.** Only from the Mission HydroSci launcher page: once after
   the initial cache check of all units, and again whenever a unit download completes
@@ -108,6 +108,13 @@ runs about three pages at the guide's density; the *Solving problems* table and 
    unit completion (or a lightweight heartbeat) would make Last Seen mean "last
    played" and keep the download dots current. The text explains the refresh step
    instead.
+4. **Download problems reach the tab only by accident.** The launcher reports device
+   status on page load and when a download *completes*, never when one fails or
+   stalls. So the amber "Download Problem" dot only appears when a failing unit
+   happens to be in a report triggered by something else. A one-line change in the
+   launcher's status handler (`missionhydrosci_units.gohtml`, the `cached` report
+   branch) to also report on `error` and `stalled` would make amber reliable. That
+   change touches the student page, so it is listed here rather than made.
 3. **Dashboard and launcher storage thresholds differ** (70/90 versus 60/80/90). Not a
    problem for teachers, but the numbers in the guide are the dashboard's; keep them
    in sync if either changes.

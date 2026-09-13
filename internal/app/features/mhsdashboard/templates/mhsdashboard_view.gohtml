@@ -224,14 +224,17 @@
   .mhs-styled-scrollbar::-webkit-scrollbar-corner {
     background: #e8f4f8;
   }
-  /* Device readiness. Two independent signals per unit cell: the dot's fill
-     is the device's download state for the unit (blue = downloaded, blue
-     outline = downloading, gray = not downloaded); the ring and the check
-     mark are the student's progress from grading (green ring = current unit,
-     check = completed). Drawn separately so neither hides the other. The one
-     combination a teacher must not miss — the student's current unit is not
-     on this device — turns the whole cell amber, so the tab can be scanned
-     for amber, the same "look at this" color Last Seen and Storage use. */
+  /* Device readiness. Each unit cell answers two questions. The dot is the
+     device: is this unit downloaded here (blue), downloading (blue outline),
+     not here (gray), or did its download run into trouble (amber)? The ring
+     and the check are the student, from grading: the green ring marks the
+     unit they are working in, and a green check circle marks a unit they
+     have completed. Completed units show only the check — which device a
+     unit was finished on does not matter. Rows are devices, and a student
+     may use several, so "not on this device" is normal and stays neutral
+     gray; amber is reserved for an actual download problem the device
+     reported (error, stalled, retrying), the same "look at this" color the
+     stale Last Seen date and the near-full Storage bar use. */
   .mhs-device-cell {
     position: relative;
     display: inline-flex;
@@ -244,20 +247,15 @@
     vertical-align: middle;
   }
   .mhs-device-cell-current { border-color: #22c55e; }
-  .mhs-device-cell-missing { border-color: #f59e0b; }
-  .mhs-device-cell-completed::after {
-    content: '\2714';
-    position: absolute;
-    top: -8px;
-    right: -9px;
-    font-size: 12px;
-    line-height: 1;
+  .mhs-device-cell-completed {
+    background: #22c55e;
+    border-color: #22c55e;
+    color: #fff;
+    font-size: 11px;
     font-weight: 800;
-    color: #16a34a;
+    line-height: 1;
   }
-  /* Under a check the download state rarely matters (finished units are
-     removed from the device automatically), so the dot steps back. */
-  .mhs-device-cell-completed .mhs-device-dot { opacity: 0.45; }
+  .mhs-device-cell-completed::after { content: '\2713'; }
   .mhs-device-dot {
     width: 10px;
     height: 10px;
@@ -267,10 +265,10 @@
   .mhs-device-dot-cached { background: #3b82f6; }
   .mhs-device-dot-downloading { border: 2px solid #60a5fa; background: transparent; }
   .mhs-device-dot-none { background: #d1d5db; }
-  .mhs-device-dot-missing { background: #f59e0b; }
+  .mhs-device-dot-problem { background: #f59e0b; }
   .mhs-legend-divider { color: #cbd5e1; }
   .mhs-legend-caption { color: #64748b; }
-  /* Seven legend items: keep each label on one line, wrap the row on narrow windows. */
+  /* Keep each legend label on one line; wrap the row on narrow windows. */
   #mhs-legend-devices { flex-wrap: wrap; row-gap: 0.25rem; }
   #mhs-legend-devices > div { white-space: nowrap; }
   /* Stale devices (last_seen > 7d ago) are flagged by the amber-colored
@@ -539,10 +537,7 @@
   .dark #mhs-dashboard .mhs-legend-caption {
     color: #94a3b8;
   }
-  .dark #mhs-dashboard .mhs-device-cell-missing {
-    border-color: #fbbf24;
-  }
-  .dark #mhs-dashboard .mhs-device-dot-missing {
+  .dark #mhs-dashboard .mhs-device-dot-problem {
     background: #fbbf24;
   }
 
@@ -867,7 +862,7 @@
     </div>
     <!-- Devices Legend -->
     <div id="mhs-legend-devices" class="hidden items-center gap-4 text-xs">
-      <span class="mhs-legend-caption">Dot: on this device &middot; Ring and check: student's progress</span>
+      <span class="mhs-legend-caption">Dot: on this device &middot; Ring: current unit &middot; Check: completed</span>
       <span class="mhs-legend-divider" aria-hidden="true">|</span>
       <div class="flex items-center gap-1.5" title="The unit's files are on this device">
         <span class="mhs-device-cell"><span class="mhs-device-dot mhs-device-dot-cached"></span></span>
@@ -877,21 +872,21 @@
         <span class="mhs-device-cell"><span class="mhs-device-dot mhs-device-dot-downloading"></span></span>
         <span class="text-slate-600">Downloading</span>
       </div>
-      <div class="flex items-center gap-1.5" title="The unit is not on this device, or a download stopped partway">
+      <div class="flex items-center gap-1.5" title="The unit is not on this device. Normal for a device the student is not using; the download starts when they open MHS on it">
         <span class="mhs-device-cell"><span class="mhs-device-dot mhs-device-dot-none"></span></span>
         <span class="text-slate-600">Not Downloaded</span>
       </div>
+      <div class="flex items-center gap-1.5" title="The device reported trouble with this unit's download: failed, stalled, or stuck retrying. Hover the dot for which">
+        <span class="mhs-device-cell"><span class="mhs-device-dot mhs-device-dot-problem"></span></span>
+        <span class="text-slate-600">Download Problem</span>
+      </div>
       <span class="mhs-legend-divider" aria-hidden="true">|</span>
-      <div class="flex items-center gap-1.5" title="The student's current unit; the dot inside is its download state on this device">
+      <div class="flex items-center gap-1.5" title="The unit the student is working in; the dot inside is its state on this device">
         <span class="mhs-device-cell mhs-device-cell-current"><span class="mhs-device-dot mhs-device-dot-cached"></span></span>
         <span class="text-slate-600">Current Unit</span>
       </div>
-      <div class="flex items-center gap-1.5" title="The unit the student is playing is not downloaded on this device">
-        <span class="mhs-device-cell mhs-device-cell-missing"><span class="mhs-device-dot mhs-device-dot-missing"></span></span>
-        <span class="text-slate-600">Current Unit Not On Device</span>
-      </div>
-      <div class="flex items-center gap-1.5" title="The student has passed every progress point in the unit; finished units are removed from the device automatically, so a faded dot here is normal">
-        <span class="mhs-device-cell mhs-device-cell-completed"><span class="mhs-device-dot mhs-device-dot-none"></span></span>
+      <div class="flex items-center gap-1.5" title="The student has passed every progress point in the unit">
+        <span class="mhs-device-cell mhs-device-cell-completed"></span>
         <span class="text-slate-600">Completed</span>
       </div>
     </div>
