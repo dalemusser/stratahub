@@ -959,7 +959,7 @@ make css-watch
   update the tables in `members-report.md`, and recapture the screenshots
   with the `stratahub-docs` skill
 
-### Unit loading status + Unit 2 Device Test (2026-09; built, on dev, not yet in production)
+### Unit loading status + Unit 2 Device Test (2026-09; built, on dev through 279d3b3, not yet in production)
 - Plan: `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md`
   (approved 2026-09-07). A0 implemented and deployed 2026-09-07 (device
   test pending): faster switch to the direct download path, content-server
@@ -994,8 +994,12 @@ make css-watch
   background-switch telemetry (`download-switched`, `bgfetch-frozen`) with a
   1 h direct preference, and a Reset this device button that winds the run
   back under the same test code. Status, open items and headless
-  verification recipes: plan §0. Real-device verification still deferred;
-  production promotion not started
+  verification recipes: plan §0 (updated 2026-09-13). Questionnaire reworked
+  2026-09-10/11 from reviewer feedback (commits c7a8c04 through 279d3b3, on
+  dev; details above) and the tester guide is handed to schools as its
+  GitHub link on `main` (HTML copy removed). Real-device verification still
+  deferred; a browser check of the reworked questionnaire on dev is open
+  (plan §0 item 6); production promotion not started
 
 ### Game log first-event rejection (2026-09-08, handed to the game developers)
 - `docs/mission-hydrosci/game-first-log-event-rejected.md`: the game's first

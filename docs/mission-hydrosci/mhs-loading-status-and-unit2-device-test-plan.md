@@ -1,7 +1,7 @@
 # Mission HydroSci — Unit Loading Status and Unit 2 Device Test — Plan
 
 **Date:** 2026-09-07 (revised twice the same day after review: the device test is standalone, one fixed route per workspace, no accounts, no sessions, no links to manage)
-**Status:** All steps built; everything through `46e452a` deployed to the dev workspace and verified there; `39dca35` (reset winds the run back) pushed, awaiting deploy + dev check. See §0 for the resume-later state.
+**Status:** All steps built; everything through `279d3b3` (2026-09-11) is deployed to the dev workspace; nothing is in production. See §0 for the resume-later state.
 **Scope:** two related pieces of work in `stratahub`, feature `internal/app/features/missionhydrosci`:
 
 - **A. Unit loading.** Answer the field reports (connection errors, downloads sitting at 0%, the long wait before the backup download method takes over) and add a visible step-by-step status so a user can see, and report, where a load fails.
@@ -9,7 +9,7 @@
 
 ---
 
-## 0. Status and how to resume (written 2026-09-10)
+## 0. Status and how to resume (written 2026-09-10, updated 2026-09-13)
 
 **Where things stand.** A0, A1, B and A2 are built and live on the dev
 workspace, plus everything added while testing (2026-09-08/09): bare
@@ -19,14 +19,36 @@ CSRF cookie that lives as long as the session, the launch watchdog with a
 content-server fallback, the service-worker install fix for devices that
 never signed in, direct-path byte-range resume, background-switch
 telemetry with a one-hour direct preference, and the Reset this device
-button. Nothing is in production yet; the device test is enabled only on
-the dev workspace.
+button. The post-play questionnaire was reworked on 2026-09-10/11 from
+reviewer feedback (next paragraph). Nothing is in production yet; the
+device test is enabled only on the dev workspace.
 
-**Pending when this was written.** `39dca35` (reset winds the run back to
+**Questionnaire as it stands (commits `c7a8c04` through `279d3b3`, on
+dev).** Five questions, none required: sound, controls, picture,
+performance, and "Identify the farthest point in the game that you
+reached?" with a vertical list in unit order — Started the game, Put
+topographic glyphs on wall, Met Anderson and her hoverboard, Found
+Jasper, Finished the unit (codes `started`, `glyphs-on-wall`,
+`met-anderson`, `found-jasper`, `finished` in
+`models.MHSDeviceTestQuestionnaireOptions`; labels and question text in
+`viewers/views/devicetests.go`, where the retired codes `into-game`,
+`part-way` and `before-glyphs` keep a label; `TestQuestionnaireLabelsCoverOptions`
+keeps model and viewer in step). The sound question is not special: no
+required mark and no "matters most" copy anywhere. Only a form with
+nothing on it is refused (`qerror=empty`); a parse failure gets
+`qerror=form`. Because a radio cannot be unselected, each radio question
+grows a small "clear" button in its legend once an option is chosen
+(script after the form in `devicetest_run.gohtml`); this was verified
+headless on a static copy of the form, not on dev. The tester guide is
+handed to schools as the GitHub link to `docs/mhs-device-test/tester-guide.md`
+on `main` (the HTML copy was removed 2026-09-11), so edits to it are live
+the moment they are pushed and it must stay placeholder-only.
+
+**Deployed but not confirmed.** `39dca35` (reset winds the run back to
 the pre-launch view under the same test code; §4.7 "Reset this device")
-is pushed but not deployed and not verified on dev. Check after deploying:
-run a device test through download and launch, press Reset, confirm the
-page returns to the download view with the same test code, the post-play
+was deployed 2026-09-10 and has not been reported checked. To check: run
+a device test through download and launch, press Reset, confirm the page
+returns to the download view with the same test code, the post-play
 questions stay hidden until the next launch, and the Device Tests detail
 shows "Resets: 1" and an "Ended … reset" line.
 
@@ -48,6 +70,11 @@ shows "Resets: 1" and an "Ended … reset" line.
    switch window can then be tuned from evidence.
 5. Promotion to production: the usual tag-based release; the device test
    stays off in each workspace until enabled in Site Settings.
+6. A browser check of the reworked questionnaire on dev (the clear button
+   appears after a choice and empties its group, the vertical checkpoint
+   list starts with Started the game, an empty form is refused with the
+   "Nothing to save yet" message), then the same on the real devices of
+   item 1.
 
 **How the pieces stay in sync.** The delivery manager
 (`mhs-delivery.js`), the service worker and the play template are one
@@ -261,11 +288,16 @@ Endpoint: `POST /missionhydrosci/api/steplog` (session-gated, CSRF token as toda
 > detail lists the trend. Members' launches get the same through their
 > launch record (`/api/steplog/{id}/heartbeat`).
 >
-> **Addendum (2026-09-08): post-play questionnaire.** Once the game has been
-> launched, the run page shows five questions (sound, controls, picture,
-> performance, how far) plus notes; answers are stored on the run record
-> (`questionnaire`), can be updated, and appear as a Sound column and filter
-> and in the detail and exports. State is server-side only: the run URL
+> **Addendum (2026-09-08, revised 2026-09-11): post-play questionnaire.**
+> Once the game has been launched, the run page shows five questions —
+> sound, controls, picture, performance, and the farthest point reached (a
+> vertical list in unit order: Started the game, Put topographic glyphs on
+> wall, Met Anderson and her hoverboard, Found Jasper, Finished the unit) —
+> plus notes. No answer is required; only a form with nothing on it is
+> refused, and each question gets a "clear" control once an option is
+> chosen. Answers are stored on the run record (`questionnaire`), can be
+> updated, and appear as a Sound column and filter and in the detail and
+> exports. State is server-side only: the run URL
 > identifies the run, and the page renders the questionnaire from the
 > record's stage and answers.
 
@@ -329,7 +361,7 @@ Site settings: `mhs_device_test_enabled` and `mhs_device_test_unit` (4.3).
 | Area | Fields | Source |
 |---|---|---|
 | Who | school or district, name, role, email (optional), device type, school-managed or not, network type, notes | the form before the test |
-| Survey answers | did the sound play, did the keyboard and pointer work, did the picture look right, how did it run, how far they got, notes, when answered | the questionnaire on the run page after launch |
+| Survey answers | did the sound play, did the keyboard and pointer work, did the picture look right, how did it run, the farthest point reached (Started the game … Finished the unit), notes, when answered | the questionnaire on the run page after launch |
 | Where and when | workspace, client IP, user agent, start / last activity / end / expiry times; time zone, languages | server and page |
 | Device | user agent and client hints (platform and version, model, architecture, bitness, brands, full versions), screen size and pixel ratio, viewport, orientation, touch points, CPU cores, device memory, battery level and charging when available | run page snapshot |
 | Browser | installed-app mode, service worker supported and controlling, Background Fetch API, Cache API, cookies enabled, cross-origin isolation, SharedArrayBuffer, WebAssembly, BroadcastChannel, WebGL 2 / 1 / none with GPU vendor and renderer, maximum texture size, page load and time-to-first-byte | run page snapshot |
