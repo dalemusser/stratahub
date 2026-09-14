@@ -226,7 +226,7 @@
   }
   /* Devices tab. Background = the student, foreground = this device. The
      unit cells of a student's block are tinted with their progress — green
-     completed, violet current unit (a blue dot stays readable on it, unlike indigo),
+     completed, purple current unit (far enough from the blue dot to keep it readable),
      nothing for a unit not reached or skipped — across every device row, so
      progress reads as a bar growing left to right that plainly belongs to
      the student, not to a machine. Inside a block the tinted cells drop
@@ -237,8 +237,8 @@
      stays neutral gray; amber is reserved for an actual problem, the same
      "look at this" color the stale Last Seen date and the near-full Storage
      bar use. */
-  .mhs-unit-done { background-color: #dcfce7; }
-  .mhs-unit-current { background-color: #ede9fe; }
+  .mhs-unit-done { background-color: #bbf7d0; }
+  .mhs-unit-current { background-color: #e9d5ff; }
   /* Rows: no alternating fill (a translucent tint on two base shades read
      as two colors). A faint line between a student's devices, a firmer one
      between students; inside a block the tinted cells drop the faint line
@@ -258,7 +258,7 @@
      so "not downloaded" never looks like two states. */
   /* The problem dot also carries a shape — an exclamation mark — so it is
      never a color-only signal. */
-  .mhs-device-dot-problem { position: relative; }
+  .mhs-device-dot-problem { position: relative; box-shadow: 0 0 0 1.5px #78350f; }
   .mhs-device-dot-problem::before,
   .mhs-device-dot-problem::after {
     content: '';
@@ -297,7 +297,7 @@
   }
   .mhs-device-dot-cached { background: #3b82f6; }
   .mhs-device-dot-downloading { border: 2.5px solid #3b82f6; background: transparent; }
-  .mhs-device-dot-none { background: #9ca3af; }
+  .mhs-device-dot-none { background: #6b7280; }
   .mhs-device-dot-problem { background: #f59e0b; }
   .mhs-legend-divider { color: #cbd5e1; }
   .mhs-legend-caption { color: #64748b; }
@@ -562,10 +562,10 @@
     background: #64748b;
   }
   .dark #mhs-dashboard .mhs-unit-done {
-    background-color: rgba(34, 197, 94, 0.22);
+    background-color: #1e4d31;
   }
   .dark #mhs-dashboard .mhs-unit-current {
-    background-color: rgba(139, 92, 246, 0.32);
+    background-color: #503580;
   }
   .dark #mhs-dashboard .mhs-device-row > td {
     border-bottom-color: #334155 !important;
