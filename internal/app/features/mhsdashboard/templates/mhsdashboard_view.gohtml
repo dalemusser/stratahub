@@ -224,36 +224,32 @@
   .mhs-styled-scrollbar::-webkit-scrollbar-corner {
     background: #e8f4f8;
   }
-  /* Devices tab marks. Each student is a block: a progress row (the student)
-     above one row per device. Both share the unit columns, so a unit's
-     progress mark sits directly above that unit's dots on each device. The
-     progress row uses the vocabulary of the student's own Mission HydroSci
-     page — filled green completed, green ring current, faint ring upcoming —
-     and never gray, which in a device row means "not on this device". Device
-     dots: blue downloaded, blue outline downloading, gray not here, amber a
-     download the device reported as failing. Rows are devices and students
-     move between them, so "not on this device" is normal and stays neutral
-     gray; amber is reserved for an actual problem, the same "look at this"
-     color the stale Last Seen date and the near-full Storage bar use. */
-  .mhs-progress-row { background-color: #eef2f8; }
-  .mhs-progress-row td { padding-top: 0.3rem; padding-bottom: 0.3rem; }
-  .mhs-progress-name { vertical-align: top; padding-top: 0.45rem; }
-  .mhs-progress-text { color: #475569; font-weight: 500; white-space: nowrap; }
-  .mhs-progress-mark {
-    width: 10px;
-    height: 10px;
-    border-radius: 50%;
+  /* Devices tab. Background = the student, foreground = this device. The
+     unit cells of a student's block are tinted with their progress — green
+     completed, indigo current unit (the Progress tab's in-progress color),
+     nothing for a unit not reached or skipped — across every device row, so
+     progress reads as a bar growing left to right that plainly belongs to
+     the student, not to a machine. Inside a block the tinted cells drop
+     their row divider so the band is continuous. The dot on top is only
+     this device: blue downloaded, blue outline downloading, gray not here,
+     amber a download the device reported as failing. Rows are devices and
+     students move between them, so "not on this device" is normal and
+     stays neutral gray; amber is reserved for an actual problem, the same
+     "look at this" color the stale Last Seen date and the near-full Storage
+     bar use. */
+  .mhs-unit-done { background-color: #dcfce7; }
+  .mhs-unit-current { background-color: #e0e7ff; }
+  .mhs-unit-band-inner { border-bottom-color: transparent; }
+  /* A gray dot needs a touch more weight on a tinted cell. */
+  .mhs-unit-done .mhs-device-dot-none,
+  .mhs-unit-current .mhs-device-dot-none { background: #9ca3af; }
+  .mhs-legend-swatch {
     display: inline-block;
+    width: 16px;
+    height: 11px;
+    border-radius: 3px;
     vertical-align: middle;
   }
-  .mhs-progress-mark-done { background: #22c55e; }
-  .mhs-progress-mark-current {
-    width: 12px;
-    height: 12px;
-    border: 2px solid #22c55e;
-    background: transparent;
-  }
-  .mhs-progress-mark-future { border: 1.5px solid #cbd5e1; background: transparent; }
   .mhs-device-cell {
     position: relative;
     display: inline-flex;
@@ -537,14 +533,15 @@
   .dark #mhs-dashboard .mhs-device-dot-none {
     background: #475569;
   }
-  .dark #mhs-dashboard .mhs-progress-row {
-    background-color: #2b3a52;
+  .dark #mhs-dashboard .mhs-unit-done {
+    background-color: rgba(34, 197, 94, 0.22);
   }
-  .dark #mhs-dashboard .mhs-progress-text {
-    color: #cbd5e1;
+  .dark #mhs-dashboard .mhs-unit-current {
+    background-color: rgba(99, 102, 241, 0.28);
   }
-  .dark #mhs-dashboard .mhs-progress-mark-future {
-    border-color: #64748b;
+  .dark #mhs-dashboard .mhs-unit-done .mhs-device-dot-none,
+  .dark #mhs-dashboard .mhs-unit-current .mhs-device-dot-none {
+    background: #64748b;
   }
   .dark #mhs-dashboard .mhs-legend-divider {
     color: #475569;
@@ -877,21 +874,17 @@
     </div>
     <!-- Devices Legend -->
     <div id="mhs-legend-devices" class="hidden items-center gap-4 text-xs">
-      <span class="mhs-legend-caption">Progress: the student</span>
-      <div class="flex items-center gap-1.5" title="The student has passed every progress point in the unit">
-        <span class="mhs-progress-mark mhs-progress-mark-done"></span>
+      <span class="mhs-legend-caption">Background: the student</span>
+      <div class="flex items-center gap-1.5" title="The student has finished every progress point in the unit">
+        <span class="mhs-legend-swatch mhs-unit-done"></span>
         <span class="text-slate-600">Completed</span>
       </div>
       <div class="flex items-center gap-1.5" title="The unit the student is working in">
-        <span class="mhs-progress-mark mhs-progress-mark-current"></span>
-        <span class="text-slate-600">Current</span>
-      </div>
-      <div class="flex items-center gap-1.5" title="Not reached yet">
-        <span class="mhs-progress-mark mhs-progress-mark-future"></span>
-        <span class="text-slate-600">Upcoming</span>
+        <span class="mhs-legend-swatch mhs-unit-current"></span>
+        <span class="text-slate-600">Current Unit</span>
       </div>
       <span class="mhs-legend-divider" aria-hidden="true">|</span>
-      <span class="mhs-legend-caption">Units: this device</span>
+      <span class="mhs-legend-caption">Dot: this device</span>
       <div class="flex items-center gap-1.5" title="The unit's files are on this device">
         <span class="mhs-device-cell"><span class="mhs-device-dot mhs-device-dot-cached"></span></span>
         <span class="text-slate-600">Downloaded</span>
@@ -904,7 +897,7 @@
         <span class="mhs-device-cell"><span class="mhs-device-dot mhs-device-dot-none"></span></span>
         <span class="text-slate-600">Not Downloaded</span>
       </div>
-      <div class="flex items-center gap-1.5" title="The device reported trouble with this unit's download: failed, stalled, or stuck retrying. Hover the dot for which">
+      <div class="flex items-center gap-1.5" title="The device reported trouble with this unit's download: failed, stalled, or stuck retrying. Hover the cell for which">
         <span class="mhs-device-cell"><span class="mhs-device-dot mhs-device-dot-problem"></span></span>
         <span class="text-slate-600">Download Problem</span>
       </div>

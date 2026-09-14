@@ -82,6 +82,7 @@ type DeviceInfo struct {
 	StorageTotal  string // Human-readable total storage (e.g., "4.8 GB")
 	LastSeen      time.Time
 	IsStale       bool // last_seen > 7 days ago
+	IsLast        bool // last (oldest) device row in the student's block; the progress band closes here
 }
 
 // MemberRow represents a single row of progress data for a member.
@@ -91,10 +92,8 @@ type MemberRow struct {
 	IsEven          bool              // For alternating row colors
 	Cells           []CellData        // Pre-computed cell data
 	Devices         []DeviceInfo      // Device readiness info
-	UnitProgress    map[string]string // unit ID → "completed"/"current"/"future"
+	UnitProgress    map[string]string // unit ID → "completed" / "current" / "future" (Devices tab band)
 	ProgressSummary string            // Devices tab tooltip, e.g. "Completed Unit 1 · Current Unit 2"
-	ProgressText    string            // Devices tab progress row, e.g. "In Unit 2 · 1 completed"
-	RowSpan         int               // Devices tab: rows in the student's block (progress row + device rows)
 	CurrentUnit     string            // Unit ID the student is currently in (from grader)
 
 	// Collection info

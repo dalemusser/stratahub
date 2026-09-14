@@ -746,6 +746,7 @@ func (h *Handler) loadDeviceMap(ctx context.Context, r *http.Request, members []
 	for uid := range deviceMap {
 		devs := deviceMap[uid]
 		sort.SliceStable(devs, func(i, j int) bool { return devs[i].LastSeen.After(devs[j].LastSeen) })
+		devs[len(devs)-1].IsLast = true
 	}
 
 	return deviceMap
@@ -906,31 +907,36 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 			}
 		}
 
-		// Compute unit-level progress status
+		// Unit-level progress for the Devices tab band. A unit is completed
+		// when every progress point is finished — passed or flagged (the
+		// Progress tab treats flagged as completed-with-concern, and a flag
+		// must not stall the band). The current unit is the grader's own
+		// record of where the student is, not "the first unit not completed",
+		// so a skipped unit stays untinted instead of being marked current.
+		// A completed unit that is also the grader's current unit shows as
+		// completed. No grades at all: nothing is tinted.
 		unitProgress := make(map[string]string, len(cfg.Units))
-		foundCurrent := false
 		for _, unit := range cfg.Units {
-			allPassed := true
-			for _, point := range unit.ProgressPoints {
-				var isPassed bool
-				if gradeDoc != nil {
-					if items, ok := gradeDoc.Grades[point.ID]; ok && len(items) > 0 {
-						if items[len(items)-1].Status == "passed" {
-							isPassed = true
-						}
+			finished := gradeDoc != nil && len(unit.ProgressPoints) > 0
+			if finished {
+				for _, point := range unit.ProgressPoints {
+					items, ok := gradeDoc.Grades[point.ID]
+					if !ok || len(items) == 0 {
+						finished = false
+						break
+					}
+					if st := items[len(items)-1].Status; st != "passed" && st != "flagged" {
+						finished = false
+						break
 					}
 				}
-				if !isPassed {
-					allPassed = false
-					break
-				}
 			}
-			if allPassed {
+			switch {
+			case finished:
 				unitProgress[unit.ID] = "completed"
-			} else if !foundCurrent {
+			case unit.ID == currentUnit:
 				unitProgress[unit.ID] = "current"
-				foundCurrent = true
-			} else {
+			default:
 				unitProgress[unit.ID] = "future"
 			}
 		}
@@ -962,25 +968,6 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 			progressSummary = "Not started"
 		}
 
-		// Devices tab: one progress row per student above their device rows.
-		// The row's Device cell carries a short text form of the same facts.
-		rowSpan := len(deviceMap[member.ID.Hex()]) + 1
-		if rowSpan < 2 {
-			rowSpan = 2 // progress row + the "No device data" row
-		}
-		started := gradeDoc != nil && len(gradeDoc.Grades) > 0
-		var progressText string
-		switch {
-		case !started:
-			progressText = "Not started"
-		case currentTitle == "" && len(cfg.Units) > 0 && len(completedTitles) == len(cfg.Units):
-			progressText = fmt.Sprintf("All %d units completed", len(cfg.Units))
-		case len(completedTitles) > 0:
-			progressText = fmt.Sprintf("In %s · %d completed", currentTitle, len(completedTitles))
-		default:
-			progressText = "In " + currentTitle
-		}
-
 		// Check for per-user collection override
 		var hasOverride bool
 		var collName string
@@ -1001,8 +988,6 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 			Devices:               deviceMap[member.ID.Hex()],
 			UnitProgress:          unitProgress,
 			ProgressSummary:       progressSummary,
-			ProgressText:          progressText,
-			RowSpan:               rowSpan,
 			CurrentUnit:           currentUnit,
 			HasCollectionOverride: hasOverride,
 			CollectionName:        collName,
