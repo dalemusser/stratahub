@@ -34,7 +34,7 @@ So a striped purple cell with a small gray dot in it says: this is the unit the 
 | **PWA** | ✓ means the student opened MHS from the installed app the last time they used this device. — means they opened it in a regular browser tab. Both work. The installed app hides the browser's address bar and tabs, which gives the game more screen space. |
 | **Unit 1 – Unit 5** | One cell per unit. The background is the student's progress and the dot is the unit's download state on this device. See *Reading the unit cells* below. |
 | **Storage** | How much space MHS is using on this device compared with the space the browser allows it, shown as a bar, a percentage, and the amounts (for example, 729 MB / 10.7 GB). |
-| **Last Seen** | The date this device last opened MHS. Hover over the date to see the exact time. A date shown in amber is more than a week old. |
+| **Last Seen** | The date this device last opened MHS. Hover over the date to see the exact time. A date shown in gold is more than a week old. |
 
 If a student has never opened MHS on any device, their row says **No device data**. Their progress band still shows, so a student who is playing on a device that has not reported yet is not mistaken for one who has not started.
 
@@ -59,7 +59,7 @@ If a student has never opened MHS on any device, their row says **No device data
 
 ![Unit cells for several students](images/devices-table-light.png)
 
-In the figure: Avery Kim has finished Units 1 and 2, is playing Unit 3, has it downloaded, and Unit 4 is downloading behind it. Jordan Patel has two Chromebooks; the newer one at the top does not have Unit 2 yet, the older one below does. Sam Okafor's Unit 3 download failed, and the red storage bar says why: that device is nearly full. Taylor Reed skipped Unit 2. Casey Brooks has not started and has never opened MHS.
+In the figure: Avery Kim has finished Units 1 and 2, is playing Unit 3, has it downloaded, and Unit 4 is downloading behind it. Jordan Patel has two Chromebooks; the newer one at the top does not have Unit 2 yet, the older one below does. Sam Okafor's Unit 3 download failed, and the red storage bar says why: that device is nearly full. Taylor Reed skipped Unit 2. Casey Brooks has not started and has never opened MHS. The two gold dates in the Last Seen column are more than a week old: Jordan Patel's older Chromebook and Jamie Fox's Windows machine have not opened MHS recently, while every other device has been used this week.
 
 **Amber is the only color that means something is wrong.** Green, purple, and blue are confirmations. A small gray dot is neutral. A small gray dot inside the striped purple cell means the unit the student is playing is not on this device, which is what you will see for a device they used earlier or have not opened MHS on yet. The download starts on its own when they open MHS there.
 
@@ -97,7 +97,7 @@ A high percentage almost always means the *device* is nearly full rather than th
 2. Scan for **amber badges**. Each one is a download the device reported trouble with; hover the cell for the reason, and check that row's Storage bar.
 3. Look at each student's striped purple cell on the top row of their group, the device they used most recently. A **small gray dot** there means the unit they are playing is not on that device yet. The download starts on its own when they open MHS, and takes a few minutes on school Wi-Fi.
 4. Scan **Storage** for orange or red bars.
-5. Scan **Last Seen** for amber dates. The student has not opened MHS on that device in over a week. They may have been absent, or they may have moved to another device (look for a second row under their name). If a device has gone quiet and the student has no newer row, ask which device they are using.
+5. Scan **Last Seen** for gold dates. The student has not opened MHS on that device in over a week. They may have been absent, or they may have moved to another device (look for a second row under their name). If a device has gone quiet and the student has no newer row, ask which device they are using.
 6. Look for **No device data**. That student has never opened MHS. Check that they can log in and find Mission HydroSci in the menu.
 
 > **Tip**
@@ -129,7 +129,7 @@ For anything finer, use the other views:
 |---|---|
 | Whether a student's device is ready for the unit they are playing | The dot in the striped purple cell on their top row: large blue is ready, small gray is not on this device yet, amber had a download problem |
 | Whether a device is short on space | Storage bar: orange above 70%, red above 90% |
-| When a student last opened MHS on a device | Last Seen (amber means more than a week ago) |
+| When a student last opened MHS on a device | Last Seen (gold means more than a week ago) |
 | Which units a student has completed | Green cells |
 | Which unit a student is working in | The striped purple cell |
 | What kind of device a student has, and its specs | Click the device name |
