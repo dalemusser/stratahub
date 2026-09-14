@@ -248,14 +248,21 @@
   }
   .mhs-device-cell-current { border-color: #22c55e; }
   .mhs-device-cell-completed {
-    background: #22c55e;
-    border-color: #22c55e;
-    color: #fff;
-    font-size: 11px;
-    font-weight: 800;
-    line-height: 1;
+    background: #16a34a;
+    border-color: #16a34a;
   }
-  .mhs-device-cell-completed::after { content: '\2713'; }
+  /* The check is drawn, not a font glyph: a text check at this size is a
+     hairline and vanished against the green. Two thick white strokes
+     (an L rotated 45°) stay crisp at any zoom. */
+  .mhs-device-cell-completed::after {
+    content: '';
+    display: block;
+    width: 5px;
+    height: 9px;
+    border: solid #fff;
+    border-width: 0 2.5px 2.5px 0;
+    transform: translate(0, -1.5px) rotate(45deg);
+  }
   .mhs-device-dot {
     width: 10px;
     height: 10px;
