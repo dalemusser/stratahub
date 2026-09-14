@@ -203,17 +203,14 @@
               {{ end }}
             </td>
             {{ range $.UnitHeaders }}
-              {{ $unitProg := index $unitProgress .ID }}
               {{ $dlStatus := index $dev.UnitStatus .ID }}
               <td class="text-center px-2 py-1.5 border-b border-slate-100">
                 {{/* Device only: the dot is this device's download state for the unit. The student's
-                     progress lives in the Progress column; the green ring here only points at the column
-                     of the student's current unit, on every one of their device rows, so "is the unit they
-                     are playing on this device?" is read from the dot inside it. Amber is reserved for a
-                     download the device reported as failing (error / stalled / retrying); "not on this
-                     device" is normal (students move between devices) and stays gray. */}}
-                <span class="mhs-device-cell{{ if eq $unitProg "current" }} mhs-device-cell-current{{ end }}"
-                      title="{{ if eq $dlStatus "cached" }}Downloaded{{ else if eq $dlStatus "downloading" }}Downloading{{ else if eq $dlStatus "error" }}Download problem: failed{{ else if eq $dlStatus "stalled" }}Download problem: stalled{{ else if eq $dlStatus "retrying" }}Download problem: interrupted, retrying{{ else if eq $dlStatus "partial" }}Not downloaded: an earlier download stopped partway and resumes when MHS is opened on this device{{ else }}Not downloaded{{ end }}{{ if eq $unitProg "current" }} · the student's current unit{{ end }}">
+                     progress lives in the Progress column. Amber is reserved for a download the device
+                     reported as failing (error / stalled / retrying); "not on this device" is normal
+                     (students move between devices) and stays gray. */}}
+                <span class="mhs-device-cell"
+                      title="{{ if eq $dlStatus "cached" }}Downloaded{{ else if eq $dlStatus "downloading" }}Downloading{{ else if eq $dlStatus "error" }}Download problem: failed{{ else if eq $dlStatus "stalled" }}Download problem: stalled{{ else if eq $dlStatus "retrying" }}Download problem: interrupted, retrying{{ else if eq $dlStatus "partial" }}Not downloaded: an earlier download stopped partway and resumes when MHS is opened on this device{{ else }}Not downloaded{{ end }}">
                   {{ if eq $dlStatus "cached" }}
                   <span class="mhs-device-dot mhs-device-dot-cached"></span>
                   {{ else if eq $dlStatus "downloading" }}

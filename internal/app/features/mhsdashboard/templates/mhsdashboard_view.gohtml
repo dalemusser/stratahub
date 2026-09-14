@@ -229,10 +229,7 @@
      green completed, green ring current, gray upcoming), spanning their
      device rows. The unit columns are the device: the dot is this device's
      download state for the unit (blue downloaded, blue outline downloading,
-     gray not here, amber a download the device reported as failing). The
-     green ring around a dot only points at the column of the student's
-     current unit, on every one of their device rows, so "is the unit they
-     are playing on this device?" is read from the dot inside it. Rows are
+     gray not here, amber a download the device reported as failing). Rows are
      devices and students move between them, so "not on this device" is
      normal and stays neutral gray; amber is reserved for an actual problem,
      the same "look at this" color the stale Last Seen date and the near-full
@@ -264,7 +261,6 @@
     border: 2px solid transparent;
     vertical-align: middle;
   }
-  .mhs-device-cell-current { border-color: #22c55e; }
   .mhs-device-dot {
     width: 10px;
     height: 10px;
@@ -902,10 +898,6 @@
       <div class="flex items-center gap-1.5" title="The device reported trouble with this unit's download: failed, stalled, or stuck retrying. Hover the dot for which">
         <span class="mhs-device-cell"><span class="mhs-device-dot mhs-device-dot-problem"></span></span>
         <span class="text-slate-600">Download Problem</span>
-      </div>
-      <div class="flex items-center gap-1.5" title="Points at the column of the student's current unit on each of their device rows; the dot inside is that unit's state on this device">
-        <span class="mhs-device-cell mhs-device-cell-current"><span class="mhs-device-dot mhs-device-dot-none"></span></span>
-        <span class="text-slate-600">Current Unit's Column</span>
       </div>
     </div>
     <!-- Surveys Legend -->
