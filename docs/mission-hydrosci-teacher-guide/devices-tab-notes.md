@@ -1,7 +1,8 @@
 # Devices View: plan, rationale, and editor notes
 
 Companion to `devices-tab.md` (the guide-ready text). Written 2026-09-13 against the
-current `mhsdashboard` and `missionhydrosci` code. The source guide is
+current `mhsdashboard` and `missionhydrosci` code; the Devices tab itself was redesigned
+the same day and the text describes the final design. Figures live in `images/`. The source guide is
 `sources/August 2026 Mission HydroSci Teacher Guide.pdf` (121 pages, Canva).
 
 ## 1. Where it goes in the guide
@@ -31,7 +32,7 @@ runs about three pages at the guide's density; the *Solving problems* table and 
 | Part | Purpose for the teacher |
 |---|---|
 | Opening + columns table | Orientation. Every column named and defined once. |
-| Reading the unit dots | The cells are the only non-obvious part of the view. Amber is the one state that means something is wrong; gray inside the ring is normal on a device the student is not using. Two caveats matter in practice (ring and check follow the account, not the device; dots are as of Last Seen). |
+| How to read a row / Reading the unit cells | The cells are the only non-obvious part of the view: background is the student (green completed, striped purple current), dot is this device. Amber is the one state that means something is wrong; a small gray dot in the purple cell is normal on a device the student is not using. Two caveats matter in practice (the band follows the account, not the device; dots are as of Last Seen). |
 | Device details | Rarely needed, but turns "the Chromebook is weird" into a report tech support can act on. |
 | Storage | The one column teachers are likely to misread. Explains the 70/90% colors, the auto-download pause at 90%, and how to distinguish "device full" from "MHS full". |
 | Two-minute check before class | The highest-value routine: catches downloads, full devices, stale devices, and never-logged-in students before they cost class time. |
@@ -69,17 +70,27 @@ runs about three pages at the guide's density; the *Solving problems* table and 
 - **PWA.** `display-mode: standalone` at report time, i.e. the student launched from
   the installed app on that visit. It is a fact about the visit, not a permanent
   install flag.
-- **Unit cells.** The student's progress marks are drawn on their first (newest)
-  device row only; older device rows show just the dots. `completed` (every progress
-  point's latest grade is `passed`) is a solid green circle with a white check and no
-  dot: the device a unit was finished on does not matter. Otherwise the dot is the device's `unit_status`: `cached` → solid
-  blue, `downloading` → blue outline, `error`/`stalled`/`retrying` → amber (hover
-  text names which), `partial`/`not_cached` → gray (hover text distinguishes an
-  interrupted download, which resumes when MHS is next opened on that device). The
-  green ring marks `current` (first unit not completed). Rows are devices and
-  students move between them, so "not on this device" is normal and stays gray;
-  amber is only an actual download problem. (`dashboard.go` unit progress block;
-  `mhsdashboard_grid.gohtml`; CSS `.mhs-device-cell*` in `mhsdashboard_view.gohtml`.)
+- **Unit cells.** Background = the student, from grading: `completed` (every progress
+  point's latest grade is `passed` or `flagged` — flagged is completed-with-concern on
+  the Progress tab and must not stall the band) → solid green; the grader's own
+  `CurrentUnit` (not "first unit not completed", so a skipped unit stays untinted)
+  → purple with a faint diagonal hatch; a completed unit that is also the grader's
+  current unit shows as completed; no grades → no tint. The band spans every row of
+  the student's block; tinted cells inside a block drop the row divider so it is
+  continuous. Dot = this device's `unit_status`: `cached` → 13px blue disc,
+  `downloading` → blue ring, `error`/`stalled`/`retrying` → amber badge with an
+  exclamation mark and a dark ring (hover text names which), `partial`/`not_cached`
+  → 8px gray dot (hover text distinguishes an interrupted download, which resumes
+  when MHS is next opened on that device). Every state has a non-color cue (solid vs
+  hatched; disc size, ring, badge) so the tab survives grayscale and red–green
+  color blindness; verified with feColorMatrix simulations. Colors: light green-200 /
+  purple-200, gray #6b7280; dark #1e4d31 / #503580, gray #64748b; blue #3b82f6 both.
+  Rows have no zebra fill: a faint line between a student's devices, a 2px line
+  between students drawn from both sides (the dashboard's dark-mode `!important`
+  border override repaints row lines, so these carry `!important` too).
+  (`dashboard.go` unit progress block and `orderDevices`; `mhsdashboard_grid.gohtml`;
+  CSS `.mhs-unit-*`, `.mhs-device-*` in `mhsdashboard_view.gohtml`; tests in
+  `devices_test.go`.)
 - **When a device reports.** Only from the Mission HydroSci launcher page: once after
   the initial cache check of all units, again whenever a unit download completes on
   that page, and whenever a download hits `error` or `stalled` (first report at once,
@@ -100,38 +111,44 @@ runs about three pages at the guide's density; the *Solving problems* table and 
 
 ## 5. Things the text works around (candidates for product changes)
 
-1. **Completed requires every point `passed`.** A `flagged` point keeps a unit from
-   ever showing the Completed check on this view, so a student two units ahead can
-   still show the earlier unit's ring. The Progress view treats flagged as
-   completed-with-concern. Either count `flagged` as complete for the unit-level
-   mark, or use the grader's `currentUnit` (already loaded for the Progress view)
-   instead of deriving it. The text has one sentence explaining the current
-   behavior; drop it if this changes.
-2. **Dots can be stale for a whole play session.** Reporting from the play page at
+1. **Dots can be stale for a whole play session.** Reporting from the play page at
    unit completion (or a lightweight heartbeat) would make Last Seen mean "last
    played" and keep the download dots current. The text explains the refresh step
    instead.
-3. **Dashboard and launcher storage thresholds differ** (70/90 versus 60/80/90). Not a
+2. **Dashboard and launcher storage thresholds differ** (70/90 versus 60/80/90). Not a
    problem for teachers, but the numbers in the guide are the dashboard's; keep them
    in sync if either changes.
+3. **The PWA column is a column of dashes** for most classes. It could hide itself
+   when no device in the group has the app installed.
+4. **Row height** is set by the two-line Storage cell; one line would fit more
+   students on a screen.
 
-## 6. Questions about the sample screenshot
+## 6. The sample screenshot, resolved
 
-In the screenshot used for this work, nearly every device shows Unit 5 as Downloaded
-while Units 3 and 4 are Not Downloaded, for students whose current unit is 1 or 2.
-The auto-download pipeline keeps only current + next + manual downloads, so that
-pattern is unexpected. Possible causes: a collection whose unit ids differ from the
-dashboard's headers, a Set current to Unit 5 during earlier testing, or manual
-downloads. Worth a look before the screenshot (or one like it) goes into the guide, so
-the figure does not contradict the text.
+The April class that puzzled us (Unit 5 downloaded on nearly every device while
+Unit 2 showed as current) turned out to be a class that skipped Unit 3 and finished
+on Unit 5. The old derivation marked Unit 2 "current" forever because one of its
+points was flagged rather than passed. Counting flagged as finished and taking the
+current unit from the grader fixed it, and the bands now read: 1, 2, 4, 5 completed,
+3 untouched.
 
 ## 7. Editor checklist
 
 - Replace the *The Devices View* paragraph on p. 119 with `devices-tab.md`.
-- Add a screenshot from a workspace with test names; the working screenshot shows
-  real first names and should not be used.
+- Figures: `images/devices-tab-light.png` (the whole view), `images/devices-table-light.png`
+  (the unit cells, referenced in the text by the fictional names), and
+  `images/devices-tab-dark.png` (dark theme, optional). All are rendered from the real
+  template with fictional students, so there is no student data in them. To
+  regenerate after a change:
+
+  ```
+  MHS_DEVICES_FIXTURE_OUT=/tmp/devices.html go test ./internal/app/features/mhsdashboard/ -run TestWriteDevicesFixture
+  ```
+  then serve `/tmp` with a copy of `internal/app/resources/assets` beside the file,
+  open it in a browser, run `switchTab('devices')`, and capture `#mhs-dashboard` and
+  `#mhs-tab-devices` (add the `dark` class to `<html>` for the dark figure). The
+  students and states are defined in `devices_fixture_test.go`.
 - Keep the guide's boxed **Tip** style for the two tips.
 - The section does not repeat the dashboard URL; the appendix intro already gives it.
-- If items in section 5 are implemented, update: the last paragraph of *What the
-  Devices view tells you about progress* (item 1) and caveat 2 under *Reading the
-  unit dots* (item 2).
+- If items in section 5 are implemented, update caveat 2 under *Reading the unit
+  cells* (item 1) and the Storage thresholds (item 2).
