@@ -247,8 +247,12 @@
      border utilities with !important (in the row's own background color),
      which would erase these separators. */
   .mhs-device-row > td { border-bottom: 1px solid #e5e9f0 !important; }
+  /* The separator between students is drawn from both sides — the bottom
+     of a block's last row and the top of the next block's first row — so
+     the collapsed table shows the 2px line whichever cell supplies it. */
   .mhs-device-row.mhs-block-end > td,
-  .mhs-block-end-cell { border-bottom: 2px solid #94a3b8 !important; }
+  td.mhs-block-end-cell { border-bottom: 2px solid #94a3b8 !important; }
+  .mhs-device-row.mhs-block-start:not(:first-child) > td { border-top: 2px solid #94a3b8 !important; }
   .mhs-device-row > td.mhs-unit-band-inner { border-bottom-color: transparent !important; }
   /* One gray everywhere: the same dot on a plain, green, or violet cell,
      so "not downloaded" never looks like two states. */
@@ -567,8 +571,11 @@
     border-bottom-color: #334155 !important;
   }
   .dark #mhs-dashboard .mhs-device-row.mhs-block-end > td,
-  .dark #mhs-dashboard .mhs-block-end-cell {
+  .dark #mhs-dashboard td.mhs-block-end-cell {
     border-bottom-color: #64748b !important;
+  }
+  .dark #mhs-dashboard .mhs-device-row.mhs-block-start:not(:first-child) > td {
+    border-top-color: #64748b !important;
   }
   .dark #mhs-dashboard .mhs-device-row > td.mhs-unit-band-inner {
     border-bottom-color: transparent !important;

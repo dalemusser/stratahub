@@ -178,7 +178,7 @@
           {{ $name := .Name }}
           {{ $devCount := len .Devices }}
           {{ range $di, $dev := .Devices }}
-          <tr class="mhs-device-row{{ if $dev.IsLast }} mhs-block-end{{ end }}{{ if $dev.IsStale }} mhs-device-stale{{ end }}">
+          <tr class="mhs-device-row{{ if eq $di 0 }} mhs-block-start{{ end }}{{ if $dev.IsLast }} mhs-block-end{{ end }}{{ if $dev.IsStale }} mhs-device-stale{{ end }}">
             {{ if eq $di 0 }}
             <td class="px-3 py-1.5 font-medium text-slate-700 border-b border-slate-100 truncate mhs-block-end-cell" rowspan="{{ $devCount }}" title="{{ $summary }}">{{ $name }}</td>
             {{ end }}
@@ -241,7 +241,7 @@
           {{ end }}
         {{ else }}
         {{/* No device yet: the band still shows the student's progress; the device cells are empty. */}}
-        <tr class="mhs-device-row mhs-block-end">
+        <tr class="mhs-device-row mhs-block-start mhs-block-end">
           <td class="px-3 py-1.5 font-medium text-slate-700 border-b border-slate-100 truncate" title="{{ $summary }}">{{ .Name }}</td>
           <td class="px-2 py-1.5 border-b border-slate-100 text-slate-400 italic">No device data</td>
           <td class="text-center px-2 py-1.5 border-b border-slate-100 text-slate-400">&mdash;</td>

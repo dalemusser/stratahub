@@ -740,16 +740,24 @@ func (h *Handler) loadDeviceMap(ctx context.Context, r *http.Request, members []
 		})
 	}
 
-	// Newest device first. The Devices tab draws the student's progress marks
-	// on their first row only — the device they used most recently — and the
-	// remaining rows show just what is on each older device.
-	for uid := range deviceMap {
-		devs := deviceMap[uid]
-		sort.SliceStable(devs, func(i, j int) bool { return devs[i].LastSeen.After(devs[j].LastSeen) })
-		devs[len(devs)-1].IsLast = true
-	}
-
+	orderDevices(deviceMap)
 	return deviceMap
+}
+
+// orderDevices puts each student's devices newest first and marks the last
+// (oldest) one, where the Devices tab draws the separator that closes the
+// student's block.
+func orderDevices(deviceMap map[string][]DeviceInfo) {
+	for uid, devs := range deviceMap {
+		if len(devs) == 0 {
+			continue
+		}
+		sort.SliceStable(devs, func(i, j int) bool { return devs[i].LastSeen.After(devs[j].LastSeen) })
+		for i := range devs {
+			devs[i].IsLast = i == len(devs)-1
+		}
+		deviceMap[uid] = devs
+	}
 }
 
 // buildProgressRows builds the progress rows for the given members using real grade data.
