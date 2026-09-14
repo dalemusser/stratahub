@@ -176,7 +176,7 @@ func (h *Handler) ServeDashboard(w http.ResponseWriter, r *http.Request) {
 	lastUpdated, tzAbbr, loc := h.formatTimeInOrgTimezone(ctx, selectedGroupOrgID)
 
 	// Load device status for all members
-	deviceMap := h.loadDeviceMap(ctx, r, members)
+	deviceMap := h.loadDeviceMap(ctx, r, members, loc)
 
 	// Build progress rows with real grade data
 	memberRows := h.buildProgressRows(ctx, r, members, cfg, deviceMap, loc)
@@ -307,7 +307,7 @@ func (h *Handler) ServeGrid(w http.ResponseWriter, r *http.Request) {
 	lastUpdated, _, loc := h.formatTimeInOrgTimezone(ctx, groupOrgID)
 
 	// Load device status for all members
-	deviceMap := h.loadDeviceMap(ctx, r, members)
+	deviceMap := h.loadDeviceMap(ctx, r, members, loc)
 
 	memberRows := h.buildProgressRows(ctx, r, members, cfg, deviceMap, loc)
 
@@ -696,7 +696,7 @@ func (h *Handler) loadProgressGrades(ctx context.Context, userIDs []string) (map
 }
 
 // loadDeviceMap fetches device status for all members and returns a map keyed by user ID hex.
-func (h *Handler) loadDeviceMap(ctx context.Context, r *http.Request, members []models.User) map[string][]DeviceInfo {
+func (h *Handler) loadDeviceMap(ctx context.Context, r *http.Request, members []models.User, loc *time.Location) map[string][]DeviceInfo {
 	deviceMap := make(map[string][]DeviceInfo)
 	if len(members) == 0 {
 		return deviceMap
@@ -735,7 +735,7 @@ func (h *Handler) loadDeviceMap(ctx context.Context, r *http.Request, members []
 			StoragePct:    pct,
 			StorageUsed:   format.Bytes(s.StorageUsage),
 			StorageTotal:  format.Bytes(s.StorageQuota),
-			LastSeen:      s.LastSeen,
+			LastSeen:      s.LastSeen.In(loc),
 			IsStale:       now.Sub(s.LastSeen) > staleDeviceThreshold,
 		})
 	}

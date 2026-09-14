@@ -310,6 +310,19 @@
   .mhs-device-dot-problem { background: #f59e0b; }
   .mhs-legend-divider { color: #cbd5e1; }
   .mhs-legend-caption { color: #64748b; }
+  .mhs-info-icon {
+    width: 15px;
+    height: 15px;
+    border-radius: 50%;
+    border: 1px solid #b1d4e0;
+    background: white;
+    color: #145374;
+    font: italic 700 10px/13px Georgia, "Times New Roman", serif;
+    padding: 0;
+    cursor: help;
+    vertical-align: middle;
+  }
+  .mhs-bar-tip.mhs-bar-tip-wide { max-width: 260px; white-space: normal; text-align: left; line-height: 1.35; }
   /* Keep each legend label on one line; wrap the row on narrow windows. */
   #mhs-legend-devices { flex-wrap: wrap; row-gap: 0.25rem; }
   #mhs-legend-devices > div { white-space: nowrap; }
@@ -595,6 +608,11 @@
   }
   .dark #mhs-dashboard .mhs-legend-caption {
     color: #94a3b8;
+  }
+  .dark #mhs-dashboard .mhs-info-icon {
+    background: #1e293b;
+    border-color: #475569;
+    color: #93c5fd;
   }
   .dark #mhs-dashboard .mhs-device-dot-problem {
     background: #fbbf24;
@@ -2670,6 +2688,7 @@
     if (bar && bar.dataset.tip) {
       var rect = bar.getBoundingClientRect();
       barTip.textContent = bar.dataset.tip;
+      barTip.classList.toggle('mhs-bar-tip-wide', !!bar.dataset.tipWide);
       barTip.style.display = '';
       barTip.style.left = (rect.left + rect.width / 2 - barTip.offsetWidth / 2) + 'px';
       if (bar.classList.contains('mhs-in-mhs-unit-bar')) {

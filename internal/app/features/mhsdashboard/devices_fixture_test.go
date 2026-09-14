@@ -26,7 +26,10 @@ func TestWriteDevicesFixture(t *testing.T) {
 	data.MemberCount = 8
 
 	now := time.Now()
-	ago := func(days int) time.Time { return now.Add(-time.Duration(days) * 24 * time.Hour) }
+	// Class-time-of-day offsets keep the Last Seen times varied and plausible.
+	ago := func(days int, hours int) time.Time {
+		return now.Add(-time.Duration(days)*24*time.Hour - time.Duration(hours)*time.Hour + 37*time.Minute)
+	}
 	dev := func(kind string, seen time.Time, pct int, used, total string, units map[string]string) DeviceInfo {
 		return DeviceInfo{
 			DeviceType: kind, UnitStatus: units, LastSeen: seen, IsStale: now.Sub(seen) > staleDeviceThreshold,
@@ -42,33 +45,33 @@ func TestWriteDevicesFixture(t *testing.T) {
 	students := []student{
 		{"Avery Kim", "Completed Unit 1, Unit 2 · Current Unit 3",
 			map[string]string{"unit1": "completed", "unit2": "completed", "unit3": "current"},
-			[]DeviceInfo{dev("Chromebook", ago(0), 12, "1.3 GB", "10.7 GB", map[string]string{"unit3": "cached", "unit4": "downloading"})}},
+			[]DeviceInfo{dev("Chromebook", ago(0, 3), 12, "1.3 GB", "10.7 GB", map[string]string{"unit3": "cached", "unit4": "downloading"})}},
 		{"Jordan Patel", "Completed Unit 1 · Current Unit 2",
 			map[string]string{"unit1": "completed", "unit2": "current"},
 			[]DeviceInfo{
-				dev("Chromebook", ago(1), 6, "729 MB", "10.7 GB", map[string]string{"unit5": "cached"}),
-				dev("Chromebook", ago(12), 2, "388 MB", "14.6 GB", map[string]string{"unit1": "cached", "unit2": "cached"}),
+				dev("Chromebook", ago(1, 5), 6, "729 MB", "10.7 GB", map[string]string{"unit5": "cached"}),
+				dev("Chromebook", ago(12, 7), 2, "388 MB", "14.6 GB", map[string]string{"unit1": "cached", "unit2": "cached"}),
 			}},
 		{"Riley Nguyen", "Current Unit 1",
 			map[string]string{"unit1": "current"},
 			[]DeviceInfo{func() DeviceInfo {
-				d := dev("iPad", ago(0), 4, "410 MB", "9.8 GB", map[string]string{"unit1": "downloading"})
+				d := dev("iPad", ago(0, 1), 4, "410 MB", "9.8 GB", map[string]string{"unit1": "downloading"})
 				d.PWAInstalled = true
 				return d
 			}()}},
 		{"Sam Okafor", "Completed Unit 1, Unit 2 · Current Unit 3",
 			map[string]string{"unit1": "completed", "unit2": "completed", "unit3": "current"},
-			[]DeviceInfo{dev("Chromebook", ago(1), 93, "2.1 GB", "2.3 GB", map[string]string{"unit3": "error"})}},
+			[]DeviceInfo{dev("Chromebook", ago(1, 2), 93, "2.1 GB", "2.3 GB", map[string]string{"unit3": "error"})}},
 		{"Morgan Diaz", "Completed all units",
 			map[string]string{"unit1": "completed", "unit2": "completed", "unit3": "completed", "unit4": "completed", "unit5": "completed"},
-			[]DeviceInfo{dev("Chromebook", ago(2), 8, "860 MB", "10.7 GB", map[string]string{"unit5": "cached"})}},
+			[]DeviceInfo{dev("Chromebook", ago(2, 6), 8, "860 MB", "10.7 GB", map[string]string{"unit5": "cached"})}},
 		{"Casey Brooks", "Not started", map[string]string{}, nil},
 		{"Taylor Reed", "Completed Unit 1 · Current Unit 3",
 			map[string]string{"unit1": "completed", "unit3": "current"},
-			[]DeviceInfo{dev("Chromebook", ago(0), 76, "3.4 GB", "4.5 GB", map[string]string{"unit3": "cached", "unit4": "cached"})}},
+			[]DeviceInfo{dev("Chromebook", ago(0, 4), 76, "3.4 GB", "4.5 GB", map[string]string{"unit3": "cached", "unit4": "cached"})}},
 		{"Jamie Fox", "Completed Unit 1 · Current Unit 2",
 			map[string]string{"unit1": "completed", "unit2": "current"},
-			[]DeviceInfo{dev("Windows", ago(20), 5, "540 MB", "10.7 GB", map[string]string{"unit2": "partial"})}},
+			[]DeviceInfo{dev("Windows", ago(20, 3), 5, "540 MB", "10.7 GB", map[string]string{"unit2": "partial"})}},
 	}
 	data.Members = nil
 	for i, s := range students {

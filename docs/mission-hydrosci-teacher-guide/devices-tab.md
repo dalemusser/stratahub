@@ -34,7 +34,7 @@ So a striped purple cell with a small gray dot in it says: this is the unit the 
 | **PWA** | ✓ means the student opened MHS from the installed app the last time they used this device. — means they opened it in a regular browser tab. Both work. The installed app hides the browser's address bar and tabs, which gives the game more screen space. |
 | **Unit 1 – Unit 5** | One cell per unit. The background is the student's progress and the dot is the unit's download state on this device. See *Reading the unit cells* below. |
 | **Storage** | How much space MHS is using on this device compared with the space the browser allows it, shown as a bar, a percentage, and the amounts (for example, 729 MB / 10.7 GB). |
-| **Last Seen** | The date this device last opened MHS. Hover over the date to see the exact time. A date shown in gold is more than a week old. |
+| **Last Seen** | The date and time this device last opened MHS, in your class's time zone. A date shown in gold is more than a week old. The small ⓘ next to the column title repeats this when you point at it. |
 
 If a student has never opened MHS on any device, their row says **No device data**. Their progress band still shows, so a student who is playing on a device that has not reported yet is not mistaken for one who has not started.
 
@@ -59,7 +59,7 @@ If a student has never opened MHS on any device, their row says **No device data
 
 ![Unit cells for several students](images/devices-table-light.png)
 
-In the figure: Avery Kim has finished Units 1 and 2, is playing Unit 3, has it downloaded, and Unit 4 is downloading behind it. Jordan Patel has two Chromebooks; the newer one at the top does not have Unit 2 yet, the older one below does. Sam Okafor's Unit 3 download failed, and the red storage bar says why: that device is nearly full. Taylor Reed skipped Unit 2. Casey Brooks has not started and has never opened MHS. The two gold dates in the Last Seen column are more than a week old: Jordan Patel's older Chromebook and Jamie Fox's Windows machine have not opened MHS recently, while every other device has been used this week.
+In the figure: Avery Kim has finished Units 1 and 2, is playing Unit 3, has it downloaded, and Unit 4 is downloading behind it. Jordan Patel has two Chromebooks; the newer one at the top does not have Unit 2 yet, the older one below does. Sam Okafor's Unit 3 download failed, and the red storage bar says why: that device is nearly full. Taylor Reed skipped Unit 2. Casey Brooks has not started and has never opened MHS. The two gold entries in the Last Seen column are more than a week old: Jordan Patel's older Chromebook and Jamie Fox's Windows machine have not opened MHS recently, while every other device has been used this week.
 
 **Amber is the only color that means something is wrong.** Green, purple, and blue are confirmations. A small gray dot is neutral. A small gray dot inside the striped purple cell means the unit the student is playing is not on this device, which is what you will see for a device they used earlier or have not opened MHS on yet. The download starts on its own when they open MHS there.
 

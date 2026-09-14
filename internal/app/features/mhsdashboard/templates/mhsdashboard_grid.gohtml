@@ -160,7 +160,12 @@
         <th class="text-center px-2 py-1.5 font-semibold text-slate-600 border-b border-slate-200 w-16" title="{{ .Title }} on each device">{{ .Title }}</th>
         {{ end }}
         <th class="text-left px-2 py-1.5 font-semibold text-slate-600 border-b border-slate-200 w-24">Storage</th>
-        <th class="text-left px-2 py-1.5 font-semibold text-slate-600 border-b border-slate-200 w-20">Last Seen</th>
+        <th class="text-left px-2 py-1.5 font-semibold text-slate-600 border-b border-slate-200 w-24">
+          <span class="inline-flex items-center gap-1">Last Seen
+            <button type="button" class="mhs-info-icon mhs-bar-tooltip" data-tip-wide="1" aria-label="About Last Seen"
+                    data-tip="When this device last opened Mission HydroSci (or finished a download there), in the class's time zone. A gold date is more than a week old: the student has not used this device recently, or has moved to another one.">i</button>
+          </span>
+        </th>
       </tr>
     </thead>
     <tbody>
@@ -230,12 +235,11 @@
               <span class="text-slate-400">&mdash;</span>
               {{ end }}
             </td>
-            <td class="px-2 py-1.5 border-b border-slate-100 text-slate-500" title="{{ $dev.LastSeen.Format "Jan 2, 2006 3:04 PM" }}">
-              {{ if $dev.IsStale }}
-              <span class="text-amber-600">{{ $dev.LastSeen.Format "Jan 2" }}</span>
-              {{ else }}
-              {{ $dev.LastSeen.Format "Jan 2" }}
-              {{ end }}
+            <td class="px-2 py-1.5 border-b border-slate-100 {{ if $dev.IsStale }}text-amber-600{{ else }}text-slate-500{{ end }}" title="{{ $dev.LastSeen.Format "Jan 2, 2006 3:04 PM MST" }}">
+              <div class="flex flex-col gap-0.5">
+                <span>{{ $dev.LastSeen.Format "Jan 2" }}</span>
+                <span class="text-[9px]">{{ $dev.LastSeen.Format "3:04 PM" }}</span>
+              </div>
             </td>
           </tr>
           {{ end }}
