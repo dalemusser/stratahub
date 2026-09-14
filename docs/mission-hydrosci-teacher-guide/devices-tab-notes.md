@@ -61,17 +61,18 @@ runs about three pages at the guide's density; the *Solving problems* table and 
 - **Rows.** One `mhs_device_status` document per (workspace, user, device); a device
   is a random id in the browser's local storage, so a new Chromebook, a new Chrome
   profile, or cleared browser data creates a new row. Rows for one student share the
-  name cell. No device documents → "No device data". (`dashboard.go loadDeviceMap`,
-  `mhsdashboard_grid.gohtml`.)
+  name cell and are sorted by `last_seen`, newest first. No device documents → "No
+  device data". (`dashboard.go loadDeviceMap`, `mhsdashboard_grid.gohtml`.)
 - **Device type.** From the user agent: CrOS → Chromebook; touch + iPad/Macintosh →
   iPad; Macintosh → macOS; Windows; Android; Linux; else Other.
   (`missionhydrosci_units.gohtml detectDeviceType`.)
 - **PWA.** `display-mode: standalone` at report time, i.e. the student launched from
   the installed app on that visit. It is a fact about the visit, not a permanent
   install flag.
-- **Unit cells.** `completed` (every progress point's latest grade is `passed`) is a
-  solid green circle with a white check and no dot: the device a unit was finished on
-  does not matter. Otherwise the dot is the device's `unit_status`: `cached` → solid
+- **Unit cells.** The student's progress marks are drawn on their first (newest)
+  device row only; older device rows show just the dots. `completed` (every progress
+  point's latest grade is `passed`) is a solid green circle with a white check and no
+  dot: the device a unit was finished on does not matter. Otherwise the dot is the device's `unit_status`: `cached` → solid
   blue, `downloading` → blue outline, `error`/`stalled`/`retrying` → amber (hover
   text names which), `partial`/`not_cached` → gray (hover text distinguishes an
   interrupted download, which resumes when MHS is next opened on that device). The

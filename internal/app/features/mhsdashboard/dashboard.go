@@ -739,6 +739,14 @@ func (h *Handler) loadDeviceMap(ctx context.Context, r *http.Request, members []
 		})
 	}
 
+	// Newest device first. The Devices tab draws the student's progress marks
+	// on their first row only — the device they used most recently — and the
+	// remaining rows show just what is on each older device.
+	for uid := range deviceMap {
+		devs := deviceMap[uid]
+		sort.SliceStable(devs, func(i, j int) bool { return devs[i].LastSeen.After(devs[j].LastSeen) })
+	}
+
 	return deviceMap
 }
 

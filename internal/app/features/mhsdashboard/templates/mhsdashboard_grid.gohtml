@@ -194,16 +194,18 @@
               {{ $unitProg := index $unitProgress .ID }}
               {{ $dlStatus := index $dev.UnitStatus .ID }}
               <td class="text-center px-2 py-1.5 border-b border-slate-100">
-                {{/* Completed: the student's check only — the device a unit was finished on does not
-                     matter. Otherwise the dot is this device's download state for the unit, and the
-                     green ring marks the student's current unit. Amber is reserved for a download the
-                     device reported as failing (error / stalled / retrying); "not on this device" is
-                     normal (students move between devices) and stays gray. */}}
-                {{ if eq $unitProg "completed" }}
+                {{/* The student's progress (green check circle for a completed unit, green ring on the
+                     current unit) is drawn once per student, on their first row — the device they used most
+                     recently (rows are sorted newest first). Rows for older devices show only what is on that
+                     device. The dot is this device's download state for the unit: amber is reserved for a
+                     download the device reported as failing (error / stalled / retrying); "not on this
+                     device" is normal (students move between devices) and stays gray. */}}
+                {{ $showProgress := eq $di 0 }}
+                {{ if and $showProgress (eq $unitProg "completed") }}
                 <span class="mhs-device-cell mhs-device-cell-completed" title="Completed"></span>
                 {{ else }}
-                <span class="mhs-device-cell{{ if eq $unitProg "current" }} mhs-device-cell-current{{ end }}"
-                      title="{{ if eq $dlStatus "cached" }}Downloaded{{ else if eq $dlStatus "downloading" }}Downloading{{ else if eq $dlStatus "error" }}Download problem: failed{{ else if eq $dlStatus "stalled" }}Download problem: stalled{{ else if eq $dlStatus "retrying" }}Download problem: interrupted, retrying{{ else if eq $dlStatus "partial" }}Not downloaded: an earlier download stopped partway and resumes when MHS is opened on this device{{ else }}Not downloaded{{ end }}{{ if eq $unitProg "current" }} · Current unit{{ end }}">
+                <span class="mhs-device-cell{{ if and $showProgress (eq $unitProg "current") }} mhs-device-cell-current{{ end }}"
+                      title="{{ if eq $dlStatus "cached" }}Downloaded{{ else if eq $dlStatus "downloading" }}Downloading{{ else if eq $dlStatus "error" }}Download problem: failed{{ else if eq $dlStatus "stalled" }}Download problem: stalled{{ else if eq $dlStatus "retrying" }}Download problem: interrupted, retrying{{ else if eq $dlStatus "partial" }}Not downloaded: an earlier download stopped partway and resumes when MHS is opened on this device{{ else }}Not downloaded{{ end }}{{ if and $showProgress (eq $unitProg "current") }} · Current unit{{ end }}">
                   {{ if eq $dlStatus "cached" }}
                   <span class="mhs-device-dot mhs-device-dot-cached"></span>
                   {{ else if eq $dlStatus "downloading" }}
