@@ -44,17 +44,25 @@ blockquote p { margin: 0; } blockquote p:first-child strong { display: block; fo
 <blockquote><p><strong>Tip</strong></p><p>The analytics view can be used to identify a student that might have experienced a technical issue</p></blockquote>
 </body></html>''')
 PY
-( cd "$B" && python3 -m http.server 8766 --bind 127.0.0.1 >/dev/null 2>&1 & echo $! > "$B/httpd.pid" )
-curl -s -o /dev/null --retry 30 --retry-connrefused --retry-delay 1 "http://127.0.0.1:8766/insert.html"
-playwright-cli open "http://127.0.0.1:8766/insert.html" >/dev/null
+# A free port each run, and the readiness check fails on any HTTP error, so a
+# stale server from an earlier run can never hand Chromium a 404 page to print.
+PORT=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1])')
+( cd "$B" && exec python3 -m http.server "$PORT" --bind 127.0.0.1 >/dev/null 2>&1 ) & HTTPD=$!
+trap 'kill $HTTPD 2>/dev/null; rm -rf "$B"' EXIT
+curl -sf -o /dev/null --retry 30 --retry-connrefused --retry-delay 1 "http://127.0.0.1:$PORT/insert.html"
+curl -sf -o /dev/null "http://127.0.0.1:$PORT/p119.html" "http://127.0.0.1:$PORT/analytics.png"
+playwright-cli open "http://127.0.0.1:$PORT/insert.html" >/dev/null
 playwright-cli run-code "async page => {
   const foot = (label) => '<div style=\"font-family: Avenir Next, Helvetica Neue, Arial, sans-serif; font-size:8px; color:#374151; width:100%; text-align:right; padding-right:0.6in;\">' + label + '</div>';
   const opts = (path, label) => ({ path, format: 'Letter', printBackground: true, displayHeaderFooter: true, headerTemplate: '<div></div>', footerTemplate: foot(label), margin: { top: '0.55in', right: '0.6in', bottom: '0.75in', left: '0.6in' } });
   await page.emulateMedia({ media: 'print' });
   await page.pdf(opts('$B/insert.pdf', 'Page 119-<span class=\"pageNumber\"></span>'));
-  await page.goto('http://127.0.0.1:8766/p119.html'); await page.emulateMedia({ media: 'print' });
+  await page.goto('http://127.0.0.1:$PORT/p119.html'); await page.emulateMedia({ media: 'print' });
   await page.pdf(opts('$B/p119.pdf', 'Page 119'));
 }" >/dev/null
-playwright-cli close >/dev/null; kill "$(cat "$B/httpd.pid")" 2>/dev/null || true
+playwright-cli close >/dev/null
+INS=$(pdfinfo "$B/insert.pdf" | awk '/^Pages/{print $2}')
+if [ "${INS:-0}" -lt 3 ]; then echo "insert.pdf has $INS page(s); expected several — refusing to splice" >&2; exit 1; fi
+pdftotext -f 1 -l 1 "$B/insert.pdf" - | grep -q "The Devices View" || { echo "insert.pdf does not start with the Devices View" >&2; exit 1; }
 qpdf --empty --pages "$SRC" 1-118 "$B/insert.pdf" 1-z "$B/p119.pdf" 1 "$SRC" 120-121 -- "$OUT"
 pdfinfo "$OUT" | grep Pages
