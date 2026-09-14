@@ -238,7 +238,7 @@
      "look at this" color the stale Last Seen date and the near-full Storage
      bar use. */
   .mhs-unit-done { background-color: #dcfce7; }
-  .mhs-unit-current { background-color: #ddd6fe; }
+  .mhs-unit-current { background-color: #ede9fe; }
   /* Rows: no alternating fill (a translucent tint on two base shades read
      as two colors). A faint line between a student's devices, a firmer one
      between students; inside a block the tinted cells drop the faint line
@@ -246,9 +246,8 @@
   .mhs-device-row > td { border-bottom-color: #e2e8f0; }
   .mhs-device-row.mhs-block-end > td, .mhs-block-end-cell { border-bottom-color: #cbd5e1; }
   .mhs-device-row > td.mhs-unit-band-inner { border-bottom-color: transparent; }
-  /* Gray and amber dots need more weight on a tinted cell. */
-  .mhs-unit-done .mhs-device-dot-none,
-  .mhs-unit-current .mhs-device-dot-none { background: #6b7280; }
+  /* One gray everywhere: the same dot on a plain, green, or violet cell,
+     so "not downloaded" never looks like two states. */
   /* The problem dot also carries a shape — an exclamation mark — so it is
      never a color-only signal. */
   .mhs-device-dot-problem { position: relative; }
@@ -290,7 +289,7 @@
   }
   .mhs-device-dot-cached { background: #3b82f6; }
   .mhs-device-dot-downloading { border: 2.5px solid #3b82f6; background: transparent; }
-  .mhs-device-dot-none { background: #d1d5db; }
+  .mhs-device-dot-none { background: #9ca3af; }
   .mhs-device-dot-problem { background: #f59e0b; }
   .mhs-legend-divider { color: #cbd5e1; }
   .mhs-legend-caption { color: #64748b; }
@@ -552,17 +551,13 @@
 
   /* Dark mode: device dots */
   .dark #mhs-dashboard .mhs-device-dot-none {
-    background: #475569;
+    background: #94a3b8;
   }
   .dark #mhs-dashboard .mhs-unit-done {
     background-color: rgba(34, 197, 94, 0.22);
   }
   .dark #mhs-dashboard .mhs-unit-current {
     background-color: rgba(139, 92, 246, 0.32);
-  }
-  .dark #mhs-dashboard .mhs-unit-done .mhs-device-dot-none,
-  .dark #mhs-dashboard .mhs-unit-current .mhs-device-dot-none {
-    background: #94a3b8;
   }
   .dark #mhs-dashboard .mhs-device-dot-cached {
     background: #60a5fa;
