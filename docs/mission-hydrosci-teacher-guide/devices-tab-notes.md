@@ -148,6 +148,13 @@ current unit from the grader fixed it, and the bands now read: 1, 2, 4, 5 comple
   open it in a browser, run `switchTab('devices')`, and capture `#mhs-dashboard` and
   `#mhs-tab-devices` (add the `dark` class to `<html>` for the dark figure). The
   students and states are defined in `devices_fixture_test.go`.
+- An updated PDF to hand back alongside the markdown: `August 2026 Mission HydroSci
+  Teacher Guide (Devices View update).pdf` (Git LFS). It is the Canva export with the
+  Devices pages spliced in after page 118, numbered 119-1 … 119-5 so the existing page
+  numbers and table of contents stay valid, and page 119 rebuilt with only its Analytics
+  section. `build-guide-pdf.sh` regenerates it from `devices-tab.md` and `images/` (needs
+  pandoc, playwright-cli, qpdf, poppler). The inserted pages approximate the guide's
+  typography; the Canva layout is still the place to finish them.
 - Keep the guide's boxed **Tip** style for the two tips.
 - The section does not repeat the dashboard URL; the appendix intro already gives it.
 - If items in section 5 are implemented, update caveat 2 under *Reading the unit
