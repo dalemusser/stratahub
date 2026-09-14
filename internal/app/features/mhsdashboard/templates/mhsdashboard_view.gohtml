@@ -238,7 +238,13 @@
      "look at this" color the stale Last Seen date and the near-full Storage
      bar use. */
   .mhs-unit-done { background-color: #bbf7d0; }
-  .mhs-unit-current { background-color: #e9d5ff; }
+  /* The current-unit band is also hatched, so it differs from the completed
+     band by texture as well as hue: without color (a washed-out projector,
+     a grayscale print, monochromacy) the two tints are the same gray. */
+  .mhs-unit-current {
+    background-color: #e9d5ff;
+    background-image: repeating-linear-gradient(135deg, rgba(88, 28, 135, 0.13) 0 2px, transparent 2px 7px);
+  }
   /* Rows: no alternating fill (a translucent tint on two base shades read
      as two colors). A faint line between a student's devices, a firmer one
      between students; inside a block the tinted cells drop the faint line
@@ -297,7 +303,10 @@
   }
   .mhs-device-dot-cached { background: #3b82f6; }
   .mhs-device-dot-downloading { border: 2.5px solid #3b82f6; background: transparent; }
-  .mhs-device-dot-none { background: #6b7280; }
+  /* Not downloaded is the quiet, normal state and must survive without
+     color: a smaller dot, so size separates it from the downloaded disc
+     even when both read as gray. */
+  .mhs-device-dot-none { background: #6b7280; width: 8px; height: 8px; }
   .mhs-device-dot-problem { background: #f59e0b; }
   .mhs-legend-divider { color: #cbd5e1; }
   .mhs-legend-caption { color: #64748b; }
@@ -566,6 +575,7 @@
   }
   .dark #mhs-dashboard .mhs-unit-current {
     background-color: #503580;
+    background-image: repeating-linear-gradient(135deg, rgba(255, 255, 255, 0.09) 0 2px, transparent 2px 7px);
   }
   .dark #mhs-dashboard .mhs-device-row > td {
     border-bottom-color: #334155 !important;
