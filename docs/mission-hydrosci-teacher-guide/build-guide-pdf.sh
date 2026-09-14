@@ -5,6 +5,8 @@
 # and the table of contents stay valid), page 119 rebuilt with only its
 # Analytics section, then the original pages 120-121.
 # Needs: pandoc, playwright-cli, qpdf, poppler (pdfimages). Run from the repo root.
+# The output (~99 MB) is NOT committed: finished copies go to cloud storage, and
+# the repo keeps only a compressed copy ("… (Devices View update) compressed.pdf").
 set -euo pipefail
 G=docs/mission-hydrosci-teacher-guide
 SRC="$G/sources/August 2026 Mission HydroSci Teacher Guide.pdf"
