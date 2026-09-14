@@ -100,9 +100,9 @@ Handles application initialization and lifecycle:
 
 | Feature | Purpose |
 |---------|---------|
-| **mhsdashboard** | MHS-specific dashboard views |
+| **mhsdashboard** | MHS-specific dashboard views. Devices tab (2026-09): rows are devices (newest first per student); the unit cells' background is the student's progress (green completed, striped purple current, from grading: a unit is finished when every point is passed or flagged, current is the grader's `CurrentUnit`), the dot is the device's download state (blue, blue ring, small gray, amber badge = reported download problem); every state has a non-color cue. Teacher-facing text + figures in `docs/mission-hydrosci-teacher-guide/`; `devices_fixture_test.go` renders the figure page |
 | **mhsbuilds** | Build/activity tracking for MHS platform |
-| **missionhydrosci** | MHS-specific configuration and management |
+| **missionhydrosci** | MHS-specific configuration and management. The launcher posts device status (`/api/device-status`) on page load, on each download completion, and on `error`/`stalled` (first at once, then ≥60 s apart per unit) — the dashboard's Devices tab reads it |
 | **gameconfig** | Game/activity configuration (MHS) |
 | **uploadcsv** | CSV import for MHS data |
 | **memberstatusapi** | Inbound `POST /api/member-status` (+ `/ping`): the survey provider reports a member's survey started/completed; shared key in the body, no session/CSRF; browser (CORS) calls allowed for the origins listed in Site Settings — its `CORS()` middleware sits ahead of the global one in bootstrap; feeds the dashboard's Surveys tab (`docs/member-status-api/`) |

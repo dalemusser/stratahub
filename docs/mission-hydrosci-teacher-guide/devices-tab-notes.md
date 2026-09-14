@@ -5,6 +5,30 @@ current `mhsdashboard` and `missionhydrosci` code; the Devices tab itself was re
 the same day and the text describes the final design. Figures live in `images/`. The source guide is
 `sources/August 2026 Mission HydroSci Teacher Guide.pdf` (121 pages, Canva).
 
+## 0. Status and how to resume (2026-09-13)
+
+**Done.** `devices-tab.md` is final for the design as built and approved; the three
+figures in `images/` and the compressed spliced PDF match it. The Devices tab itself was
+redesigned the same day (14 commits; see §4 for the encoding) and the launcher now
+reports download trouble, so the tab's amber badge is reliable.
+
+**Handoff.** Give the guide's author the markdown, the figures, and the compressed PDF
+(the Devices pages are 119-1 … 119-5; page 119 rebuilt with only its Analytics section).
+The inserted pages approximate the Canva typography; final layout is done in Canva.
+
+**Deployment.** The dashboard and launcher changes were on `main` by 3d1ff9d. Dale
+deployed during the session to review on the live site; confirm production is at or
+past that commit before pointing teachers at the guide.
+
+**Open, in priority order.**
+1. Watch a live fall class in its first week: with the new derivation and reporting,
+   bands should read cleanly and amber should appear only for real download trouble.
+2. Product candidates in §5 (stale dots during a play session, storage thresholds, the
+   empty PWA column, row height). None block the guide.
+3. If the Devices tab changes again: rerun `TestWriteDevicesFixture` and the capture
+   steps in §7 for new figures, then `build-guide-pdf.sh` for the PDF (do not commit the
+   ~99 MB output; the repo keeps only a compressed copy).
+
 ## 1. Where it goes in the guide
 
 The guide's Appendix, *How To Use the Teacher Dashboard* (pp. 118–120), covers the

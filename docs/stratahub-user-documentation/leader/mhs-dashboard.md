@@ -19,7 +19,7 @@ member count are shown at the top. Select **Refresh** to pull the latest data.
 Tabs switch between ways of looking at the group:
 
 - **Progress** — each member's progress through the units (shown above).
-- **Devices** — the devices members are playing on.
+- **Devices** — one row per device a member has used. The colored background across the unit columns is the member's progress (green completed, striped purple current unit); the dot in each cell is whether that unit is downloaded on that device, with an amber badge for a download the device reported as failing. Storage and Last Seen (gold when more than a week old) complete the row.
 - **Analytics** — summarized activity and performance.
 
 ## Reading the progress grid

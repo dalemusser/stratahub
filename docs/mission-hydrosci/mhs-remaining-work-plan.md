@@ -255,6 +255,26 @@ Fallback now has retries/resume/watchdog/lifecycle fixes; remaining is one
 guest/incognito verification run + adding Background-Fetch availability to
 telemetry, then close or re-scope. (`issues/MHS-004-*.md`.)
 
+### Devices tab follow-ups (2026-09-13)
+
+The dashboard's Devices tab was redesigned for the teacher guide (see
+`docs/mission-hydrosci-teacher-guide/devices-tab-notes.md`, §4 for the encoding and §5
+for these). None block anything.
+
+**DEV-1 — dots go stale during a play session.** The launcher reports device status
+on load, download completion, and download trouble, never from the play page. A
+report at unit completion (or a light heartbeat) would keep Last Seen and the dots
+current while a student plays.
+
+**DEV-2 — storage thresholds differ.** Dashboard bar: orange > 70 %, red > 90 %;
+launcher bar: yellow > 60 %, red > 80 %, auto-download paused ≥ 90 %. The guide quotes
+the dashboard's numbers.
+
+**DEV-3 — PWA column.** A column of dashes for most classes; hide it when no device in
+the group has the app installed.
+
+**DEV-4 — row height.** The two-line Storage cell sets it; one line fits more students.
+
 ### Architecture
 
 **ARCH-1 — pipeline duplication (refactor or freeze).** *(from review)*
