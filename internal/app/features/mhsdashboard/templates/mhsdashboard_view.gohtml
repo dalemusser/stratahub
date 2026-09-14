@@ -243,9 +243,13 @@
      as two colors). A faint line between a student's devices, a firmer one
      between students; inside a block the tinted cells drop the faint line
      so the band is continuous. */
-  .mhs-device-row > td { border-bottom-color: #e2e8f0; }
-  .mhs-device-row.mhs-block-end > td, .mhs-block-end-cell { border-bottom-color: #cbd5e1; }
-  .mhs-device-row > td.mhs-unit-band-inner { border-bottom-color: transparent; }
+  /* !important: the dashboard's dark-mode overrides repaint the Tailwind
+     border utilities with !important (in the row's own background color),
+     which would erase these separators. */
+  .mhs-device-row > td { border-bottom: 1px solid #e5e9f0 !important; }
+  .mhs-device-row.mhs-block-end > td,
+  .mhs-block-end-cell { border-bottom: 2px solid #94a3b8 !important; }
+  .mhs-device-row > td.mhs-unit-band-inner { border-bottom-color: transparent !important; }
   /* One gray everywhere: the same dot on a plain, green, or violet cell,
      so "not downloaded" never looks like two states. */
   /* The problem dot also carries a shape — an exclamation mark — so it is
@@ -560,14 +564,14 @@
     background-color: rgba(139, 92, 246, 0.32);
   }
   .dark #mhs-dashboard .mhs-device-row > td {
-    border-bottom-color: #2c3a4f;
+    border-bottom-color: #334155 !important;
   }
   .dark #mhs-dashboard .mhs-device-row.mhs-block-end > td,
   .dark #mhs-dashboard .mhs-block-end-cell {
-    border-bottom-color: #4b5b74;
+    border-bottom-color: #64748b !important;
   }
   .dark #mhs-dashboard .mhs-device-row > td.mhs-unit-band-inner {
-    border-bottom-color: transparent;
+    border-bottom-color: transparent !important;
   }
   .dark #mhs-dashboard .mhs-legend-divider {
     color: #475569;
