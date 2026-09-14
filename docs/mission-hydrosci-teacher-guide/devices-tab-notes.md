@@ -16,9 +16,8 @@ reports download trouble, so the tab's amber badge is reliable.
 (the Devices pages are 119-1 … 119-5; page 119 rebuilt with only its Analytics section).
 The inserted pages approximate the Canva typography; final layout is done in Canva.
 
-**Deployment.** The dashboard and launcher changes were on `main` by 3d1ff9d. Dale
-deployed during the session to review on the live site; confirm production is at or
-past that commit before pointing teachers at the guide.
+**Deployment.** In production as of 2026-09-13 (Dale deployed and confirmed), so the
+guide can go to teachers as written.
 
 **Open, in priority order.**
 1. Watch a live fall class in its first week: with the new derivation and reporting,
