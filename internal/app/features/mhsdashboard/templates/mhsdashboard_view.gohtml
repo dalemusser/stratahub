@@ -224,17 +224,35 @@
   .mhs-styled-scrollbar::-webkit-scrollbar-corner {
     background: #e8f4f8;
   }
-  /* Device readiness. Each unit cell answers two questions. The dot is the
-     device: is this unit downloaded here (blue), downloading (blue outline),
-     not here (gray), or did its download run into trouble (amber)? The ring
-     and the check are the student, from grading: the green ring marks the
-     unit they are working in, and a green check circle marks a unit they
-     have completed. Completed units show only the check — which device a
-     unit was finished on does not matter. Rows are devices, and a student
-     may use several, so "not on this device" is normal and stays neutral
-     gray; amber is reserved for an actual download problem the device
-     reported (error, stalled, retrying), the same "look at this" color the
-     stale Last Seen date and the near-full Storage bar use. */
+  /* Devices tab marks. The Progress column is the student: one small mark
+     per unit in the vocabulary of their own Mission HydroSci page (filled
+     green completed, green ring current, gray upcoming), spanning their
+     device rows. The unit columns are the device: the dot is this device's
+     download state for the unit (blue downloaded, blue outline downloading,
+     gray not here, amber a download the device reported as failing). The
+     green ring around a dot only points at the column of the student's
+     current unit, on every one of their device rows, so "is the unit they
+     are playing on this device?" is read from the dot inside it. Rows are
+     devices and students move between them, so "not on this device" is
+     normal and stays neutral gray; amber is reserved for an actual problem,
+     the same "look at this" color the stale Last Seen date and the near-full
+     Storage bar use. */
+  .mhs-progress-strip {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    vertical-align: middle;
+  }
+  .mhs-progress-mark {
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    display: inline-block;
+    border: 2px solid transparent;
+  }
+  .mhs-progress-mark-done { background: #22c55e; border-color: #22c55e; }
+  .mhs-progress-mark-current { background: transparent; border-color: #22c55e; }
+  .mhs-progress-mark-future { background: #d1d5db; border-color: #d1d5db; }
   .mhs-device-cell {
     position: relative;
     display: inline-flex;
@@ -247,22 +265,6 @@
     vertical-align: middle;
   }
   .mhs-device-cell-current { border-color: #22c55e; }
-  .mhs-device-cell-completed {
-    background: #16a34a;
-    border-color: #16a34a;
-  }
-  /* The check is drawn, not a font glyph: a text check at this size is a
-     hairline and vanished against the green. Two thick white strokes
-     (an L rotated 45°) stay crisp at any zoom. */
-  .mhs-device-cell-completed::after {
-    content: '';
-    display: block;
-    width: 5px;
-    height: 9px;
-    border: solid #fff;
-    border-width: 0 2.5px 2.5px 0;
-    transform: translate(0, -1.5px) rotate(45deg);
-  }
   .mhs-device-dot {
     width: 10px;
     height: 10px;
@@ -535,8 +537,9 @@
   .dark #mhs-dashboard .mhs-device-dot-none {
     background: #475569;
   }
-  .dark #mhs-dashboard .mhs-device-cell-completed::after {
-    color: #4ade80;
+  .dark #mhs-dashboard .mhs-progress-mark-future {
+    background: #475569;
+    border-color: #475569;
   }
   .dark #mhs-dashboard .mhs-legend-divider {
     color: #475569;
@@ -869,8 +872,21 @@
     </div>
     <!-- Devices Legend -->
     <div id="mhs-legend-devices" class="hidden items-center gap-4 text-xs">
-      <span class="mhs-legend-caption">Dot: on this device &middot; Ring: current unit &middot; Check: completed</span>
+      <span class="mhs-legend-caption">Progress: the student</span>
+      <div class="flex items-center gap-1.5" title="The student has passed every progress point in the unit">
+        <span class="mhs-progress-mark mhs-progress-mark-done"></span>
+        <span class="text-slate-600">Completed</span>
+      </div>
+      <div class="flex items-center gap-1.5" title="The unit the student is working in">
+        <span class="mhs-progress-mark mhs-progress-mark-current"></span>
+        <span class="text-slate-600">Current</span>
+      </div>
+      <div class="flex items-center gap-1.5" title="Not reached yet">
+        <span class="mhs-progress-mark mhs-progress-mark-future"></span>
+        <span class="text-slate-600">Upcoming</span>
+      </div>
       <span class="mhs-legend-divider" aria-hidden="true">|</span>
+      <span class="mhs-legend-caption">Units: this device</span>
       <div class="flex items-center gap-1.5" title="The unit's files are on this device">
         <span class="mhs-device-cell"><span class="mhs-device-dot mhs-device-dot-cached"></span></span>
         <span class="text-slate-600">Downloaded</span>
@@ -887,14 +903,9 @@
         <span class="mhs-device-cell"><span class="mhs-device-dot mhs-device-dot-problem"></span></span>
         <span class="text-slate-600">Download Problem</span>
       </div>
-      <span class="mhs-legend-divider" aria-hidden="true">|</span>
-      <div class="flex items-center gap-1.5" title="The unit the student is working in; the dot inside is its state on this device">
-        <span class="mhs-device-cell mhs-device-cell-current"><span class="mhs-device-dot mhs-device-dot-cached"></span></span>
-        <span class="text-slate-600">Current Unit</span>
-      </div>
-      <div class="flex items-center gap-1.5" title="The student has passed every progress point in the unit">
-        <span class="mhs-device-cell mhs-device-cell-completed"></span>
-        <span class="text-slate-600">Completed</span>
+      <div class="flex items-center gap-1.5" title="Points at the column of the student's current unit on each of their device rows; the dot inside is that unit's state on this device">
+        <span class="mhs-device-cell mhs-device-cell-current"><span class="mhs-device-dot mhs-device-dot-none"></span></span>
+        <span class="text-slate-600">Current Unit's Column</span>
       </div>
     </div>
     <!-- Surveys Legend -->

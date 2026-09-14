@@ -86,13 +86,14 @@ type DeviceInfo struct {
 
 // MemberRow represents a single row of progress data for a member.
 type MemberRow struct {
-	ID           string
-	Name         string
-	IsEven       bool              // For alternating row colors
-	Cells        []CellData        // Pre-computed cell data
-	Devices      []DeviceInfo      // Device readiness info
-	UnitProgress map[string]string // unit ID → "completed"/"current"/"future"
-	CurrentUnit  string            // Unit ID the student is currently in (from grader)
+	ID              string
+	Name            string
+	IsEven          bool              // For alternating row colors
+	Cells           []CellData        // Pre-computed cell data
+	Devices         []DeviceInfo      // Device readiness info
+	UnitProgress    map[string]string // unit ID → "completed"/"current"/"future"
+	ProgressSummary string            // Devices tab tooltip, e.g. "Completed Unit 1 · Current Unit 2"
+	CurrentUnit     string            // Unit ID the student is currently in (from grader)
 
 	// Collection info
 	HasCollectionOverride bool   // True if user has a per-user collection override

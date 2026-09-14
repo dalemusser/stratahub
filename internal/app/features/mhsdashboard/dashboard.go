@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"sort"
+	"strings"
 	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
@@ -934,6 +935,33 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 			}
 		}
 
+		// One-line summary for the Devices tab's Progress strip tooltip.
+		var completedTitles []string
+		currentTitle := ""
+		for _, unit := range cfg.Units {
+			switch unitProgress[unit.ID] {
+			case "completed":
+				completedTitles = append(completedTitles, unit.Title)
+			case "current":
+				currentTitle = unit.Title
+			}
+		}
+		progressSummary := ""
+		if len(completedTitles) > 0 {
+			progressSummary = "Completed " + strings.Join(completedTitles, ", ")
+		}
+		if currentTitle != "" {
+			if progressSummary != "" {
+				progressSummary += " · "
+			}
+			progressSummary += "Current " + currentTitle
+		} else if len(completedTitles) == len(cfg.Units) && len(cfg.Units) > 0 {
+			progressSummary = "Completed all units"
+		}
+		if progressSummary == "" {
+			progressSummary = "Not started"
+		}
+
 		// Check for per-user collection override
 		var hasOverride bool
 		var collName string
@@ -953,6 +981,7 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 			Cells:                 cells,
 			Devices:               deviceMap[member.ID.Hex()],
 			UnitProgress:          unitProgress,
+			ProgressSummary:       progressSummary,
 			CurrentUnit:           currentUnit,
 			HasCollectionOverride: hasOverride,
 			CollectionName:        collName,
