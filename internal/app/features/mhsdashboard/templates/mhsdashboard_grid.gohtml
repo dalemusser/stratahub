@@ -154,7 +154,6 @@
     <thead class="bg-slate-50 sticky top-0">
       <tr>
         <th class="text-left px-3 py-1.5 font-semibold text-slate-600 border-b border-slate-200 w-36">Student</th>
-        <th class="text-left px-2 py-1.5 font-semibold text-slate-600 border-b border-slate-200 w-24" title="The student's units: completed, current, upcoming">Progress</th>
         <th class="text-left px-2 py-1.5 font-semibold text-slate-600 border-b border-slate-200 w-24">Device</th>
         <th class="text-center px-2 py-1.5 font-semibold text-slate-600 border-b border-slate-200 w-12">PWA</th>
         {{ range .UnitHeaders }}
@@ -166,27 +165,30 @@
     </thead>
     <tbody>
       {{ range .Members }}
-        {{ $member := . }}
         {{ $unitProgress := .UnitProgress }}
+        {{ $isEven := .IsEven }}
+        {{/* Progress row: the student. Sits above their device rows and shares the unit columns, so a
+             unit's progress mark is directly above that unit's dots on each device. Marks use the
+             vocabulary of the student's own Mission HydroSci page — filled green completed, green ring
+             current, faint ring upcoming — and never gray, which one row down means "not on this
+             device". The Device cell carries the same facts in words. The name spans the block. */}}
+        <tr class="mhs-progress-row">
+          <td class="px-3 font-medium text-slate-700 border-b border-slate-100 truncate mhs-progress-name {{ if $isEven }}bg-slate-50{{ else }}bg-white{{ end }}" rowspan="{{ .RowSpan }}" title="{{ .Name }}">{{ .Name }}</td>
+          <td class="px-2 border-b border-slate-100 mhs-progress-text" title="{{ .ProgressSummary }}">{{ .ProgressText }}</td>
+          <td class="border-b border-slate-100"></td>
+          {{ range $.UnitHeaders }}
+            {{ $p := index $unitProgress .ID }}
+            <td class="text-center px-2 border-b border-slate-100">
+              <span class="mhs-progress-mark{{ if eq $p "completed" }} mhs-progress-mark-done{{ else if eq $p "current" }} mhs-progress-mark-current{{ else }} mhs-progress-mark-future{{ end }}" title="{{ .Title }}: {{ if eq $p "completed" }}completed{{ else if eq $p "current" }}current{{ else }}upcoming{{ end }}"></span>
+            </td>
+          {{ end }}
+          <td class="border-b border-slate-100"></td>
+          <td class="border-b border-slate-100"></td>
+        </tr>
         {{ if .Devices }}
           {{ $name := .Name }}
-          {{ $isEven := .IsEven }}
-          {{ $devCount := len .Devices }}
           {{ range $di, $dev := .Devices }}
           <tr class="{{ if $isEven }}bg-slate-50{{ else }}bg-white{{ end }} {{ if $dev.IsStale }}mhs-device-stale{{ end }}">
-            {{ if eq $di 0 }}
-            <td class="px-3 py-1.5 font-medium text-slate-700 border-b border-slate-100 truncate" rowspan="{{ $devCount }}" title="{{ $name }}">{{ $name }}</td>
-            <td class="px-2 py-1.5 border-b border-slate-100" rowspan="{{ $devCount }}" title="{{ $member.ProgressSummary }}">
-              {{/* Progress strip: the student's units in the vocabulary of their own Mission HydroSci page —
-                   filled green completed, green ring current, gray upcoming. Spans the student's device rows. */}}
-              <span class="mhs-progress-strip">
-                {{ range $.UnitHeaders }}
-                  {{ $p := index $unitProgress .ID }}
-                  <span class="mhs-progress-mark{{ if eq $p "completed" }} mhs-progress-mark-done{{ else if eq $p "current" }} mhs-progress-mark-current{{ else }} mhs-progress-mark-future{{ end }}" title="{{ .Title }}: {{ if eq $p "completed" }}completed{{ else if eq $p "current" }}current{{ else }}upcoming{{ end }}"></span>
-                {{ end }}
-              </span>
-            </td>
-            {{ end }}
             <td class="px-2 py-1.5 border-b border-slate-100">
               {{ if $dev.DeviceDetails }}
               <button class="text-blue-600 dark:text-blue-400 underline decoration-blue-400 dark:decoration-blue-400 hover:text-blue-800 dark:hover:text-blue-300 cursor-pointer bg-transparent border-none p-0 text-xs font-medium"
@@ -247,18 +249,7 @@
           </tr>
           {{ end }}
         {{ else }}
-        <tr class="{{ if .IsEven }}bg-slate-50{{ else }}bg-white{{ end }}">
-          <td class="px-3 py-1.5 font-medium text-slate-700 border-b border-slate-100 truncate" title="{{ .Name }}">{{ .Name }}</td>
-          <td class="px-2 py-1.5 border-b border-slate-100" rowspan="1" title="{{ .ProgressSummary }}">
-            {{/* Progress strip: the student's units in the vocabulary of their own Mission HydroSci page —
-               filled green completed, green ring current, gray upcoming. Spans the student's device rows. */}}
-            <span class="mhs-progress-strip">
-            {{ range $.UnitHeaders }}
-              {{ $p := index $unitProgress .ID }}
-              <span class="mhs-progress-mark{{ if eq $p "completed" }} mhs-progress-mark-done{{ else if eq $p "current" }} mhs-progress-mark-current{{ else }} mhs-progress-mark-future{{ end }}" title="{{ .Title }}: {{ if eq $p "completed" }}completed{{ else if eq $p "current" }}current{{ else }}upcoming{{ end }}"></span>
-            {{ end }}
-            </span>
-          </td>
+        <tr class="{{ if $isEven }}bg-slate-50{{ else }}bg-white{{ end }}">
           <td colspan="99" class="px-2 py-1.5 text-slate-400 border-b border-slate-100 italic">No device data</td>
         </tr>
         {{ end }}

@@ -962,6 +962,25 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 			progressSummary = "Not started"
 		}
 
+		// Devices tab: one progress row per student above their device rows.
+		// The row's Device cell carries a short text form of the same facts.
+		rowSpan := len(deviceMap[member.ID.Hex()]) + 1
+		if rowSpan < 2 {
+			rowSpan = 2 // progress row + the "No device data" row
+		}
+		started := gradeDoc != nil && len(gradeDoc.Grades) > 0
+		var progressText string
+		switch {
+		case !started:
+			progressText = "Not started"
+		case currentTitle == "" && len(cfg.Units) > 0 && len(completedTitles) == len(cfg.Units):
+			progressText = fmt.Sprintf("All %d units completed", len(cfg.Units))
+		case len(completedTitles) > 0:
+			progressText = fmt.Sprintf("In %s · %d completed", currentTitle, len(completedTitles))
+		default:
+			progressText = "In " + currentTitle
+		}
+
 		// Check for per-user collection override
 		var hasOverride bool
 		var collName string
@@ -982,6 +1001,8 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 			Devices:               deviceMap[member.ID.Hex()],
 			UnitProgress:          unitProgress,
 			ProgressSummary:       progressSummary,
+			ProgressText:          progressText,
+			RowSpan:               rowSpan,
 			CurrentUnit:           currentUnit,
 			HasCollectionOverride: hasOverride,
 			CollectionName:        collName,

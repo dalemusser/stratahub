@@ -224,32 +224,36 @@
   .mhs-styled-scrollbar::-webkit-scrollbar-corner {
     background: #e8f4f8;
   }
-  /* Devices tab marks. The Progress column is the student: one small mark
-     per unit in the vocabulary of their own Mission HydroSci page (filled
-     green completed, green ring current, gray upcoming), spanning their
-     device rows. The unit columns are the device: the dot is this device's
-     download state for the unit (blue downloaded, blue outline downloading,
-     gray not here, amber a download the device reported as failing). Rows are
-     devices and students move between them, so "not on this device" is
-     normal and stays neutral gray; amber is reserved for an actual problem,
-     the same "look at this" color the stale Last Seen date and the near-full
-     Storage bar use. */
-  .mhs-progress-strip {
-    display: inline-flex;
-    align-items: center;
-    gap: 4px;
-    vertical-align: middle;
-  }
+  /* Devices tab marks. Each student is a block: a progress row (the student)
+     above one row per device. Both share the unit columns, so a unit's
+     progress mark sits directly above that unit's dots on each device. The
+     progress row uses the vocabulary of the student's own Mission HydroSci
+     page — filled green completed, green ring current, faint ring upcoming —
+     and never gray, which in a device row means "not on this device". Device
+     dots: blue downloaded, blue outline downloading, gray not here, amber a
+     download the device reported as failing. Rows are devices and students
+     move between them, so "not on this device" is normal and stays neutral
+     gray; amber is reserved for an actual problem, the same "look at this"
+     color the stale Last Seen date and the near-full Storage bar use. */
+  .mhs-progress-row { background-color: #eef2f8; }
+  .mhs-progress-row td { padding-top: 0.3rem; padding-bottom: 0.3rem; }
+  .mhs-progress-name { vertical-align: top; padding-top: 0.45rem; }
+  .mhs-progress-text { color: #475569; font-weight: 500; white-space: nowrap; }
   .mhs-progress-mark {
-    width: 9px;
-    height: 9px;
+    width: 10px;
+    height: 10px;
     border-radius: 50%;
     display: inline-block;
-    border: 2px solid transparent;
+    vertical-align: middle;
   }
-  .mhs-progress-mark-done { background: #22c55e; border-color: #22c55e; }
-  .mhs-progress-mark-current { background: transparent; border-color: #22c55e; }
-  .mhs-progress-mark-future { background: #d1d5db; border-color: #d1d5db; }
+  .mhs-progress-mark-done { background: #22c55e; }
+  .mhs-progress-mark-current {
+    width: 12px;
+    height: 12px;
+    border: 2px solid #22c55e;
+    background: transparent;
+  }
+  .mhs-progress-mark-future { border: 1.5px solid #cbd5e1; background: transparent; }
   .mhs-device-cell {
     position: relative;
     display: inline-flex;
@@ -533,9 +537,14 @@
   .dark #mhs-dashboard .mhs-device-dot-none {
     background: #475569;
   }
+  .dark #mhs-dashboard .mhs-progress-row {
+    background-color: #2b3a52;
+  }
+  .dark #mhs-dashboard .mhs-progress-text {
+    color: #cbd5e1;
+  }
   .dark #mhs-dashboard .mhs-progress-mark-future {
-    background: #475569;
-    border-color: #475569;
+    border-color: #64748b;
   }
   .dark #mhs-dashboard .mhs-legend-divider {
     color: #475569;

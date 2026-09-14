@@ -93,6 +93,8 @@ type MemberRow struct {
 	Devices         []DeviceInfo      // Device readiness info
 	UnitProgress    map[string]string // unit ID → "completed"/"current"/"future"
 	ProgressSummary string            // Devices tab tooltip, e.g. "Completed Unit 1 · Current Unit 2"
+	ProgressText    string            // Devices tab progress row, e.g. "In Unit 2 · 1 completed"
+	RowSpan         int               // Devices tab: rows in the student's block (progress row + device rows)
 	CurrentUnit     string            // Unit ID the student is currently in (from grader)
 
 	// Collection info
