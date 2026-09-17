@@ -57,6 +57,8 @@ func fillLoggingHealth(d *DeviceInfo, s models.MHSDeviceStatus, launch *models.M
 		d.LoggingTitle = fmt.Sprintf("The game's local log store on this device is %d%% full (%d KB of %d KB): gameplay logs have been piling up unsent for a long time.", d.PrefsPct, d.PrefsBytes/1024, models.MHSPlayerPrefsCapBytes/1024) + loggingRemedy
 	case d.LogsState == models.MHSLogsStateSeen && !d.LogsSeenAt.IsZero():
 		d.LoggingTitle = "Gameplay logs from this device reached the server at " + d.LogsSeenAt.Format("Jan 2, 3:04 PM") + "."
+	case d.LogsState == models.MHSLogsStateQuiet:
+		d.LoggingTitle = "No verdict: the latest play session on this device produced no game activity to record (the game sat at a menu screen or in a background tab), so there was nothing to check."
 	case launch != nil:
 		d.LoggingTitle = "No verdict yet: the latest play session on this device was too short for a check (the first check comes after about five minutes of play)."
 	default:

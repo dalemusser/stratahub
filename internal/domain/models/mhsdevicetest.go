@@ -142,9 +142,18 @@ type MHSDeviceTestHeartbeat struct {
 // docs/mission-hydrosci/mhs-game-logging-silent-failure-plan.md detects.
 const (
 	MHSLogsStateSeen    = "seen"
-	MHSLogsStateNone    = "none"
+	MHSLogsStateNone    = "none"    // nothing arrived while the game was producing events it could not send (a failure)
+	MHSLogsStateQuiet   = "quiet"   // nothing arrived, but the game shows no sign of producing events either (idle at a menu); not a failure
 	MHSLogsStateUnknown = "unknown" // the check could not run; never treated as a failure
 )
+
+// MHSPlayerPrefsGrowthBytes is how much the game's PlayerPrefs store must
+// have grown since launch for "no entries arriving" to count as a failure
+// rather than an idle game: the game writes every event it cannot send to
+// that store, so a growing store with nothing arriving is the failure, and
+// a still store with nothing arriving is a game that is not producing
+// events (a menu screen, a paused tab). A few events' worth.
+const MHSPlayerPrefsGrowthBytes = 4096
 
 // MHSPlayerPrefsCapBytes is Unity's limit on WebGL PlayerPrefs (the whole
 // store, all keys). The game keeps its unsent-log cache there.
@@ -276,6 +285,10 @@ type MHSDeviceTest struct {
 	NoLogsFlaggedAt  *time.Time `bson:"no_logs_flagged_at,omitempty" json:"no_logs_flagged_at,omitempty"`
 	CacheErrors      int        `bson:"cache_errors,omitempty" json:"cache_errors,omitempty"`
 	PlayerPrefsBytes int64      `bson:"playerprefs_bytes,omitempty" json:"playerprefs_bytes,omitempty"`
+	// The store's size at the first heartbeat that could read it; growth
+	// since then is the sign that the game is producing events (see
+	// MHSPlayerPrefsGrowthBytes).
+	PlayerPrefsBytesAtLaunch int64 `bson:"playerprefs_bytes_at_launch,omitempty" json:"playerprefs_bytes_at_launch,omitempty"`
 }
 
 // LoggingProblem reports whether this launch shows the game's logging

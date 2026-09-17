@@ -102,6 +102,8 @@ func logsCell(t models.MHSDeviceTest) viewers.Cell {
 			title += " — last confirmed " + t.LogsSeenAt.UTC().Format(time.RFC3339) + " UTC"
 		}
 		return viewers.Cell{Text: "Seen", Class: viewers.PillGreen, Title: title}
+	case t.LogsState == models.MHSLogsStateQuiet:
+		return viewers.Cell{Text: "Quiet", Class: viewers.TextMuted, Title: "Nothing arrived, but the game produced no activity to send either (its local store did not grow): a menu screen or a background tab, not a failure"}
 	case t.LogsState == models.MHSLogsStateUnknown:
 		return viewers.Cell{Text: "Unknown", Class: viewers.TextMuted, Title: "The check could not run (log database unavailable) or it was too early to tell"}
 	default:

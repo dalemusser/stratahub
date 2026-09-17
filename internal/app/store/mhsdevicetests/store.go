@@ -197,6 +197,14 @@ func (s *Store) Heartbeat(ctx context.Context, workspaceID, id primitive.ObjectI
 		}
 		return ErrClosed
 	}
+	if beat.PlayerPrefsBytes > 0 {
+		// The first readable size is the baseline for "has the store grown
+		// since launch" (one extra write per launch, then a no-op filter).
+		baseline := bson.M{"_id": id, "workspace_id": workspaceID, "playerprefs_bytes_at_launch": bson.M{"$exists": false}}
+		if _, err := s.c.UpdateOne(ctx, baseline, bson.M{"$set": bson.M{"playerprefs_bytes_at_launch": beat.PlayerPrefsBytes}}); err != nil {
+			return err
+		}
+	}
 	if closing {
 		// Completion wins over a later "closed": only stamp an open run.
 		closeFilter := bson.M{"_id": id, "workspace_id": workspaceID, "unit_completed_at": bson.M{"$exists": false}}

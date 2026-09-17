@@ -1015,6 +1015,10 @@
             hideLoggingNotice();
           }
           if (!lnStateLogged.seen) { lnStateLogged.seen = true; stepLog.record('game', 'info', 'Gameplay logs are reaching the server'); }
+        } else if (state === 'quiet') {
+          // Nothing has arrived, but the game has not produced any activity
+          // to send either (a menu screen, a paused tab): not a failure.
+          if (!lnStateLogged.quiet) { lnStateLogged.quiet = true; stepLog.record('game', 'info', 'No gameplay logs yet, and the game has produced no activity to record so far (normal at a menu screen)'); }
         }
       }
       // 2. The game's console error. Installed before the loader runs; calls

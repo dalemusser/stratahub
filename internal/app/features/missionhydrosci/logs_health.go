@@ -45,6 +45,30 @@ type heartbeatReply struct {
 	Logs string `json:"logs,omitempty"`
 }
 
+// gameProducingEvents reports whether the game has been generating events it
+// could not send: it writes every unsent event to its PlayerPrefs store, so
+// a store that has grown since launch, one near Unity's cap, or a
+// cache-write error the page saw all mean events exist. Without that, "no
+// entries arriving" is an idle game, not a failure. A page that cannot read
+// the store (no IndexedDB, an older browser) reports 0 and is treated as
+// idle, so it never raises a false alarm; the cache-error hook still covers
+// it at the cap.
+func gameProducingEvents(rec models.MHSDeviceTest, beat models.MHSDeviceTestHeartbeat) bool {
+	if beat.CacheErrors > 0 {
+		return true
+	}
+	if beat.PlayerPrefsBytes <= 0 {
+		return false
+	}
+	if beat.PlayerPrefsBytes*100 >= int64(models.MHSPlayerPrefsWarnPercent)*models.MHSPlayerPrefsCapBytes {
+		return true
+	}
+	if rec.PlayerPrefsBytesAtLaunch <= 0 {
+		return false // this beat is the baseline; growth is measured from here
+	}
+	return beat.PlayerPrefsBytes-rec.PlayerPrefsBytesAtLaunch >= models.MHSPlayerPrefsGrowthBytes
+}
+
 // logsHealthAfterBeat runs the check when this beat is due and returns the
 // state for the page. rec is the record as it was before the beat was
 // appended (so its count is one behind); gameUserID is the id the game logs
@@ -76,8 +100,13 @@ func (h *Handler) logsHealthAfterBeat(ctx context.Context, rec models.MHSDeviceT
 			h.Log.Warn("logging-health check failed", zap.String("record", rec.ID.Hex()), zap.Error(err))
 		case seen:
 			state = models.MHSLogsStateSeen
-		default:
+		case gameProducingEvents(rec, beat):
 			state = models.MHSLogsStateNone
+		default:
+			// Nothing arrived, but the game shows no sign of producing
+			// events either (its store has not grown): a menu screen, not
+			// a failure. Keep checking.
+			state = models.MHSLogsStateQuiet
 		}
 	}
 
