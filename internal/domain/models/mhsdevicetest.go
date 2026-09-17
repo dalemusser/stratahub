@@ -128,7 +128,32 @@ type MHSDeviceTestHeartbeat struct {
 	WasmHeapMB    int       `bson:"wasm_heap_mb,omitempty" json:"wasm_heap_mb,omitempty"`
 	FPS           float64   `bson:"fps,omitempty" json:"fps,omitempty"`
 	Visibility    string    `bson:"visibility,omitempty" json:"visibility,omitempty"`
+	// Logging health read by the page (see MHSDeviceTest.LogsState): the size
+	// of the game's PlayerPrefs store, which holds its unsent-log cache and
+	// is capped by Unity at MHSPlayerPrefsCapBytes on WebGL, and how many
+	// "Failed to save cached logs" errors the page has seen from the game.
+	PlayerPrefsBytes int64 `bson:"playerprefs_bytes,omitempty" json:"playerprefs_bytes,omitempty"`
+	CacheErrors      int   `bson:"cache_errors,omitempty" json:"cache_errors,omitempty"`
 }
+
+// Logging-health states of a launch (MHSDeviceTest.LogsState): whether the
+// log service has received gameplay entries from this launch. "none" while
+// the game runs is the silent failure the plan in
+// docs/mission-hydrosci/mhs-game-logging-silent-failure-plan.md detects.
+const (
+	MHSLogsStateSeen    = "seen"
+	MHSLogsStateNone    = "none"
+	MHSLogsStateUnknown = "unknown" // the check could not run; never treated as a failure
+)
+
+// MHSPlayerPrefsCapBytes is Unity's limit on WebGL PlayerPrefs (the whole
+// store, all keys). The game keeps its unsent-log cache there.
+const MHSPlayerPrefsCapBytes = 1 << 20
+
+// MHSPlayerPrefsWarnPercent is the fill level at which the store is reported
+// as a problem: past it the cache has been growing for a long time, which
+// means the game's sender has not been keeping up.
+const MHSPlayerPrefsWarnPercent = 90
 
 // MHSDeviceTestMaxHeartbeats caps the stored trend (two hours at 30 s).
 const MHSDeviceTestMaxHeartbeats = 240
@@ -238,6 +263,29 @@ type MHSDeviceTest struct {
 	LastHeartbeat   *MHSDeviceTestHeartbeat  `bson:"last_heartbeat,omitempty" json:"last_heartbeat,omitempty"`
 	HeartbeatCount  int                      `bson:"heartbeat_count,omitempty" json:"heartbeat_count,omitempty"`
 	Heartbeats      []MHSDeviceTestHeartbeat `bson:"heartbeats,omitempty" json:"heartbeats,omitempty"`
+
+	// Logging health of this launch, written by the heartbeat handler (see
+	// docs/mission-hydrosci/mhs-game-logging-silent-failure-plan.md §5.1).
+	// LogsState is the latest check; LogsSeenAt the last time the log
+	// service had an entry from this launch; NoLogsFlaggedAt the first time
+	// the page was told "playing, but nothing is arriving". CacheErrors and
+	// PlayerPrefsBytes are the latest values the page reported.
+	LogsState        string     `bson:"logs_state,omitempty" json:"logs_state,omitempty"`
+	LogsCheckedAt    *time.Time `bson:"logs_checked_at,omitempty" json:"logs_checked_at,omitempty"`
+	LogsSeenAt       *time.Time `bson:"logs_seen_at,omitempty" json:"logs_seen_at,omitempty"`
+	NoLogsFlaggedAt  *time.Time `bson:"no_logs_flagged_at,omitempty" json:"no_logs_flagged_at,omitempty"`
+	CacheErrors      int        `bson:"cache_errors,omitempty" json:"cache_errors,omitempty"`
+	PlayerPrefsBytes int64      `bson:"playerprefs_bytes,omitempty" json:"playerprefs_bytes,omitempty"`
+}
+
+// LoggingProblem reports whether this launch shows the game's logging
+// failing: the log service saw nothing while the game ran, the page saw the
+// game fail to write its log cache, or the cache store is nearly full.
+func (t MHSDeviceTest) LoggingProblem() bool {
+	if t.CacheErrors > 0 || t.LogsState == MHSLogsStateNone {
+		return true
+	}
+	return t.PlayerPrefsBytes*100 >= int64(MHSPlayerPrefsWarnPercent)*MHSPlayerPrefsCapBytes
 }
 
 // Launched reports whether the game page was reached at least once, which

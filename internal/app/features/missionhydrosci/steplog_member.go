@@ -160,11 +160,14 @@ func (h *Handler) HandleMemberHeartbeat(w http.ResponseWriter, r *http.Request) 
 		writeDeviceTestJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bad_json"})
 		return
 	}
-	if err := h.DeviceTestStore.Heartbeat(ctx, wsID, id, req.beat(), req.Closing); err != nil {
+	beat := req.beat()
+	if err := h.DeviceTestStore.Heartbeat(ctx, wsID, id, beat, req.Closing); err != nil {
 		h.deviceTestWriteError(w, err)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	// Logging health rides on the heartbeat: the reply tells the page whether
+	// the log service is receiving this launch's entries (logs_health.go).
+	writeDeviceTestJSON(w, http.StatusOK, h.logsHealthAfterBeat(ctx, rec, beat, user.ID))
 }
 
 func clientIPForLog(r *http.Request) string {

@@ -64,6 +64,9 @@ func (s *Store) Upsert(ctx context.Context, status models.MHSDeviceStatus) error
 	if status.BackgroundFetchAvailable != nil {
 		set["background_fetch_available"] = *status.BackgroundFetchAvailable
 	}
+	if status.PlayerPrefsBytes != nil {
+		set["playerprefs_bytes"] = *status.PlayerPrefsBytes
+	}
 
 	opts := options.Update().SetUpsert(true)
 	_, err := s.c.UpdateOne(ctx, filter, update, opts)

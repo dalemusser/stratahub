@@ -39,6 +39,42 @@
         z-index: 10;
       }
       #loading-overlay.hidden { display: none; }
+      /* Logging notice: a slim bar over the bottom edge of the game (the top
+         edge holds the back and fullscreen buttons), inside #unity-container
+         so it survives fullscreen. Amber is right here: it only appears for a
+         real problem (nothing is being recorded), and the "!" mark keeps it
+         readable without color. */
+      #mhs-logging-notice {
+        position: absolute;
+        bottom: 0; left: 0; right: 0;
+        z-index: 30;
+        background: rgba(120, 53, 15, 0.94);
+        color: #fffbeb;
+        font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        font-size: 13px;
+        line-height: 1.35;
+        padding: 6px 48px 6px 12px;
+        box-shadow: 0 1px 4px rgba(0,0,0,0.35);
+      }
+      #mhs-logging-notice[hidden] { display: none; }
+      #mhs-logging-notice .mhs-ln-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+      #mhs-logging-notice .mhs-ln-icon {
+        flex: none; width: 18px; height: 18px; border-radius: 50%;
+        background: #f59e0b; color: #451a03; font-weight: 700; font-size: 13px;
+        display: inline-flex; align-items: center; justify-content: center;
+      }
+      #mhs-logging-notice .mhs-ln-text { flex: 1 1 260px; }
+      #mhs-logging-notice .mhs-ln-btn {
+        flex: none; background: rgba(255,255,255,0.14); color: #fffbeb;
+        border: 1px solid rgba(255,255,255,0.35); border-radius: 4px;
+        padding: 2px 8px; font: inherit; font-size: 12px; cursor: pointer;
+      }
+      #mhs-logging-notice .mhs-ln-btn:hover { background: rgba(255,255,255,0.24); }
+      #mhs-logging-notice .mhs-ln-dismiss { position: absolute; top: 4px; right: 8px; font-size: 16px; line-height: 1; padding: 2px 7px; }
+      #mhs-logging-notice .mhs-ln-how { margin: 6px 0 2px; padding: 8px 10px; background: rgba(0,0,0,0.25); border-radius: 6px; max-width: 720px; }
+      #mhs-logging-notice .mhs-ln-how[hidden] { display: none; }
+      #mhs-logging-notice .mhs-ln-how ol { margin: 4px 0 0 18px; padding: 0; }
+      #mhs-logging-notice .mhs-ln-how li { margin: 3px 0; }
       .loading-bar-bg {
         width: 300px;
         height: 8px;
@@ -181,6 +217,30 @@
         </div>
       </div>
       <canvas id="unity-canvas" width="1400" height="800" tabindex="-1"></canvas>
+
+      <!-- Logging notice. Shown when the server reports that no gameplay logs
+           are arriving from this launch while the game runs, when the game
+           says it cannot save its log cache, or when that cache's store is
+           nearly full. The student's line is calm and the fix is for the
+           teacher (docs/mission-hydrosci/mhs-game-logging-silent-failure-plan.md §5.1). -->
+      <div id="mhs-logging-notice" role="status" aria-live="polite" hidden>
+        <div class="mhs-ln-row">
+          <span class="mhs-ln-icon" aria-hidden="true">!</span>
+          <span class="mhs-ln-text" id="mhs-ln-text">Game activity is not being recorded on this device. You can keep playing. Please tell your teacher.</span>
+          <button type="button" class="mhs-ln-btn" id="mhs-ln-how-btn" aria-expanded="false" aria-controls="mhs-ln-how">What to do</button>
+          <button type="button" class="mhs-ln-btn mhs-ln-dismiss" id="mhs-ln-dismiss" aria-label="Hide this notice" title="Hide this notice">&times;</button>
+        </div>
+        <div class="mhs-ln-how" id="mhs-ln-how" hidden>
+          <strong>For the teacher.</strong> The game is playing normally, but the record of this student's play is not reaching the research log. <span id="mhs-ln-reason"></span>
+          <ol>
+            <li>Let the student finish. Progress and settings are saved on the server and are not affected.</li>
+            <li>When they are done, on this device clear the site data for this site: click the padlock (or the tune icon) in the browser's address bar, choose <em>Site settings</em>, then <em>Delete data</em>. This clears the game's stuck local log store.</li>
+            <li>Sign the student in again and open the unit. The unit downloads again, so use good Wi-Fi.</li>
+            <li>If this notice comes back on this device, the school network may be blocking the game's log service. Tell your program contact and name this device.</li>
+          </ol>
+          Details are in the Teacher Guide under "Game activity not recorded".
+        </div>
+      </div>
 
       <!-- Help overlay (toggle with ? key, inside container so it's visible in fullscreen) -->
       <div id="help-overlay" role="dialog" aria-modal="true" aria-label="Game controls" style="
@@ -738,7 +798,12 @@
           elapsed_ms: now - launchStartedAt,
           visibility: document.visibilityState,
           fps: Math.round((hbFrames / secs) * 10) / 10,
-          closing: !!closing
+          closing: !!closing,
+          // Logging health (see loggingHealth below): the size of the game's
+          // PlayerPrefs store and how many cache-write failures the game has
+          // printed. The reply carries the server's own verdict.
+          playerprefs_bytes: (typeof loggingHealth.prefsBytes === 'number') ? loggingHealth.prefsBytes : 0,
+          cache_errors: loggingHealth.cacheErrors
         };
         hbFrames = 0; hbLastAt = now;
         try {
@@ -762,6 +827,11 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(heartbeatBody(closing)),
             keepalive: !!closing
+          }).then(function(resp) {
+            if (closing || !resp || !resp.ok) return null;
+            return resp.json().catch(function() { return null; });
+          }).then(function(data) {
+            if (data && data.logs) onLogsState(data.logs);
           }).catch(function() {});
         } catch (e) { /* best effort */ }
       }
@@ -882,6 +952,112 @@
         var reason = event.reason || {};
         reportCrash('unhandled_rejection', reason.message || String(reason), reason.stack || '', crashPhase);
       };
+
+      // ---- Logging health ------------------------------------------------
+      // The game says nothing to anyone when its gameplay logging fails
+      // (docs/mission-hydrosci/mhs-game-logging-silent-failure-plan.md §2), so
+      // three signals are watched here and shown as one calm notice:
+      //  1. the heartbeat reply: the server checks whether the log service is
+      //     receiving this launch's entries ("none" after a few minutes of
+      //     play is the silent failure itself);
+      //  2. the game's own console error when it cannot write its log cache
+      //     (its PlayerPrefs store is full or unwritable);
+      //  3. the size of that store, read from IndexedDB, nearly at Unity's
+      //     1 MB cap.
+      var loggingHealth = { cacheErrors: 0, prefsBytes: null, state: '', shown: '', dismissed: {}, warnedFull: false };
+      var lnEl = document.getElementById('mhs-logging-notice');
+      var lnHow = document.getElementById('mhs-ln-how');
+      var lnHowBtn = document.getElementById('mhs-ln-how-btn');
+      var lnReason = document.getElementById('mhs-ln-reason');
+      var lnReasons = {
+        none: 'StrataHub has been watching this session and no gameplay logs have arrived from it.',
+        cache: 'The game reported that it can no longer save its log cache on this device (the store is full).',
+        full: 'The game’s local log store on this device is nearly full, which means logs have been piling up unsent for a long time.'
+      };
+      if (lnHowBtn) lnHowBtn.addEventListener('click', function() {
+        var open = lnHow.hidden;
+        lnHow.hidden = !open;
+        lnHowBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        lnHowBtn.textContent = open ? 'Hide' : 'What to do';
+      });
+      var lnDismiss = document.getElementById('mhs-ln-dismiss');
+      if (lnDismiss) lnDismiss.addEventListener('click', function() {
+        loggingHealth.dismissed[loggingHealth.shown] = true;
+        hideLoggingNotice();
+      });
+      function showLoggingNotice(reason) {
+        if (!lnEl || loggingHealth.dismissed[reason]) return;
+        if (loggingHealth.shown === reason) return;
+        loggingHealth.shown = reason;
+        if (lnReason) lnReason.textContent = lnReasons[reason] || '';
+        lnEl.hidden = false;
+      }
+      function hideLoggingNotice() {
+        if (!lnEl) return;
+        lnEl.hidden = true;
+        if (lnHow) lnHow.hidden = true;
+        if (lnHowBtn) { lnHowBtn.setAttribute('aria-expanded', 'false'); lnHowBtn.textContent = 'What to do'; }
+        loggingHealth.shown = '';
+      }
+      // 1. The server's verdict, from the heartbeat reply.
+      var lnStateLogged = {};
+      function onLogsState(state) {
+        loggingHealth.state = state;
+        if (state === 'none') {
+          if (!lnStateLogged.none) {
+            lnStateLogged.none = true;
+            stepLog.record('game', 'warn', 'No gameplay logs are reaching the server from this session — the game is playing but its activity is not being recorded on this device');
+          }
+          showLoggingNotice('none');
+        } else if (state === 'seen') {
+          if (loggingHealth.shown === 'none') {
+            stepLog.record('game', 'ok', 'Gameplay logs are reaching the server again');
+            hideLoggingNotice();
+          }
+          if (!lnStateLogged.seen) { lnStateLogged.seen = true; stepLog.record('game', 'info', 'Gameplay logs are reaching the server'); }
+        }
+      }
+      // 2. The game's console error. Installed before the loader runs; calls
+      //    the original first so nothing else changes.
+      (function hookConsoleError() {
+        var orig = console.error;
+        if (typeof orig !== 'function') return;
+        console.error = function() {
+          try {
+            var first = arguments.length ? String(arguments[0]) : '';
+            if (first.indexOf('Failed to save cached logs') !== -1 || first.indexOf('Failed to load cached logs') !== -1) onGameLogCacheError(first);
+          } catch (e) { /* never interfere with the game's output */ }
+          return orig.apply(console, arguments);
+        };
+      })();
+      function onGameLogCacheError(message) {
+        loggingHealth.cacheErrors++;
+        if (loggingHealth.cacheErrors === 1) {
+          stepLog.record('game', 'warn', 'The game cannot save its log cache on this device (' + String(message).slice(0, 120) + ') — gameplay logs are not being recorded here');
+          showLoggingNotice('cache');
+          if (hbTimer) sendHeartbeat(false); // let the server record it now rather than at the next beat
+        }
+      }
+      // 3. The store's size: once before the game starts (the step log gets
+      //    the figure), then once a minute while it runs.
+      function readUnityPrefs(first) {
+        MHSStepLog.readUnityPrefsBytes().then(function(bytes) {
+          if (typeof bytes !== 'number') return;
+          loggingHealth.prefsBytes = bytes;
+          var pct = Math.round(bytes * 100 / MHSStepLog.UNITY_PREFS_CAP);
+          if (first && bytes > 0) {
+            stepLog.record('storage', pct >= 90 ? 'warn' : 'info', 'Game log cache store: ' + MHSStepLog.unityPrefsText(bytes) +
+              (pct >= 90 ? ' — nearly full: gameplay logs have been piling up unsent on this device' : ''));
+          }
+          if (pct >= 95 && !loggingHealth.warnedFull) {
+            loggingHealth.warnedFull = true;
+            if (!first) stepLog.record('storage', 'warn', 'Game log cache store nearly full: ' + MHSStepLog.unityPrefsText(bytes));
+            showLoggingNotice('full');
+          }
+        }).catch(function() {});
+      }
+      readUnityPrefs(true);
+      setInterval(function() { readUnityPrefs(false); }, 60000);
 
       // Aspect-ratio-preserving resize (matches dev build: 1400x800, 7:4 ratio).
       // In fullscreen mode, CSS handles sizing via viewport units (see <style> above)

@@ -715,6 +715,16 @@ func (h *Handler) loadDeviceMap(ctx context.Context, r *http.Request, members []
 	}
 
 	now := time.Now()
+
+	// Logging health per device ("Logs" column): the newest launch record on
+	// each device in the last 30 days carries the server's "are gameplay
+	// logs arriving" verdict and the page's readings (logging_health.go).
+	launches, lerr := h.LaunchStore.LatestMemberLaunches(ctx, wsID, userIDs, now.Add(-30*24*time.Hour))
+	if lerr != nil {
+		h.Log.Warn("failed to load launch records for logging health", zap.Error(lerr))
+		launches = nil
+	}
+
 	for _, s := range statuses {
 		uid := s.UserID.Hex()
 		var pct int
@@ -725,7 +735,7 @@ func (h *Handler) loadDeviceMap(ctx context.Context, r *http.Request, members []
 		if unitStatus == nil {
 			unitStatus = make(map[string]string)
 		}
-		deviceMap[uid] = append(deviceMap[uid], DeviceInfo{
+		info := DeviceInfo{
 			DeviceType:    s.DeviceType,
 			DeviceDetails: s.DeviceDetails,
 			PWAInstalled:  s.PWAInstalled,
@@ -737,7 +747,15 @@ func (h *Handler) loadDeviceMap(ctx context.Context, r *http.Request, members []
 			StorageTotal:  format.Bytes(s.StorageQuota),
 			LastSeen:      s.LastSeen.In(loc),
 			IsStale:       now.Sub(s.LastSeen) > staleDeviceThreshold,
-		})
+		}
+		var launch *models.MHSDeviceTest
+		if byDevice := launches[s.UserID]; byDevice != nil {
+			if l, ok := byDevice[s.DeviceID]; ok {
+				launch = &l
+			}
+		}
+		fillLoggingHealth(&info, s, launch, loc)
+		deviceMap[uid] = append(deviceMap[uid], info)
 	}
 
 	orderDevices(deviceMap)

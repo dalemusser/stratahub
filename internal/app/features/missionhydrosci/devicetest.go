@@ -851,18 +851,23 @@ type deviceTestHeartbeatRequest struct {
 	FPS           float64 `json:"fps"`
 	Visibility    string  `json:"visibility"`
 	Closing       bool    `json:"closing"`
+	// Logging health read by the page (optional; older pages omit them).
+	PlayerPrefsBytes int64 `json:"playerprefs_bytes"`
+	CacheErrors      int   `json:"cache_errors"`
 }
 
 func (r deviceTestHeartbeatRequest) beat() models.MHSDeviceTestHeartbeat {
 	return models.MHSDeviceTestHeartbeat{
-		At:            time.Now().UTC(),
-		ElapsedMs:     r.ElapsedMs,
-		Phase:         models.ClipRunes(r.Phase, 16),
-		JSHeapMB:      r.JSHeapMB,
-		JSHeapTotalMB: r.JSHeapTotalMB,
-		WasmHeapMB:    r.WasmHeapMB,
-		FPS:           r.FPS,
-		Visibility:    models.ClipRunes(r.Visibility, 16),
+		At:               time.Now().UTC(),
+		ElapsedMs:        r.ElapsedMs,
+		Phase:            models.ClipRunes(r.Phase, 16),
+		JSHeapMB:         r.JSHeapMB,
+		JSHeapTotalMB:    r.JSHeapTotalMB,
+		WasmHeapMB:       r.WasmHeapMB,
+		FPS:              r.FPS,
+		Visibility:       models.ClipRunes(r.Visibility, 16),
+		PlayerPrefsBytes: r.PlayerPrefsBytes,
+		CacheErrors:      r.CacheErrors,
 	}
 }
 
@@ -880,11 +885,13 @@ func (h *Handler) HandleDeviceTestHeartbeat(w http.ResponseWriter, r *http.Reque
 		writeDeviceTestJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bad_json"})
 		return
 	}
-	if err := h.DeviceTestStore.Heartbeat(ctx, run.WorkspaceID, run.ID, req.beat(), req.Closing); err != nil {
+	beat := req.beat()
+	if err := h.DeviceTestStore.Heartbeat(ctx, run.WorkspaceID, run.ID, beat, req.Closing); err != nil {
 		h.deviceTestWriteError(w, err)
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	// The run id is the game's user_id for a device test.
+	writeDeviceTestJSON(w, http.StatusOK, h.logsHealthAfterBeat(ctx, run, beat, run.ID.Hex()))
 }
 
 // HandleDeviceTestReport stores a note the tester typed.

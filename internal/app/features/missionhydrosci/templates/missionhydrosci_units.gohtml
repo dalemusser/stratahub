@@ -421,13 +421,32 @@
       function withPersisted(next) {
         manager.getStoragePersisted().then(function(p) { report.storage_persisted = p; next(); }).catch(next);
       }
+      // The game's PlayerPrefs store (its unsent-log cache lives there, capped
+      // at 1 MB by Unity): its size is the one sign of a logging problem that
+      // persists between sessions, so it is read here, before any launch, and
+      // reported with the device status for the Devices tab.
+      function withUnityPrefs(next) {
+        MHSStepLog.readUnityPrefsBytes().then(function(bytes) {
+          if (typeof bytes === 'number') {
+            report.playerprefs_bytes = bytes;
+            var pct = Math.round(bytes * 100 / MHSStepLog.UNITY_PREFS_CAP);
+            var log = (typeof stepLog !== 'undefined') ? stepLog : null; // this page's step log (same script block, created below)
+            if (bytes > 0 && log) {
+              log.record('storage', pct >= 90 ? 'warn' : 'info',
+                'Game log cache store: ' + MHSStepLog.unityPrefsText(bytes) +
+                (pct >= 90 ? ' — nearly full: gameplay logs have been piling up unsent on this device (see the teacher guide, "Game activity not recorded")' : ''));
+            }
+          }
+          next();
+        }).catch(next);
+      }
       if (navigator.storage && navigator.storage.estimate) {
         navigator.storage.estimate().then(function(est) {
           report.storage_quota = est.quota || 0;
           report.storage_usage = est.usage || 0;
-          withPersisted(send);
-        }).catch(function() { withPersisted(send); });
-      } else { withPersisted(send); }
+          withPersisted(function() { withUnityPrefs(send); });
+        }).catch(function() { withPersisted(function() { withUnityPrefs(send); }); });
+      } else { withPersisted(function() { withUnityPrefs(send); }); }
     });
   }
 

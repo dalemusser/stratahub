@@ -47,6 +47,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/store/activity"
 	announcementstore "github.com/dalemusser/stratahub/internal/app/store/announcement"
 	"github.com/dalemusser/stratahub/internal/app/store/audit"
+	"github.com/dalemusser/stratahub/internal/app/store/logdata"
 	"github.com/dalemusser/stratahub/internal/app/store/oauthstate"
 	"github.com/dalemusser/stratahub/internal/app/store/sessions"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
@@ -334,6 +335,11 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		logger,
 	)
 	missionHydroSciHandler.StaffAuthVerifier = staffAuthVerifier
+	// Logging-health checks read the log service's entries (same cluster);
+	// without that database the checks answer "unknown".
+	if deps.StratalogDatabase != nil {
+		missionHydroSciHandler.Logs = logdata.New(deps.StratalogDatabase)
+	}
 	// Client download timing + game-service reachability probes, served with
 	// the content manifest (see docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md, A0).
 	missionHydroSciHandler.Tuning = missionhydroscifeature.ManifestTuning{

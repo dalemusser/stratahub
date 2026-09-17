@@ -68,8 +68,59 @@ const (
 	dtDevice = "device"
 	dtSchool = "school"
 	dtSound  = "sound"
+	dtLogs   = "logs"
 	dtID     = "id"
 )
+
+// gameIDFor is the id the game logs under for a record: the run id of a
+// device test (its _id is the marked game user_id), the member's user id
+// for a member launch record.
+func gameIDFor(t *models.MHSDeviceTest) string {
+	if t.Kind == models.MHSDeviceTestKindMember {
+		if t.UserID == nil {
+			return ""
+		}
+		return t.UserID.Hex()
+	}
+	return t.ID.Hex()
+}
+
+// logsCell renders the record's logging health (see models.MHSLogsState*).
+func logsCell(t models.MHSDeviceTest) viewers.Cell {
+	switch {
+	case t.CacheErrors > 0:
+		return viewers.Cell{Text: "Cache full", Class: viewers.PillAmber, Title: fmt.Sprintf("The page saw the game fail to save its log cache %d time(s): gameplay logs were not being recorded on this device", t.CacheErrors)}
+	case t.LogsState == models.MHSLogsStateNone:
+		title := "The game ran for several minutes and the log service received nothing from it"
+		if t.NoLogsFlaggedAt != nil {
+			title += " — flagged " + t.NoLogsFlaggedAt.UTC().Format(time.RFC3339) + " UTC"
+		}
+		return viewers.Cell{Text: "None", Class: viewers.PillAmber, Title: title}
+	case t.LogsState == models.MHSLogsStateSeen:
+		title := "The log service received gameplay entries from this launch"
+		if t.LogsSeenAt != nil {
+			title += " — last confirmed " + t.LogsSeenAt.UTC().Format(time.RFC3339) + " UTC"
+		}
+		return viewers.Cell{Text: "Seen", Class: viewers.PillGreen, Title: title}
+	case t.LogsState == models.MHSLogsStateUnknown:
+		return viewers.Cell{Text: "Unknown", Class: viewers.TextMuted, Title: "The check could not run (log database unavailable) or it was too early to tell"}
+	default:
+		return viewers.Cell{Text: "—", Class: viewers.TextMuted, Title: "No check yet: the first check comes about five minutes into play"}
+	}
+}
+
+// logsDetail is the "Logging" line of the detail page.
+func logsDetail(t *models.MHSDeviceTest) string {
+	c := logsCell(*t)
+	s := c.Text + " — " + c.Title
+	if t.PlayerPrefsBytes > 0 {
+		s += fmt.Sprintf(" · game log cache store %d KB of %d KB (%d%%)", t.PlayerPrefsBytes/1024, models.MHSPlayerPrefsCapBytes/1024, t.PlayerPrefsBytes*100/models.MHSPlayerPrefsCapBytes)
+	}
+	if t.LogsCheckedAt != nil {
+		s += " · last check " + t.LogsCheckedAt.UTC().Format(time.RFC3339) + " UTC"
+	}
+	return s
+}
 
 var questionnaireLabels = map[string]map[string]string{
 	"sound":       {"worked": "Worked", "none": "No sound", "problems": "Problems"},
@@ -129,6 +180,11 @@ func (v *DeviceTests) Filters() []viewers.FilterSpec {
 			{Value: "none", Label: "No sound"},
 			{Value: "problems", Label: "Problems"},
 		}},
+		{Key: dtLogs, Label: "Logs", Type: viewers.FilterSelect, Options: []viewers.Option{
+			{Value: "problem", Label: "Problem (none, cache full, or store nearly full)"},
+			{Value: models.MHSLogsStateNone, Label: "None arrived"},
+			{Value: models.MHSLogsStateSeen, Label: "Seen"},
+		}},
 		{Key: dtID, Label: "Test id", Type: viewers.FilterID, Placeholder: "24-char test id"},
 	}
 }
@@ -143,6 +199,7 @@ func (v *DeviceTests) Columns() []viewers.ColumnSpec {
 		{Key: "path", Label: "Path"},
 		{Key: "download", Label: "Download", Class: "whitespace-nowrap"},
 		{Key: "stage", Label: "Stage", Class: "whitespace-nowrap"},
+		{Key: "logs", Label: "Logs", Class: "whitespace-nowrap"},
 		{Key: "sound", Label: "Sound", Class: "whitespace-nowrap"},
 		{Key: "failed", Label: "Last problem"},
 		{Key: "duration", Label: "Duration", Class: "whitespace-nowrap"},
@@ -162,6 +219,7 @@ func (v *DeviceTests) listQuery(ctx context.Context, scope *viewscope.Scope, f v
 		DeviceType:  f.Get(dtDevice),
 		School:      strings.TrimSpace(f.Get(dtSchool)),
 		Sound:       f.Get(dtSound),
+		Logs:        f.Get(dtLogs),
 	}
 	if from, to, ok := f.DateRange(dtWhen, time.Now().UTC()); ok {
 		q.From, q.To = from, to
@@ -411,7 +469,7 @@ func (v *DeviceTests) row(t models.MHSDeviceTest, names map[primitive.ObjectID]s
 		}
 	}
 
-	return viewers.Row{ID: t.ID.Hex(), Cells: []viewers.Cell{started, school, tester, device, network, path, download, stage, sound, failed, duration}}
+	return viewers.Row{ID: t.ID.Hex(), Cells: []viewers.Cell{started, school, tester, device, network, path, download, stage, logsCell(t), sound, failed, duration}}
 }
 
 // heartbeatMemory renders the memory figures of a beat for a column.
@@ -661,6 +719,9 @@ func (v *DeviceTests) Detail(ctx context.Context, scope *viewscope.Scope, id str
 	if t.LastHeartbeat != nil {
 		fields = add(fields, "Last heartbeat", heartbeatText(t.LastHeartbeat)+fmt.Sprintf(" (%d beats)", t.HeartbeatCount), false)
 	}
+	if t.LogsState != "" || t.CacheErrors > 0 || t.PlayerPrefsBytes > 0 {
+		fields = add(fields, "Logging", logsDetail(t), false)
+	}
 	// The answers themselves are the "Survey answers" section below, one
 	// question per line; this line only says whether there are any.
 	if q := t.Questionnaire; q != nil {
@@ -669,7 +730,7 @@ func (v *DeviceTests) Detail(ctx context.Context, scope *viewscope.Scope, id str
 		fields = add(fields, "Survey", "Not answered — the tester has not submitted the post-play questions", false)
 	}
 
-	g := v.loadGameplay(ctx, t.ID.Hex())
+	g := v.loadGameplay(ctx, gameIDFor(t))
 	html := v.detailHTML(t, g)
 
 	raw, _ := json.MarshalIndent(struct {
@@ -984,7 +1045,7 @@ func (v *DeviceTests) DetailJSON(ctx context.Context, scope *viewscope.Scope, id
 	if err != nil {
 		return nil, err
 	}
-	g := v.loadGameplay(ctx, t.ID.Hex())
+	g := v.loadGameplay(ctx, gameIDFor(t))
 	return json.MarshalIndent(struct {
 		Run      *models.MHSDeviceTest `json:"run"`
 		Gameplay gameplay              `json:"gameplay"`

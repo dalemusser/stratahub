@@ -173,9 +173,18 @@ func (s *Store) Heartbeat(ctx context.Context, workspaceID, id primitive.ObjectI
 			return err
 		}
 	}
+	set := bson.M{"last_heartbeat_at": beat.At, "last_heartbeat": beat, "last_seen_at": now}
+	// The page's latest logging-health readings, kept on the record so list
+	// views (the Devices tab) need not load the beats.
+	if beat.CacheErrors > 0 {
+		set["cache_errors"] = beat.CacheErrors
+	}
+	if beat.PlayerPrefsBytes > 0 {
+		set["playerprefs_bytes"] = beat.PlayerPrefsBytes
+	}
 	update := bson.M{
 		"$push": bson.M{"heartbeats": bson.M{"$each": []models.MHSDeviceTestHeartbeat{beat}, "$slice": -models.MHSDeviceTestMaxHeartbeats}},
-		"$set":  bson.M{"last_heartbeat_at": beat.At, "last_heartbeat": beat, "last_seen_at": now},
+		"$set":  set,
 		"$inc":  bson.M{"heartbeat_count": 1},
 	}
 	res, err := s.c.UpdateOne(ctx, base, update)
@@ -194,6 +203,68 @@ func (s *Store) Heartbeat(ctx context.Context, workspaceID, id primitive.ObjectI
 		_, err = s.c.UpdateOne(ctx, closeFilter, bson.M{"$set": bson.M{"ended_at": now, "end_reason": models.MHSDeviceTestEndClosed}})
 	}
 	return err
+}
+
+// SetLogsState records the result of a logging-health check (one of
+// models.MHSLogsState*). A "seen" result stamps logs_seen_at; flag stamps
+// no_logs_flagged_at the first time only, so the flag marks when the page
+// was first told that nothing was arriving.
+func (s *Store) SetLogsState(ctx context.Context, workspaceID, id primitive.ObjectID, state string, flag bool) error {
+	now := time.Now().UTC()
+	set := bson.M{"logs_state": state, "logs_checked_at": now}
+	if state == models.MHSLogsStateSeen {
+		set["logs_seen_at"] = now
+	}
+	if _, err := s.c.UpdateOne(ctx, bson.M{"_id": id, "workspace_id": workspaceID}, bson.M{"$set": set}); err != nil {
+		return err
+	}
+	if !flag {
+		return nil
+	}
+	first := bson.M{"_id": id, "workspace_id": workspaceID, "no_logs_flagged_at": bson.M{"$exists": false}}
+	_, err := s.c.UpdateOne(ctx, first, bson.M{"$set": bson.M{"no_logs_flagged_at": now}})
+	return err
+}
+
+// LatestMemberLaunches returns, for each of the users, the newest launch
+// record ("launch-ok") per device started at or after since, without the
+// bulky arrays. Keyed by user id, then device id. The Devices tab reads its
+// logging-health fields from these.
+func (s *Store) LatestMemberLaunches(ctx context.Context, workspaceID primitive.ObjectID, userIDs []primitive.ObjectID, since time.Time) (map[primitive.ObjectID]map[string]models.MHSDeviceTest, error) {
+	out := map[primitive.ObjectID]map[string]models.MHSDeviceTest{}
+	if len(userIDs) == 0 {
+		return out, nil
+	}
+	filter := bson.M{
+		"workspace_id":        workspaceID,
+		"kind":                models.MHSDeviceTestKindMember,
+		"user_id":             bson.M{"$in": userIDs},
+		"started_at":          bson.M{"$gte": since.UTC()},
+		"diagnostics.outcome": "launch-ok",
+	}
+	cur, err := s.c.Find(ctx, filter, options.Find().SetProjection(listProjection))
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	for cur.Next(ctx) {
+		var t models.MHSDeviceTest
+		if err := cur.Decode(&t); err != nil {
+			return nil, err
+		}
+		if t.UserID == nil {
+			continue
+		}
+		byDevice := out[*t.UserID]
+		if byDevice == nil {
+			byDevice = map[string]models.MHSDeviceTest{}
+			out[*t.UserID] = byDevice
+		}
+		if prev, ok := byDevice[t.DeviceID]; !ok || t.StartedAt.After(prev.StartedAt) {
+			byDevice[t.DeviceID] = t
+		}
+	}
+	return out, cur.Err()
 }
 
 // SetQuestionnaire stores (or replaces) the tester's post-play answers.
@@ -255,6 +326,7 @@ type ListQuery struct {
 	DeviceType string
 	School     string // case-insensitive prefix
 	Sound      string // questionnaire.sound code
+	Logs       string // logging health: "seen", "none", or "problem" (none, cache errors, or a nearly full store)
 	ID         *primitive.ObjectID
 
 	After *Position
@@ -291,6 +363,17 @@ func (q ListQuery) filter() bson.M {
 	}
 	if q.Sound != "" {
 		f["questionnaire.sound"] = q.Sound
+	}
+	switch q.Logs {
+	case models.MHSLogsStateSeen, models.MHSLogsStateNone:
+		f["logs_state"] = q.Logs
+	case "problem":
+		warnBytes := int64(models.MHSPlayerPrefsWarnPercent) * models.MHSPlayerPrefsCapBytes / 100
+		and = append(and, bson.M{"$or": []bson.M{
+			{"logs_state": models.MHSLogsStateNone},
+			{"cache_errors": bson.M{"$gt": 0}},
+			{"playerprefs_bytes": bson.M{"$gte": warnBytes}},
+		}})
 	}
 	if q.ID != nil {
 		f["_id"] = *q.ID

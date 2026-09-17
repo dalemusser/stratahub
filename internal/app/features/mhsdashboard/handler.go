@@ -9,6 +9,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/store/memberstatus"
 	"github.com/dalemusser/stratahub/internal/app/store/mhscollections"
 	"github.com/dalemusser/stratahub/internal/app/store/mhsdevicestatus"
+	"github.com/dalemusser/stratahub/internal/app/store/mhsdevicetests"
 	"github.com/dalemusser/stratahub/internal/app/store/mhsuserprogress"
 	"github.com/dalemusser/stratahub/internal/app/system/memberstatuscfg"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -24,6 +25,7 @@ type Handler struct {
 	Log                *zap.Logger
 	ErrLog             *uierrors.ErrorLogger
 	DeviceStatusStore  *mhsdevicestatus.Store
+	LaunchStore        *mhsdevicetests.Store // members' launch records: logging health per device (Devices tab)
 	ProgressStore      *mhsuserprogress.Store
 	CollectionStore    *mhscollections.Store
 	MemberStatusStore  *memberstatus.Store     // survey started/completed status (Member Status API)
@@ -42,6 +44,7 @@ func NewHandler(db, gradesDB, logDB *mongo.Database, errLog *uierrors.ErrorLogge
 		Log:               logger,
 		ErrLog:            errLog,
 		DeviceStatusStore: mhsdevicestatus.New(db),
+		LaunchStore:       mhsdevicetests.New(db),
 		ProgressStore:     mhsuserprogress.New(db),
 		CollectionStore:   mhscollections.New(db),
 		MemberStatusStore: memberstatus.New(db),

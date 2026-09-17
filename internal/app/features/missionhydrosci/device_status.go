@@ -27,6 +27,9 @@ type deviceStatusRequest struct {
 	// persisted (MHS-005) and whether the Background Fetch API exists.
 	StoragePersisted         *bool `json:"storage_persisted"`
 	BackgroundFetchAvailable *bool `json:"background_fetch_available"`
+	// Optional: the size of the game's PlayerPrefs store (its unsent-log
+	// cache lives there; see models.MHSPlayerPrefsCapBytes).
+	PlayerPrefsBytes *int64 `json:"playerprefs_bytes"`
 }
 
 // HandleDeviceStatus receives a device status report from the client.
@@ -74,6 +77,7 @@ func (h *Handler) HandleDeviceStatus(w http.ResponseWriter, r *http.Request) {
 
 		StoragePersisted:         req.StoragePersisted,
 		BackgroundFetchAvailable: req.BackgroundFetchAvailable,
+		PlayerPrefsBytes:         req.PlayerPrefsBytes,
 	}
 
 	if err := h.DeviceStatusStore.Upsert(r.Context(), status); err != nil {

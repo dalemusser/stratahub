@@ -7,6 +7,7 @@ import (
 	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
+	"github.com/dalemusser/stratahub/internal/app/store/logdata"
 	"github.com/dalemusser/stratahub/internal/app/store/mhsbuilds"
 	"github.com/dalemusser/stratahub/internal/app/store/mhscollections"
 	"github.com/dalemusser/stratahub/internal/app/store/mhsdevicestatus"
@@ -46,6 +47,7 @@ type Handler struct {
 	ProgressStore     *mhsuserprogress.Store
 	DeviceStatusStore *mhsdevicestatus.Store
 	DeviceTestStore   *mhsdevicetests.Store
+	Logs              *logdata.Store // read-only view of the log service's entries (logging-health checks); nil when its database is not configured
 	SettingsStore     *settingsstore.Store
 	CollectionStore   *mhscollections.Store
 	BuildStore        *mhsbuilds.Store

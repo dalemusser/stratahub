@@ -83,6 +83,20 @@ type DeviceInfo struct {
 	LastSeen      time.Time
 	IsStale       bool // last_seen > 7 days ago
 	IsLast        bool // last (oldest) device row in the student's block; the progress band closes here
+
+	// Logging health of the game on this device (Devices tab "Logs" column),
+	// from the newest launch record on this device and the launcher's last
+	// reading of the game's PlayerPrefs store. See
+	// docs/mission-hydrosci/mhs-game-logging-silent-failure-plan.md §5.2.
+	LogsState      string    // "" (no launch record), models.MHSLogsStateSeen / None / Unknown
+	LogsSeenAt     time.Time // last time the log service had an entry from a launch on this device (zero = never seen)
+	LogsCheckedAt  time.Time // zero = no check yet
+	CacheErrors    int       // the game's "cannot save cached logs" errors seen by the page in the newest launch
+	PrefsBytes     int64     // size of the game's PlayerPrefs store (unsent-log cache), latest reading
+	PrefsPct       int       // PrefsBytes as a percentage of Unity's cap
+	LoggingProblem bool      // show the amber badge
+	LoggingText    string    // short cell text ("Not recorded", "Cache full", "Nearly full")
+	LoggingTitle   string    // tooltip: what is known and what to do
 }
 
 // MemberRow represents a single row of progress data for a member.

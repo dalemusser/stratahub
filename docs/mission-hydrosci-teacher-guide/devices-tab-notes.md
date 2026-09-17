@@ -82,6 +82,18 @@ runs about three pages at the guide's density; the *Solving problems* table and 
 
 ## 4. Behavior verified in code (for whoever edits or updates the text)
 
+- **Logs column (added 2026-09-17).** From the newest "launch-ok" member launch
+  record on that device in the last 30 days (`mhs_device_tests`, kind `member`)
+  plus the launcher's last reading of the game's PlayerPrefs store
+  (`mhs_device_status.playerprefs_bytes`). Amber "!" with "Not recorded" when the
+  heartbeat check found no log entries after about five minutes of play
+  (`logs_state: none`), "Cache full" when the page saw the game's
+  "Failed to save cached logs" console error (`cache_errors > 0`), "Nearly full"
+  when the store is ≥ 90 % of Unity's 1 MB cap; a green ✓ and the `logs_seen_at`
+  time when entries were confirmed; a dash otherwise. The tooltip carries the
+  remedy. (`mhsdashboard/logging_health.go`, `missionhydrosci/logs_health.go`;
+  plan: `docs/mission-hydrosci/mhs-game-logging-silent-failure-plan.md`.)
+
 - **Rows.** One `mhs_device_status` document per (workspace, user, device); a device
   is a random id in the browser's local storage, so a new Chromebook, a new Chrome
   profile, or cleared browser data creates a new row. Rows for one student share the

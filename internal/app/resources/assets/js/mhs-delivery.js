@@ -756,9 +756,14 @@
       badList.push(sv.name + ' (' + sv.host + ') unreachable: ' + sv.error);
     }
     if (result.services.length) {
+      // The game itself says nothing when a service is unreachable: with the
+      // log service blocked it plays normally and its gameplay logs are
+      // simply not recorded; with the save service blocked, progress does not
+      // save. Say so here, since this line is the only warning anyone sees.
       this._step('services', badList.length ? 'warn' : 'ok', badList.length
         ? 'Game service' + (badList.length > 1 ? 's' : '') + ' ' + badList.join('; ') +
-          ' — the game may report a connection error' + (okList.length ? ' · reachable: ' + okList.join(', ') : '')
+          ' — the game will play but will not show an error: gameplay logs and/or progress will not be recorded from this device until the network allows these hosts' +
+          (okList.length ? ' · reachable: ' + okList.join(', ') : '')
         : 'Game services reachable: ' + okList.join(', '));
     }
     this.preflightResult = result;

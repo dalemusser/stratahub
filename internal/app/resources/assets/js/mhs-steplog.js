@@ -610,5 +610,79 @@
     return { open: function() { setOpen(true); }, close: function() { setOpen(false); }, refresh: refresh };
   };
 
+  // --- The game's PlayerPrefs store -------------------------------------
+  // Unity keeps the game's PlayerPrefs (where the game caches gameplay logs
+  // it has not managed to send) as one file inside the IndexedDB database
+  // it mounts at /idbfs, under a path ending in /PlayerPrefs, and caps the
+  // store at 1 MB on WebGL. A store near the cap has been collecting unsent
+  // logs for a long time: the game's sender has not been keeping up. See
+  // docs/mission-hydrosci/mhs-game-logging-silent-failure-plan.md §4.
+  MHSStepLog.UNITY_PREFS_CAP = 1048576;
+
+  // Resolves the store's size in bytes: 0 when the game has never run here,
+  // null when it cannot be read (no IndexedDB, an older browser without
+  // indexedDB.databases(), a read that fails or takes too long). Read-only,
+  // and never creates the database: the game must be the one to do that.
+  MHSStepLog.readUnityPrefsBytes = function() {
+    return new Promise(function(resolve) {
+      var done = false;
+      function finish(v) { if (!done) { done = true; resolve(v); } }
+      try {
+        if (!window.indexedDB || typeof indexedDB.databases !== 'function') return finish(null);
+        setTimeout(function() { finish(null); }, 4000);
+        indexedDB.databases().then(function(list) {
+          var present = false;
+          for (var i = 0; i < (list || []).length; i++) if (list[i] && list[i].name === '/idbfs') present = true;
+          if (!present) return finish(0);
+          var req = indexedDB.open('/idbfs');
+          req.onerror = function() { finish(null); };
+          req.onblocked = function() { finish(null); };
+          req.onupgradeneeded = function() { try { req.transaction.abort(); } catch (e) {} finish(null); };
+          req.onsuccess = function() {
+            var db = req.result;
+            function close() { try { db.close(); } catch (e) {} }
+            try {
+              if (!db.objectStoreNames.contains('FILE_DATA')) { close(); return finish(0); }
+              var store = db.transaction('FILE_DATA', 'readonly').objectStore('FILE_DATA');
+              // Keys first (paths), then only the PlayerPrefs entries' values, so
+              // the other files the game may keep here are never loaded.
+              var keys = [];
+              var kc = store.openKeyCursor();
+              kc.onerror = function() { close(); finish(null); };
+              kc.onsuccess = function(ev) {
+                var c = ev.target.result;
+                if (c) {
+                  var key = String(c.key || '');
+                  if (key.length >= 12 && key.slice(-12) === '/PlayerPrefs') keys.push(c.key);
+                  c.continue();
+                  return;
+                }
+                if (!keys.length) { close(); return finish(0); }
+                var total = 0, pending = keys.length;
+                keys.forEach(function(k) {
+                  var g = store.get(k);
+                  g.onerror = function() { if (--pending === 0) { close(); finish(total); } };
+                  g.onsuccess = function() {
+                    var v = g.result || {}, contents = v.contents;
+                    if (contents && typeof contents.byteLength === 'number') total += contents.byteLength;
+                    else if (contents && typeof contents.length === 'number') total += contents.length;
+                    if (--pending === 0) { close(); finish(total); }
+                  };
+                });
+              };
+            } catch (e) { close(); finish(null); }
+          };
+        }).catch(function() { finish(null); });
+      } catch (e) { finish(null); }
+    });
+  };
+
+  // "812 KB of 1,024 KB (79%)" for a step-log line or a report.
+  MHSStepLog.unityPrefsText = function(bytes) {
+    var cap = MHSStepLog.UNITY_PREFS_CAP;
+    var pct = Math.round(bytes * 100 / cap);
+    return Math.round(bytes / 1024) + ' KB of ' + (cap / 1024).toLocaleString() + ' KB (' + pct + '%)';
+  };
+
   window.MHSStepLog = MHSStepLog;
 })();

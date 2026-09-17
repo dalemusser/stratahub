@@ -29,9 +29,14 @@ type MHSDeviceStatus struct {
 	// Optional diagnostics (absent from reports by older pages): whether the
 	// origin's storage is persisted (not evictable) and whether the browser
 	// exposes the Background Fetch API.
-	StoragePersisted         *bool     `bson:"storage_persisted,omitempty" json:"storage_persisted,omitempty"`
-	BackgroundFetchAvailable *bool     `bson:"background_fetch_available,omitempty" json:"background_fetch_available,omitempty"`
-	LastSeen                 time.Time `bson:"last_seen" json:"last_seen"`
-	CreatedAt                time.Time `bson:"created_at" json:"created_at"`
-	UpdatedAt                time.Time `bson:"updated_at" json:"updated_at"`
+	StoragePersisted         *bool `bson:"storage_persisted,omitempty" json:"storage_persisted,omitempty"`
+	BackgroundFetchAvailable *bool `bson:"background_fetch_available,omitempty" json:"background_fetch_available,omitempty"`
+	// Size of the game's PlayerPrefs store on this device, as last read by
+	// the page (nil when it could not be read). The store holds the game's
+	// unsent-log cache and is capped at MHSPlayerPrefsCapBytes; a value near
+	// the cap means logs have been piling up unsent on this device.
+	PlayerPrefsBytes *int64    `bson:"playerprefs_bytes,omitempty" json:"playerprefs_bytes,omitempty"`
+	LastSeen         time.Time `bson:"last_seen" json:"last_seen"`
+	CreatedAt        time.Time `bson:"created_at" json:"created_at"`
+	UpdatedAt        time.Time `bson:"updated_at" json:"updated_at"`
 }

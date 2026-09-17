@@ -80,6 +80,26 @@ func (s *Store) ListForUserByScenes(ctx context.Context, game, userID string, sc
 	return entries, nil
 }
 
+// HasEntrySince reports whether the user has at least one entry created at
+// or after since. Entry ids are time-ordered ObjectIDs assigned on insert,
+// so with the {game, user_id, _id} index this is a single index seek.
+func (s *Store) HasEntrySince(ctx context.Context, game, userID string, since time.Time) (bool, error) {
+	filter := bson.M{
+		"game":    game,
+		"user_id": userID,
+		"_id":     bson.M{"$gte": primitive.NewObjectIDFromTimestamp(since.UTC())},
+	}
+	opts := options.FindOne().SetProjection(bson.M{"_id": 1})
+	err := s.c.FindOne(ctx, filter, opts).Err()
+	if err == mongo.ErrNoDocuments {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
 // CountForUser returns the total number of log entries for a user in a game.
 // userID is the 24-char hex string of stratahub.users._id.
 func (s *Store) CountForUser(ctx context.Context, game, userID string) (int64, error) {
