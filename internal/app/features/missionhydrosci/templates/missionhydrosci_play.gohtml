@@ -772,6 +772,7 @@
       // Member launches: store the step log on a launch outcome (plan step A2)
       // so a field report can be read step by step in the Device Tests view.
       var memberReported = {};
+      var launchRecordRetry = null;
       function memberReport(outcome) {
         if (memberReported[outcome]) return;
         memberReported[outcome] = true;
@@ -781,13 +782,26 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ outcome: outcome, unit: unitId, version: unitVersion, context: stepLog.context, entries: stepLog.entries.slice(-300) }),
             keepalive: true
-          }).then(function(resp) { return resp.ok ? resp.json() : null; }).then(function(data) {
+          }).then(function(resp) {
+            if (outcome === 'launch-ok') onHeartbeatReached(); // the server answered: online
+            return resp.ok ? resp.json() : null;
+          }).then(function(data) {
             // The launch record is where this launch's heartbeats go.
             if (outcome === 'launch-ok' && data && data.id) {
               heartbeatUrl = '/missionhydrosci/api/steplog/' + data.id + '/heartbeat';
               startHeartbeat();
             }
-          }).catch(function() {});
+          }).catch(function() {
+            // No answer at all: the device is offline (a unit launched from
+            // its cached files with the network already down). Without the
+            // launch record no heartbeat runs, so nothing would ever notice;
+            // count it as a failed beat and keep trying every 30 s until the
+            // record exists, then the heartbeats take over.
+            if (outcome !== 'launch-ok') return;
+            memberReported[outcome] = false;
+            onHeartbeatFailed();
+            if (!launchRecordRetry) launchRecordRetry = setTimeout(function() { launchRecordRetry = null; memberReport('launch-ok'); }, 30000);
+          });
         } catch (e) { /* best effort */ }
       }
       {{ end }}
@@ -1153,9 +1167,18 @@
         showOffline();
       });
       window.addEventListener('online', function() {
-        // Not proof by itself; let a beat confirm it.
+        // Not proof by itself; let a beat confirm it. If the launch record
+        // never got created (network down at launch), try it now.
         if (hbTimer) sendHeartbeat(false);
+        else if (typeof memberReported !== 'undefined' && !memberReported['launch-ok']) {
+          if (launchRecordRetry) { clearTimeout(launchRecordRetry); launchRecordRetry = null; }
+          memberReport('launch-ok');
+        }
       });
+      // Already offline when the page opened (a unit launched from its
+      // cached files with the network down): no transition event will come,
+      // so say so now rather than after the first failures.
+      if (navigator.onLine === false) showOffline();
 
       // Aspect-ratio-preserving resize (matches dev build: 1400x800, 7:4 ratio).
       // In fullscreen mode, CSS handles sizing via viewport units (see <style> above)
