@@ -134,6 +134,9 @@ type MHSDeviceTestHeartbeat struct {
 	// "Failed to save cached logs" errors the page has seen from the game.
 	PlayerPrefsBytes int64 `bson:"playerprefs_bytes,omitempty" json:"playerprefs_bytes,omitempty"`
 	CacheErrors      int   `bson:"cache_errors,omitempty" json:"cache_errors,omitempty"`
+	// Time the page has seen the device offline so far this session (its own
+	// heartbeats failing), cumulative; reported once the connection is back.
+	OfflineMs int64 `bson:"offline_ms,omitempty" json:"offline_ms,omitempty"`
 }
 
 // Logging-health states of a launch (MHSDeviceTest.LogsState): whether the
@@ -289,6 +292,8 @@ type MHSDeviceTest struct {
 	// since then is the sign that the game is producing events (see
 	// MHSPlayerPrefsGrowthBytes).
 	PlayerPrefsBytesAtLaunch int64 `bson:"playerprefs_bytes_at_launch,omitempty" json:"playerprefs_bytes_at_launch,omitempty"`
+	// Cumulative time the page saw the device offline this session.
+	OfflineMs int64 `bson:"offline_ms,omitempty" json:"offline_ms,omitempty"`
 }
 
 // LoggingProblem reports whether this launch shows the game's logging

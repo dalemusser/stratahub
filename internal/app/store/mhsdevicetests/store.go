@@ -182,6 +182,9 @@ func (s *Store) Heartbeat(ctx context.Context, workspaceID, id primitive.ObjectI
 	if beat.PlayerPrefsBytes > 0 {
 		set["playerprefs_bytes"] = beat.PlayerPrefsBytes
 	}
+	if beat.OfflineMs > 0 {
+		set["offline_ms"] = beat.OfflineMs
+	}
 	update := bson.M{
 		"$push": bson.M{"heartbeats": bson.M{"$each": []models.MHSDeviceTestHeartbeat{beat}, "$slice": -models.MHSDeviceTestMaxHeartbeats}},
 		"$set":  set,

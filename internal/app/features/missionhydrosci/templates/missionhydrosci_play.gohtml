@@ -39,12 +39,13 @@
         z-index: 10;
       }
       #loading-overlay.hidden { display: none; }
-      /* Logging notice: a slim bar over the bottom edge of the game (the top
-         edge holds the back and fullscreen buttons), inside #unity-container
-         so it survives fullscreen. Amber is right here: it only appears for a
-         real problem (nothing is being recorded), and the "!" mark keeps it
-         readable without color. */
-      #mhs-logging-notice {
+      /* Notice bars (logging, offline): a slim bar over the bottom edge of the
+         game (the top edge holds the back and fullscreen buttons), inside
+         #unity-container so it survives fullscreen. Amber is right here: a bar
+         only appears for a real problem, and the "!" mark keeps it readable
+         without color. Only one bar shows at a time: while the device is
+         offline the offline bar replaces the logging one. */
+      .mhs-notice-bar {
         position: absolute;
         bottom: 0; left: 0; right: 0;
         z-index: 30;
@@ -56,25 +57,25 @@
         padding: 6px 48px 6px 12px;
         box-shadow: 0 1px 4px rgba(0,0,0,0.35);
       }
-      #mhs-logging-notice[hidden] { display: none; }
-      #mhs-logging-notice .mhs-ln-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-      #mhs-logging-notice .mhs-ln-icon {
+      .mhs-notice-bar[hidden] { display: none; }
+      .mhs-notice-bar .mhs-ln-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+      .mhs-notice-bar .mhs-ln-icon {
         flex: none; width: 18px; height: 18px; border-radius: 50%;
         background: #f59e0b; color: #451a03; font-weight: 700; font-size: 13px;
         display: inline-flex; align-items: center; justify-content: center;
       }
-      #mhs-logging-notice .mhs-ln-text { flex: 1 1 260px; }
-      #mhs-logging-notice .mhs-ln-btn {
+      .mhs-notice-bar .mhs-ln-text { flex: 1 1 260px; }
+      .mhs-notice-bar .mhs-ln-btn {
         flex: none; background: rgba(255,255,255,0.14); color: #fffbeb;
         border: 1px solid rgba(255,255,255,0.35); border-radius: 4px;
         padding: 2px 8px; font: inherit; font-size: 12px; cursor: pointer;
       }
-      #mhs-logging-notice .mhs-ln-btn:hover { background: rgba(255,255,255,0.24); }
-      #mhs-logging-notice .mhs-ln-dismiss { position: absolute; top: 4px; right: 8px; font-size: 16px; line-height: 1; padding: 2px 7px; }
-      #mhs-logging-notice .mhs-ln-how { margin: 6px 0 2px; padding: 8px 10px; background: rgba(0,0,0,0.25); border-radius: 6px; max-width: 720px; }
-      #mhs-logging-notice .mhs-ln-how[hidden] { display: none; }
-      #mhs-logging-notice .mhs-ln-how ol { margin: 4px 0 0 18px; padding: 0; }
-      #mhs-logging-notice .mhs-ln-how li { margin: 3px 0; }
+      .mhs-notice-bar .mhs-ln-btn:hover { background: rgba(255,255,255,0.24); }
+      .mhs-notice-bar .mhs-ln-dismiss { position: absolute; top: 4px; right: 8px; font-size: 16px; line-height: 1; padding: 2px 7px; }
+      .mhs-notice-bar .mhs-ln-how { margin: 6px 0 2px; padding: 8px 10px; background: rgba(0,0,0,0.25); border-radius: 6px; max-width: 720px; }
+      .mhs-notice-bar .mhs-ln-how[hidden] { display: none; }
+      .mhs-notice-bar .mhs-ln-how ol { margin: 4px 0 0 18px; padding: 0; }
+      .mhs-notice-bar .mhs-ln-how li { margin: 3px 0; }
       .loading-bar-bg {
         width: 300px;
         height: 8px;
@@ -223,7 +224,7 @@
            says it cannot save its log cache, or when that cache's store is
            nearly full. The student's line is calm and the fix is for the
            teacher (docs/mission-hydrosci/mhs-game-logging-silent-failure-plan.md §5.1). -->
-      <div id="mhs-logging-notice" role="status" aria-live="polite" hidden>
+      <div id="mhs-logging-notice" class="mhs-notice-bar" role="status" aria-live="polite" hidden>
         <div class="mhs-ln-row">
           <span class="mhs-ln-icon" aria-hidden="true">!</span>
           <span class="mhs-ln-text" id="mhs-ln-text">Game activity is not being recorded on this device. You can keep playing. Please tell your teacher.</span>
@@ -239,6 +240,27 @@
             <li>If this notice comes back on this device, the school network may be blocking the game's log service. Tell your program contact and name this device.</li>
           </ol>
           Details are in the Teacher Guide under "Game activity not recorded".
+        </div>
+      </div>
+
+      <!-- Offline notice. The page's own heartbeats fail, so the device has
+           lost its connection: the game keeps playing, but it cannot save
+           progress online or send its activity record until the connection
+           returns (it keeps the record on the device meanwhile). -->
+      <div id="mhs-offline-notice" class="mhs-notice-bar" role="status" aria-live="polite" hidden>
+        <div class="mhs-ln-row">
+          <span class="mhs-ln-icon" aria-hidden="true">!</span>
+          <span class="mhs-ln-text" id="mhs-off-text">This device has lost its internet connection. You can keep playing. Keep this tab open: when the connection returns, the game will save your progress and send your activity.</span>
+          <button type="button" class="mhs-ln-btn" id="mhs-off-how-btn" aria-expanded="false" aria-controls="mhs-off-how">What to do</button>
+          <button type="button" class="mhs-ln-btn mhs-ln-dismiss" id="mhs-off-dismiss" aria-label="Hide this notice" title="Hide this notice">&times;</button>
+        </div>
+        <div class="mhs-ln-how" id="mhs-off-how" hidden>
+          <strong>For the teacher.</strong> The game is playing normally, but this device cannot reach the internet, so the game cannot save the student's progress or send their activity record. <span id="mhs-off-detail"></span>
+          <ol>
+            <li>Check the device's Wi-Fi. If the whole class is affected, the network is down; the game keeps running on every device meanwhile.</li>
+            <li>Keep the game tab open until the connection is back. The next save will include everything the student has done, and the activity kept on the device is sent automatically.</li>
+            <li>Only if the connection will not return this period: let the student finish what they are doing, and know that progress since the last successful save may need to be replayed.</li>
+          </ol>
         </div>
       </div>
 
@@ -803,7 +825,10 @@
           // PlayerPrefs store and how many cache-write failures the game has
           // printed. The reply carries the server's own verdict.
           playerprefs_bytes: (typeof loggingHealth.prefsBytes === 'number') ? loggingHealth.prefsBytes : 0,
-          cache_errors: loggingHealth.cacheErrors
+          cache_errors: loggingHealth.cacheErrors,
+          // Cumulative time this page has seen the device offline (its own
+          // beats failing); only ever delivered once the connection is back.
+          offline_ms: netHealth.offlineMs + (netHealth.offlineSince ? (now - netHealth.offlineSince) : 0)
         };
         hbFrames = 0; hbLastAt = now;
         try {
@@ -828,11 +853,15 @@
             body: JSON.stringify(heartbeatBody(closing)),
             keepalive: !!closing
           }).then(function(resp) {
+            if (!closing) onHeartbeatReached(); // the server answered: the device is online, whatever the status
             if (closing || !resp || !resp.ok) return null;
             return resp.json().catch(function() { return null; });
           }).then(function(data) {
             if (data && data.logs) onLogsState(data.logs);
-          }).catch(function() {});
+          }).catch(function() {
+            // A rejected fetch is a network failure (no server answer at all).
+            if (!closing) onHeartbeatFailed();
+          });
         } catch (e) { /* best effort */ }
       }
       function startHeartbeat() {
@@ -1062,6 +1091,71 @@
       }
       readUnityPrefs(true);
       setInterval(function() { readUnityPrefs(false); }, 60000);
+
+      // ---- Offline ----------------------------------------------------------
+      // The one case the server cannot see: with no network, no heartbeat
+      // arrives and no verdict comes back. The page's own failing beats are
+      // the signal. The game keeps playing, cannot save progress online, and
+      // keeps its activity record on the device until the connection returns
+      // (it sends the backlog itself, up to its store's cap). Two failed
+      // beats in a row (about a minute), or the browser's own offline event,
+      // show the offline bar; the first answered beat clears it.
+      var netHealth = { failures: 0, offlineSince: 0, offlineMs: 0, shown: false, loggingWasShown: '' };
+      var offEl = document.getElementById('mhs-offline-notice');
+      var offHow = document.getElementById('mhs-off-how');
+      var offHowBtn = document.getElementById('mhs-off-how-btn');
+      var offDetail = document.getElementById('mhs-off-detail');
+      if (offHowBtn) offHowBtn.addEventListener('click', function() {
+        var open = offHow.hidden;
+        offHow.hidden = !open;
+        offHowBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        offHowBtn.textContent = open ? 'Hide' : 'What to do';
+      });
+      var offDismiss = document.getElementById('mhs-off-dismiss');
+      if (offDismiss) offDismiss.addEventListener('click', function() { if (offEl) offEl.hidden = true; });
+      function showOffline() {
+        if (netHealth.shown) return;
+        netHealth.shown = true;
+        if (!netHealth.offlineSince) netHealth.offlineSince = Date.now();
+        stepLog.record('game', 'warn', 'Connection lost — the game keeps playing, but progress cannot be saved online and the activity record stays on this device until the connection returns');
+        if (offDetail) {
+          var kept = (typeof loggingHealth.prefsBytes === 'number' && loggingHealth.prefsBytes > 1024)
+            ? ' About ' + Math.round(loggingHealth.prefsBytes / 1024) + ' KB of activity is being kept on this device for sending later.' : '';
+          offDetail.textContent = 'Lost at ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.' + kept;
+        }
+        // The offline bar explains everything the logging bar would; show one.
+        if (loggingHealth.shown) { netHealth.loggingWasShown = loggingHealth.shown; hideLoggingNotice(); }
+        if (offEl) offEl.hidden = false;
+      }
+      function hideOffline() {
+        if (!netHealth.shown) return;
+        netHealth.shown = false;
+        var mins = netHealth.offlineSince ? Math.round((Date.now() - netHealth.offlineSince) / 60000) : 0;
+        stepLog.record('game', 'ok', 'Connection back' + (mins ? ' after about ' + mins + ' min' : ''));
+        if (offEl) offEl.hidden = true;
+        if (offHow) offHow.hidden = true;
+        if (offHowBtn) { offHowBtn.setAttribute('aria-expanded', 'false'); offHowBtn.textContent = 'What to do'; }
+        if (netHealth.loggingWasShown) { var was = netHealth.loggingWasShown; netHealth.loggingWasShown = ''; showLoggingNotice(was); }
+      }
+      function onHeartbeatFailed() {
+        netHealth.failures++;
+        if (!netHealth.offlineSince) netHealth.offlineSince = Date.now();
+        if (netHealth.failures >= 2 || navigator.onLine === false) showOffline();
+      }
+      function onHeartbeatReached() {
+        netHealth.failures = 0;
+        if (netHealth.offlineSince) { netHealth.offlineMs += Date.now() - netHealth.offlineSince; netHealth.offlineSince = 0; }
+        hideOffline();
+      }
+      window.addEventListener('offline', function() {
+        // The browser is sure: show at once rather than after two beats.
+        if (!netHealth.offlineSince) netHealth.offlineSince = Date.now();
+        showOffline();
+      });
+      window.addEventListener('online', function() {
+        // Not proof by itself; let a beat confirm it.
+        if (hbTimer) sendHeartbeat(false);
+      });
 
       // Aspect-ratio-preserving resize (matches dev build: 1400x800, 7:4 ratio).
       // In fullscreen mode, CSS handles sizing via viewport units (see <style> above)

@@ -854,6 +854,7 @@ type deviceTestHeartbeatRequest struct {
 	// Logging health read by the page (optional; older pages omit them).
 	PlayerPrefsBytes int64 `json:"playerprefs_bytes"`
 	CacheErrors      int   `json:"cache_errors"`
+	OfflineMs        int64 `json:"offline_ms"`
 }
 
 func (r deviceTestHeartbeatRequest) beat() models.MHSDeviceTestHeartbeat {
@@ -868,6 +869,7 @@ func (r deviceTestHeartbeatRequest) beat() models.MHSDeviceTestHeartbeat {
 		Visibility:       models.ClipRunes(r.Visibility, 16),
 		PlayerPrefsBytes: r.PlayerPrefsBytes,
 		CacheErrors:      r.CacheErrors,
+		OfflineMs:        r.OfflineMs,
 	}
 }
 

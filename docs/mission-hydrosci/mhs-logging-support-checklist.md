@@ -17,7 +17,7 @@ Any one of these confirms it:
 - **The student's screen:** the amber bar along the bottom of the game, "Game activity is not being recorded on this device."
 - **Server journal** (StrataHub): `logging-health: playing with no log entries arriving` lines, one per flagged session, with the record id and unit.
 
-What does *not* confirm it: the launcher's preflight warning that the log service is unreachable. That is a network finding (see §4), and it says the same thing about every device on that network.
+What does *not* confirm it: the launcher's preflight warning that the log service is unreachable. That is a network finding (see §4), and it says the same thing about every device on that network. Nor does the **offline bar** ("This device has lost its internet connection"): that is the page noticing its own heartbeats failing. The game is fine, keeps its record on the device, and sends it when the connection returns; the Device Tests detail shows how long the device was offline.
 
 ## 2. Capture evidence before anything is cleared
 

@@ -37,6 +37,16 @@ Point at the cell for the details and the steps. Amber means something is wrong,
 
 If you can, before step 2, tell your program contact which device it was and when it happened. They may ask for a file from the device that helps the game's developers find the cause.
 
+## If the device goes offline
+
+A different bar appears when the device loses its internet connection while the game is open:
+
+> **!** This device has lost its internet connection. You can keep playing. Keep this tab open: when the connection returns, the game will save your progress and send your activity.
+
+This is not the recording problem above. The game is fine and keeps playing, but while the device is offline it cannot save the student's progress online or send their activity record. It keeps the record on the device and sends it on its own once the connection is back, and the next save includes everything the student has done since the last one. The bar disappears by itself when the connection returns.
+
+What to do: check the device's Wi-Fi; if the whole class sees the bar, the network is down. Keep the game tab open until the connection is back. Only if the connection will not return that period, let the student finish what they are doing, and expect that progress since the last successful save may need to be replayed.
+
 ## When this happens
 
 It is rare, and it is about the device, not the student's account. It has been seen on a computer that had been used to play the game many times over several months. A device shared by many students collects more over time than a personal one. The other cause is a network that blocks the game's log address while allowing everything else; in that case every device on that network is affected and the fix is on the network side.
