@@ -122,7 +122,7 @@ func logsDetail(t *models.MHSDeviceTest) string {
 		s += " · last check " + t.LogsCheckedAt.UTC().Format(time.RFC3339) + " UTC"
 	}
 	if t.OfflineMs > 0 {
-		s += fmt.Sprintf(" · device offline for %s during the session (heartbeats failed; the game keeps its record on the device meanwhile)", mmss(time.Duration(t.OfflineMs)*time.Millisecond))
+		s += fmt.Sprintf(" · device offline for %s during the session (heartbeats failed; an outage over about ten seconds ends the game's logging on that device until its site data is cleared)", mmss(time.Duration(t.OfflineMs)*time.Millisecond))
 	}
 	return s
 }
