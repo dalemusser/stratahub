@@ -58,6 +58,15 @@
         box-shadow: 0 1px 4px rgba(0,0,0,0.35);
       }
       .mhs-notice-bar[hidden] { display: none; }
+      /* Shown through the Popover API the bar sits in the browser's top
+         layer, above a fullscreen canvas (the game can fullscreen its own
+         canvas, which would otherwise cover the bar). Undo the UA popover
+         box and pin it to the viewport's bottom edge. */
+      .mhs-notice-bar[popover] {
+        position: fixed; top: auto; bottom: 0; left: 0; right: 0;
+        width: auto; height: auto; max-width: none; margin: 0; border: 0;
+        overflow: visible; inset-inline: 0;
+      }
       .mhs-notice-bar .mhs-ln-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
       .mhs-notice-bar .mhs-ln-icon {
         flex: none; width: 18px; height: 18px; border-radius: 50%;
@@ -1028,16 +1037,43 @@
         loggingHealth.dismissed[loggingHealth.shown] = true;
         hideLoggingNotice();
       });
+      // Show a bar in the browser's top layer when the Popover API exists, so
+      // it stays above a fullscreen canvas; plain visibility otherwise.
+      function barShow(el) {
+        if (!el) return;
+        el.hidden = false;
+        if (typeof el.showPopover !== 'function') return;
+        try {
+          if (!el.hasAttribute('popover')) el.setAttribute('popover', 'manual');
+          if (!el.matches(':popover-open')) el.showPopover();
+        } catch (e) { /* fall back to plain visibility */ }
+      }
+      function barHide(el) {
+        if (!el) return;
+        try { if (typeof el.hidePopover === 'function' && el.matches(':popover-open')) el.hidePopover(); } catch (e) {}
+        el.hidden = true;
+      }
+      // A later top-layer entrant paints above an earlier one: when
+      // fullscreen changes, re-raise any bar that is showing.
+      ['fullscreenchange', 'webkitfullscreenchange'].forEach(function(ev) {
+        document.addEventListener(ev, function() {
+          [document.getElementById('mhs-logging-notice'), document.getElementById('mhs-offline-notice')].forEach(function(el) {
+            if (el && !el.hidden && typeof el.showPopover === 'function') {
+              try { if (el.matches(':popover-open')) el.hidePopover(); el.showPopover(); } catch (e) {}
+            }
+          });
+        });
+      });
       function showLoggingNotice(reason) {
         if (!lnEl || loggingHealth.dismissed[reason]) return;
         if (loggingHealth.shown === reason) return;
         loggingHealth.shown = reason;
         if (lnReason) lnReason.textContent = lnReasons[reason] || '';
-        lnEl.hidden = false;
+        barShow(lnEl);
       }
       function hideLoggingNotice() {
         if (!lnEl) return;
-        lnEl.hidden = true;
+        barHide(lnEl);
         if (lnHow) lnHow.hidden = true;
         if (lnHowBtn) { lnHowBtn.setAttribute('aria-expanded', 'false'); lnHowBtn.textContent = 'What to do'; }
         loggingHealth.shown = '';
@@ -1126,7 +1162,7 @@
         offHowBtn.textContent = open ? 'Hide' : 'What to do';
       });
       var offDismiss = document.getElementById('mhs-off-dismiss');
-      if (offDismiss) offDismiss.addEventListener('click', function() { if (offEl) offEl.hidden = true; });
+      if (offDismiss) offDismiss.addEventListener('click', function() { barHide(offEl); });
       function showOffline() {
         if (netHealth.shown) return;
         netHealth.shown = true;
@@ -1139,14 +1175,14 @@
         }
         // The offline bar explains everything the logging bar would; show one.
         if (loggingHealth.shown) { netHealth.loggingWasShown = loggingHealth.shown; hideLoggingNotice(); }
-        if (offEl) offEl.hidden = false;
+        barShow(offEl);
       }
       function hideOffline() {
         if (!netHealth.shown) return;
         netHealth.shown = false;
         var mins = netHealth.offlineSince ? Math.round((Date.now() - netHealth.offlineSince) / 60000) : 0;
         stepLog.record('game', 'ok', 'Connection back' + (mins ? ' after about ' + mins + ' min' : ''));
-        if (offEl) offEl.hidden = true;
+        barHide(offEl);
         if (offHow) offHow.hidden = true;
         if (offHowBtn) { offHowBtn.setAttribute('aria-expanded', 'false'); offHowBtn.textContent = 'What to do'; }
         if (netHealth.loggingWasShown) { var was = netHealth.loggingWasShown; netHealth.loggingWasShown = ''; showLoggingNotice(was); }
