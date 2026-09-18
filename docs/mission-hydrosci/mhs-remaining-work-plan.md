@@ -261,7 +261,7 @@ browser profile until its site data is cleared. StrataHub now detects it within
 about five minutes of play (recording bar, Devices tab Logs column, viewer filter),
 plus an offline bar. The game-side fix is in `mhs-updates/gamelogger-cache-overflow-091626/`
 (reproduction and specimen included) and belongs in the next build. Plan, status
-and open items: `mhs-game-logging-silent-failure-plan.md` §0; support:
+and open items: `mhs-game-logging-silent-failure-plan.md` §0; **next to build: §5.7** (audit-log entries, an incidents viewer with open/resolved, email + daily digest); support:
 `mhs-logging-support-checklist.md`; teacher text:
 `../mission-hydrosci-teacher-guide/game-activity-not-recorded.md` (PDF rebuild pending).
 

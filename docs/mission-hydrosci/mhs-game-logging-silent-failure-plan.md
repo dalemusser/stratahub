@@ -24,6 +24,7 @@
 **Handoff to the game team.** Give them the whole folder `mhs-updates/gamelogger-cache-overflow-091626/` (also on GitHub). Ask for the `GameLogger.cs` that is actually in the September builds. The drop-in there still needs three additions before use: copy the dictionary on enqueue; skip empty or unreadable entries when loading the cache; diff the shipped logger against the drop-in so the attempt-limit code is not carried forward. The project lead has held bundle code changes until the shipped source is seen.
 
 **Open items.**
+0. **Next work when resuming: §5.7 incident records, admin visibility and notification** (audit-log entries at detection and recovery; an incidents viewer with open/resolved and a follow-up note; email on new incidents plus a daily digest across workspaces). Needs the project lead's go and the notification recipients.
 1. Rebuild the teacher guide PDF with the new section and the Devices view text (`docs/mission-hydrosci-teacher-guide/build-guide-pdf.sh`).
 2. A look on a real Chromebook: normal play shows no bar and the Storage line; the Devices tab with a real class.
 3. Delete seven "Automated check" device-test runs from the dev workspace's data (ids begin `ffffffffcc85`, `ffffffffce81`, `ffffffff6cec`, `ffffffff06ea`, `ffffffff3b3b`, `ffffffff92d6`, `ffffffff6952`).
@@ -157,6 +158,22 @@ The handoff bundle `mhs-updates/gamelogger-cache-overflow-091626/` contains the 
 ### 5.6 Optional experiment: manufacture a specimen
 
 A tester on a dev test account blocks the log host in DevTools, plays for about an hour so the cache fills, exports the PlayerPrefs file, then unblocks and reloads. If logging recovers, a full cache alone is not the killer and the level-3 theory gains weight. If it does not, we have a reproducible case and a file for the game team. Needs one person and an hour; risks nothing.
+
+---
+
+## 5.7 Next: incident records, admin visibility, notification (planned 2026-09-18, not built)
+
+**Why.** Detection is recorded on the launch record and visible in the Device Tests viewer (Kind = Member load record, Logs = Problem) and on the Devices tab, but only to someone who goes and looks, one workspace at a time, and nothing says whether a flagged device was ever fixed. The project lead wants to know that it is happening, to whom and when, without searching, and to be able to follow each case to resolution. This is the first thing to build when work resumes.
+
+**5.7.1 Audit log entries (about an hour).** At detection, write an event to the existing audit log (`store/audit`, viewer `views.AuditLog`, roles admin and coordinator): category "Mission HydroSci", event `mhs.logging_failure_detected`, the member, the device id, the unit, the record id, the reason (none / cache full / nearly full). When a later launch on the same device is confirmed logging with a small store, write `mhs.logging_recovered`. Hook: `missionhydrosci/logs_health.go` where the flag is set, and where a `seen` follows a flagged record on the same device. This alone gives the "who and when" record in a place admins already use.
+
+**5.7.2 Incident records and an incidents viewer (about a day).** One document per (workspace, member, device id): `opened_at` (first detection), `last_flagged_at`, `sessions` (launch record ids), `reason`, `resolved_at`, `resolved_by` (auto: the next confirmed launch on that device; manual: an admin with a note), `note`. A viewer beside Device Tests, roles admin and analyst, filters Status (open / resolved), Member, Device, date range; the detail links the sessions and offers Mark resolved with a note. This is the follow-up queue. Store: new `mhsloggingincidents` collection; the auto-resolve check runs in the same place as 5.7.1.
+
+**5.7.3 Notification (about half a day).** Using `system/mailer`: an email on each newly opened incident (member, device, unit, workspace, time, link to the incident) and a daily digest of everything still open, across all workspaces, sent early morning. Recipients: decision pending (workspace admins, a fixed address, or both). Viewers are scoped to one workspace, so the digest is what answers "is it happening anywhere" without a search.
+
+**Order.** 5.7.1 first (immediate value, no new UI), then 5.7.2, then 5.7.3 once recipients are decided. Estimated two days in all.
+
+**Decisions needed from the project lead.** Which of the three to do now (recommendation: all three, in order, before or during the first week of classes), and who receives the notifications.
 
 ---
 
