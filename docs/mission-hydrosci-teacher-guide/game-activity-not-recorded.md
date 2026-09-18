@@ -41,11 +41,11 @@ If you can, before step 2, tell your program contact which device it was and whe
 
 A different bar appears when the device loses its internet connection while the game is open:
 
-> **!** This device has lost its internet connection. You can keep playing. Keep this tab open: when the connection returns, the game will save your progress and send your activity.
+> **!** This device has lost its internet connection. You can keep playing, but your game activity is not being recorded. Please tell your teacher.
 
-This is not the recording problem above. The game is fine and keeps playing, but while the device is offline it cannot save the student's progress online or send their activity record. It keeps the record on the device and sends it on its own once the connection is back, and the next save includes everything the student has done since the last one. The bar disappears by itself when the connection returns.
+The game keeps playing, but it cannot save the student's progress online while the device is offline, and once the connection has been gone for more than about ten seconds the game stops recording activity on that device for good. It does not start again when the connection returns. The bar disappears by itself when the connection is back; a few minutes later the recording bar above appears in its place, because the recording has stopped.
 
-What to do: check the device's Wi-Fi; if the whole class sees the bar, the network is down. Keep the game tab open until the connection is back. Only if the connection will not return that period, let the student finish what they are doing, and expect that progress since the last successful save may need to be replayed.
+What to do: check the device's Wi-Fi; if the whole class sees the bar, the network is down. Keep the game tab open until the connection is back so progress can save again. After the session, clear the site data for the Mission HydroSci site on that device (the steps above) and sign the student in again. Until that is done, the Devices view shows the device as **Not recorded**.
 
 ## When this happens
 

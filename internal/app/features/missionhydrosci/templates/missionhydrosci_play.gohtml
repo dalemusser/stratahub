@@ -259,16 +259,16 @@
       <div id="mhs-offline-notice" class="mhs-notice-bar" role="status" aria-live="polite" hidden>
         <div class="mhs-ln-row">
           <span class="mhs-ln-icon" aria-hidden="true">!</span>
-          <span class="mhs-ln-text" id="mhs-off-text">This device has lost its internet connection. You can keep playing. Keep this tab open: when the connection returns, the game will save your progress and send your activity.</span>
+          <span class="mhs-ln-text" id="mhs-off-text">This device has lost its internet connection. You can keep playing, but your game activity is not being recorded. Please tell your teacher.</span>
           <button type="button" class="mhs-ln-btn" id="mhs-off-how-btn" aria-expanded="false" aria-controls="mhs-off-how">What to do</button>
           <button type="button" class="mhs-ln-btn mhs-ln-dismiss" id="mhs-off-dismiss" aria-label="Hide this notice" title="Hide this notice">&times;</button>
         </div>
         <div class="mhs-ln-how" id="mhs-off-how" hidden>
-          <strong>For the teacher.</strong> The game is playing normally, but this device cannot reach the internet, so the game cannot save the student's progress or send their activity record. <span id="mhs-off-detail"></span>
+          <strong>For the teacher.</strong> The game is playing normally, but this device cannot reach the internet. Progress cannot be saved online while it is offline, and the game's activity record stops for good once the connection has been gone for more than about ten seconds: it does not resume when the connection returns. <span id="mhs-off-detail"></span>
           <ol>
             <li>Check the device's Wi-Fi. If the whole class is affected, the network is down; the game keeps running on every device meanwhile.</li>
-            <li>Keep the game tab open until the connection is back. The next save will include everything the student has done, and the activity kept on the device is sent automatically.</li>
-            <li>Only if the connection will not return this period: let the student finish what they are doing, and know that progress since the last successful save may need to be replayed.</li>
+            <li>Keep the game tab open until the connection is back, so the game can save progress again.</li>
+            <li>After the session, on this device, clear the site data for this site (padlock in the address bar, Site settings, Delete data) and sign the student in again. Until that is done the game will not record activity on this device, and the Devices tab will show it as Not recorded.</li>
           </ol>
         </div>
       </div>
@@ -1145,11 +1145,12 @@
       // ---- Offline ----------------------------------------------------------
       // The one case the server cannot see: with no network, no heartbeat
       // arrives and no verdict comes back. The page's own failing beats are
-      // the signal. The game keeps playing, cannot save progress online, and
-      // keeps its activity record on the device until the connection returns
-      // (it sends the backlog itself, up to its store's cap). Two failed
-      // beats in a row (about a minute), or the browser's own offline event,
-      // show the offline bar; the first answered beat clears it.
+      // the signal. The game keeps playing but cannot save progress online,
+      // and an outage of more than about ten seconds kills its logging for
+      // good (see the plan). Two failed beats in a row (about a minute), or
+      // the browser's own offline event, show the offline bar; the first
+      // answered beat clears it, after which the logging check reports the
+      // dead sender within a few minutes.
       var netHealth = { failures: 0, offlineSince: 0, offlineMs: 0, shown: false, loggingWasShown: '' };
       var offEl = document.getElementById('mhs-offline-notice');
       var offHow = document.getElementById('mhs-off-how');
@@ -1170,7 +1171,7 @@
         stepLog.record('game', 'warn', 'Connection lost — the game keeps playing, but progress cannot be saved online and the activity record stays on this device until the connection returns');
         if (offDetail) {
           var kept = (typeof loggingHealth.prefsBytes === 'number' && loggingHealth.prefsBytes > 1024)
-            ? ' About ' + Math.round(loggingHealth.prefsBytes / 1024) + ' KB of activity is being kept on this device for sending later.' : '';
+            ? ' About ' + Math.round(loggingHealth.prefsBytes / 1024) + ' KB of unsent activity is sitting on this device.' : '';
           offDetail.textContent = 'Lost at ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + '.' + kept;
         }
         // The offline bar explains everything the logging bar would; show one.

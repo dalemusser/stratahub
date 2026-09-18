@@ -17,11 +17,11 @@ Any one of these confirms it:
 - **The student's screen:** the amber bar along the bottom of the game, "Game activity is not being recorded on this device."
 - **Server journal** (StrataHub): `logging-health: playing with no log entries arriving` lines, one per flagged session, with the record id and unit.
 
-What does *not* confirm it: the launcher's preflight warning that the log service is unreachable. That is a network finding (see §4), and it says the same thing about every device on that network. Nor does the **offline bar** ("This device has lost its internet connection"): that is the page noticing its own heartbeats failing. The game is fine, keeps its record on the device, and sends it when the connection returns; the Device Tests detail shows how long the device was offline.
+What does *not* confirm it: the launcher's preflight warning that the log service is unreachable. That is a network finding (see §4), and it says the same thing about every device on that network. The **offline bar** ("This device has lost its internet connection") is the page noticing its own heartbeats failing. It is not itself the recording problem, but it predicts one: an outage of more than about ten seconds during play kills the game's logging on that device for good (verified 2026-09-18), so a device that showed the offline bar will show Not recorded a few minutes after reconnecting and needs the §3 remedy after the session. The Device Tests detail shows how long the device was offline.
 
 ## 2. Capture evidence before anything is cleared
 
-The cause on the game side is still a hypothesis (plan §2). One captured store would settle it. On the affected device, before any clearing:
+The cause on the game side is reproduced and documented (bundle note `02-reproduction-and-specimen.md`), but the shipped logger source has not been seen, and every field specimen helps confirm it. On the affected device, before any clearing:
 
 1. Open the game's site in the browser, then DevTools (F12, or ⋮ → More tools → Developer tools).
 2. **Application** tab → **IndexedDB** → the database named `/idbfs` → object store `FILE_DATA`.
@@ -56,4 +56,4 @@ Several devices flagged at the same site, or one device flagged again straight a
 
 ## 6. Escalation to the game team
 
-The handoff bundle `mhs-updates/gamelogger-cache-overflow-091626/` has the write-up and a drop-in `GameLogger.cs`. It is deferred until after the September launch unless the plan's trigger fires (more than a handful of student devices flagged in the first week, or a research cohort that needs complete data). A captured store (§2) goes with it.
+The handoff bundle `mhs-updates/gamelogger-cache-overflow-091626/` has the write-up, the two-minute reproduction, a captured store, and a drop-in `GameLogger.cs` with the additions it still needs listed. Any log request that fails twice in a row, ten seconds apart, ends logging on that browser profile until its site data is cleared, so the fix belongs in the next game build; the project lead decides the timing. A captured field store (§2) goes with it.

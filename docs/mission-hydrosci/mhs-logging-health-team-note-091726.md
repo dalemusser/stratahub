@@ -16,7 +16,7 @@ On one heavily used Windows browser profile, the game stopped sending its gamepl
 
 **What's live now**
 
-- **On the student's screen.** If the game runs for about five minutes with none of its logs reaching the server, a thin amber bar appears along the bottom of the game: "Game activity is not being recorded on this device. You can keep playing. Please tell your teacher." A **What to do** button holds the steps for the teacher. A separate bar appears if the device loses its internet connection; that one clears itself when the connection returns.
+- **On the student's screen.** If the game runs for about five minutes with none of its logs reaching the server, a thin amber bar appears along the bottom of the game: "Game activity is not being recorded on this device. You can keep playing. Please tell your teacher." A **What to do** button holds the steps for the teacher. A separate bar appears if the device loses its internet connection; it clears when the connection returns. Note that an outage of more than about ten seconds during play kills the game's logging on that device for good (see below), so the recording bar follows a few minutes later.
 - **Devices tab on the teacher dashboard.** A new **Logs** column: a check mark and time when the record is arriving, an amber **!** (Not recorded, Cache full, or Nearly full) when it is not, with the fix in the tooltip.
 - **Device Tests viewer (admins and analysts).** A Logs column and a Logs filter. Kind = Member load record with Logs = Problem is the list of play sessions where logging failed. Member records now also show the game's own log count, which they did not before.
 - **Units page.** The game's local log store size is reported with the device status and shown in the status details, so a device that has been piling up unsent logs can be spotted before a launch.
@@ -31,7 +31,7 @@ There is a support checklist in the repo (`docs/mission-hydrosci/mhs-logging-sup
 
 **What this does not do**
 
-It does not change the game. A handoff bundle with a fix for the game's logger is written and waiting for the game team, deferred until after the September launch unless the first week's data shows the problem on more than a handful of student devices. The cause on the game side is still a hypothesis; the one machine we had was cleared before anyone could capture its store, which is why the checklist now says evidence first.
+It does not change the game. A handoff bundle with a fix for the game's logger is written and waiting for the game team. The cause is now reproduced and observed, not hypothesized: when a log request fails twice in a row, ten seconds apart, for any reason (a blocked host, a Wi-Fi drop, being offline), the game's sender stops for good on that browser profile and every later session is silent until the site data is cleared. The captured store and the two-minute reproduction are in the bundle. Given that, the game fix belongs in the next build rather than waiting for a trigger.
 
 **Asks**
 
