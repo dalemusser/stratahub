@@ -8,31 +8,30 @@
 
 ---
 
-## 0. Status and how to resume
+## 0. Status and how to resume (updated 2026-09-18)
 
-**Decided (2026-09-16).**
-- The game is final for launch. Real students start in under a week. No new game build before then unless the trigger in §5.5 fires. Anything that could destabilize loading or play is out.
-- Work goes into StrataHub: detect the failure independently of the game, show it to teachers and researchers, and document the remedy. Measurements and alerts are preferred over game changes.
-- The evidence from the incident machine is gone (all site data cleared). The exact game-side mechanism stays a hypothesis unless it recurs; the plan must work without knowing it.
+**Where things stand.** Everything in §5.1 to §5.4 is built, verified and deployed to the shared service for every workspace (stratahub commits c5e42f2 through 618270f on main, deployed with `stratahub_update/aws_update.sh`). The game-side cause is reproduced and documented in the handoff bundle. Nothing is waiting on code from this side; what remains is in the hands of the game team, the teacher-guide PDF, and a few decisions.
 
-**Decided 2026-09-17 (project lead).** Build the whole plan now, secondary signals included. Students see the in-page notice and teachers see the Devices tab, both with the fix. Member launch records stay in the Device Tests viewer behind its Kind filter for now; where and to whom data is shown is a later discussion.
+**What is live (all workspaces, production included).**
+- Server: every 10th heartbeat (about every 5 minutes of play) checks the log service for entries from the launch, or since the last confirmation once confirmed; replies `seen | none | quiet | unknown`; `none` only when the game's store shows events piling up unsent (grew ≥ 4 KB since launch, ≥ 90 % of the 1 MB cap, or the page saw the game's cache error). Flagged sessions are logged as `logging-health: playing with no log entries arriving`.
+- Play page: amber recording bar with teacher steps (Popover API, so it stays above the game's own fullscreen canvas); a separate offline bar (two failed heartbeats or the browser's offline event; shown at load if already offline; the launch record is retried every 30 s when created offline); console hook on the game's cache error; PlayerPrefs store size read from IndexedDB.
+- Units page: store size in the device-status report and the step log; preflight wording.
+- Devices tab: Logs column; Device Tests viewer: Logs column and filter, Logging detail line, telemetry lookup by user id.
+- Docs: teacher guide section `mission-hydrosci-teacher-guide/game-activity-not-recorded.md`, support checklist `mhs-logging-support-checklist.md`, team note `mhs-logging-health-team-note-091726.md`.
 
-**Built 2026-09-17 (all of §5.1 to §5.4).**
-- Server: the heartbeat handlers (member and device test) run the "are logs arriving" check on every 10th beat, then every 20th once seen, against the log service's collection through `store/logdata.HasEntrySince` (one index seek, 3 s budget, errors → unknown); the reply carries `{"logs": "seen"|"none"|"unknown"}`; the record gets `logs_state`, `logs_checked_at`, `logs_seen_at`, `no_logs_flagged_at`, and the page's `cache_errors` / `playerprefs_bytes`. A flagged session is logged as `logging-health: playing with no log entries arriving`. (`missionhydrosci/logs_health.go`, `store/mhsdevicetests`, `models/mhsdevicetest.go`.)
-- Play page: console hook on the game's "Failed to save/load cached logs" text; PlayerPrefs store size read from IndexedDB before launch and once a minute (`MHSStepLog.readUnityPrefsBytes`, read-only, never creates the database); one calm notice along the bottom of the game with a "What to do" panel for the teacher; both readings ride on the heartbeat; the reply's verdict shows or clears the notice. Device-test play pages get the same.
-- Units page: the store size goes into the device-status report (`playerprefs_bytes`) and the step log's Storage line. Preflight wording now says the game plays but records nothing when a service is blocked.
-- Devices tab: a **Logs** column (✓ and time when seen; amber "!" with Not recorded / Cache full / Nearly full; dash when no verdict) with the remedy in the tooltip and the header's info icon, plus a legend entry. (`mhsdashboard/logging_health.go`.)
-- Device Tests viewer: game-telemetry lookup by the member's user id for member records; a Logs column, a Logs filter (Problem / None arrived / Seen), and a Logging line in the detail. Kind = Member load record + Logs = Problem is the researcher's "launched but nothing arrived" list.
-- Docs: teacher guide section `mission-hydrosci-teacher-guide/game-activity-not-recorded.md` and the Devices view text; support checklist `mhs-logging-support-checklist.md` (evidence before remedy; network case).
+**The cause, in one paragraph (details: bundle note `02-reproduction-and-specimen.md`).** When a log request fails at the network level, the game retries it once after ten seconds; after the second failure it empties that entry's dictionary in place instead of removing it from the queue, and its send loop then reads the empty head as an empty queue and exits. Nothing is sent again in that session, the cache is persisted with the `{}` in front, and every later launch reloads it that way: the browser profile is silent until its site data is cleared. Being fully offline fails the same way (the reachability check does not stop the attempts). Two further defects: queued entries share the `LoggingData` assets' reusable data dictionary (a backlog carries wrong payloads), and a second logger instance sits on the gameplay prefab's console-manager object. The logger source in the May drop and in the MHS 2.0 project copy (April 2026) retries forever and cannot produce this, so the September builds carry a newer send loop nobody on this side has seen.
 
-**Verified 2026-09-17.** `go build`, `go vet`, and the tests of every touched package; `node --check` on both JS modules; every inline script block of the play and units templates syntax-checked for both template branches; a local server start compiled all pages; the Devices grid rendered from the fixture test with the new column in every row. Deployed to the shared service, then a headless device-test run on the dev workspace (unit 2, run id starting `ffffffffcc85fd01`, form name "Automated check", safe to delete): the play page launched with no page errors, the notice stayed hidden, the store reader returned the real Unity store (536 bytes, database `/idbfs` at Emscripten version 21), heartbeats carried the readings and returned JSON, and at the tenth beat the check answered "none" for a game nobody was playing. That last result was correct as a fact and wrong as a verdict, which produced the "idle is not failure" rule above; it was rebuilt, redeployed and re-run the same night. The offline bar was verified the same way (run id starting `ffffffff6cec46`): cutting the browser's network showed the bar within seconds with a "Connection lost" step entry, restoring it cleared the bar with "Connection back", and the next heartbeat carried the offline time. Not verified: the console-error text on a real game store at the cap, and the Devices tab with real rows.
+**Handoff to the game team.** Give them the whole folder `mhs-updates/gamelogger-cache-overflow-091626/` (also on GitHub). Ask for the `GameLogger.cs` that is actually in the September builds. The drop-in there still needs three additions before use: copy the dictionary on enqueue; skip empty or unreadable entries when loading the cache; diff the shipped logger against the drop-in so the attempt-limit code is not carried forward. The project lead has held bundle code changes until the shipped source is seen.
 
-**Still pending (owner: project lead).**
-1. ~~The optional experiment in §5.6~~ Done 2026-09-18, headless, with a stronger result than hoped: the failure reproduces in two minutes and the mechanism is observed (see §2).
-2. When to add the second part of the game fix (§5.5: loop guard, bridge reporting) to the handoff bundle.
-3. A Chromebook look at the play page (notice hidden in normal play; the Storage line in the step log) and at the Devices tab with a class.
+**Open items.**
+1. Rebuild the teacher guide PDF with the new section and the Devices view text (`docs/mission-hydrosci-teacher-guide/build-guide-pdf.sh`).
+2. A look on a real Chromebook: normal play shows no bar and the Storage line; the Devices tab with a real class.
+3. Delete seven "Automated check" device-test runs from the dev workspace's data (ids begin `ffffffffcc85`, `ffffffffce81`, `ffffffff6cec`, `ffffffff06ea`, `ffffffff3b3b`, `ffffffff92d6`, `ffffffff6952`).
+4. The project lead's own no-network test machine on the dev workspace is almost certainly in the dead state; playing five minutes there confirms the whole path, then clear its site data.
+5. Decide when the game fix goes into a build. Given the cause, the recommendation is the next build.
+6. Later: members' heartbeats at 60 s; a retention job for launch-record beat arrays; where member launch records live and who sees what.
 
-**Resume by** reading §1 for what was verified, §5 for the design, §7 for costs.
+**Watching the first week.** Device Tests viewer, Kind = Member load record, Logs = Problem. Each row is a device that needs the support checklist. Several at one school at once means the network is blocking the log host.
 
 ---
 

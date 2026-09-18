@@ -255,6 +255,16 @@ Fallback now has retries/resume/watchdog/lifecycle fixes; remaining is one
 guest/incognito verification run + adding Background-Fetch availability to
 telemetry, then close or re-scope. (`issues/MHS-004-*.md`.)
 
+**RDY-7 — game logging silent failure (2026-09-15 incident).** *(built 2026-09-17/18; game fix pending)*
+A log request that fails twice ten seconds apart ends the game's logging on that
+browser profile until its site data is cleared. StrataHub now detects it within
+about five minutes of play (recording bar, Devices tab Logs column, viewer filter),
+plus an offline bar. The game-side fix is in `mhs-updates/gamelogger-cache-overflow-091626/`
+(reproduction and specimen included) and belongs in the next build. Plan, status
+and open items: `mhs-game-logging-silent-failure-plan.md` §0; support:
+`mhs-logging-support-checklist.md`; teacher text:
+`../mission-hydrosci-teacher-guide/game-activity-not-recorded.md` (PDF rebuild pending).
+
 ### Devices tab follow-ups (2026-09-13)
 
 The dashboard's Devices tab was redesigned for the teacher guide (see
