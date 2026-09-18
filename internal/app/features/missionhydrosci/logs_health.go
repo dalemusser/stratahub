@@ -18,12 +18,12 @@ import (
 const (
 	logsHealthGame = "mhs"
 
-	// Check on every logsCheckEvery-th beat until the service has seen an
-	// entry from this launch, then every logsRecheckEvery-th so a sender
-	// that dies mid-session is still caught. Beats are 30 s apart, so the
-	// first check lands about 4.5 minutes into play.
-	logsCheckEvery   = 10
-	logsRecheckEvery = 20
+	// Check on every logsCheckEvery-th beat. Beats are 30 s apart, so the
+	// first check lands about 4.5 minutes into play and the rest every five
+	// minutes; once entries have been seen, later checks ask "anything since
+	// the last confirmation" so a sender that dies mid-session is caught at
+	// the next check rather than at the device's next launch.
+	logsCheckEvery = 10
 
 	// The page is told "nothing is arriving" only after this much play, so
 	// a slow start never trips the notice; the same rule stamps the flag.
@@ -76,11 +76,7 @@ func gameProducingEvents(rec models.MHSDeviceTest, beat models.MHSDeviceTestHear
 func (h *Handler) logsHealthAfterBeat(ctx context.Context, rec models.MHSDeviceTest, beat models.MHSDeviceTestHeartbeat, gameUserID string) heartbeatReply {
 	reply := heartbeatReply{Logs: rec.LogsState}
 	count := rec.HeartbeatCount + 1
-	every := logsCheckEvery
-	if rec.LogsSeenAt != nil {
-		every = logsRecheckEvery
-	}
-	if count%every != 0 {
+	if count%logsCheckEvery != 0 {
 		return reply
 	}
 
@@ -88,6 +84,12 @@ func (h *Handler) logsHealthAfterBeat(ctx context.Context, rec models.MHSDeviceT
 	if rec.Kind == models.MHSDeviceTestKindDeviceTest && rec.LastLaunchAt != nil {
 		// A device-test run starts at the form, possibly long before launch.
 		since = *rec.LastLaunchAt
+	}
+	if rec.LogsSeenAt != nil && rec.LogsSeenAt.After(since) {
+		// Already confirmed once: the question is now whether anything has
+		// arrived since then, so a sender that died after the confirmation
+		// shows up as "none" at this check.
+		since = *rec.LogsSeenAt
 	}
 
 	state := models.MHSLogsStateUnknown

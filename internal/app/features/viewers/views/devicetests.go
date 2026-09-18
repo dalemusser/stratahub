@@ -96,7 +96,7 @@ func logsCell(t models.MHSDeviceTest) viewers.Cell {
 			title += " — flagged " + t.NoLogsFlaggedAt.UTC().Format(time.RFC3339) + " UTC"
 		}
 		return viewers.Cell{Text: "None", Class: viewers.PillAmber, Title: title}
-	case t.LogsState == models.MHSLogsStateSeen:
+	case t.LogsState == models.MHSLogsStateSeen, t.LogsState == models.MHSLogsStateQuiet && t.LogsSeenAt != nil:
 		title := "The log service received gameplay entries from this launch"
 		if t.LogsSeenAt != nil {
 			title += " — last confirmed " + t.LogsSeenAt.UTC().Format(time.RFC3339) + " UTC"
