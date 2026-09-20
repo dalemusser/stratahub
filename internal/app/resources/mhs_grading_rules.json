@@ -26,8 +26,12 @@
       "unit": 1,
       "point": 1,
       "activity_name": "Getting Your Space Legs",
-      "start_keys": ["questActiveEvent:28"],
-      "trigger_keys": ["DialogueNodeEvent:31:29"],
+      "start_keys": [
+        "questActiveEvent:28"
+      ],
+      "trigger_keys": [
+        "DialogueNodeEvent:31:29"
+      ],
       "grading_type": "completion",
       "evaluated_keys": {}
     },
@@ -37,24 +41,34 @@
       "unit": 1,
       "point": 2,
       "activity_name": "Info and Intros",
-      "start_keys": ["DialogueNodeEvent:31:29"],
-      "trigger_keys": ["DialogueNodeEvent:30:98"],
+      "start_keys": [
+        "DialogueNodeEvent:31:29"
+      ],
+      "trigger_keys": [
+        "DialogueNodeEvent:30:98"
+      ],
       "grading_type": "completion",
       "evaluated_keys": {}
     },
     {
-      "rule_id": "u1p3_v2",
+      "rule_id": "u1p3_v3",
       "point_id": "u1p3",
       "unit": 1,
       "point": 3,
       "activity_name": "Defend the Expedition",
-      "start_keys": ["DialogueNodeEvent:30:98"],
-      "trigger_keys": ["questActiveEvent:34"],
+      "start_keys": [
+        "DialogueNodeEvent:30:98"
+      ],
+      "trigger_keys": [
+        "questActiveEvent:34"
+      ],
       "grading_type": "yellow_count",
       "evaluated_keys": {
         "yellow": [
-          "DialogueNodeEvent:70:25",
-          "DialogueNodeEvent:70:33"
+          "DialogueNodeEvent:70:25"
+        ],
+        "success": [
+          "DialogueNodeEvent:70:7"
         ]
       }
     },
@@ -64,22 +78,32 @@
       "unit": 1,
       "point": 4,
       "activity_name": "What Was That?",
-      "start_keys": ["questActiveEvent:34"],
-      "trigger_keys": ["DialogueNodeEvent:33:19"],
+      "start_keys": [
+        "questActiveEvent:34"
+      ],
+      "trigger_keys": [
+        "DialogueNodeEvent:33:19"
+      ],
       "grading_type": "completion",
       "evaluated_keys": {}
     },
     {
-      "rule_id": "u2p1_v2",
+      "rule_id": "u2p1_v3",
       "point_id": "u2p1",
       "unit": 2,
       "point": 1,
       "activity_name": "Escape the Ruin",
-      "start_keys": ["DialogueNodeEvent:18:1"],
-      "trigger_keys": ["questFinishEvent:21"],
+      "start_keys": [
+        "DialogueNodeEvent:18:1"
+      ],
+      "trigger_keys": [
+        "questFinishEvent:21"
+      ],
       "grading_type": "yellow_count",
       "evaluated_keys": {
-        "success": ["DialogueNodeEvent:68:29"],
+        "success": [
+          "DialogueNodeEvent:68:29"
+        ],
         "yellow": [
           "DialogueNodeEvent:68:22",
           "DialogueNodeEvent:68:23",
@@ -90,36 +114,41 @@
       }
     },
     {
-      "rule_id": "u2p2_v2",
+      "rule_id": "u2p2_v3",
       "point_id": "u2p2",
       "unit": 2,
       "point": 2,
       "activity_name": "Foraged Forging",
-      "start_keys": ["questFinishEvent:21"],
-      "trigger_keys": ["DialogueNodeEvent:20:26"],
+      "start_keys": [
+        "questFinishEvent:21"
+      ],
+      "trigger_keys": [
+        "DialogueNodeEvent:20:26"
+      ],
       "grading_type": "yellow_count",
       "evaluated_keys": {
         "yellow": [
-          "DialogueNodeEvent:18:99",
           "DialogueNodeEvent:28:179",
           "DialogueNodeEvent:59:179",
-          "DialogueNodeEvent:18:223",
           "DialogueNodeEvent:28:182",
           "DialogueNodeEvent:59:182",
-          "DialogueNodeEvent:18:224",
           "DialogueNodeEvent:28:183",
           "DialogueNodeEvent:59:183"
         ]
       }
     },
     {
-      "rule_id": "u2p3_v2",
+      "rule_id": "u2p3_v3",
       "point_id": "u2p3",
       "unit": 2,
       "point": 3,
       "activity_name": "Getting the Band Back Together Part II",
-      "start_keys": ["DialogueNodeEvent:20:33"],
-      "trigger_keys": ["DialogueNodeEvent:22:18"],
+      "start_keys": [
+        "DialogueNodeEvent:20:33"
+      ],
+      "trigger_keys": [
+        "DialogueNodeEvent:22:18"
+      ],
       "grading_type": "yellow_count",
       "evaluated_keys": {
         "yellow": [
@@ -160,16 +189,22 @@
       }
     },
     {
-      "rule_id": "u2p4_v2",
+      "rule_id": "u2p4_v3",
       "point_id": "u2p4",
       "unit": 2,
       "point": 4,
       "activity_name": "Investigate the Temple",
-      "start_keys": ["DialogueNodeEvent:22:18"],
-      "trigger_keys": ["DialogueNodeEvent:23:17"],
+      "start_keys": [
+        "DialogueNodeEvent:22:18"
+      ],
+      "trigger_keys": [
+        "DialogueNodeEvent:23:17"
+      ],
       "grading_type": "yellow_count",
       "evaluated_keys": {
-        "success": ["DialogueNodeEvent:74:21"],
+        "success": [
+          "DialogueNodeEvent:74:21"
+        ],
         "yellow": [
           "DialogueNodeEvent:74:16",
           "DialogueNodeEvent:74:17",
@@ -179,23 +214,32 @@
       }
     },
     {
-      "rule_id": "u2p5_v2",
+      "rule_id": "u2p5_v3",
       "point_id": "u2p5",
       "unit": 2,
       "point": 5,
       "activity_name": "Classified Information",
-      "start_keys": ["DialogueNodeEvent:23:17"],
-      "trigger_keys": ["DialogueNodeEvent:23:42"],
+      "start_keys": [
+        "DialogueNodeEvent:23:17"
+      ],
+      "trigger_keys": [
+        "DialogueNodeEvent:23:42"
+      ],
       "grading_type": "score_based",
       "evaluated_keys": {
         "positive": [
+          "DialogueNodeEvent:26:140",
+          "DialogueNodeEvent:26:142",
+          "DialogueNodeEvent:26:143",
+          "DialogueNodeEvent:26:146",
+          "DialogueNodeEvent:26:147",
+          "DialogueNodeEvent:26:148",
           "DialogueNodeEvent:26:165",
           "DialogueNodeEvent:26:166",
           "DialogueNodeEvent:26:167",
           "DialogueNodeEvent:26:168",
           "DialogueNodeEvent:26:169",
           "DialogueNodeEvent:26:170",
-          "DialogueNodeEvent:26:171",
           "DialogueNodeEvent:26:172",
           "DialogueNodeEvent:26:173",
           "DialogueNodeEvent:26:174",
@@ -213,10 +257,12 @@
           "DialogueNodeEvent:26:186"
         ],
         "negative": [
+          "DialogueNodeEvent:26:137",
+          "DialogueNodeEvent:26:144",
+          "DialogueNodeEvent:26:145",
           "DialogueNodeEvent:26:187",
           "DialogueNodeEvent:26:188",
           "DialogueNodeEvent:26:189",
-          "DialogueNodeEvent:26:190",
           "DialogueNodeEvent:26:191",
           "DialogueNodeEvent:26:192",
           "DialogueNodeEvent:26:193",
@@ -242,16 +288,22 @@
       }
     },
     {
-      "rule_id": "u2p6_v2",
+      "rule_id": "u2p6_v3",
       "point_id": "u2p6",
       "unit": 2,
       "point": 6,
       "activity_name": "Which Watershed? Part I",
-      "start_keys": ["DialogueNodeEvent:23:42"],
-      "trigger_keys": ["DialogueNodeEvent:20:46"],
+      "start_keys": [
+        "DialogueNodeEvent:23:42"
+      ],
+      "trigger_keys": [
+        "DialogueNodeEvent:20:46"
+      ],
       "grading_type": "yellow_count",
       "evaluated_keys": {
-        "success": ["DialogueNodeEvent:20:43"],
+        "success": [
+          "DialogueNodeEvent:20:43"
+        ],
         "yellow": [
           "DialogueNodeEvent:20:44",
           "DialogueNodeEvent:20:45"
@@ -259,16 +311,22 @@
       }
     },
     {
-      "rule_id": "u2p7_v2",
+      "rule_id": "u2p7_v3",
       "point_id": "u2p7",
       "unit": 2,
       "point": 7,
       "activity_name": "Which Watershed? Part II",
-      "start_keys": ["DialogueNodeEvent:20:46"],
-      "trigger_keys": ["questFinishEvent:54"],
+      "start_keys": [
+        "DialogueNodeEvent:20:46"
+      ],
+      "trigger_keys": [
+        "questFinishEvent:54"
+      ],
       "grading_type": "yellow_count",
       "evaluated_keys": {
-        "success": ["DialogueNodeEvent:27:7"],
+        "success": [
+          "DialogueNodeEvent:27:7"
+        ],
         "negative": [
           "DialogueNodeEvent:27:11",
           "DialogueNodeEvent:27:12",
@@ -278,12 +336,7 @@
           "DialogueNodeEvent:27:16",
           "DialogueNodeEvent:27:17",
           "DialogueNodeEvent:27:18",
-          "DialogueNodeEvent:27:19",
           "DialogueNodeEvent:27:20",
-          "DialogueNodeEvent:27:21",
-          "DialogueNodeEvent:27:22",
-          "DialogueNodeEvent:27:23",
-          "DialogueNodeEvent:27:24",
           "DialogueNodeEvent:27:25",
           "DialogueNodeEvent:27:26",
           "DialogueNodeEvent:27:27",
@@ -294,26 +347,36 @@
       }
     },
     {
-      "rule_id": "u3p1_v2",
+      "rule_id": "u3p1_v3",
       "point_id": "u3p1",
       "unit": 3,
       "point": 1,
       "activity_name": "Supply Run",
-      "start_keys": ["DialogueNodeEvent:10:1"],
-      "trigger_keys": ["DialogueNodeEvent:11:22"],
+      "start_keys": [
+        "DialogueNodeEvent:10:1"
+      ],
+      "trigger_keys": [
+        "DialogueNodeEvent:11:22"
+      ],
       "grading_type": "score_based",
       "evaluated_keys": {
-        "positive": ["DialogueNodeEvent:10:30"]
+        "positive": [
+          "DialogueNodeEvent:10:30"
+        ]
       }
     },
     {
-      "rule_id": "u3p2_v2",
+      "rule_id": "u3p2_v3",
       "point_id": "u3p2",
       "unit": 3,
       "point": 2,
       "activity_name": "Pollution Solution Part I",
-      "start_keys": ["questFinishEvent:17"],
-      "trigger_keys": ["DialogueNodeEvent:11:34"],
+      "start_keys": [
+        "questActiveEvent:17"
+      ],
+      "trigger_keys": [
+        "DialogueNodeEvent:11:34"
+      ],
       "grading_type": "score_based",
       "evaluated_keys": {
         "negative": [
@@ -324,13 +387,17 @@
       }
     },
     {
-      "rule_id": "u3p3_v2",
+      "rule_id": "u3p3_v3",
       "point_id": "u3p3",
       "unit": 3,
       "point": 3,
       "activity_name": "Pollution Solution Part II",
-      "start_keys": ["DialogueNodeEvent:11:34"],
-      "trigger_keys": ["questFinishEvent:18"],
+      "start_keys": [
+        "DialogueNodeEvent:11:34"
+      ],
+      "trigger_keys": [
+        "questFinishEvent:18"
+      ],
       "grading_type": "score_based",
       "evaluated_keys": {
         "negative": [
@@ -353,20 +420,28 @@
           "DialogueNodeEvent:84:46",
           "DialogueNodeEvent:84:47"
         ],
-        "custom_event_types": ["argumentationToolEvent"]
+        "custom_event_types": [
+          "argumentationToolEvent"
+        ]
       }
     },
     {
-      "rule_id": "u3p4_v2",
+      "rule_id": "u3p4_v3",
       "point_id": "u3p4",
       "unit": 3,
       "point": 4,
       "activity_name": "Forsaken Facility",
-      "start_keys": ["questFinishEvent:18"],
-      "trigger_keys": ["DialogueNodeEvent:73:200"],
+      "start_keys": [
+        "questActiveEvent:18"
+      ],
+      "trigger_keys": [
+        "DialogueNodeEvent:73:200"
+      ],
       "grading_type": "score_based",
       "evaluated_keys": {
-        "gate": ["DialogueNodeEvent:78:24"],
+        "gate": [
+          "DialogueNodeEvent:78:24"
+        ],
         "negative": [
           "DialogueNodeEvent:78:3",
           "DialogueNodeEvent:78:4",
@@ -380,16 +455,22 @@
       }
     },
     {
-      "rule_id": "u3p5_v2",
+      "rule_id": "u3p5_v3",
       "point_id": "u3p5",
       "unit": 3,
       "point": 5,
       "activity_name": "Part of a Balanced Ecosystem",
-      "start_keys": ["DialogueNodeEvent:73:200"],
-      "trigger_keys": ["DialogueNodeEvent:10:194"],
+      "start_keys": [
+        "DialogueNodeEvent:73:200"
+      ],
+      "trigger_keys": [
+        "DialogueNodeEvent:10:194"
+      ],
       "grading_type": "score_based",
       "evaluated_keys": {
-        "positive": ["DialogueNodeEvent:73:163"],
+        "positive": [
+          "DialogueNodeEvent:73:163"
+        ],
         "negative": [
           "DialogueNodeEvent:73:164",
           "DialogueNodeEvent:73:168",
@@ -398,60 +479,85 @@
       }
     },
     {
-      "rule_id": "u4p1_v2",
+      "rule_id": "u4p1_v3",
       "point_id": "u4p1",
       "unit": 4,
       "point": 1,
       "activity_name": "Well What Have We Here?",
-      "start_keys": ["DialogueNodeEvent:88:0"],
-      "trigger_keys": ["questActiveEvent:39"],
+      "start_keys": [
+        "DialogueNodeEvent:88:0"
+      ],
+      "trigger_keys": [],
       "grading_type": "timestamp_window",
       "evaluated_keys": {
-        "success": ["DialogueNodeEvent:88:5"],
-        "custom_event_types": ["Soil Key Puzzle"]
-      }
+        "success": [
+          "DialogueNodeEvent:88:5"
+        ],
+        "custom_event_types": [
+          "Soil Key Puzzle"
+        ]
+      },
+      "trigger_note": "Unit 4 'Soil Key Puzzle' event with Soil Key Puzzle Status = Finished (eventType + data match, no eventKey)"
     },
     {
-      "rule_id": "u4p2_v2",
+      "rule_id": "u4p2_v3",
       "point_id": "u4p2",
       "unit": 4,
       "point": 2,
       "activity_name": "Power Play - Floors 1 & 2",
-      "start_keys": ["questActiveEvent:39"],
-      "trigger_keys": ["questActiveEvent:48"],
+      "start_keys": [],
+      "trigger_keys": [
+        "questActiveEvent:48"
+      ],
       "grading_type": "yellow_count",
       "evaluated_keys": {
-        "success": ["DialogueNodeEvent:88:11"],
+        "success": [
+          "DialogueNodeEvent:88:11"
+        ],
         "yellow": [
           "DialogueNodeEvent:102:9",
           "DialogueNodeEvent:102:10",
           "DialogueNodeEvent:102:12",
           "DialogueNodeEvent:102:18",
           "DialogueNodeEvent:102:23"
+        ],
+        "custom_event_types": [
+          "Soil Key Puzzle"
         ]
-      }
+      },
+      "start_note": "Unit 4 'Soil Key Puzzle' event with Soil Key Puzzle Status = Finished (eventType + data match, no eventKey)"
     },
     {
-      "rule_id": "u4p3_v2",
+      "rule_id": "u4p3_v3",
       "point_id": "u4p3",
       "unit": 4,
       "point": 3,
       "activity_name": "Power Play - Floors 3 & 4",
-      "start_keys": ["questActiveEvent:48"],
-      "trigger_keys": ["questActiveEvent:50"],
+      "start_keys": [
+        "questActiveEvent:48"
+      ],
+      "trigger_keys": [
+        "questActiveEvent:50"
+      ],
       "grading_type": "score_based",
       "evaluated_keys": {
-        "custom_event_types": ["soilMachine"]
+        "custom_event_types": [
+          "soilMachine"
+        ]
       }
     },
     {
-      "rule_id": "u4p4_v2",
+      "rule_id": "u4p4_v3",
       "point_id": "u4p4",
       "unit": 4,
       "point": 4,
       "activity_name": "Power Play - Floor 5",
-      "start_keys": ["questActiveEvent:50"],
-      "trigger_keys": ["questActiveEvent:36"],
+      "start_keys": [
+        "questActiveEvent:50"
+      ],
+      "trigger_keys": [
+        "questActiveEvent:36"
+      ],
       "grading_type": "score_based",
       "evaluated_keys": {
         "success": [
@@ -463,17 +569,23 @@
           "DialogueNodeEvent:107:3",
           "DialogueNodeEvent:107:6"
         ],
-        "custom_event_types": ["soilMachine"]
+        "custom_event_types": [
+          "soilMachine"
+        ]
       }
     },
     {
-      "rule_id": "u4p5_v2",
+      "rule_id": "u4p5_v3",
       "point_id": "u4p5",
       "unit": 4,
       "point": 5,
       "activity_name": "Saving Cadet Anderson",
-      "start_keys": ["questActiveEvent:36"],
-      "trigger_keys": ["questActiveEvent:41"],
+      "start_keys": [
+        "questActiveEvent:36"
+      ],
+      "trigger_keys": [
+        "questActiveEvent:41"
+      ],
       "grading_type": "yellow_count",
       "evaluated_keys": {
         "positive": [
@@ -498,57 +610,85 @@
       }
     },
     {
-      "rule_id": "u4p6_v2",
+      "rule_id": "u4p6_v3",
       "point_id": "u4p6",
       "unit": 4,
       "point": 6,
       "activity_name": "Desert Delicacies",
-      "start_keys": ["questActiveEvent:41"],
-      "trigger_keys": ["questFinishEvent:56"],
+      "start_keys": [
+        "questActiveEvent:41"
+      ],
+      "trigger_keys": [
+        "questFinishEvent:56"
+      ],
       "grading_type": "score_based",
       "evaluated_keys": {
-        "custom_event_types": ["TerasGardenBox"]
-      }
-    },
-    {
-      "rule_id": "u5p1_v2",
-      "point_id": "u5p1",
-      "unit": 5,
-      "point": 1,
-      "activity_name": "If I Had a Nickel - Floors 1 & 2",
-      "start_keys": ["questActiveEvent:43"],
-      "trigger_keys": ["questFinishEvent:43"],
-      "grading_type": "yellow_count",
-      "evaluated_keys": {
-        "success": ["DialogueNodeEvent:100:44"],
-        "negative": [
-          "DialogueNodeEvent:100:38",
-          "DialogueNodeEvent:100:39",
-          "DialogueNodeEvent:100:43"
+        "custom_event_types": [
+          "TerasGardenBox"
         ]
       }
     },
     {
-      "rule_id": "u5p2_v2",
+      "rule_id": "u5p1_v3",
+      "point_id": "u5p1",
+      "unit": 5,
+      "point": 1,
+      "activity_name": "If I Had a Nickel - Floors 1 & 2",
+      "start_keys": [
+        "questActiveEvent:43"
+      ],
+      "trigger_keys": [
+        "questFinishEvent:43"
+      ],
+      "grading_type": "yellow_count",
+      "evaluated_keys": {
+        "success": [
+          "DialogueNodeEvent:100:44"
+        ],
+        "negative": [
+          "DialogueNodeEvent:100:38",
+          "DialogueNodeEvent:100:39",
+          "DialogueNodeEvent:100:43"
+        ],
+        "assist": [
+          "DialogueNodeEvent:100:40",
+          "DialogueNodeEvent:100:41",
+          "DialogueNodeEvent:100:43",
+          "DialogueNodeEvent:100:46"
+        ]
+      }
+    },
+    {
+      "rule_id": "u5p2_v3",
       "point_id": "u5p2",
       "unit": 5,
       "point": 2,
       "activity_name": "If I Had a Nickel - Floors 3 & 4",
-      "start_keys": ["questFinishEvent:43"],
-      "trigger_keys": ["DialogueNodeEvent:96:1"],
+      "start_keys": [
+        "questFinishEvent:43"
+      ],
+      "trigger_keys": [
+        "DialogueNodeEvent:96:1"
+      ],
       "grading_type": "score_based",
       "evaluated_keys": {
-        "custom_event_types": ["WaterChamberEvent"]
+        "custom_event_types": [
+          "WaterChamberEvent"
+        ]
       }
     },
     {
-      "rule_id": "u5p3_v2",
+      "rule_id": "u5p3_v3",
       "point_id": "u5p3",
       "unit": 5,
       "point": 3,
       "activity_name": "What Happened Here?",
-      "start_keys": ["DialogueNodeEvent:96:1"],
-      "trigger_keys": ["questFinishEvent:44"],
+      "start_keys": [
+        "DialogueNodeEvent:96:1"
+      ],
+      "trigger_keys": [
+        "questFinishEvent:44"
+      ],
       "grading_type": "yellow_count",
       "evaluated_keys": {
         "negative": [
@@ -566,6 +706,12 @@
           "DialogueNodeEvent:108:60",
           "DialogueNodeEvent:108:61",
           "DialogueNodeEvent:108:62",
+          "DialogueNodeEvent:108:63",
+          "DialogueNodeEvent:108:64",
+          "DialogueNodeEvent:108:65",
+          "DialogueNodeEvent:108:66",
+          "DialogueNodeEvent:108:68",
+          "DialogueNodeEvent:108:69",
           "DialogueNodeEvent:108:70",
           "DialogueNodeEvent:108:72",
           "DialogueNodeEvent:108:73",
@@ -589,16 +735,22 @@
       }
     },
     {
-      "rule_id": "u5p4_v2",
+      "rule_id": "u5p4_v3",
       "point_id": "u5p4",
       "unit": 5,
       "point": 4,
       "activity_name": "Water Problems Require Water Solutions",
-      "start_keys": ["questFinishEvent:44"],
-      "trigger_keys": ["questFinishEvent:45"],
+      "start_keys": [
+        "questFinishEvent:44"
+      ],
+      "trigger_keys": [
+        "questFinishEvent:45"
+      ],
       "grading_type": "yellow_count",
       "evaluated_keys": {
-        "success": ["DialogueNodeEvent:106:35"],
+        "success": [
+          "DialogueNodeEvent:106:35"
+        ],
         "negative": [
           "DialogueNodeEvent:106:4",
           "DialogueNodeEvent:106:25",
