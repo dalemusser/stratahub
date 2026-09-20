@@ -132,7 +132,9 @@
                data-student-name="{{ .StudentName }}"
                data-point-id="{{ .PointID }}"
                data-point-title="{{ .PointTitle }}"
-               data-review-reason="{{ .ReviewReason }}"></div>
+               data-review-reason="{{ .ReviewReason }}"
+               data-review-guidance="{{ .ReviewGuidance }}"
+               data-restarted="{{ if .Restarted }}1{{ end }}"></div>
           {{ else }}
           <div class="{{ .CellClass }} w-full h-full rounded border {{ .BorderClass }} relative z-[1]"></div>
           {{ end }}

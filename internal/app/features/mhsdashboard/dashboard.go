@@ -615,12 +615,20 @@ type ProgressGradeItem struct {
 	Status             string         `bson:"status"`  // "active", "passed", or "flagged"
 	ComputedAt         time.Time      `bson:"computedAt"`
 	RuleID             string         `bson:"ruleId"`
-	ReasonCode         string         `bson:"reasonCode,omitempty"`         // Only for flagged grades
+	ReasonCode         string         `bson:"reasonCode,omitempty"`         // First triggered reason code (flagged grades)
+	Reasons            []GradeReason  `bson:"reasons,omitempty"`            // Every triggered reason code with its message variables
 	Metrics            map[string]any `bson:"metrics,omitempty"`            // Grade metrics (mistakeCount, etc.)
 	StartTime          *time.Time     `bson:"startTime,omitempty"`          // Activity start
 	EndTime            *time.Time     `bson:"endTime,omitempty"`            // Activity end
 	DurationSecs       *float64       `bson:"durationSecs,omitempty"`       // Wall-clock completion time in seconds
 	ActiveDurationSecs *float64       `bson:"activeDurationSecs,omitempty"` // Active time excluding gaps in seconds
+}
+
+// GradeReason is one triggered reason code with the variables its
+// instructor-message template interpolates (names are the spec's placeholders).
+type GradeReason struct {
+	Code      string         `bson:"code"`
+	Variables map[string]any `bson:"variables,omitempty"`
 }
 
 // formatDuration formats seconds into a human-readable duration string.
@@ -639,7 +647,9 @@ func formatDuration(secs float64) string {
 	return fmt.Sprintf("%d:%02d", m, s)
 }
 
-// reasonCodeToMessage maps reason codes to human-readable messages.
+// reasonCodeToMessage maps the reason codes of grades written before the
+// September 2026 grader to fixed descriptions. Current grades carry Reasons
+// whose messages come from the reason catalog (reasoncodes.go).
 var reasonCodeToMessage = map[string]string{
 	"NO_TRIGGER":               "Student has not yet completed the trigger event for this activity.",
 	"TOO_MANY_TARGETS":         "Student used more targets than allowed for efficient problem-solving.",
@@ -814,6 +824,13 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 	// Load survey status for the Surveys tab (nil when none are configured)
 	surveyCells := h.loadSurveyCells(ctx, wsID, members, loc)
 
+	// Teacher-facing text for flagged cells (nil catalog = fixed fallbacks)
+	catalog, err := LoadReasonCatalog()
+	if err != nil {
+		h.Log.Error("failed to load the reason-code catalog", zap.Error(err))
+		catalog = nil
+	}
+
 	for i, member := range members {
 		cells := make([]CellData, totalPoints)
 		gradeDoc := grades[member.ID.Hex()]
@@ -834,9 +851,13 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 		for _, unit := range cfg.Units {
 			for j, point := range unit.ProgressPoints {
 				var value int
-				var cellClass, borderClass, reviewReason string
+				var cellClass, borderClass, reviewReason, reviewGuidance string
+				var restarted bool
 
-				// Look up the latest grade for this progress point
+				// Look up the grade to show for this progress point: the latest
+				// attempt, except that an attempt merely started again after a
+				// finished one shows the finished grade (with a "started again"
+				// note) rather than hiding it behind the pencil.
 				var gradeItem *ProgressGradeItem
 				var attemptCount int
 				if gradeDoc != nil {
@@ -844,6 +865,16 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 						latest := items[len(items)-1]
 						gradeItem = &latest
 						attemptCount = len(items)
+						if latest.Status == "active" {
+							for j := len(items) - 2; j >= 0; j-- {
+								if st := items[j].Status; st == "passed" || st == "flagged" {
+									final := items[j]
+									gradeItem = &final
+									restarted = true
+									break
+								}
+							}
+						}
 					}
 				}
 
@@ -864,14 +895,10 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 					value = 1
 					cellClass = "mhs-cell-warning"
 					borderClass = "border-yellow-300"
-					// Get human-readable message from reason code
-					if msg, ok := reasonCodeToMessage[gradeItem.ReasonCode]; ok {
-						reviewReason = msg
-					} else if gradeItem.ReasonCode != "" {
-						reviewReason = "Needs improvement: " + gradeItem.ReasonCode
-					} else {
-						reviewReason = "This progress point needs review."
-					}
+					// Instructor message(s) and teacher guidance from the spec
+					messages, guidance := reviewText(catalog, point.ID, gradeItem)
+					reviewReason = strings.Join(messages, "\n\n")
+					reviewGuidance = guidance
 				}
 
 				// Format completion durations if available
@@ -909,6 +936,8 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 					PointTitle:            point.ShortName,
 					StudentName:           member.FullName,
 					ReviewReason:          reviewReason,
+					ReviewGuidance:        reviewGuidance,
+					Restarted:             restarted,
 					DurationDisplay:       durationDisplay,
 					ActiveDurationDisplay: activeDurationDisplay,
 					MistakeCount:          mistakeCount,

@@ -61,7 +61,9 @@ type CellData struct {
 	PointID               string // Progress point ID (e.g., "u1p1")
 	PointTitle            string // Progress point title
 	StudentName           string // Student name for this row
-	ReviewReason          string // Reason for flagged cells
+	ReviewReason          string // Flagged cells: instructor message(s), paragraphs separated by blank lines
+	ReviewGuidance        string // Flagged cells: the point's teacher guidance, one item per line
+	Restarted             bool   // The student started this point again after finishing it; the finished grade is shown
 	DurationDisplay       string // Formatted wall-clock completion time (e.g., "12:34" or "1:23:45")
 	ActiveDurationDisplay string // Formatted active time excluding gaps
 	MistakeCount          int    // Number of mistakes/negative events (-1 = no data)
