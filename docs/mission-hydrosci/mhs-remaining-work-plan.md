@@ -285,6 +285,25 @@ the group has the app installed.
 
 **DEV-4 — row height.** The two-line Storage cell sets it; one line fits more students.
 
+### Grading sync follow-ups (2026-09-21)
+
+The grader now implements the September 2026 grading spec and the Progress tab's
+review pop-up renders the spec's instructor messages (record:
+`mhsgrader/docs/grading-sync-plan-092026.md`). Left open:
+
+- **GS-1 — Per-point AI summary button** inside the review pop-up (Dale: later). Inputs
+  per point: the grade's variables plus that point's rubric / curriculum goal /
+  strategies / dialogue excerpt from `mhsgrading/feedback-message-for-each-pp/`, in
+  the 80–150-word form of `example-pop-up-feedback/`. Reuse the Claude path in
+  `mhsdashboard/summary.go`.
+- **GS-2 — Teacher guide** note on reading the Progress-view pop-up (guide covers the
+  Devices view only).
+- **GS-3 — Debug timeline key annotations**: `resources/mhs_grading_rules.json` was
+  hand-updated for the points whose anchors changed; generate it from the Go rules.
+- **GS-4 — Grading-team answers** to `mhsgrading/docs/grading-team-questions-2026-09.md`
+  may change scripts (regrade) or wording (regenerate `mhs_reason_codes.json`, deploy
+  stratahub only).
+
 ### Architecture
 
 **ARCH-1 — pipeline duplication (refactor or freeze).** *(from review)*
