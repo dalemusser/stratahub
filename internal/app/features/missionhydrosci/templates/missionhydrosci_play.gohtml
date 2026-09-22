@@ -687,11 +687,14 @@
       // MHSBridge callback — the game calls this when the player has finished
       // the game and is ready to exit (from the end-of-game screen).
       // New in April 2026 MHSBridge update. Older builds don't call this —
-      // the player uses the back button instead.
+      // the player uses the back button instead (the units page then offers
+      // the ceremony once the student is complete).
+      // When the collection carries an end-of-game ceremony this lands on it
+      // (docs/mission-hydrosci/mhs-end-ceremony-plan.md D6); otherwise the launcher.
       // TODO: Remove backward compatibility note once all builds use the new MHSBridge.
       window.mhsEndGame = function() {
-        console.log('MHS: mhsEndGame called — returning to the launcher');
-        window.location.href = '{{ if .PlayBackURL }}{{ .PlayBackURL }}{{ else }}/missionhydrosci/units{{ end }}';
+        console.log('MHS: mhsEndGame called — leaving the game');
+        window.location.href = '{{ if .CeremonyURL }}{{ .CeremonyURL }}{{ else if .PlayBackURL }}{{ .PlayBackURL }}{{ else }}/missionhydrosci/units{{ end }}';
       };
 
       // Expose for cleanup script

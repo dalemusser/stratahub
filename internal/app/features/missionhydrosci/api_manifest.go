@@ -439,10 +439,48 @@ func (h *Handler) collectionToManifest(ctx context.Context, coll models.MHSColle
 
 		units = append(units, buildToManifestUnit(u.UnitID, u.Title, u.Version, u.BuildIdentifier, build))
 	}
-	return ContentManifest{
+	m := ContentManifest{
 		CDNBaseURL: h.CDNBaseURL,
 		Units:      units,
 	}
+	if coll.HasCeremony() {
+		build, err := h.BuildStore.GetCeremony(ctx, coll.Ceremony.Version)
+		switch {
+		case err != nil || !build.IsCeremony() || build.EntryFile == "":
+			h.Log.Warn("ceremony build record missing for collection — ceremony will be excluded from manifest",
+				zap.String("version", coll.Ceremony.Version),
+				zap.String("collection", coll.Name),
+				zap.Error(err))
+		default:
+			files := make([]ContentManifestFile, len(build.Files))
+			for j, f := range build.Files {
+				files[j] = ContentManifestFile{Path: f.Path, Size: f.Size}
+			}
+			id := coll.Ceremony.BuildIdentifier
+			if id == "" {
+				id = build.BuildIdentifier
+			}
+			m.Ceremony = &ContentManifestCeremony{
+				ID:              models.MHSCeremonyBuildID,
+				Version:         build.Version,
+				BuildIdentifier: id,
+				Entry:           build.EntryFile,
+				Files:           files,
+				TotalSize:       build.TotalSize,
+			}
+		}
+	}
+	return m
+}
+
+// CeremonyPath is the host page's route for the end-of-game ceremony.
+const CeremonyPath = "/missionhydrosci/ceremony"
+
+// ceremonyBase is the same-origin content path every ceremony file resolves
+// under (served from the service-worker cache when present, otherwise
+// redirected to the CDN by ContentFallback).
+func ceremonyBase(version string) string {
+	return "/missionhydrosci/content/" + models.MHSCeremonyBuildID + "/v" + version + "/"
 }
 
 // buildToManifestUnit converts one build record (plus the title and build

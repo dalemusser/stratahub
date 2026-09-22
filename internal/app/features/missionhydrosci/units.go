@@ -94,6 +94,7 @@ func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
 		Units:                units,
 		CurrentUnit:          currentUnit,
 		IsComplete:           isComplete,
+		CeremonyURL:          ceremonyURLFor(manifest),
 		NextUnitID:           nextUnitID,
 		CollectionOverride:   collInfo.IsOverride,
 		ActiveCollectionName: collInfo.Name,
@@ -102,4 +103,3 @@ func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
 
 	templates.Render(w, r, "missionhydrosci_units", data)
 }
-

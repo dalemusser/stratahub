@@ -47,7 +47,8 @@ type Handler struct {
 	ProgressStore     *mhsuserprogress.Store
 	DeviceStatusStore *mhsdevicestatus.Store
 	DeviceTestStore   *mhsdevicetests.Store
-	Logs              *logdata.Store // read-only view of the log service's entries (logging-health checks); nil when its database is not configured
+	Logs              *logdata.Store  // read-only view of the log service's entries (logging-health checks); nil when its database is not configured
+	GradesDB          *mongo.Database // mhsgrader's database: EA checkpoint scores for the ceremony (progress_point_grades); nil when not configured
 	SettingsStore     *settingsstore.Store
 	CollectionStore   *mhscollections.Store
 	BuildStore        *mhsbuilds.Store

@@ -33,6 +33,11 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 		pr.Post("/api/manage/lock", h.HandleManageLock)
 		pr.Get("/api/manage/status", h.ServeManageStatus)
 		pr.Get("/play/{unit}", h.ServePlay)
+		// End-of-game ceremony (docs/mission-hydrosci/mhs-end-ceremony-plan.md):
+		// the host page, the student's EA scores for it, and the viewed marks.
+		pr.Get("/ceremony", h.ServeCeremony)
+		pr.Get("/api/ea-scores", h.ServeEAScores)
+		pr.Post("/api/ceremony/viewed", h.HandleCeremonyViewed)
 		// Redirect game-initiated unit transitions (MHSBridge URL-mode fallback).
 		// The game navigates to ../unit2/index.html which resolves to /missionhydrosci/unit2/index.html.
 		pr.Get("/{unit}/index.html", h.RedirectToPlay)

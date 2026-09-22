@@ -64,7 +64,6 @@ func (h *Handler) ServeProgress(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-
 // setToUnitRequest is the JSON body for POST /api/progress/set-unit.
 type setToUnitRequest struct {
 	Unit      string `json:"unit"`

@@ -23,6 +23,15 @@ type MHSUserProgress struct {
 	// CollectionOverrideID is the per-user collection override.
 	// When set, this user plays from this collection instead of the group/workspace default.
 	CollectionOverrideID *primitive.ObjectID `bson:"collection_override_id,omitempty" json:"collection_override_id,omitempty"`
-	CreatedAt      time.Time          `bson:"created_at" json:"created_at"`
-	UpdatedAt      time.Time          `bson:"updated_at" json:"updated_at"`
+
+	// End-of-game ceremony marks (docs/mission-hydrosci/mhs-end-ceremony-plan.md
+	// D8), written by the ceremony host page and never by unit progress:
+	// when the student first pressed Begin, when a showing last reached its end,
+	// the ceremony version last shown, and how many times Begin was pressed.
+	CeremonyStartedAt  *time.Time `bson:"ceremony_started_at,omitempty" json:"ceremony_started_at,omitempty"`
+	CeremonyFinishedAt *time.Time `bson:"ceremony_finished_at,omitempty" json:"ceremony_finished_at,omitempty"`
+	CeremonyVersion    string     `bson:"ceremony_version,omitempty" json:"ceremony_version,omitempty"`
+	CeremonyViewCount  int        `bson:"ceremony_view_count,omitempty" json:"ceremony_view_count,omitempty"`
+	CreatedAt          time.Time  `bson:"created_at" json:"created_at"`
+	UpdatedAt          time.Time  `bson:"updated_at" json:"updated_at"`
 }

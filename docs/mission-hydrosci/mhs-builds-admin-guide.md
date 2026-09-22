@@ -188,3 +188,79 @@ When deploying updates or testing on the server, use **Maintenance Mode** to blo
 2. Upload the zip — the new collection inherits unit1-4 from the previous collection and uses the new unit5
 3. Test the new collection
 4. Activate it — groups that are pinned stay on their version; unpinned groups get the fix
+
+---
+
+## End-of-Game Ceremony
+
+The ceremony is the award show students see after finishing Unit 5. It is a
+separate web bundle (the `mhs-gameplay-end` project), not a Unity unit, and it
+is versioned and chosen per collection like the units
+(`docs/mission-hydrosci/mhs-end-ceremony-plan.md`).
+
+### Where the files live
+
+Ceremony versions sit next to the units in the same S3 bucket and CDN, under
+`end/vX.Y.Z/` (for example `end/v0.1.8/`). The developers upload a version
+folder with their release tooling; version folders are never changed after
+upload, a new version gets a new folder. A folder is recognised as a ceremony
+by its `lib/embed.js` entry file.
+
+### Registering a version
+
+1. Go to **MHS Builds** > **S3 Storage** and click **Sync from S3**.
+2. The new version appears in the list with a **ceremony** badge and unit id
+   `end`; the sync message counts ceremony versions separately.
+3. Edit its build identifier if you want a friendlier label (it defaults to
+   `mhs-gameplay-end`).
+
+### Choosing the version a collection plays
+
+Every collection has an **End-of-game ceremony** select on the manual-create
+and edit forms: **None** (the game's own ending returns students to the units
+page, as before) or one of the registered versions. The collection detail
+page shows the chosen version and its size. A collection created by
+uploading a build inherits the previous collection's ceremony.
+
+Activating a collection with a ceremony makes it live for the workspace at
+once, for students who have already finished as well as those who finish
+later; group pins and per-user overrides pick their collection's ceremony
+the same way they pick unit versions.
+
+### What students see
+
+- On a new game build, the game's own end screen hands over to the ceremony
+  when the student chooses to leave it. On older builds the student uses the
+  back button and finds a **Watch your ceremony** button on the units page.
+- The units page keeps that button after completion, so the ceremony can be
+  replayed any time.
+- The show starts as soon as its characters have loaded; it reads each
+  unit's results just before that character speaks, so a grade that is still
+  being recorded when the student finishes is picked up during the show. A
+  result that never arrives plays the gentler line for that moment and leaves
+  that unit's star row dark. Nothing waits on grading.
+- A **Back to Mission HydroSci** control is always available, top right.
+
+### What staff see
+
+- Leaders, coordinators and admins can open the ceremony page any time; with
+  `?user_id=<the student's id>` on `/missionhydrosci/ceremony` they preview a
+  student's own ceremony (students within their reach only). Previews are not
+  recorded.
+- A student's progress record keeps when they first pressed Begin, when they
+  last reached the end, the version shown, and how many times they started
+  it.
+- Load problems and completions are recorded like unit launches and appear in
+  the **Device Tests** viewer under unit `end` (outcomes `ceremony-ok` and
+  `ceremony-failed`).
+
+### Troubleshooting
+
+- **The collection detail page says "build record missing"**: the version
+  the collection references is not registered. Run **Sync from S3**; if the
+  folder is gone from the bucket, pick another version.
+- **Students land on the units page instead of the ceremony**: the resolved
+  collection (their override, their group's pin, or the workspace's active
+  collection) has no ceremony, or their progress is not complete.
+- **The ceremony page shows "could not be loaded"**: the bundle's entry file
+  did not load. Check the version folder on the CDN and the sync.

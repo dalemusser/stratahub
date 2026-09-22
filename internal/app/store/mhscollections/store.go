@@ -75,15 +75,22 @@ func (s *Store) Latest(ctx context.Context) (models.MHSCollection, error) {
 	return c, err
 }
 
-// Update updates a collection's name, description, and units.
+// Update updates a collection's name, description, units, and ceremony
+// reference (a nil Ceremony removes it).
 func (s *Store) Update(ctx context.Context, id primitive.ObjectID, coll models.MHSCollection) error {
-	_, err := s.c.UpdateOne(ctx, bson.M{"_id": id}, bson.M{
+	update := bson.M{
 		"$set": bson.M{
 			"name":        coll.Name,
 			"description": coll.Description,
 			"units":       coll.Units,
 		},
-	})
+	}
+	if coll.HasCeremony() {
+		update["$set"].(bson.M)["ceremony"] = coll.Ceremony
+	} else {
+		update["$unset"] = bson.M{"ceremony": ""}
+	}
+	_, err := s.c.UpdateOne(ctx, bson.M{"_id": id}, update)
 	if err != nil {
 		return err
 	}

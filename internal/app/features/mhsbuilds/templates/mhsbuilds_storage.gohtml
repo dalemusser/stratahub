@@ -35,7 +35,7 @@
     {{ end }}
 
     <p class="text-gray-500 dark:text-gray-400 mb-4">
-      Unit versions registered in the database. Click "Sync from S3" to discover new versions uploaded to S3 storage.
+      Unit versions registered in the database, plus end-of-game ceremony versions (uploaded under <code>end/vX.Y.Z/</code>). Click "Sync from S3" to discover new versions uploaded to S3 storage.
     </p>
 
     {{ if not .Builds }}
@@ -57,7 +57,10 @@
         <tbody>
           {{ range .Builds }}
           <tr class="border-b dark:border-gray-700">
-            <td class="py-2 px-2 font-medium text-gray-900 dark:text-gray-100">{{ .UnitID }}</td>
+            <td class="py-2 px-2 font-medium text-gray-900 dark:text-gray-100">
+              {{ .UnitID }}
+              {{ if .IsCeremony }}<span class="ml-1 inline-flex items-center px-1.5 py-0.5 rounded text-[10px] uppercase tracking-wide bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200" title="End-of-game ceremony bundle, not a Unity unit">ceremony</span>{{ end }}
+            </td>
             <td class="py-2 px-2">
               <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
                 v{{ .Version }}

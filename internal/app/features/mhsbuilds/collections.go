@@ -18,8 +18,8 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/gorilla/csrf"
 	"go.mongodb.org/mongo-driver/bson"
-	"go.uber.org/zap"
 	"go.mongodb.org/mongo-driver/bson/primitive"
+	"go.uber.org/zap"
 )
 
 // ServeCollections renders the collection list page.
@@ -47,7 +47,7 @@ func (h *Handler) ServeCollections(w http.ResponseWriter, r *http.Request) {
 			ID:            c.ID.Hex(),
 			Name:          c.Name,
 			Description:   c.Description,
-			UnitsSummary:  unitsSummary(c.Units),
+			UnitsSummary:  collectionSummary(c),
 			CreatedAt:     c.CreatedAt,
 			CreatedByName: c.CreatedByName,
 			IsActive:      c.ID.Hex() == activeID,
@@ -113,12 +113,26 @@ func (h *Handler) ServeCollectionDetail(w http.ResponseWriter, r *http.Request) 
 		}
 	}
 
+	var ceremonyVM *CollectionCeremonyVM
+	if coll.HasCeremony() {
+		vm := CollectionCeremonyVM{Version: coll.Ceremony.Version, BuildIdentifier: coll.Ceremony.BuildIdentifier}
+		if b, err := h.BuildStore.GetCeremony(ctx, coll.Ceremony.Version); err == nil {
+			vm.FileCount = len(b.Files)
+			vm.TotalSize = b.TotalSize
+			vm.SizeLabel = format.Bytes(b.TotalSize)
+		} else {
+			vm.Missing = true
+		}
+		ceremonyVM = &vm
+	}
+
 	data := CollectionDetailData{
 		BaseVM:        viewdata.LoadBase(r, h.DB),
 		ID:            coll.ID.Hex(),
 		Name:          coll.Name,
 		Description:   coll.Description,
 		Units:         unitVMs,
+		Ceremony:      ceremonyVM,
 		CreatedAt:     coll.CreatedAt,
 		CreatedByName: coll.CreatedByName,
 		IsActive:      coll.ID.Hex() == activeID,
@@ -245,9 +259,10 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 
 	// Load all builds grouped by unit for version dropdowns
 	allBuilds, _ := h.BuildStore.ListAll(ctx)
-	buildsByUnit := make(map[string][]models.MHSBuild)
-	for _, b := range allBuilds {
-		buildsByUnit[b.UnitID] = append(buildsByUnit[b.UnitID], b)
+	buildsByUnit, ceremonies := splitBuilds(allBuilds)
+	ceremonyVersion := ""
+	if coll.HasCeremony() {
+		ceremonyVersion = coll.Ceremony.Version
 	}
 
 	units := make([]EditCollectionUnitRow, len(coll.Units))
@@ -276,6 +291,7 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 		Name:        coll.Name,
 		Description: coll.Description,
 		Units:       units,
+		Ceremony:    ceremonyRow(ceremonies, ceremonyVersion),
 		IsActive:    isActive,
 	}
 
@@ -333,6 +349,13 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 		return coll.Units[i].UnitID < coll.Units[j].UnitID
 	})
 
+	ceremony, ceremonyErr := h.ceremonyFromForm(ctx, r)
+	if ceremonyErr != "" {
+		h.renderEditError(w, r, oid, ceremonyErr)
+		return
+	}
+	coll.Ceremony = ceremony
+
 	coll.Name = newName
 	coll.Description = newDesc
 
@@ -352,10 +375,7 @@ func (h *Handler) renderEditError(w http.ResponseWriter, r *http.Request, id pri
 
 	// Load builds for version dropdowns
 	allBuilds, _ := h.BuildStore.ListAll(ctx)
-	buildsByUnit := make(map[string][]models.MHSBuild)
-	for _, b := range allBuilds {
-		buildsByUnit[b.UnitID] = append(buildsByUnit[b.UnitID], b)
-	}
+	buildsByUnit, ceremonies := splitBuilds(allBuilds)
 
 	units := make([]EditCollectionUnitRow, len(coll.Units))
 	for i, u := range coll.Units {
@@ -387,6 +407,7 @@ func (h *Handler) renderEditError(w http.ResponseWriter, r *http.Request, id pri
 		Name:        r.FormValue("collection_name"),
 		Description: r.FormValue("collection_description"),
 		Units:       units,
+		Ceremony:    ceremonyRow(ceremonies, strings.TrimSpace(r.FormValue("version_"+models.MHSCeremonyBuildID))),
 		Error:       msg,
 	}
 	templates.Render(w, r, "mhsbuilds_collection_edit", data)
@@ -679,11 +700,29 @@ func (h *Handler) HandleDelete(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/mhsbuilds/collections", http.StatusSeeOther)
 }
 
-// unitsSummary creates a short summary string of unit versions.
-func unitsSummary(units []models.MHSCollectionUnit) string {
-	parts := make([]string, len(units))
-	for i, u := range units {
-		parts[i] = fmt.Sprintf("%s:v%s", u.UnitID, u.Version)
+// collectionSummary creates a short summary string of a collection's unit
+// versions, plus the ceremony ("end:vX.Y.Z") when it has one.
+func collectionSummary(c models.MHSCollection) string {
+	parts := make([]string, 0, len(c.Units)+1)
+	for _, u := range c.Units {
+		parts = append(parts, fmt.Sprintf("%s:v%s", u.UnitID, u.Version))
+	}
+	if c.HasCeremony() {
+		parts = append(parts, fmt.Sprintf("%s:v%s", models.MHSCeremonyBuildID, c.Ceremony.Version))
 	}
 	return strings.Join(parts, ", ")
+}
+
+// collectionReferences reports whether a collection references the build
+// (a unit version, or the ceremony version when unitID is the ceremony id).
+func collectionReferences(c models.MHSCollection, unitID, version string) bool {
+	if unitID == models.MHSCeremonyBuildID {
+		return c.HasCeremony() && c.Ceremony.Version == version
+	}
+	for _, u := range c.Units {
+		if u.UnitID == unitID && u.Version == version {
+			return true
+		}
+	}
+	return false
 }

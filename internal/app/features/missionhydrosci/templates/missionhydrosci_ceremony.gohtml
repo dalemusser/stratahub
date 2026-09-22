@@ -1,0 +1,94 @@
+{{ define "missionhydrosci_ceremony" }}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex">
+<title>Mission Complete - Mission HydroSci</title>
+<link rel="icon" href="data:,">
+<style>
+  html, body { margin: 0; height: 100%; background: #05070c; color: #dfe6f0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+  #ceremony-nofile { padding: 24px; max-width: 520px; line-height: 1.5; }
+  #ceremony-nofile a { color: #7fd0ff; }
+</style>
+</head>
+<body>
+<!-- End-of-game ceremony host page (docs/mission-hydrosci/mhs-end-ceremony-plan.md D3).
+     The whole show comes from the ceremony bundle at .Base — the same-origin content
+     path the service worker serves from cache or the server redirects to the CDN —
+     through its embed API (mhs-gameplay-end/docs/embed-api.md). This page only
+     supplies the scores endpoint, the way back, and reporting. -->
+<script src="{{ .Base }}lib/embed.js"></script>
+<script>
+(function () {
+  'use strict';
+  var csrf = {{ .CSRFToken }};
+  var version = {{ .Version }};
+  var preview = {{ .Preview }};
+  var returnUrl = {{ .ReturnURL }};
+  var steps = [];
+
+  function post(url, body) {
+    try {
+      return fetch(url, {
+        method: 'POST', credentials: 'same-origin',
+        headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf },
+        body: JSON.stringify(body)
+      }).catch(function () {});
+    } catch (e) { return Promise.resolve(); }
+  }
+  // One step per embed event, in the member step-log shape (the Device Tests
+  // viewer shows them under unit "end").
+  function record(name, detail) {
+    var d = {};
+    Object.keys(detail || {}).forEach(function (k) {
+      var v = detail[k];
+      d[k] = (v !== null && typeof v === 'object') ? JSON.stringify(v).slice(0, 300) : String(v);
+    });
+    steps.push({ t: Date.now(), at: new Date().toISOString(), step: 'ceremony', state: name === 'failed' ? 'fail' : 'ok', msg: name, detail: d });
+    if (steps.length > 300) steps.shift();
+  }
+  function stepLog(outcome) {
+    if (preview) return;
+    post('/missionhydrosci/api/steplog', {
+      outcome: outcome, unit: 'end', version: version,
+      context: { page: 'ceremony', deviceType: (navigator.userAgentData && navigator.userAgentData.platform) || navigator.platform || '', userAgent: navigator.userAgent },
+      entries: steps
+    });
+  }
+  function viewed(event) {
+    if (preview) return;
+    post('/missionhydrosci/api/ceremony/viewed', { event: event, version: version });
+  }
+
+  if (!window.MHSCeremony) {
+    // The bundle's entry script did not load (content path, CDN, or network):
+    // a plain way back rather than a black page.
+    var p = document.createElement('div');
+    p.id = 'ceremony-nofile';
+    p.innerHTML = 'The ceremony could not be loaded right now. <a href="' + returnUrl + '">' + {{ .ExitLabel }} + '</a>';
+    document.body.appendChild(p);
+    record('failed', { stage: 'entry', message: 'embed.js did not load' });
+    stepLog('ceremony-failed');
+    return;
+  }
+
+  MHSCeremony.mount(document.body, {
+    scoresUrl: {{ .ScoresURL }},
+    returnUrl: returnUrl,
+    exitLabel: {{ .ExitLabel }},
+    dev: {{ .Dev }},
+    onEvent: function (name, detail) {
+      record(name, detail);
+      if (name === 'started') viewed('started');
+      if (name === 'finished') { viewed('finished'); stepLog('ceremony-ok'); }
+      if (name === 'failed') stepLog('ceremony-failed');
+    }
+  });
+})();
+</script>
+</body>
+</html>
+{{ end }}

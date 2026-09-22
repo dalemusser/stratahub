@@ -26,6 +26,7 @@ type UnitsData struct {
 	Units                []UnitVM
 	CurrentUnit          string // e.g., "unit3" or "complete"
 	IsComplete           bool   // True when all units are done
+	CeremonyURL          string // "/missionhydrosci/ceremony" when the collection has a ceremony (shown once complete)
 	NextUnitID           string // Unit after CurrentUnit, empty if last/complete
 	CollectionOverride   bool   // True when a per-user override is active (drives the "(override)" badge)
 	ActiveCollectionName string // Name of the effective collection being used (version line)
@@ -42,6 +43,7 @@ type PlayData struct {
 	UserIDHex       string // Hex of users._id; injected into Unity identity bridge
 	NextUnitID      string // Next unit after this one, empty if last
 	NextUnitVersion string // Version of the next unit
+	CeremonyURL     string // where the game's EndGame lands when the collection has a ceremony ("" = units page)
 	DataFile        string // Build file name for data (e.g., "unit1.data" or "unit2.data.unityweb")
 	FrameworkFile   string // Build file name for framework
 	CodeFile        string // Build file name for wasm
@@ -64,6 +66,20 @@ type PlayData struct {
 	DeviceTestShortID string // last 6 hex characters, quoted back to us by testers
 	DeviceTestBase    string // "/missionhydrosci/devicetest/run/<id>"
 	PlayBackURL       string // where the back button goes
+}
+
+// CeremonyData is the view model for the end-of-game ceremony host page
+// (docs/mission-hydrosci/mhs-end-ceremony-plan.md D3; the bundle's contract
+// is mhs-gameplay-end/docs/embed-api.md).
+type CeremonyData struct {
+	viewdata.BaseVM
+	Base      string // "/missionhydrosci/content/end/v<version>/" — every bundle file resolves under it
+	Version   string // ceremony version from the resolved collection
+	ScoresURL string // the EA-scores endpoint the embed polls
+	ReturnURL string // where the Exit control goes
+	ExitLabel string
+	Dev       bool // reviewer's beat selector (staff only)
+	Preview   bool // a staff preview of a student's ceremony: no viewed marks, no step log
 }
 
 // OfflineData is the view model for the offline fallback page.
@@ -109,10 +125,24 @@ type ManifestProbe struct {
 	URL  string `json:"url"`
 }
 
+// ContentManifestCeremony is the end-of-game ceremony in the content
+// manifest: a separate block beside the units (it is not a unit: it is never
+// downloaded ahead, listed, or counted toward completion), served at
+// CDNBaseURL + "/" + file.path like everything else.
+type ContentManifestCeremony struct {
+	ID              string                `json:"id"` // "end"
+	Version         string                `json:"version"`
+	BuildIdentifier string                `json:"buildIdentifier,omitempty"`
+	Entry           string                `json:"entry"` // "lib/embed.js", relative to the version folder
+	Files           []ContentManifestFile `json:"files"`
+	TotalSize       int64                 `json:"totalSize"`
+}
+
 // ContentManifest is the JSON response for the content manifest API.
 type ContentManifest struct {
-	CDNBaseURL string                `json:"cdnBaseUrl"`
-	Units      []ContentManifestUnit `json:"units"`
-	Tuning     *ManifestTuning       `json:"tuning,omitempty"`
-	Probes     []ManifestProbe       `json:"probes,omitempty"`
+	CDNBaseURL string                   `json:"cdnBaseUrl"`
+	Units      []ContentManifestUnit    `json:"units"`
+	Ceremony   *ContentManifestCeremony `json:"ceremony,omitempty"`
+	Tuning     *ManifestTuning          `json:"tuning,omitempty"`
+	Probes     []ManifestProbe          `json:"probes,omitempty"`
 }

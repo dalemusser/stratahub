@@ -81,7 +81,18 @@ func (h *Handler) ServePlay(w http.ResponseWriter, r *http.Request) {
 		UserName:        userName,
 		UserIDHex:       userIDHex,
 		BackURL:         "/missionhydrosci/units",
+		CeremonyURL:     ceremonyURLFor(manifest),
 	})
+}
+
+// ceremonyURLFor returns the ceremony host page path when the resolved
+// collection carries a ceremony, "" otherwise (the game then ends on the
+// units page as before).
+func ceremonyURLFor(m ContentManifest) string {
+	if m.Ceremony == nil {
+		return ""
+	}
+	return CeremonyPath
 }
 
 // playRender is what renderPlay needs beyond the request: the manifest unit
@@ -94,6 +105,7 @@ type playRender struct {
 	UserName        string
 	UserIDHex       string
 	BackURL         string
+	CeremonyURL     string          // where MHSBridge.EndGame lands ("" = BackURL)
 	DeviceTest      *deviceTestPlay // nil for the normal launcher
 }
 
@@ -121,6 +133,7 @@ func (h *Handler) renderPlay(w http.ResponseWriter, r *http.Request, p playRende
 		UserIDHex:       p.UserIDHex,
 		NextUnitID:      p.NextUnitID,
 		NextUnitVersion: p.NextUnitVersion,
+		CeremonyURL:     p.CeremonyURL,
 		DataFile:        p.Unit.DataFile,
 		FrameworkFile:   p.Unit.FrameworkFile,
 		CodeFile:        p.Unit.CodeFile,

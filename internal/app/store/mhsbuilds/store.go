@@ -133,6 +133,31 @@ func (s *Store) UpdateFiles(ctx context.Context, unitID, version string, files [
 	return err
 }
 
+// UpdateCeremonyFiles refreshes a ceremony build's file list and entry file
+// (the S3 sync calls it when a version folder's contents changed).
+func (s *Store) UpdateCeremonyFiles(ctx context.Context, version string, files []models.MHSBuildFile, totalSize int64, entryFile string) error {
+	filter := bson.M{"unit_id": models.MHSCeremonyBuildID, "version": version}
+	update := bson.M{"$set": bson.M{
+		"kind":       models.MHSBuildKindCeremony,
+		"files":      files,
+		"total_size": totalSize,
+		"entry_file": entryFile,
+	}}
+	_, err := s.c.UpdateOne(ctx, filter, update)
+	return err
+}
+
+// ListCeremonies returns the ceremony builds, newest version first by
+// creation time.
+func (s *Store) ListCeremonies(ctx context.Context) ([]models.MHSBuild, error) {
+	return s.ListByUnit(ctx, models.MHSCeremonyBuildID)
+}
+
+// GetCeremony returns the ceremony build for a version.
+func (s *Store) GetCeremony(ctx context.Context, version string) (models.MHSBuild, error) {
+	return s.GetByUnitVersion(ctx, models.MHSCeremonyBuildID, version)
+}
+
 // GetByUnitVersionBatch looks up multiple unit+version pairs in a single query.
 // Returns a map keyed by "unitID:version".
 func (s *Store) GetByUnitVersionBatch(ctx context.Context, pairs []UnitVersionPair) (map[string]models.MHSBuild, error) {

@@ -29,9 +29,17 @@ remain open in §7 and do not block the phases. Nothing has been implemented.*
   runtime); **not uploaded** (no AWS credentials on this machine — Dale
   uploads with `aws s3 sync`, then snapshots the plain pair to `_v7`). The
   host-page contract stratahub builds against: `mhs-gameplay-end/docs/embed-api.md`.
-- **Next step:** stratahub S1–S4 against the embed contract (host page can be
-  developed against `dist/v0.1.8` served locally or the CDN folder once
-  uploaded); grader G1.
+- **2026-09-22:** v0.1.8 is live on the CDN (`<cdn>/mhs/end/v0.1.8/`, 103/103
+  files, browser-verified; archived as `_v7`). stratahub **S1, S2, S4, S5,
+  S6, S7 implemented** (see §4 status notes): ceremony build kind + sync,
+  collection reference + forms, manifest block, host page, ea-scores endpoint,
+  viewed marks, play/units hooks, step-log outcomes. Verified: CORS from the
+  workspace origin to the CDN works directly and through the content redirect
+  (so no service-worker change is needed). Not yet: the dashboard link and
+  trophy mark (S6 dashboard part), docs screenshots, e2e; grader G1/G2.
+- **Next step:** deploy, register v0.1.8 with Sync from S3, put it on a
+  Dev MHS collection, walk a test student to complete and watch it; then
+  grader G1 (nine checkpoints) so the dialogue variants become real.
 - Related documents: `mhs-gameplay-end/docs/implementation-plan.md` (Phase 5
   is the original stratahub integration spec), `mhs-gameplay-end/docs/partial-nodata-plan.md`
   (on hold), `mhsgrader/docs/updates/ea-scores.md` (the grader brief, decision

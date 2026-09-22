@@ -17,8 +17,8 @@ import (
 	"time"
 
 	"github.com/dalemusser/stratahub/internal/app/store/mhsbuilds"
-	"github.com/dalemusser/stratahub/internal/app/system/format"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
+	"github.com/dalemusser/stratahub/internal/app/system/format"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/storage"
@@ -307,10 +307,16 @@ func (h *Handler) createCollectionWithUploads(ctx context.Context, name, descrip
 		newBuildMap[b.UnitID] = b
 	}
 
-	// Start from the latest collection to inherit unchanged units
+	// Start from the latest collection to inherit unchanged units (and its
+	// ceremony reference — an upload never changes the ceremony)
 	var units []models.MHSCollectionUnit
+	var ceremony *models.MHSCollectionCeremony
 	latest, err := h.CollectionStore.Latest(ctx)
 	if err == nil {
+		if latest.HasCeremony() {
+			c := *latest.Ceremony
+			ceremony = &c
+		}
 		// Inherit all units from latest, overriding the uploaded ones
 		for _, u := range latest.Units {
 			if nb, ok := newBuildMap[u.UnitID]; ok {
@@ -340,6 +346,7 @@ func (h *Handler) createCollectionWithUploads(ctx context.Context, name, descrip
 		Name:          name,
 		Description:   description,
 		Units:         units,
+		Ceremony:      ceremony,
 		CreatedByID:   createdByID,
 		CreatedByName: createdByName,
 	}
@@ -476,7 +483,6 @@ func incrementPatch(version string) string {
 	}
 	return fmt.Sprintf("%s.%s.%d", parts[0], parts[1], patch+1)
 }
-
 
 func (h *Handler) renderUploadError(w http.ResponseWriter, r *http.Request, msg string) {
 	data := UploadData{

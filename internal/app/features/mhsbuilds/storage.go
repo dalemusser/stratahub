@@ -34,8 +34,8 @@ func (h *Handler) HandleSync(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	msg := fmt.Sprintf("Sync complete. Found %d units. Discovered %d new, updated %d, %d unchanged.",
-		result.Units, result.Discovered, result.Updated, result.Unchanged)
+	msg := fmt.Sprintf("Sync complete. Found %d units and %d ceremony version(s). Discovered %d new, updated %d, %d unchanged.",
+		result.Units, result.Ceremonies, result.Discovered, result.Updated, result.Unchanged)
 	h.renderStorage(w, r, msg, "")
 }
 
@@ -89,10 +89,8 @@ func (h *Handler) isBuildInCollection(ctx context.Context, unitID, version strin
 		return true // err on the side of caution
 	}
 	for _, coll := range collections {
-		for _, u := range coll.Units {
-			if u.UnitID == unitID && u.Version == version {
-				return true
-			}
+		if collectionReferences(coll, unitID, version) {
+			return true
 		}
 	}
 	return false
@@ -102,11 +100,8 @@ func (h *Handler) isBuildInCollection(ctx context.Context, unitID, version strin
 func (h *Handler) collectionsForBuild(collections []models.MHSCollection, unitID, version string) []string {
 	var names []string
 	for _, coll := range collections {
-		for _, u := range coll.Units {
-			if u.UnitID == unitID && u.Version == version {
-				names = append(names, coll.Name)
-				break
-			}
+		if collectionReferences(coll, unitID, version) {
+			names = append(names, coll.Name)
 		}
 	}
 	return names
@@ -132,6 +127,7 @@ func (h *Handler) renderStorage(w http.ResponseWriter, r *http.Request, syncMsg,
 		vms[i] = StorageBuildVM{
 			ID:              b.ID.Hex(),
 			UnitID:          b.UnitID,
+			IsCeremony:      b.IsCeremony(),
 			Version:         b.Version,
 			BuildIdentifier: b.BuildIdentifier,
 			FileCount:       len(b.Files),

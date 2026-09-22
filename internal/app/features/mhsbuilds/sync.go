@@ -20,10 +20,15 @@ type SyncResult struct {
 	Updated    int // Existing builds refreshed with current S3 data
 	Unchanged  int // Existing builds with no changes
 	Units      int // Total unique units found
+	Ceremonies int // Ceremony versions found (the "end/" prefix)
 }
 
-// SyncS3Builds scans S3 for all unit versions and creates mhs_builds records
-// for any that don't already exist in the database. Idempotent — safe to run multiple times.
+// SyncS3Builds scans S3 for all unit versions — and ceremony versions under
+// the "end/" prefix (models.MHSCeremonyBuildID) — and creates mhs_builds
+// records for any that don't already exist in the database. Idempotent — safe
+// to run multiple times. A ceremony version folder is recognised by its entry
+// file (models.MHSCeremonyEntryFile); a folder without it is skipped with a
+// warning rather than registered as an empty ceremony.
 func (h *Handler) SyncS3Builds(ctx context.Context) (SyncResult, error) {
 	var result SyncResult
 
@@ -39,7 +44,7 @@ func (h *Handler) SyncS3Builds(ctx context.Context) (SyncResult, error) {
 		Prefix  string // e.g., "unit1/v2.2.2/"
 	}
 
-	seen := make(map[string]bool)        // "unit1/v2.2.2" -> true
+	seen := make(map[string]bool) // "unit1/v2.2.2" -> true
 	var toSync []unitVersion
 	unitSet := make(map[string]bool)
 
@@ -69,7 +74,8 @@ func (h *Handler) SyncS3Builds(ctx context.Context) (SyncResult, error) {
 			unitID := parts[0]
 			vDir := parts[1]
 
-			if !unitDirPattern.MatchString(unitID) {
+			isCeremony := unitID == models.MHSCeremonyBuildID
+			if !isCeremony && !unitDirPattern.MatchString(unitID) {
 				continue
 			}
 			if !versionDirPattern.MatchString(vDir) {
@@ -81,7 +87,11 @@ func (h *Handler) SyncS3Builds(ctx context.Context) (SyncResult, error) {
 				continue
 			}
 			seen[key] = true
-			unitSet[unitID] = true
+			if isCeremony {
+				result.Ceremonies++
+			} else {
+				unitSet[unitID] = true
+			}
 
 			version := strings.TrimPrefix(vDir, "v")
 			toSync = append(toSync, unitVersion{
@@ -118,6 +128,13 @@ func (h *Handler) SyncS3Builds(ctx context.Context) (SyncResult, error) {
 
 		files, totalSize, dataFile, frameworkFile, codeFile := buildFilesFromS3Objects(fileResult.Objects)
 		if len(files) == 0 {
+			continue
+		}
+
+		if uv.UnitID == models.MHSCeremonyBuildID {
+			if err := h.syncCeremonyVersion(ctx, uv.Version, uv.Prefix, files, totalSize, &result); err != nil {
+				h.Log.Warn("failed to sync ceremony version from S3", zap.String("version", uv.Version), zap.Error(err))
+			}
 			continue
 		}
 
@@ -171,4 +188,44 @@ func (h *Handler) SyncS3Builds(ctx context.Context) (SyncResult, error) {
 	}
 
 	return result, nil
+}
+
+// syncCeremonyVersion creates or refreshes the mhs_builds record for one
+// ceremony version folder ("end/vX.Y.Z/").
+func (h *Handler) syncCeremonyVersion(ctx context.Context, version, prefix string, files []models.MHSBuildFile, totalSize int64, result *SyncResult) error {
+	entry := detectCeremonyEntry(prefix, files)
+	if entry == "" {
+		h.Log.Warn("ceremony version folder has no entry file — skipped",
+			zap.String("version", version), zap.String("expected", models.MHSCeremonyEntryFile))
+		return nil
+	}
+	existing, err := h.BuildStore.GetCeremony(ctx, version)
+	if err == nil {
+		if existing.IsCeremony() && existing.EntryFile == entry && existing.TotalSize == totalSize && len(existing.Files) == len(files) {
+			result.Unchanged++
+			return nil
+		}
+		if err := h.BuildStore.UpdateCeremonyFiles(ctx, version, files, totalSize, entry); err != nil {
+			return err
+		}
+		result.Updated++
+		h.Log.Info("updated ceremony from S3", zap.String("version", version), zap.Int("files", len(files)))
+		return nil
+	}
+	build := models.MHSBuild{
+		UnitID:          models.MHSCeremonyBuildID,
+		Kind:            models.MHSBuildKindCeremony,
+		EntryFile:       entry,
+		Version:         version,
+		BuildIdentifier: "mhs-gameplay-end",
+		Files:           files,
+		TotalSize:       totalSize,
+		CreatedByName:   "S3 Sync",
+	}
+	if _, err := h.BuildStore.Create(ctx, build); err != nil {
+		return err
+	}
+	result.Discovered++
+	h.Log.Info("synced ceremony from S3", zap.String("version", version), zap.Int("files", len(files)))
+	return nil
 }

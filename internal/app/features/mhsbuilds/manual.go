@@ -31,12 +31,9 @@ func (h *Handler) ServeManual(w http.ResponseWriter, r *http.Request) {
 	h.SyncS3Builds(syncCtx)
 	syncCancel()
 
-	// Get all builds grouped by unit
+	// Get all builds grouped by unit (ceremony builds kept apart)
 	allBuilds, _ := h.BuildStore.ListAll(ctx)
-	buildsByUnit := make(map[string][]models.MHSBuild)
-	for _, b := range allBuilds {
-		buildsByUnit[b.UnitID] = append(buildsByUnit[b.UnitID], b)
-	}
+	buildsByUnit, ceremonies := splitBuilds(allBuilds)
 
 	// Determine which units to show — from latest collection + any units discovered in S3
 	unitIDs := make(map[string]bool)
@@ -52,11 +49,15 @@ func (h *Handler) ServeManual(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Strings(sortedUnitIDs)
 
-	// Pre-fill versions from latest collection
+	// Pre-fill versions (and the ceremony) from latest collection
 	latestMap := make(map[string]models.MHSCollectionUnit)
+	ceremonyVersion := ""
 	if latest, err := h.CollectionStore.Latest(ctx); err == nil {
 		for _, u := range latest.Units {
 			latestMap[u.UnitID] = u
+		}
+		if latest.HasCeremony() {
+			ceremonyVersion = latest.Ceremony.Version
 		}
 	}
 
@@ -85,10 +86,58 @@ func (h *Handler) ServeManual(w http.ResponseWriter, r *http.Request) {
 	data := ManualData{
 		BaseVM:         viewdata.LoadBase(r, h.DB),
 		Units:          rows,
+		Ceremony:       ceremonyRow(ceremonies, ceremonyVersion),
 		CollectionName: fmt.Sprintf("Manual Collection — %s", time.Now().UTC().Format("2006-01-02")),
 	}
 	data.Title = "Create Collection Manually"
 	templates.Render(w, r, "mhsbuilds_manual", data)
+}
+
+// splitBuilds groups unit builds by unit id and returns the ceremony builds
+// separately (they share the store but are never unit rows).
+func splitBuilds(all []models.MHSBuild) (map[string][]models.MHSBuild, []models.MHSBuild) {
+	byUnit := make(map[string][]models.MHSBuild)
+	var ceremonies []models.MHSBuild
+	for _, b := range all {
+		if b.IsCeremony() || b.UnitID == models.MHSCeremonyBuildID {
+			ceremonies = append(ceremonies, b)
+			continue
+		}
+		byUnit[b.UnitID] = append(byUnit[b.UnitID], b)
+	}
+	return byUnit, ceremonies
+}
+
+// ceremonyRow builds the ceremony select for a form: the available ceremony
+// versions with `selected` marked ("" = none).
+func ceremonyRow(ceremonies []models.MHSBuild, selected string) CeremonyRow {
+	row := CeremonyRow{Version: selected}
+	for _, b := range ceremonies {
+		row.AvailableVersions = append(row.AvailableVersions, ManualVersionOption{
+			Version:         b.Version,
+			BuildIdentifier: b.BuildIdentifier,
+			Selected:        b.Version == selected,
+		})
+	}
+	return row
+}
+
+// ceremonyFromForm resolves the form's ceremony selection (field
+// "version_end": "" or "none" = no ceremony) to a collection reference,
+// verifying the build record exists. Returns (nil, "") for none.
+func (h *Handler) ceremonyFromForm(ctx context.Context, r *http.Request) (*models.MHSCollectionCeremony, string) {
+	v := strings.TrimSpace(r.FormValue("version_" + models.MHSCeremonyBuildID))
+	if v == "" || v == "none" {
+		return nil, ""
+	}
+	build, err := h.BuildStore.GetCeremony(ctx, v)
+	if err == mhsbuilds.ErrNotFound || (err == nil && !build.IsCeremony()) {
+		return nil, fmt.Sprintf("No ceremony build record found for v%s. Try syncing from S3 first.", v)
+	}
+	if err != nil {
+		return nil, fmt.Sprintf("Failed to check the ceremony build: %s", err)
+	}
+	return &models.MHSCollectionCeremony{Version: build.Version, BuildIdentifier: build.BuildIdentifier}, ""
 }
 
 // HandleManual processes the manual collection creation form.
@@ -118,14 +167,21 @@ func (h *Handler) HandleManual(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Minute)
 	defer cancel()
 
-	// Collect unit IDs from form fields (version_unit1, version_unit2, etc.)
+	// Collect unit IDs from form fields (version_unit1, version_unit2, etc.);
+	// the ceremony select (version_end) is not a unit.
 	var unitIDs []string
 	for key := range r.Form {
-		if strings.HasPrefix(key, "version_") {
+		if strings.HasPrefix(key, "version_") && key != "version_"+models.MHSCeremonyBuildID {
 			unitIDs = append(unitIDs, strings.TrimPrefix(key, "version_"))
 		}
 	}
 	sort.Strings(unitIDs)
+
+	ceremony, ceremonyErr := h.ceremonyFromForm(ctx, r)
+	if ceremonyErr != "" {
+		h.renderManualError(w, r, ceremonyErr)
+		return
+	}
 
 	var units []models.MHSCollectionUnit
 
@@ -169,6 +225,7 @@ func (h *Handler) HandleManual(w http.ResponseWriter, r *http.Request) {
 		Name:          collectionName,
 		Description:   collectionDesc,
 		Units:         units,
+		Ceremony:      ceremony,
 		CreatedByID:   createdByID,
 		CreatedByName: createdByName,
 	}
@@ -188,10 +245,7 @@ func (h *Handler) renderManualError(w http.ResponseWriter, r *http.Request, msg 
 
 	// Discover all units from builds (same logic as ServeManual)
 	allBuilds, _ := h.BuildStore.ListAll(ctx)
-	buildsByUnit := make(map[string][]models.MHSBuild)
-	for _, b := range allBuilds {
-		buildsByUnit[b.UnitID] = append(buildsByUnit[b.UnitID], b)
-	}
+	buildsByUnit, ceremonies := splitBuilds(allBuilds)
 
 	unitIDs := make(map[string]bool)
 	for _, id := range defaultUnitIDs {
@@ -240,6 +294,7 @@ func (h *Handler) renderManualError(w http.ResponseWriter, r *http.Request, msg 
 	data := ManualData{
 		BaseVM:         viewdata.LoadBase(r, h.DB),
 		Units:          rows,
+		Ceremony:       ceremonyRow(ceremonies, strings.TrimSpace(r.FormValue("version_"+models.MHSCeremonyBuildID))),
 		CollectionName: r.FormValue("collection_name"),
 		Error:          msg,
 	}

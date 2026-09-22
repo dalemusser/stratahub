@@ -31,6 +31,18 @@ func buildFilesFromS3Objects(objects []storage.ObjectInfo) (files []models.MHSBu
 	return
 }
 
+// detectCeremonyEntry returns the ceremony's entry file when the listed files
+// (full keys under prefix, e.g. "end/v0.1.8/lib/embed.js") form a ceremony
+// bundle, i.e. contain models.MHSCeremonyEntryFile; "" otherwise.
+func detectCeremonyEntry(prefix string, files []models.MHSBuildFile) string {
+	for _, f := range files {
+		if strings.TrimPrefix(f.Path, prefix) == models.MHSCeremonyEntryFile {
+			return models.MHSCeremonyEntryFile
+		}
+	}
+	return ""
+}
+
 // detectKeyFile checks if a filename is a key Unity build file and sets the appropriate pointer.
 // Handles both old format (.unityweb extension) and new format (no .unityweb extension).
 func detectKeyFile(name string, dataFile, frameworkFile, codeFile *string) {

@@ -89,6 +89,22 @@
         </tbody>
       </table>
     </div>
+
+    <h2 class="text-base font-semibold text-gray-800 dark:text-gray-200 mt-6 mb-2">End-of-game ceremony</h2>
+    {{ if .Ceremony }}
+    <p class="text-gray-700 dark:text-gray-300">
+      <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-mono bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">v{{ .Ceremony.Version }}</span>
+      <span class="ml-2 text-xs font-mono text-gray-600 dark:text-gray-400">{{ .Ceremony.BuildIdentifier }}</span>
+      {{ if .Ceremony.Missing }}
+      <span class="ml-2 text-xs text-red-600 dark:text-red-400">build record missing — sync from S3</span>
+      {{ else }}
+      <span class="ml-2 text-xs text-gray-600 dark:text-gray-400">{{ .Ceremony.FileCount }} files · {{ .Ceremony.SizeLabel }}</span>
+      {{ end }}
+    </p>
+    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Played after the last unit; students can replay it from the units page.</p>
+    {{ else }}
+    <p class="text-gray-500 dark:text-gray-400">None — the game's own ending returns the player to the units page.</p>
+    {{ end }}
   </div>
 </div>
 {{ end }}

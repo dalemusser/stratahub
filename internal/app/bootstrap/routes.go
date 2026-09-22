@@ -335,6 +335,9 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		logger,
 	)
 	missionHydroSciHandler.StaffAuthVerifier = staffAuthVerifier
+	// The end-of-game ceremony reads the student's EA checkpoint scores from
+	// the grader's database (docs/mission-hydrosci/mhs-end-ceremony-plan.md D5).
+	missionHydroSciHandler.GradesDB = deps.MHSGraderDatabase
 	// Logging-health checks read the log service's entries (same cluster);
 	// without that database the checks answer "unknown".
 	if deps.StratalogDatabase != nil {

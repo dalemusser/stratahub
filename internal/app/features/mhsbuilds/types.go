@@ -52,8 +52,16 @@ type ManualVersionOption struct {
 type ManualData struct {
 	viewdata.BaseVM
 	Units          []ManualUnitRow
+	Ceremony       CeremonyRow // the end-of-game ceremony version select
 	CollectionName string
 	Error          string
+}
+
+// CeremonyRow is the ceremony version select on the manual and edit forms:
+// the selected version ("" = none) and the ceremony builds available.
+type CeremonyRow struct {
+	Version           string
+	AvailableVersions []ManualVersionOption
 }
 
 // CollectionVM is a view model for a collection in the list.
@@ -70,8 +78,18 @@ type CollectionVM struct {
 // CollectionsData is the view model for the collections list page.
 type CollectionsData struct {
 	viewdata.BaseVM
-	Collections      []CollectionVM
-	ActiveID         string // Current workspace active collection ID
+	Collections []CollectionVM
+	ActiveID    string // Current workspace active collection ID
+}
+
+// CollectionCeremonyVM is the ceremony line in the collection detail view.
+type CollectionCeremonyVM struct {
+	Version         string
+	BuildIdentifier string
+	FileCount       int
+	TotalSize       int64
+	SizeLabel       string
+	Missing         bool // referenced version has no build record
 }
 
 // CollectionUnitVM is a unit row in the collection detail view.
@@ -101,6 +119,7 @@ type EditCollectionData struct {
 	Name        string
 	Description string
 	Units       []EditCollectionUnitRow
+	Ceremony    CeremonyRow
 	IsActive    bool
 	Error       string
 }
@@ -152,21 +171,22 @@ type AssignmentUser struct {
 // AssignmentsData is the view model for the collection assignments page.
 type AssignmentsData struct {
 	viewdata.BaseVM
-	CollectionID       string
-	CollectionName     string
-	Workspaces         []AssignmentWorkspace
-	Groups             []AssignmentGroup
-	Users              []AssignmentUser
-	EnabledGroups      []MHSEnabledGroup
-	WorkspaceOptions   []WorkspaceOption
-	SelectedWorkspace  string // "all" or workspace ID hex
-	IsUnused           bool
+	CollectionID      string
+	CollectionName    string
+	Workspaces        []AssignmentWorkspace
+	Groups            []AssignmentGroup
+	Users             []AssignmentUser
+	EnabledGroups     []MHSEnabledGroup
+	WorkspaceOptions  []WorkspaceOption
+	SelectedWorkspace string // "all" or workspace ID hex
+	IsUnused          bool
 }
 
 // StorageBuildVM represents a unit version in the S3 storage page.
 type StorageBuildVM struct {
 	ID              string
 	UnitID          string
+	IsCeremony      bool // the end-of-game ceremony bundle, not a Unity unit
 	Version         string
 	BuildIdentifier string
 	FileCount       int
@@ -192,6 +212,7 @@ type CollectionDetailData struct {
 	Name          string
 	Description   string
 	Units         []CollectionUnitVM
+	Ceremony      *CollectionCeremonyVM // nil when the collection has no ceremony
 	CreatedAt     time.Time
 	CreatedByName string
 	IsActive      bool   // True if this is the workspace active collection

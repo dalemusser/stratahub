@@ -166,6 +166,49 @@ func (s *Store) SetCollectionOverride(ctx context.Context, workspaceID, userID p
 	return err
 }
 
+// Ceremony mark events (see models.MHSUserProgress).
+const (
+	CeremonyStarted  = "started"  // Begin pressed: earliest kept, view count +1, version recorded
+	CeremonyFinished = "finished" // the show reached its end screen: latest kept
+)
+
+// MarkCeremony records a ceremony event on the student's progress. It never
+// touches current_unit, completed_units, or updated_at (which unit progress
+// owns), and creates the record if the student has none yet.
+func (s *Store) MarkCeremony(ctx context.Context, workspaceID, userID primitive.ObjectID, event, version string) error {
+	now := time.Now().UTC()
+	filter := bson.M{"workspace_id": workspaceID, "user_id": userID}
+	update := bson.M{
+		"$setOnInsert": bson.M{
+			"_id":             primitive.NewObjectID(),
+			"workspace_id":    workspaceID,
+			"user_id":         userID,
+			"current_unit":    "unit1",
+			"completed_units": []string{},
+			"created_at":      now,
+			"updated_at":      now,
+		},
+	}
+	switch event {
+	case CeremonyStarted:
+		update["$min"] = bson.M{"ceremony_started_at": now}
+		update["$inc"] = bson.M{"ceremony_view_count": 1}
+		if version != "" {
+			update["$set"] = bson.M{"ceremony_version": version}
+		}
+	case CeremonyFinished:
+		set := bson.M{"ceremony_finished_at": now}
+		if version != "" {
+			set["ceremony_version"] = version
+		}
+		update["$set"] = set
+	default:
+		return fmt.Errorf("unknown ceremony event: %q", event)
+	}
+	_, err := s.c.UpdateOne(ctx, filter, update, options.Update().SetUpsert(true))
+	return err
+}
+
 // CompleteUnit marks a unit as completed and advances current_unit.
 // totalUnits is the number of units in the active collection (e.g., 5 or 6).
 // Idempotent: if the unit is already completed or before current_unit, returns current state.
