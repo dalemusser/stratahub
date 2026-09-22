@@ -46,9 +46,17 @@ remain open in §7 and do not block the phases. Nothing has been implemented.*
   documents wiped and replayed in 47 batches, zero errors; afterwards 584
   documents carry EA scores, 421 a unit star, 116 all four units; the cursor
   sits at the latest trigger event.
-- **Next step:** a real end-to-end run with a test student (the Dev MHS
-  collection carries v0.1.8); grader G2 (the other fourteen checkpoints, true
-  star totals) as the team's answers arrive.
+- **2026-09-22 (v0.1.9):** the first host-page run froze after the cold open:
+  the bundle's holo images were plain image loads, tainted by the content
+  path's redirect to the CDN, and Babylon's texture upload threw at Toppo's
+  first line. Fixed in the bundle (player v8: CORS image loads;
+  `mhs-gameplay-end/docs/v0.1.9-plan.md`), v0.1.9 uploaded by Dale, synced and
+  selected on Dev MHS; Dale confirmed Open (preview) plays through. Hosting
+  rule recorded in the embed contract: every asset is a CORS load, so the CDN
+  must allow the host page's origin.
+- **Next step:** an end-to-end run with a test student who completes Unit 5
+  (late binding, viewed marks, the dashboard trophy); grader G2 (the other
+  fourteen checkpoints, true star totals) as the team's answers arrive.
 - Related documents: `mhs-gameplay-end/docs/implementation-plan.md` (Phase 5
   is the original stratahub integration spec), `mhs-gameplay-end/docs/partial-nodata-plan.md`
   (on hold), `mhsgrader/docs/updates/ea-scores.md` (the grader brief, decision
