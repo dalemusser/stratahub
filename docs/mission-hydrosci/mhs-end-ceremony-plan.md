@@ -42,12 +42,13 @@ remain open in §7 and do not block the phases. Nothing has been implemented.*
   Dev MHS collection; the units list gained the ceremony row (staff: Open
   (preview)). **Grader G1 done** (mhsgrader `293a5fb`): the nine checkpoints
   as `eaScores` on finished attempts and interim `eaStars` per unit, harness
-  26/26 on all fixtures, binary deployed. Existing students' grades get EA
-  scores only through the wipe-and-replay backfill (`aws_reset.sh` +
-  `aws_update.sh`, ~15 min of blank dashboard cells) — pending Dale's go.
-- **Next step:** the backfill replay; then a real end-to-end run with a test
-  student; grader G2 (the other fourteen checkpoints, true star totals) as the
-  team's answers arrive.
+  26/26 on all fixtures, binary deployed. **Backfill done** 2026-09-22 07:53–08:06 UTC (Dale's go): 795 grade
+  documents wiped and replayed in 47 batches, zero errors; afterwards 584
+  documents carry EA scores, 421 a unit star, 116 all four units; the cursor
+  sits at the latest trigger event.
+- **Next step:** a real end-to-end run with a test student (the Dev MHS
+  collection carries v0.1.8); grader G2 (the other fourteen checkpoints, true
+  star totals) as the team's answers arrive.
 - Related documents: `mhs-gameplay-end/docs/implementation-plan.md` (Phase 5
   is the original stratahub integration spec), `mhs-gameplay-end/docs/partial-nodata-plan.md`
   (on hold), `mhsgrader/docs/updates/ea-scores.md` (the grader brief, decision
