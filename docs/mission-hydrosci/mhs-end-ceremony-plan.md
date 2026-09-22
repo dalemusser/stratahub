@@ -20,7 +20,18 @@ remain open in §7 and do not block the phases. Nothing has been implemented.*
 - **Still open (grader side, non-blocking):** U2.C3 composition and the
   U5.C4 per-selection detection (§7 Q11), and the U3.C5 threshold mismatch
   (§7 Q13).
-- **Next step:** start §5 Phase 1.
+- **Progress 2026-09-21 (evening):** the team document with the EA-score
+  decisions and questions is at `mhsgrading/docs/ea-scores-team-questions-2026-09.md`
+  (the grader brief `mhsgrader/docs/updates/ea-scores.md` points at it).
+  Ceremony Phase 1 (E1–E4, E7) is DONE: `mhs-gameplay-end` v0.1.8 built,
+  verified in a browser (standalone + late-binding harness), committed, and
+  staged locally as `dist/v0.1.8` (103 files, 71 MB incl. the 9.4 MB vendored
+  runtime); **not uploaded** (no AWS credentials on this machine — Dale
+  uploads with `aws s3 sync`, then snapshots the plain pair to `_v7`). The
+  host-page contract stratahub builds against: `mhs-gameplay-end/docs/embed-api.md`.
+- **Next step:** stratahub S1–S4 against the embed contract (host page can be
+  developed against `dist/v0.1.8` served locally or the CDN folder once
+  uploaded); grader G1.
 - Related documents: `mhs-gameplay-end/docs/implementation-plan.md` (Phase 5
   is the original stratahub integration spec), `mhs-gameplay-end/docs/partial-nodata-plan.md`
   (on hold), `mhsgrader/docs/updates/ea-scores.md` (the grader brief, decision
@@ -271,8 +282,10 @@ rejected: 45 s is far too long for middle-school students. Instead:
 
 ### D8 — Exit and reporting. *(decided 2026-09-21)*
 
-- `finished` → host page shows **Return to Mission HydroSci**; an always-visible
-  small Exit control covers accessibility and a student who must leave early.
+- The embed's Exit control (top-right, always visible, label from the host
+  page, e.g. "Back to Mission HydroSci") covers the end screen, a student who
+  must leave early, and a device that cannot play; it navigates to
+  `returnUrl` (the units page). The end-screen text names it.
 - Reporting through existing endpoints: `POST /api/steplog` with new outcomes
   `ceremony-ok` / `ceremony-failed` (load failure, WebGL unavailable, scores
   never ready) carrying the resolved variant set and stars in the note.
