@@ -38,9 +38,16 @@ remain open in §7 and do not block the phases. Nothing has been implemented.*
   (so no service-worker change is needed). Dashboard link + trophy mark done
   the same day. Deployed to production 2026-09-22 (the ceremony stays off until
   a collection selects a version). Not yet: docs screenshots, e2e; grader G1/G2.
-- **Next step:** deploy, register v0.1.8 with Sync from S3, put it on a
-  Dev MHS collection, walk a test student to complete and watch it; then
-  grader G1 (nine checkpoints) so the dialogue variants become real.
+- **2026-09-22 (later):** Dale registered v0.1.8 and put it on the active
+  Dev MHS collection; the units list gained the ceremony row (staff: Open
+  (preview)). **Grader G1 done** (mhsgrader `293a5fb`): the nine checkpoints
+  as `eaScores` on finished attempts and interim `eaStars` per unit, harness
+  26/26 on all fixtures, binary deployed. Existing students' grades get EA
+  scores only through the wipe-and-replay backfill (`aws_reset.sh` +
+  `aws_update.sh`, ~15 min of blank dashboard cells) — pending Dale's go.
+- **Next step:** the backfill replay; then a real end-to-end run with a test
+  student; grader G2 (the other fourteen checkpoints, true star totals) as the
+  team's answers arrive.
 - Related documents: `mhs-gameplay-end/docs/implementation-plan.md` (Phase 5
   is the original stratahub integration spec), `mhs-gameplay-end/docs/partial-nodata-plan.md`
   (on hold), `mhsgrader/docs/updates/ea-scores.md` (the grader brief, decision
