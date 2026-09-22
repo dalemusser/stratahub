@@ -35,8 +35,9 @@ remain open in §7 and do not block the phases. Nothing has been implemented.*
   collection reference + forms, manifest block, host page, ea-scores endpoint,
   viewed marks, play/units hooks, step-log outcomes. Verified: CORS from the
   workspace origin to the CDN works directly and through the content redirect
-  (so no service-worker change is needed). Not yet: the dashboard link and
-  trophy mark (S6 dashboard part), docs screenshots, e2e; grader G1/G2.
+  (so no service-worker change is needed). Dashboard link + trophy mark done
+  the same day. Deployed to production 2026-09-22 (the ceremony stays off until
+  a collection selects a version). Not yet: docs screenshots, e2e; grader G1/G2.
 - **Next step:** deploy, register v0.1.8 with Sync from S3, put it on a
   Dev MHS collection, walk a test student to complete and watch it; then
   grader G1 (nine checkpoints) so the dialogue variants become real.

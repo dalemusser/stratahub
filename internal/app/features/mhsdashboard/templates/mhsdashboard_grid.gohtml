@@ -77,6 +77,16 @@
            title="{{ .Name }}"
            data-member-id="{{ .ID }}">
         <span class="truncate flex-1">{{ .Name }}</span>
+        {{ if .CeremonyViewed }}
+        <span class="ml-1 text-[11px] leading-none" role="img" aria-label="Watched the ceremony" title="{{ .CeremonyTitle }}">🏆</span>
+        {{ end }}
+        <a href="{{ .CeremonyPreviewURL }}" target="_blank" rel="noopener"
+           class="ml-1 p-0.5 rounded text-slate-400 hover:text-amber-600 dark:hover:text-amber-300 hover:bg-amber-100/50 dark:hover:bg-amber-400/20"
+           title="View {{ .Name }}'s end-of-game ceremony (preview with their results){{ if .CeremonyViewed }} — {{ .CeremonyTitle }}{{ end }}">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 21h8m-4-4v4m-5-9a5 5 0 0010 0V4H7v8zM7 6H4a1 1 0 00-1 1v1a4 4 0 004 4m10-6h3a1 1 0 011 1v1a4 4 0 01-4 4"/>
+          </svg>
+        </a>
         {{ if $.EnableClaudeSummaries }}
         <button type="button"
                 class="ml-1 p-0.5 rounded text-indigo-400 hover:text-indigo-600 dark:hover:text-indigo-300 hover:bg-indigo-100/50 dark:hover:bg-indigo-400/20"

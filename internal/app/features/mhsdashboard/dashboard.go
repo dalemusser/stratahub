@@ -1035,6 +1035,9 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 			}
 		}
 
+		// End-of-game ceremony marks (written by the ceremony host page)
+		ceremonyViewed, ceremonyTitle := ceremonyMark(mhsProgress[member.ID.Hex()], loc)
+
 		result[i] = MemberRow{
 			ID:                    member.ID.Hex(),
 			Name:                  member.FullName,
@@ -1046,11 +1049,37 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 			CurrentUnit:           currentUnit,
 			HasCollectionOverride: hasOverride,
 			CollectionName:        collName,
+			CeremonyViewed:        ceremonyViewed,
+			CeremonyTitle:         ceremonyTitle,
+			CeremonyPreviewURL:    "/missionhydrosci/ceremony?user_id=" + member.ID.Hex(),
 			Surveys:               surveyCells[member.ID.Hex()],
 		}
 	}
 
 	return result
+}
+
+// ceremonyMark summarises a student's end-of-game ceremony marks for the
+// Progress tab: viewed = Begin was pressed at least once; the title says when
+// it was first started, the version, how many times, and whether a showing
+// reached the end.
+func ceremonyMark(p models.MHSUserProgress, loc *time.Location) (bool, string) {
+	if p.CeremonyStartedAt == nil {
+		return false, "Ceremony not watched yet"
+	}
+	title := "Ceremony started " + p.CeremonyStartedAt.In(loc).Format("Jan 2, 2006 3:04 PM")
+	if p.CeremonyVersion != "" {
+		title += " (v" + p.CeremonyVersion + ")"
+	}
+	if p.CeremonyViewCount > 1 {
+		title += fmt.Sprintf(", %d times", p.CeremonyViewCount)
+	}
+	if p.CeremonyFinishedAt != nil {
+		title += " · reached the end " + p.CeremonyFinishedAt.In(loc).Format("Jan 2, 2006 3:04 PM")
+	} else {
+		title += " · not yet watched to the end"
+	}
+	return true, title
 }
 
 // loadOrgsWithGroupCounts builds the organization dropdown options from the

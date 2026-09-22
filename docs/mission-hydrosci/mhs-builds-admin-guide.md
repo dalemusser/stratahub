@@ -243,10 +243,14 @@ the same way they pick unit versions.
 
 ### What staff see
 
-- Leaders, coordinators and admins can open the ceremony page any time; with
-  `?user_id=<the student's id>` on `/missionhydrosci/ceremony` they preview a
-  student's own ceremony (students within their reach only). Previews are not
-  recorded.
+- Leaders, coordinators and admins can open the ceremony page any time. The
+  MHS Dashboard's Progress tab has a small trophy link beside each student's
+  name that previews that student's own ceremony (their real results);
+  the same page is `/missionhydrosci/ceremony?user_id=<the student's id>` for
+  students within their reach. Previews are not recorded.
+- Once a student has pressed Begin, a 🏆 mark appears beside their name on
+  the Progress tab; its tooltip says when they started, the version, how many
+  times, and whether a showing reached the end.
 - A student's progress record keeps when they first pressed Begin, when they
   last reached the end, the version shown, and how many times they started
   it.

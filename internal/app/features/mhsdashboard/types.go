@@ -116,6 +116,13 @@ type MemberRow struct {
 	HasCollectionOverride bool   // True if user has a per-user collection override
 	CollectionName        string // Name of the effective collection (override or group/workspace)
 
+	// End-of-game ceremony (docs/mission-hydrosci/mhs-end-ceremony-plan.md D6/D8):
+	// whether the student has pressed Begin on it, a tooltip with when, the
+	// version and whether they reached the end, and the staff preview link.
+	CeremonyViewed     bool
+	CeremonyTitle      string
+	CeremonyPreviewURL string
+
 	// Surveys tab: one cell per configured survey, in SurveyHeaders order.
 	// Nil when no surveys are configured.
 	Surveys []SurveyCell
