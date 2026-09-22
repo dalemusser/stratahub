@@ -89,12 +89,39 @@ func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
 	// Resolve effective collection info for the read-only version line.
 	collInfo := h.resolveEffectiveCollectionInfo(r)
 
+	// The ceremony row: members open it once complete, staff any time.
+	var ceremonyCard *CeremonyCardVM
+	if manifest.Ceremony != nil {
+		isMember := true
+		if user, ok := auth.CurrentUser(r); ok {
+			isMember = user.Role == "member"
+		}
+		card := &CeremonyCardVM{
+			Version:   manifest.Ceremony.Version,
+			SizeLabel: format.Bytes(manifest.Ceremony.TotalSize),
+			URL:       CeremonyPath,
+		}
+		switch {
+		case !isMember:
+			card.Label, card.CanOpen = "Open (preview)", true
+		case isComplete:
+			card.Label, card.CanOpen = "Watch", true
+		default:
+			card.Label = "After Unit 5"
+			if n := len(manifest.Units); n > 0 {
+				card.Label = "After " + manifest.Units[n-1].Title
+			}
+		}
+		ceremonyCard = card
+	}
+
 	data := UnitsData{
 		BaseVM:               viewdata.LoadBase(r, h.DB),
 		Units:                units,
 		CurrentUnit:          currentUnit,
 		IsComplete:           isComplete,
 		CeremonyURL:          ceremonyURLFor(manifest),
+		Ceremony:             ceremonyCard,
 		NextUnitID:           nextUnitID,
 		CollectionOverride:   collInfo.IsOverride,
 		ActiveCollectionName: collInfo.Name,

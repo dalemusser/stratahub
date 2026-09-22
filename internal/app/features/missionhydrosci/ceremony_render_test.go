@@ -88,18 +88,22 @@ func TestUnitsPageOffersCeremonyWhenComplete(t *testing.T) {
 	render := func(url string) string {
 		rec := httptest.NewRecorder()
 		req := httptest.NewRequest("GET", "/missionhydrosci/units", nil)
+		var card *CeremonyCardVM
+		if url != "" {
+			card = &CeremonyCardVM{Version: "0.1.8", SizeLabel: "71.2 MB", URL: url, Label: "Watch", CanOpen: true}
+		}
 		templates.Render(rec, req, "missionhydrosci_units", UnitsData{
-			BaseVM: viewdata.BaseVM{Title: "Mission HydroSci"}, IsComplete: true, CurrentUnit: "complete", CeremonyURL: url,
+			BaseVM: viewdata.BaseVM{Title: "Mission HydroSci"}, IsComplete: true, CurrentUnit: "complete", CeremonyURL: url, Ceremony: card,
 		})
 		if rec.Code != 200 {
 			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
 		}
 		return rec.Body.String()
 	}
-	if body := render(CeremonyPath); !strings.Contains(body, `href="/missionhydrosci/ceremony"`) || !strings.Contains(body, "Watch your ceremony") {
-		t.Errorf("complete + ceremony: button missing")
+	if body := render(CeremonyPath); !strings.Contains(body, `href="/missionhydrosci/ceremony"`) || !strings.Contains(body, "Watch your ceremony") || !strings.Contains(body, `id="ceremony-card"`) || !strings.Contains(body, "v0.1.8") {
+		t.Errorf("complete + ceremony: button or list row missing")
 	}
-	if body := render(""); strings.Contains(body, "Watch your ceremony") {
-		t.Errorf("complete without ceremony: button must not show")
+	if body := render(""); strings.Contains(body, "Watch your ceremony") || strings.Contains(body, `id="ceremony-card"`) {
+		t.Errorf("complete without ceremony: button and row must not show")
 	}
 }

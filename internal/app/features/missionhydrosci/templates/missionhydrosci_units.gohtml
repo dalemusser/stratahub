@@ -166,6 +166,20 @@
         <span id="status-{{ .ID }}" aria-live="polite" class="text-xs text-gray-500 dark:text-gray-400 ml-2">{{ if eq .Status "completed" }}Completed{{ else }}Checking...{{ end }}</span>
       </div>
       {{ end }}
+      {{ if .Ceremony }}
+      <!-- The end-of-game ceremony (not a unit: nothing to download ahead; it
+           streams when watched). Members open it once complete; staff any time. -->
+      <div id="ceremony-card" class="bg-gray-50 dark:bg-gray-700/50 rounded p-3">
+        <span class="text-sm font-medium text-gray-900 dark:text-gray-100">🏆 End-of-game ceremony</span>
+        <span class="text-xs text-gray-400 dark:text-gray-500 ml-1">v{{ .Ceremony.Version }}</span>
+        <span class="text-xs text-gray-500 dark:text-gray-400 ml-2">{{ .Ceremony.SizeLabel }}</span>
+        {{ if .Ceremony.CanOpen }}
+        <a href="{{ .Ceremony.URL }}" class="text-xs ml-2 font-medium text-blue-600 dark:text-blue-400 hover:underline">{{ .Ceremony.Label }}</a>
+        {{ else }}
+        <span class="text-xs text-gray-500 dark:text-gray-400 ml-2">{{ .Ceremony.Label }}</span>
+        {{ end }}
+      </div>
+      {{ end }}
     </div>
 
     <!-- Storage quota bar (below the unit list) -->

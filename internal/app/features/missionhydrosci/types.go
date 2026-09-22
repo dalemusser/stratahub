@@ -24,12 +24,13 @@ type UnitVM struct {
 type UnitsData struct {
 	viewdata.BaseVM
 	Units                []UnitVM
-	CurrentUnit          string // e.g., "unit3" or "complete"
-	IsComplete           bool   // True when all units are done
-	CeremonyURL          string // "/missionhydrosci/ceremony" when the collection has a ceremony (shown once complete)
-	NextUnitID           string // Unit after CurrentUnit, empty if last/complete
-	CollectionOverride   bool   // True when a per-user override is active (drives the "(override)" badge)
-	ActiveCollectionName string // Name of the effective collection being used (version line)
+	CurrentUnit          string          // e.g., "unit3" or "complete"
+	IsComplete           bool            // True when all units are done
+	CeremonyURL          string          // "/missionhydrosci/ceremony" when the collection has a ceremony (shown once complete)
+	Ceremony             *CeremonyCardVM // the ceremony row at the end of the unit list; nil when the collection has none
+	NextUnitID           string          // Unit after CurrentUnit, empty if last/complete
+	CollectionOverride   bool            // True when a per-user override is active (drives the "(override)" badge)
+	ActiveCollectionName string          // Name of the effective collection being used (version line)
 }
 
 // PlayData is the view model for the game launcher page.
@@ -66,6 +67,17 @@ type PlayData struct {
 	DeviceTestShortID string // last 6 hex characters, quoted back to us by testers
 	DeviceTestBase    string // "/missionhydrosci/devicetest/run/<id>"
 	PlayBackURL       string // where the back button goes
+}
+
+// CeremonyCardVM is the end-of-game ceremony's row in the unit list: always
+// visible when the collection carries one, so students see what follows
+// Unit 5 and staff can see (and open) the version in use.
+type CeremonyCardVM struct {
+	Version   string
+	SizeLabel string
+	URL       string
+	Label     string // "After Unit 5" / "Watch" / "Open (preview)"
+	CanOpen   bool   // Label is a link
 }
 
 // CeremonyData is the view model for the end-of-game ceremony host page
