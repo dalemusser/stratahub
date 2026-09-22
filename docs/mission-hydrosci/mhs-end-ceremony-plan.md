@@ -58,8 +58,9 @@ remain open in §7 and do not block the phases. Nothing has been implemented.*
   visible change — unused clips and orphan samplers dropped, clips resampled,
   WebP textures ≤ 1024 px, voice 64 kbps, music 128 kbps, holo ≤ 1280 px, WebP
   logo (`mhs-gameplay-end/docs/v0.2.0-plan.md`, pipeline `tools/optimize.sh`).
-  Staged; Dale uploads, syncs and selects v0.2.0. A member in Unit 5 is testing
-  the end-to-end path on Dev MHS; the team's EA questions have been sent.
+  Live and selected on Dev MHS the same day (Dale confirmed it plays; sweep
+  103/103; player archived as `_v9`). A member in Unit 5 is testing the
+  end-to-end path on Dev MHS; the team's EA questions have been sent.
 - **Next step:** the member's result; grader G2 (the other fourteen
   checkpoints, true star totals) as the team's answers arrive.
 - Related documents: `mhs-gameplay-end/docs/implementation-plan.md` (Phase 5
