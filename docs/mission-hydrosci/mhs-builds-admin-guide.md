@@ -229,9 +229,10 @@ the same way they pick unit versions.
 
 ### What students see
 
-- On a new game build, the game's own end screen hands over to the ceremony
-  when the student chooses to leave it. On older builds the student uses the
-  back button and finds a **Watch your ceremony** button on the units page.
+- On a new game build, the game's own end screen (Continue) hands over to the
+  ceremony; the launcher records Unit 5 as complete at that moment, whether or
+  not the game reported it. On older builds the student uses the back button
+  and finds a **Watch your ceremony** button on the units page once complete.
 - The unit list always ends with an **End-of-game ceremony** row showing the
   version in use: "After Unit 5" until the student is complete, then
   **Watch**; staff see **Open (preview)** at any time. The units page keeps

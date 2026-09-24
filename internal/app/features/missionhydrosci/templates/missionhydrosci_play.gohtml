@@ -691,10 +691,46 @@
       // the ceremony once the student is complete).
       // When the collection carries an end-of-game ceremony this lands on it
       // (docs/mission-hydrosci/mhs-end-ceremony-plan.md D6); otherwise the launcher.
+      //
+      // The end screen means the last unit is done, but the shipped build
+      // (2.8.1) calls only EndGame at the end of Unit 5 — never CompleteUnit
+      // for it — so the student's progress stayed on unit5 and the ceremony's
+      // gate sent them back to the launcher (2026-09-24). Record the
+      // completion here before leaving; when a build does call CompleteUnit
+      // first, completionHandled is already set and this just navigates.
       // TODO: Remove backward compatibility note once all builds use the new MHSBridge.
       window.mhsEndGame = function() {
         console.log('MHS: mhsEndGame called — leaving the game');
-        window.location.href = '{{ if .CeremonyURL }}{{ .CeremonyURL }}{{ else if .PlayBackURL }}{{ .PlayBackURL }}{{ else }}/missionhydrosci/units{{ end }}';
+        var target = '{{ if .CeremonyURL }}{{ .CeremonyURL }}{{ else if .PlayBackURL }}{{ .PlayBackURL }}{{ else }}/missionhydrosci/units{{ end }}';
+        {{ if .DeviceTest }}
+        window.location.href = target;
+        return;
+        {{ end }}
+        if (completionHandled) { window.location.href = target; return; }
+        completionHandled = true;
+        if (window.__mhsStepLog) window.__mhsStepLog.record('game', 'ok', 'Game end reported by the game; recording the unit as complete');
+        try { localStorage.setItem('missionhydrosci-progress-changed', '1'); } catch (e) {}
+        var left = false;
+        var leave = function() { if (left) return; left = true; window.location.href = target; };
+        // Never strand the student on the end screen: if the completion POST
+        // has not answered in 8 s, queue it (the launcher flushes the queue)
+        // and go; the ceremony page sends a not-yet-complete student to the
+        // launcher, which is where they would end up anyway.
+        var timer = setTimeout(function() { queueCompletion(unitId); leave(); }, 8000);
+        fetch('/missionhydrosci/api/progress/complete', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
+          body: JSON.stringify({ unit: unitId }),
+          keepalive: true
+        })
+        .then(function(resp) { if (!resp.ok) { throw new Error('HTTP ' + resp.status); } return resp.json(); })
+        .then(function() { clearTimeout(timer); leave(); })
+        .catch(function(err) {
+          console.error('MHS: end-game completion POST failed, queuing offline', err);
+          clearTimeout(timer);
+          queueCompletion(unitId);
+          leave();
+        });
       };
 
       // Expose for cleanup script

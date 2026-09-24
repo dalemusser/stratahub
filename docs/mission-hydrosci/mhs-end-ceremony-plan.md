@@ -61,7 +61,18 @@ remain open in §7 and do not block the phases. Nothing has been implemented.*
   Live and selected on Dev MHS the same day (Dale confirmed it plays; sweep
   103/103; player archived as `_v9`). A member in Unit 5 is testing the
   end-to-end path on Dev MHS; the team's EA questions have been sent.
-- **Next step:** the member's result; grader G2 (the other fourteen
+- **2026-09-24 (the member's run):** the game's end screen (Continue) landed
+  the student on the launcher with Unit 5 still "Ready to play" and no
+  ceremony. Cause: the shipped build (2.8.1) calls only `EndGame` at the end
+  of Unit 5, never `CompleteUnit("unit5")` (the bridge contract says every
+  unit, the last included), so `mhs_user_progress` stayed on unit5 and the
+  ceremony's gate sent the student back. Confirmed in the data: `EndOfUnit`
+  logged, u5p4 graded, progress unchanged since the 16th, no ceremony step log.
+  Fix in the play page: `mhsEndGame` records the completion itself
+  (idempotent; 8 s cap, offline queue) before going to the ceremony. Worth
+  telling the game team, but stratahub no longer depends on it.
+- **Next step:** the member re-enters Unit 5 and reaches the end screen again
+  (or a re-run by any completed student); grader G2 (the other fourteen
   checkpoints, true star totals) as the team's answers arrive.
 - Related documents: `mhs-gameplay-end/docs/implementation-plan.md` (Phase 5
   is the original stratahub integration spec), `mhs-gameplay-end/docs/partial-nodata-plan.md`
