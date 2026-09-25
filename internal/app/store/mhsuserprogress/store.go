@@ -101,9 +101,64 @@ func (s *Store) SetToUnit(ctx context.Context, workspaceID, userID primitive.Obj
 			"completed_units": completed,
 			"updated_at":      now,
 		},
+		// Back in the game: the game has not ended any more.
+		"$unset": bson.M{"game_ended_at": "", "game_ended_by": "", "game_ended_name": ""},
 	}
 
 	_, err := s.c.UpdateOne(ctx, filter, update)
+	return err
+}
+
+// Sources of the end-of-game mark (models.MHSUserProgress.GameEndedBy).
+const (
+	GameEndedByGame     = "game"     // the game's EndGame call
+	GameEndedByStaff    = "staff"    // a teacher's or admin's jump
+	GameEndedByBackfill = "backfill" // records already complete when the mark was introduced
+)
+
+// MarkGameEnded records that the game has ended for the student, keeping the
+// first timestamp when it is already set (a replay's EndGame changes nothing).
+// The record is created if the student has none.
+func (s *Store) MarkGameEnded(ctx context.Context, workspaceID, userID primitive.ObjectID, by, name string) error {
+	if _, err := s.GetOrCreate(ctx, workspaceID, userID); err != nil {
+		return err
+	}
+	now := time.Now().UTC()
+	set := bson.M{"game_ended_at": now, "game_ended_by": by}
+	if name != "" {
+		set["game_ended_name"] = name
+	}
+	_, err := s.c.UpdateOne(ctx,
+		bson.M{"workspace_id": workspaceID, "user_id": userID, "game_ended_at": bson.M{"$exists": false}},
+		bson.M{"$set": set})
+	return err
+}
+
+// JumpToEndOfGame is the staff action: every listed unit completed, the
+// current unit "complete", and the end-of-game mark set now (overwriting an
+// earlier one), so the student sees Mission Complete and can watch the
+// ceremony. unitIDs are the collection's units in order. Undone by SetToUnit.
+func (s *Store) JumpToEndOfGame(ctx context.Context, workspaceID, userID primitive.ObjectID, unitIDs []string, staffName string) error {
+	now := time.Now().UTC()
+	completed := append([]string{}, unitIDs...)
+	filter := bson.M{"workspace_id": workspaceID, "user_id": userID}
+	update := bson.M{
+		"$set": bson.M{
+			"current_unit":    "complete",
+			"completed_units": completed,
+			"updated_at":      now,
+			"game_ended_at":   now,
+			"game_ended_by":   GameEndedByStaff,
+			"game_ended_name": staffName,
+		},
+		"$setOnInsert": bson.M{
+			"_id":          primitive.NewObjectID(),
+			"workspace_id": workspaceID,
+			"user_id":      userID,
+			"created_at":   now,
+		},
+	}
+	_, err := s.c.UpdateOne(ctx, filter, update, options.Update().SetUpsert(true))
 	return err
 }
 

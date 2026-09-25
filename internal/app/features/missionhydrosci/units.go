@@ -19,7 +19,7 @@ func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
 	// Load user progress
 	var currentUnit string
 	var completedUnits []string
-	var isComplete bool
+	var isComplete, gameEnded bool
 	wsID := workspace.IDFromRequest(r)
 
 	if user, ok := auth.CurrentUser(r); ok {
@@ -41,6 +41,7 @@ func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
 		currentUnit = progress.CurrentUnit
 		completedUnits = progress.CompletedUnits
 		isComplete = progress.CurrentUnit == "complete"
+		gameEnded = progress.GameEnded()
 	}
 	if currentUnit == "" {
 		currentUnit = "unit1"
@@ -89,7 +90,8 @@ func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
 	// Resolve effective collection info for the read-only version line.
 	collInfo := h.resolveEffectiveCollectionInfo(r)
 
-	// The ceremony row: members open it once complete, staff any time.
+	// The ceremony row: members open it once the game has ended (the
+	// end-of-game mark, not unit completion), staff any time.
 	var ceremonyCard *CeremonyCardVM
 	if manifest.Ceremony != nil {
 		isMember := true
@@ -104,10 +106,10 @@ func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case !isMember:
 			card.Label, card.CanOpen = "Open (preview)", true
-		case isComplete:
+		case gameEnded:
 			card.Label, card.CanOpen = "Watch", true
 		default:
-			card.Label = "After Unit 5"
+			card.Label = "After the game ends"
 			if n := len(manifest.Units); n > 0 {
 				card.Label = "After " + manifest.Units[n-1].Title
 			}
@@ -120,6 +122,7 @@ func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
 		Units:                units,
 		CurrentUnit:          currentUnit,
 		IsComplete:           isComplete,
+		GameEnded:            gameEnded,
 		CeremonyURL:          ceremonyURLFor(manifest),
 		Ceremony:             ceremonyCard,
 		NextUnitID:           nextUnitID,

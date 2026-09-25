@@ -4,6 +4,7 @@ package testutil
 import (
 	"context"
 	"fmt"
+	"os"
 	"sync"
 	"testing"
 	"time"
@@ -14,11 +15,22 @@ import (
 )
 
 const (
-	// TestDBURI is the MongoDB connection string for tests.
-	TestDBURI = "mongodb://localhost:27017"
 	// TestDBName is the database name used for tests.
 	TestDBName = "strata_hub_test"
 )
+
+// TestDBURI is the MongoDB connection string for tests. STRATAHUB_TEST_MONGO_URI
+// overrides it: the suites create every index per test database, so a
+// long-running local instance that has grown slow at index builds times them
+// out; a throwaway instance on another port runs them in seconds.
+var TestDBURI = envOr("STRATAHUB_TEST_MONGO_URI", "mongodb://localhost:27017")
+
+func envOr(key, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
+}
 
 var (
 	clientOnce sync.Once
@@ -36,10 +48,10 @@ func getClient() (*mongo.Client, error) {
 		// Configure connection pool for parallel test execution
 		clientOpts := options.Client().
 			ApplyURI(TestDBURI).
-			SetMaxPoolSize(200).                    // Increase pool for parallel tests
-			SetMinPoolSize(10).                     // Keep some connections warm
-			SetMaxConnIdleTime(30 * time.Second).   // Release idle connections faster
-			SetConnectTimeout(10 * time.Second).    // Connection timeout
+			SetMaxPoolSize(200).                  // Increase pool for parallel tests
+			SetMinPoolSize(10).                   // Keep some connections warm
+			SetMaxConnIdleTime(30 * time.Second). // Release idle connections faster
+			SetConnectTimeout(10 * time.Second).  // Connection timeout
 			SetServerSelectionTimeout(10 * time.Second)
 
 		client, clientErr = mongo.Connect(ctx, clientOpts)

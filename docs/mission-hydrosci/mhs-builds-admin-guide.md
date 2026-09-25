@@ -193,7 +193,7 @@ When deploying updates or testing on the server, use **Maintenance Mode** to blo
 
 ## End-of-Game Ceremony
 
-The ceremony is the award show students see after finishing Unit 5. It is a
+The ceremony is the award show students see when the game ends. It is a
 separate web bundle (the `mhs-gameplay-end` project), not a Unity unit, and it
 is versioned and chosen per collection like the units
 (`docs/mission-hydrosci/mhs-end-ceremony-plan.md`).
@@ -227,21 +227,45 @@ once, for students who have already finished as well as those who finish
 later; group pins and per-user overrides pick their collection's ceremony
 the same way they pick unit versions.
 
+### When the game ends
+
+The ceremony hangs off one fact on the student's progress record: **the game
+has ended**. It is separate from unit completion, so a student can reach it
+without every unit being marked complete, and completing Unit 5 on its own
+does not open it.
+
+- The game sets it. When the game reports its end (the Continue button on
+  its final screen, or the end of Unit 5 on builds without that screen), the
+  play page records the end of the game, marks Unit 5 complete if the game
+  had not already reported that, and opens the ceremony.
+- Staff can set it. **End of game** is the last entry of the set-progress
+  menu (the gear beside a student's name on the MHS Dashboard's Progress
+  tab) and a button below the units table on the student's Manage page. It
+  asks for confirmation, marks every unit complete, and ends the game, so
+  the ceremony becomes available to the student at once. Use it for a
+  student who could not finish, or whose game never reported its end.
+- Setting a unit undoes it. Choosing any unit from the same menu (or **Set
+  current** on the Manage page) puts the student back in the game and
+  clears the end-of-game mark; the ceremony's link disappears until the
+  game ends again. Viewing history (below) is kept.
+- The Manage page's progress line says who ended the game and when ("Game
+  ended by the game on …" or by the staff member's name).
+
 ### What students see
 
-- On a new game build, the game's own end screen (Continue) hands over to the
-  ceremony; the launcher records Unit 5 as complete at that moment, whether or
-  not the game reported it. On older builds the student uses the back button
-  and finds a **Watch your ceremony** button on the units page once complete.
+- When the game ends, the browser leaves the game and the ceremony plays;
+  it starts on its own as soon as it has loaded. On the rare device whose
+  browser will not play sound without a tap, a **Begin Ceremony** button
+  appears with a note to tap it.
 - The unit list always ends with an **End-of-game ceremony** row showing the
-  version in use: "After Unit 5" until the student is complete, then
-  **Watch**; staff see **Open (preview)** at any time. The units page keeps
-  the button after completion, so the ceremony can be replayed any time.
-- The show starts as soon as its characters have loaded; it reads each
-  unit's results just before that character speaks, so a grade that is still
-  being recorded when the student finishes is picked up during the show. A
-  result that never arrives plays the gentler line for that moment and leaves
-  that unit's star row dark. Nothing waits on grading.
+  version in use: "After Unit 5" until the game has ended, then **Watch**;
+  staff see **Open (preview)** at any time. Once the game has ended the
+  units page also shows a **Watch your ceremony** button, so the ceremony
+  can be replayed any time.
+- The show reads each unit's results just before that character speaks, so
+  a grade that is still being recorded when the student finishes is picked
+  up during the show. A result that never arrives plays the gentler line for
+  that moment and leaves that unit's star row dark. Nothing waits on grading.
 - A **Back to Mission HydroSci** control is always available, top right.
 
 ### What staff see
@@ -251,12 +275,12 @@ the same way they pick unit versions.
   name that previews that student's own ceremony (their real results);
   the same page is `/missionhydrosci/ceremony?user_id=<the student's id>` for
   students within their reach. Previews are not recorded.
-- Once a student has pressed Begin, a 🏆 mark appears beside their name on
-  the Progress tab; its tooltip says when they started, the version, how many
-  times, and whether a showing reached the end.
-- A student's progress record keeps when they first pressed Begin, when they
-  last reached the end, the version shown, and how many times they started
-  it.
+- Once a student's ceremony has started, a 🏆 mark appears beside their name
+  on the Progress tab; its tooltip says when it first started, the version,
+  how many times, and whether a showing reached the end.
+- A student's progress record keeps when the game ended and who ended it,
+  when the ceremony first started, when it last reached the end, the version
+  shown, and how many times it started.
 - Load problems and completions are recorded like unit launches and appear in
   the **Device Tests** viewer under unit `end` (outcomes `ceremony-ok` and
   `ceremony-failed`).

@@ -270,6 +270,9 @@
       Current: <strong>{{ range .Units }}{{ if eq .Status "current" }}{{ .Title }}{{ end }}{{ end }}</strong>
       &middot; Completed: {{ len .CompletedUnits }} of {{ len .Units }} units
       {{ end }}
+      {{ if .GameEnded }}
+      &middot; Game {{ .GameEndedNote }}
+      {{ end }}
     </p>
 
     <!-- Units table: download state, progress, and per-unit actions.
@@ -331,8 +334,29 @@
       </table>
     </div>
     <p class="text-[11px] text-gray-400 dark:text-gray-500 -mt-2 mb-4">
-      Set current: marks all earlier units complete. Does not affect downloads or saved game data.
+      Set current: marks all earlier units complete and puts the student back in the game (clears End of game). Does not affect downloads or saved game data.
     </p>
+
+    <!-- End of game: the mark the end-of-game ceremony hangs off. The game
+         sets it through EndGame; this is the staff jump for a student who
+         needs it set by hand. Setting any unit as current clears it again. -->
+    <div class="flex items-start gap-3 mt-3">
+      {{ if .GameEnded }}
+      <span class="w-56 shrink-0 px-3 py-2 text-xs font-medium text-center text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded">🏆 Game ended</span>
+      <p class="text-[11px] text-gray-400 dark:text-gray-500 pt-1">
+        The game has ended ({{ .GameEndedNote }}); the end-of-game ceremony is available on the Mission HydroSci page.
+        To put the student back in the game, set a unit as current above.
+      </p>
+      {{ else }}
+      <button id="end-of-game-btn" onclick="mhsEndOfGame()" class="w-56 shrink-0 px-3 py-2 text-xs font-medium bg-indigo-600 text-white rounded hover:bg-indigo-700">
+        🏆 End of game
+      </button>
+      <p class="text-[11px] text-gray-400 dark:text-gray-500 pt-1">
+        Marks every unit complete and ends the game, which makes the end-of-game ceremony available
+        on the Mission HydroSci page. Setting a unit as current undoes this.
+      </p>
+      {{ end }}
+    </div>
 
     <!-- Bulk local actions -->
     <div class="space-y-3 pt-3 border-t border-gray-200 dark:border-gray-700">
@@ -949,6 +973,33 @@
     })
     .catch(function(err) {
       alert('Failed to set progress: ' + err.message);
+    });
+  };
+
+  // The staff jump to the end of the game (see the "End of game" button):
+  // set-unit with "end". The page reloads so the summary, the table and the
+  // note reflect the server's state.
+  window.mhsEndOfGame = function() {
+    if (!confirm('End the game? Every unit is marked complete and the end-of-game ceremony becomes available. Setting a unit as current undoes this.')) return;
+    csrf.fetch('/missionhydrosci/api/progress/set-unit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unit: 'end' })
+    })
+    .then(function(resp) {
+      if (!resp.ok) {
+        if (handleAuthFailure(resp)) return null;
+        throw new Error('end of game failed');
+      }
+      return resp.json();
+    })
+    .then(function(data) {
+      if (!data) return;
+      try { localStorage.setItem('missionhydrosci-progress-changed', '1'); } catch (e) {}
+      window.location.reload();
+    })
+    .catch(function(err) {
+      alert('Failed to end the game: ' + err.message);
     });
   };
 

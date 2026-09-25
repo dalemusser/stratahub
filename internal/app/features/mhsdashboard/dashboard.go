@@ -409,8 +409,27 @@ func (h *Handler) HandleSetProgress(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Set progress
-	if err := h.ProgressStore.SetToUnit(ctx, wsID, targetUserID, targetUnit); err != nil {
+	// Set progress. "end" is the jump to the end of the game: every unit
+	// complete and the end-of-game mark set (the ceremony gate); setting any
+	// unit afterwards clears the mark again.
+	if targetUnit == "end" {
+		cfg, err := LoadProgressConfig()
+		if err != nil {
+			h.Log.Error("failed to load the progress config", zap.Error(err))
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		unitIDs := make([]string, len(cfg.Units))
+		for i, u := range cfg.Units {
+			unitIDs[i] = u.ID
+		}
+		_, staffName, _, _ := authz.UserCtx(r)
+		if err := h.ProgressStore.JumpToEndOfGame(ctx, wsID, targetUserID, unitIDs, staffName); err != nil {
+			h.Log.Error("failed to jump progress to the end of the game", zap.Error(err))
+			http.Error(w, "failed to set progress", http.StatusInternalServerError)
+			return
+		}
+	} else if err := h.ProgressStore.SetToUnit(ctx, wsID, targetUserID, targetUnit); err != nil {
 		h.Log.Error("failed to set progress", zap.Error(err), zap.String("targetUnit", targetUnit))
 		http.Error(w, "failed to set progress", http.StatusInternalServerError)
 		return

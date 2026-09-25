@@ -79,9 +79,32 @@ remain open in §7 and do not block the phases. Nothing has been implemented.*
   Continue screen; call `CompleteUnit("unit5", null)` then `EndGame()` at the
   portal). Until that build ships, the current build still reaches the
   ceremony through the `EndGame` path.
-- **Next step:** the testers' re-run on the current build; the game team's
-  build; grader G2 (the other fourteen checkpoints, true star totals) as the
-  team's answers arrive.
+- **2026-09-24/25 (the end-of-game model, Dale's correction):** the
+  immediate jump on unit completion was wrong: the ceremony must hang off the
+  end of the game only, never on unit completion, and staff need a way to end
+  the game for a student. Built as D6 now reads: `game_ended_at/by/name` on
+  `mhs_user_progress`; `POST /api/progress/end-game` (courtesy completion of
+  the last unit, then the mark); the play page's `isFinal` branch back to
+  hiding the overlay only; `mhsEndGame` posts end-game (8 s cap, queued
+  offline, flushed by the launcher); ceremony gate, launcher buttons and the
+  ea-scores pending window keyed on the mark; **End of game** (with
+  confirmation) in the dashboard set-progress menu and on the manage page;
+  any set-to-unit clears the mark; `scripts/backfill_mhs_game_ended.js` for
+  records already complete. Ceremony v0.2.1 (player v10, `EMBED_V` 4):
+  `autostart` with a silent-audio probe and Begin fallback, verified in a
+  headless browser both ways; staged `dist/v0.2.1`. Hand-off rewritten
+  (`mhs-updates/end-of-game-ceremony-092426/`): both events required, the
+  Congratulations screen is the team's choice with recommended copy
+  ("Your crew is waiting to celebrate with you" / "Continue to the
+  celebration"). Test note: the DB-backed suites time out on the local
+  MongoDB when its index builds have grown slow; `STRATAHUB_TEST_MONGO_URI`
+  points them at a throwaway instance (`mongod --dbpath <tmp> --port 27099`).
+- **Next step:** Dale uploads `dist/v0.2.1` and selects it on Dev MHS; run
+  the backfill on production after the deploy; the testers' re-run on the
+  current build (`EndGame` only) and the console simulation of the new
+  path (`window.mhsUnitComplete('unit5'); window.mhsEndGame()`); the game
+  team's build; grader G2 (the other fourteen checkpoints, true star totals)
+  as the team's answers arrive.
 - Related documents: `mhs-gameplay-end/docs/implementation-plan.md` (Phase 5
   is the original stratahub integration spec), `mhs-gameplay-end/docs/partial-nodata-plan.md`
   (on hold), `mhsgrader/docs/updates/ea-scores.md` (the grader brief, decision
@@ -283,18 +306,44 @@ contract in §3. Staff may pass `user_id` for a student within their reach
 (`viewscope`, the same rule as the dashboard) to drive the per-student preview
 in D6.
 
-### D6 — Trigger and gating. **`mhsEndGame` → ceremony; replay from the units page.** *(decided 2026-09-21)*
+### D6 — Trigger and gating. **The end of the game is its own fact; `mhsEndGame` sets it and opens the ceremony; replay from the units page.** *(decided 2026-09-21; reworked 2026-09-24, Dale)*
 
-- `window.mhsEndGame` navigates to `/missionhydrosci/ceremony` when the
-  resolved collection has a ceremony, otherwise to the units page as today.
-  The `isFinal` branch stays as it is (it exists to keep the game's end screen
-  reachable).
-- Old builds without EndGame: the units page "Mission Complete" card gains a
-  **Watch your ceremony** button. The same button is the replay entry point,
-  available any time after completion.
-- Gate: members may open the ceremony only when
-  `mhs_user_progress.current_unit == "complete"`. This keeps the on-hold
-  "partial player" question out of this plan (see D7).
+- Two events, kept apart. **End of Unit 5** (`CompleteUnit("unit5")` →
+  `/api/progress/complete`) completes the unit and nothing more: the
+  `isFinal` branch hides the play page's overlay and leaves the game
+  running. **End of game** (`EndGame()` → `window.mhsEndGame` →
+  `POST /api/progress/end-game`) sets `mhs_user_progress.game_ended_at`
+  (`game_ended_by: "game"`), completes the unit the page was running when
+  it is the collection's last (the shipped build 2.8.1 never calls
+  `CompleteUnit("unit5")`), and navigates to `/missionhydrosci/ceremony`
+  when the resolved collection has a ceremony, otherwise to the units page.
+  Both posts are idempotent; the play page caps the end-game post at 8 s and
+  queues it (`mhs-progress-queue`, `event: "end-game"`) for the launcher to
+  flush when offline. Builds that send both events back to back and builds
+  that send only `EndGame` both work.
+- Gate: members may open the ceremony only when the game has ended
+  (`game_ended_at` set). Unit completion never opens it, and the mark does
+  not require any unit to be complete — the ceremony is "the game is over",
+  whatever the units say (Dale, 2026-09-24).
+- Staff jump: **End of game** in the dashboard's set-progress menu
+  (`POST /mhsdashboard/set-progress`, `unit=end`) and on the manage page
+  (`POST /missionhydrosci/api/progress/set-unit`, `unit: "end"`, member auth
+  as for any unit) marks every unit complete, sets `current_unit` to
+  `complete` and the mark (`game_ended_by: "staff"`, `game_ended_name`),
+  after a confirmation. Any set-to-unit clears the mark (the undo).
+  Ceremony viewed marks are history and are never cleared.
+- Backfill (one-time, `scripts/backfill_mhs_game_ended.js`): records already
+  at `complete` when the mark was introduced get `game_ended_at` from their
+  `updated_at` (`game_ended_by: "backfill"`); records at unit5 or earlier
+  do not (the remedy is the staff jump or playing to the end again).
+- The units page "Mission Complete" card (and, when the game ended without
+  every unit complete, a line above the current unit) shows **Watch your
+  ceremony** once the game has ended; the ceremony row reads "After
+  Unit 5" → **Watch**. The same button is the replay entry point.
+- Autostart (ceremony v0.2.1): the host page passes `autostart: true` on
+  every arrival, so the show begins with no Begin click when the browser
+  lets the page play sound; otherwise the Begin button stays with a "Tap
+  Begin to start." note. The Exit control stays "Back to Mission HydroSci".
 - Staff per-student preview (leader, coordinator, admin): the dashboard's
   student row gets a "View ceremony" link to
   `/missionhydrosci/ceremony?user_id=<hex>`; the host page and the scores

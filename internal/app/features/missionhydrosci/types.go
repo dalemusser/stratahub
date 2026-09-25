@@ -26,7 +26,8 @@ type UnitsData struct {
 	Units                []UnitVM
 	CurrentUnit          string          // e.g., "unit3" or "complete"
 	IsComplete           bool            // True when all units are done
-	CeremonyURL          string          // "/missionhydrosci/ceremony" when the collection has a ceremony (shown once complete)
+	GameEnded            bool            // True when the game has ended for the student (the ceremony gate; models.MHSUserProgress.GameEnded)
+	CeremonyURL          string          // "/missionhydrosci/ceremony" when the collection has a ceremony (shown once the game has ended)
 	Ceremony             *CeremonyCardVM // the ceremony row at the end of the unit list; nil when the collection has none
 	NextUnitID           string          // Unit after CurrentUnit, empty if last/complete
 	CollectionOverride   bool            // True when a per-user override is active (drives the "(override)" badge)
@@ -76,9 +77,13 @@ type CeremonyCardVM struct {
 	Version   string
 	SizeLabel string
 	URL       string
-	Label     string // "After Unit 5" / "Watch" / "Open (preview)"
+	Label     string // "After the game ends" / "Watch" / "Open (preview)"
 	CanOpen   bool   // Label is a link
 }
+
+// endOfGameUnitID is the value the set-unit endpoints and the dashboard's
+// set-progress menu use for the staff jump to the end of the game.
+const endOfGameUnitID = "end"
 
 // CeremonyData is the view model for the end-of-game ceremony host page
 // (docs/mission-hydrosci/mhs-end-ceremony-plan.md D3; the bundle's contract

@@ -44,6 +44,9 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 		pr.Get("/api/manifest", h.ServeContentManifest)
 		pr.Get("/api/progress", h.ServeProgress)
 		pr.Post("/api/progress/complete", h.HandleCompleteUnit)
+		// The game's EndGame: marks the game ended (the ceremony gate), completing
+		// the current unit first when it is the collection's last.
+		pr.Post("/api/progress/end-game", h.HandleEndGame)
 		pr.Post("/api/progress/set-unit", h.HandleSetToUnit)
 
 		// Delete online saved game data (state / settings) via stratasave.

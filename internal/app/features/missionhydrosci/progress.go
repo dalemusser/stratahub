@@ -3,8 +3,10 @@ package missionhydrosci
 
 import (
 	"encoding/json"
+	"io"
 	"net/http"
 
+	"github.com/dalemusser/stratahub/internal/app/store/mhsuserprogress"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -88,8 +90,10 @@ func (h *Handler) HandleSetToUnit(w http.ResponseWriter, r *http.Request) {
 	// Validate the requested unit against this user's resolved manifest rather
 	// than a fixed unit1..unitN list. Collections are data-driven, so the unit
 	// set can change (e.g. a future unit6) — the manifest is the source of truth.
+	// "end" is the jump to the end of the game (every unit complete, the
+	// end-of-game mark set); setting any unit clears that mark again.
 	manifest, _ := h.resolveManifest(r)
-	validUnit := false
+	validUnit := req.Unit == endOfGameUnitID
 	for _, u := range manifest.Units {
 		if u.ID == req.Unit {
 			validUnit = true
@@ -116,6 +120,21 @@ func (h *Handler) HandleSetToUnit(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if req.Unit == endOfGameUnitID {
+		unitIDs := make([]string, len(manifest.Units))
+		for i, u := range manifest.Units {
+			unitIDs[i] = u.ID
+		}
+		if err := h.ProgressStore.JumpToEndOfGame(r.Context(), wsID, userID, unitIDs, h.actingStaffName(r, user)); err != nil {
+			h.Log.Error("failed to jump progress to the end of the game", zap.Error(err))
+			http.Error(w, "internal error", http.StatusInternalServerError)
+			return
+		}
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"ok": true, "unit": endOfGameUnitID, "game_ended": true})
+		return
+	}
+
 	if err := h.ProgressStore.SetToUnit(r.Context(), wsID, userID, req.Unit); err != nil {
 		h.Log.Error("failed to set progress to unit", zap.Error(err))
 		http.Error(w, "internal error", http.StatusInternalServerError)
@@ -124,6 +143,70 @@ func (h *Handler) HandleSetToUnit(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{"ok": true, "unit": req.Unit})
+}
+
+// actingStaffName names who is behind a staff action on the manage page:
+// the signed-in staff member, or for a member the staff whose unlock (or the
+// keyword) authorized the action.
+func (h *Handler) actingStaffName(r *http.Request, user *auth.SessionUser) string {
+	if user.Role != "member" {
+		return user.Name
+	}
+	if key, _, _, ok := h.unlockKey(r); ok {
+		if unlock, err := h.UnlockStore.GetActive(r.Context(), key); err == nil && unlock != nil && unlock.GrantedBy != "" {
+			return unlock.GrantedBy
+		}
+	}
+	return "manage page"
+}
+
+// endGameRequest is the JSON body for POST /api/progress/end-game: the unit
+// the play page was running when the game reported its end (optional).
+type endGameRequest struct {
+	Unit string `json:"unit"`
+}
+
+// HandleEndGame records that the game has ended for the signed-in student —
+// the one fact the ceremony hangs off. It first completes the reported unit
+// when that unit is the collection's last (so a build that never calls
+// CompleteUnit for it still shows Mission Complete), then sets the
+// end-of-game mark. Idempotent: a replay's EndGame changes nothing.
+func (h *Handler) HandleEndGame(w http.ResponseWriter, r *http.Request) {
+	user, ok := auth.CurrentUser(r)
+	if !ok {
+		http.Error(w, "unauthorized", http.StatusUnauthorized)
+		return
+	}
+	var req endGameRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil && err != io.EOF {
+		http.Error(w, "invalid request body", http.StatusBadRequest)
+		return
+	}
+	wsID := workspace.IDFromRequest(r)
+	userID, err := primitive.ObjectIDFromHex(user.ID)
+	if err != nil {
+		http.Error(w, "invalid user", http.StatusBadRequest)
+		return
+	}
+	if _, err := h.ProgressStore.GetOrCreate(r.Context(), wsID, userID); err != nil {
+		h.Log.Error("end-game: failed to load progress", zap.Error(err))
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	manifest, _ := h.resolveManifest(r)
+	if n := len(manifest.Units); req.Unit != "" && n > 0 && manifest.Units[n-1].ID == req.Unit {
+		if _, err := h.ProgressStore.CompleteUnit(r.Context(), wsID, userID, req.Unit, n); err != nil {
+			// The end-of-game mark is what matters; keep going.
+			h.Log.Error("end-game: failed to complete the last unit", zap.Error(err))
+		}
+	}
+	if err := h.ProgressStore.MarkGameEnded(r.Context(), wsID, userID, mhsuserprogress.GameEndedByGame, ""); err != nil {
+		h.Log.Error("end-game: failed to mark the game ended", zap.Error(err))
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]any{"ok": true, "game_ended": true, "ceremony": manifest.Ceremony != nil})
 }
 
 // HandleCompleteUnit marks a unit as completed and advances to the next one.

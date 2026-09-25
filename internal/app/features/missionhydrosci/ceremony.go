@@ -125,7 +125,7 @@ func (h *Handler) ServeCeremony(w http.ResponseWriter, r *http.Request) {
 			h.ErrLog.LogServerError(w, r, "load MHS progress failed (ceremony gate)", err, "Couldn't load Mission HydroSci. Please try again.", "/missionhydrosci/units")
 			return
 		}
-		if progress.CurrentUnit != "complete" {
+		if !progress.GameEnded() {
 			http.Redirect(w, r, "/missionhydrosci/units", http.StatusSeeOther)
 			return
 		}
@@ -321,8 +321,8 @@ func buildEAScores(userIDHex string, doc *eaGradeDoc, progress models.MHSUserPro
 			}
 		}
 	}
-	if progress.CurrentUnit == "complete" && !finalGraded {
-		recent := now.Sub(progress.UpdatedAt) < eaPendingWindow
+	if progress.GameEnded() && !finalGraded {
+		recent := now.Sub(*progress.GameEndedAt) < eaPendingWindow
 		if doc != nil && now.Sub(doc.LastUpdated) < eaPendingWindow {
 			recent = true
 		}

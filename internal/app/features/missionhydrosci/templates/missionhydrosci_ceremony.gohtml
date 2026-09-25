@@ -80,6 +80,10 @@
     returnUrl: returnUrl,
     exitLabel: {{ .ExitLabel }},
     dev: {{ .Dev }},
+    // Every arrival starts the show at once when the browser allows sound
+    // (the student just pressed Continue in the game or Watch on the launcher);
+    // otherwise the bundle keeps its Begin button (v0.2.1).
+    autostart: true,
     onEvent: function (name, detail) {
       record(name, detail);
       if (name === 'started') viewed('started');

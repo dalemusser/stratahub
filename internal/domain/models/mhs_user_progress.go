@@ -11,6 +11,9 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+// GameEnded reports whether the game has ended for the student (the ceremony gate).
+func (p MHSUserProgress) GameEnded() bool { return p.GameEndedAt != nil }
+
 // MHSUserProgress tracks a student's progress through the Mission HydroSci units.
 // One document per (workspace, user) pair.
 type MHSUserProgress struct {
@@ -23,6 +26,17 @@ type MHSUserProgress struct {
 	// CollectionOverrideID is the per-user collection override.
 	// When set, this user plays from this collection instead of the group/workspace default.
 	CollectionOverrideID *primitive.ObjectID `bson:"collection_override_id,omitempty" json:"collection_override_id,omitempty"`
+
+	// End of game (docs/mission-hydrosci/mhs-end-ceremony-plan.md, 2026-09-24):
+	// the one fact the end-of-game ceremony hangs off. Set by the game's
+	// EndGame call (GameEndedBy "game") or by a staff jump ("staff", with the
+	// staff member's name), or by the one-time backfill of records that were
+	// already complete ("backfill"); cleared by any set-to-unit, which puts
+	// the student back in the game. Deliberately independent of unit
+	// completion, which a staff jump can skip.
+	GameEndedAt   *time.Time `bson:"game_ended_at,omitempty" json:"game_ended_at,omitempty"`
+	GameEndedBy   string     `bson:"game_ended_by,omitempty" json:"game_ended_by,omitempty"`
+	GameEndedName string     `bson:"game_ended_name,omitempty" json:"game_ended_name,omitempty"`
 
 	// End-of-game ceremony marks (docs/mission-hydrosci/mhs-end-ceremony-plan.md
 	// D8), written by the ceremony host page and never by unit progress:

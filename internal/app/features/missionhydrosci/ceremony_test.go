@@ -10,8 +10,10 @@ import (
 func TestBuildEAScores(t *testing.T) {
 	now := time.Date(2026, 9, 22, 12, 0, 0, 0, time.UTC)
 	complete := func(ago time.Duration) models.MHSUserProgress {
+		ended := now.Add(-ago)
 		return models.MHSUserProgress{CurrentUnit: "complete",
-			CompletedUnits: []string{"unit1", "unit2", "unit3", "unit4", "unit5"}, UpdatedAt: now.Add(-ago)}
+			CompletedUnits: []string{"unit1", "unit2", "unit3", "unit4", "unit5"}, UpdatedAt: ended,
+			GameEndedAt: &ended, GameEndedBy: "game"}
 	}
 
 	t.Run("no grades right after finishing → pending, empty items", func(t *testing.T) {
@@ -71,6 +73,14 @@ func TestBuildEAScores(t *testing.T) {
 		doc := &eaGradeDoc{LastUpdated: now.Add(-time.Minute), Grades: map[string][]eaGradeItem{}}
 		if r := buildEAScores("abc", doc, complete(2*time.Hour), now); r.Status != "pending" {
 			t.Fatalf("status = %q", r.Status)
+		}
+	})
+
+	t.Run("complete but the game has not ended is never pending", func(t *testing.T) {
+		p := models.MHSUserProgress{CurrentUnit: "complete",
+			CompletedUnits: []string{"unit1", "unit2", "unit3", "unit4", "unit5"}, UpdatedAt: now}
+		if r := buildEAScores("abc", nil, p, now); r.Status != "ready" {
+			t.Fatalf("status = %q, want ready (pending hangs off the end-of-game mark, not unit completion)", r.Status)
 		}
 	})
 

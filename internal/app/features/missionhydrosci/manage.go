@@ -33,6 +33,8 @@ type ManageData struct {
 	CurrentUnit    string
 	CompletedUnits []string
 	IsComplete     bool
+	GameEnded      bool   // the end-of-game mark (the ceremony gate); set by EndGame or a staff jump, cleared by set-to-unit
+	GameEndedNote  string // "ended by the game on …" / "ended by <name> on …"
 	NextUnitID     string // current/next are auto-managed; manage JS needs them for manual-download tracking
 
 	CollectionOverride   bool
@@ -108,6 +110,20 @@ func (h *Handler) ServeManage(w http.ResponseWriter, r *http.Request) {
 	}
 	if completedUnits == nil {
 		completedUnits = []string{}
+	}
+	if progress.GameEnded() {
+		data.GameEnded = true
+		who := "the game"
+		switch progress.GameEndedBy {
+		case "staff":
+			who = progress.GameEndedName
+			if who == "" {
+				who = "staff"
+			}
+		case "backfill":
+			who = "the game (recorded when the mark was introduced)"
+		}
+		data.GameEndedNote = "ended by " + who + " on " + progress.GameEndedAt.Format("Jan 2, 2006")
 	}
 
 	completedSet := make(map[string]bool, len(completedUnits))

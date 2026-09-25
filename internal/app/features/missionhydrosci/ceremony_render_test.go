@@ -93,7 +93,7 @@ func TestUnitsPageOffersCeremonyWhenComplete(t *testing.T) {
 			card = &CeremonyCardVM{Version: "0.1.8", SizeLabel: "71.2 MB", URL: url, Label: "Watch", CanOpen: true}
 		}
 		templates.Render(rec, req, "missionhydrosci_units", UnitsData{
-			BaseVM: viewdata.BaseVM{Title: "Mission HydroSci"}, IsComplete: true, CurrentUnit: "complete", CeremonyURL: url, Ceremony: card,
+			BaseVM: viewdata.BaseVM{Title: "Mission HydroSci"}, IsComplete: true, GameEnded: true, CurrentUnit: "complete", CeremonyURL: url, Ceremony: card,
 		})
 		if rec.Code != 200 {
 			t.Fatalf("status %d: %s", rec.Code, rec.Body.String())

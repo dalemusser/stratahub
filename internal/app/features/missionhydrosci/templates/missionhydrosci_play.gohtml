@@ -392,6 +392,7 @@
       var nextUnitId = '{{ .NextUnitID }}';
       var nextUnitVersion = '{{ .NextUnitVersion }}';
       var completionHandled = false;
+      var endGameHandled = false; // the game's EndGame, recorded once per page
 
       function isExternalGameUrl(url) {
         try {
@@ -501,19 +502,11 @@
 
       function completeAndTransition(nextUnit, isFinal) {
         if (isFinal || !nextUnit) {
-          {{ if .CeremonyURL }}
-          // Final unit, and the collection carries an end-of-game ceremony:
-          // StrataHub owns the ending from here. Leave the game the moment it
-          // reports the last unit complete and go straight to the ceremony —
-          // no in-game end screen, no EndGame needed (a build that still
-          // shows one is simply skipped). mhs-updates/end-of-game-ceremony-092426.
-          cleanupUnity();
-          window.location.href = '{{ .CeremonyURL }}';
-          return;
-          {{ end }}
           // Final unit — the game owns the end-of-game experience (its own end
-          // screen / recap) and calls MHSBridge.EndGame() -> mhsEndGame() to
-          // return to StrataHub when the player is ready. Unity is intentionally
+          // screen / recap) and calls MHSBridge.EndGame() -> mhsEndGame() when
+          // the player is ready; that is what ends the game and opens the
+          // ceremony (docs/mission-hydrosci/mhs-end-ceremony-plan.md). Unit
+          // completion on its own never leaves the game. Unity is intentionally
           // left running.
           //
           // handleUnitComplete optimistically showed the "Loading next unit..."
@@ -687,6 +680,15 @@
         localStorage.setItem(key, JSON.stringify(queue));
       }
 
+      // The end-of-game event, queued the same way (event: 'end-game'); the
+      // launcher's replayProgressQueue posts it to /api/progress/end-game.
+      function queueEndGame(unitId) {
+        var key = 'mhs-progress-queue';
+        var queue = JSON.parse(localStorage.getItem(key) || '[]');
+        queue.push({ unit: unitId, event: 'end-game', timestamp: new Date().toISOString() });
+        localStorage.setItem(key, JSON.stringify(queue));
+      }
+
       // MHSBridge callback — the game calls this via jslib when a unit is completed.
       // This is the primary completion signal (Phase 4).
       window.mhsUnitComplete = function(completedUnitId) {
@@ -695,39 +697,34 @@
       };
 
       // MHSBridge callback — the game calls this when the player has finished
-      // the game and is ready to exit (from the end-of-game screen).
-      // New in April 2026 MHSBridge update. Older builds don't call this —
-      // the player uses the back button instead (the units page then offers
-      // the ceremony once the student is complete).
-      // When the collection carries an end-of-game ceremony this lands on it
-      // (docs/mission-hydrosci/mhs-end-ceremony-plan.md D6); otherwise the launcher.
-      //
-      // The end screen means the last unit is done, but the shipped build
-      // (2.8.1) calls only EndGame at the end of Unit 5 — never CompleteUnit
-      // for it — so the student's progress stayed on unit5 and the ceremony's
-      // gate sent them back to the launcher (2026-09-24). Record the
-      // completion here before leaving; when a build does call CompleteUnit
-      // first, completionHandled is already set and this just navigates.
-      // TODO: Remove backward compatibility note once all builds use the new MHSBridge.
+      // the game (from its end screen, or straight after the last unit). This
+      // is the end-of-game event: the server records the end-of-game mark —
+      // the one fact the ceremony hangs off, independent of unit completion —
+      // and, as a courtesy for builds that never call CompleteUnit for the
+      // last unit (2.8.1 calls only EndGame at the end of Unit 5), completes
+      // that unit too. Then we leave for the ceremony when the collection has
+      // one (docs/mission-hydrosci/mhs-end-ceremony-plan.md), else the launcher.
+      // Builds that call CompleteUnit("unit5") first and EndGame right after
+      // work the same way: both posts are idempotent.
       window.mhsEndGame = function() {
-        console.log('MHS: mhsEndGame called — leaving the game');
+        console.log('MHS: mhsEndGame called — the game has ended');
         var target = '{{ if .CeremonyURL }}{{ .CeremonyURL }}{{ else if .PlayBackURL }}{{ .PlayBackURL }}{{ else }}/missionhydrosci/units{{ end }}';
         {{ if .DeviceTest }}
         window.location.href = target;
         return;
         {{ end }}
-        if (completionHandled) { window.location.href = target; return; }
-        completionHandled = true;
-        if (window.__mhsStepLog) window.__mhsStepLog.record('game', 'ok', 'Game end reported by the game; recording the unit as complete');
+        if (endGameHandled) { window.location.href = target; return; }
+        endGameHandled = true;
+        if (window.__mhsStepLog) window.__mhsStepLog.record('game', 'ok', 'Game end reported by the game; recording it');
         try { localStorage.setItem('missionhydrosci-progress-changed', '1'); } catch (e) {}
         var left = false;
         var leave = function() { if (left) return; left = true; window.location.href = target; };
-        // Never strand the student on the end screen: if the completion POST
-        // has not answered in 8 s, queue it (the launcher flushes the queue)
-        // and go; the ceremony page sends a not-yet-complete student to the
+        // Never strand the student on the end screen: if the POST has not
+        // answered in 8 s, queue it (the launcher flushes the queue) and go;
+        // the ceremony page sends a student whose game has not ended to the
         // launcher, which is where they would end up anyway.
-        var timer = setTimeout(function() { queueCompletion(unitId); leave(); }, 8000);
-        fetch('/missionhydrosci/api/progress/complete', {
+        var timer = setTimeout(function() { queueEndGame(unitId); leave(); }, 8000);
+        fetch('/missionhydrosci/api/progress/end-game', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrfToken },
           body: JSON.stringify({ unit: unitId }),
@@ -736,9 +733,9 @@
         .then(function(resp) { if (!resp.ok) { throw new Error('HTTP ' + resp.status); } return resp.json(); })
         .then(function() { clearTimeout(timer); leave(); })
         .catch(function(err) {
-          console.error('MHS: end-game completion POST failed, queuing offline', err);
+          console.error('MHS: end-game POST failed, queuing offline', err);
           clearTimeout(timer);
-          queueCompletion(unitId);
+          queueEndGame(unitId);
           leave();
         });
       };
