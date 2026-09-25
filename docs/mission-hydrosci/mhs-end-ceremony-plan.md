@@ -114,6 +114,15 @@ remain open in §7 and do not block the phases. Nothing has been implemented.*
   group pin → workspace active), and its status card names that collection;
   editing a collection that is not the resolved one changes nothing for that
   account.
+- **2026-09-25 (undo):** Dale could not find how to un-end a game (the undo
+  was implicit: set any unit). Shipped `dddf50c`: once ended, the dashboard
+  menu's slot reads **↩ Undo end of game** (back to the last unit) and the
+  manage page's label became the same button; the unit entries' confirm
+  mentions the undo; the manage page reloads after any progress change
+  while ended. Verified live on the docs workspace (end → undo from the
+  dashboard menu). Note: the manage-page undo needs a collection with units
+  (it sets the last unit); a workspace with no MHS collection has nothing to
+  go back to.
 - **Next step:** the testers' run and the console simulation of the new path
   (`window.mhsUnitComplete('unit5'); window.mhsEndGame()`); the game team's
   build; grader G2 (the other fourteen checkpoints, true star totals) as the
