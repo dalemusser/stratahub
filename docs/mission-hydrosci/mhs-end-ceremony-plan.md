@@ -99,12 +99,19 @@ remain open in §7 and do not block the phases. Nothing has been implemented.*
   celebration"). Test note: the DB-backed suites time out on the local
   MongoDB when its index builds have grown slow; `STRATAHUB_TEST_MONGO_URI`
   points them at a throwaway instance (`mongod --dbpath <tmp> --port 27099`).
-- **Next step:** Dale uploads `dist/v0.2.1` and selects it on Dev MHS; run
-  the backfill on production after the deploy; the testers' re-run on the
-  current build (`EndGame` only) and the console simulation of the new
-  path (`window.mhsUnitComplete('unit5'); window.mhsEndGame()`); the game
-  team's build; grader G2 (the other fourteen checkpoints, true star totals)
-  as the team's answers arrive.
+- **2026-09-25 (shipped):** stratahub `e6e394c` deployed to production at
+  00:29 PT; the backfill marked the 5 records that were already complete
+  (two workspaces, March–August; 864 records in all). Ceremony v0.2.1 is on
+  the CDN (sweep 103/103, `EMBED_V` 4) and archived as `_v10`. Walkthrough on
+  the deployed site as a coordinator: the dashboard's set-progress menu ends
+  with "🏆 End of game", the manage page shows the button. Testers are
+  playing out Unit 5 on build 2.8.1 (the `EndGame`-only path).
+- **Next step:** select v0.2.1 on the Dev MHS collection (MHS Builds → Sync
+  from S3, then the collection's ceremony select) so arrivals autostart; the
+  testers' run and the console simulation of the new path
+  (`window.mhsUnitComplete('unit5'); window.mhsEndGame()`); the game team's
+  build; grader G2 (the other fourteen checkpoints, true star totals) as the
+  team's answers arrive.
 - Related documents: `mhs-gameplay-end/docs/implementation-plan.md` (Phase 5
   is the original stratahub integration spec), `mhs-gameplay-end/docs/partial-nodata-plan.md`
   (on hold), `mhsgrader/docs/updates/ea-scores.md` (the grader brief, decision
