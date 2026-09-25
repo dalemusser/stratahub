@@ -122,6 +122,7 @@ type MemberRow struct {
 	CeremonyViewed     bool
 	CeremonyTitle      string
 	CeremonyPreviewURL string
+	GameEnded          bool // the end-of-game mark is set (the set-progress menu offers the undo)
 
 	// Surveys tab: one cell per configured survey, in SurveyHeaders order.
 	// Nil when no surveys are configured.

@@ -343,7 +343,10 @@ in D6.
   (`POST /missionhydrosci/api/progress/set-unit`, `unit: "end"`, member auth
   as for any unit) marks every unit complete, sets `current_unit` to
   `complete` and the mark (`game_ended_by: "staff"`, `game_ended_name`),
-  after a confirmation. Any set-to-unit clears the mark (the undo).
+  after a confirmation. Any set-to-unit clears the mark (the undo); once
+  the game has ended the same menu slot and the manage-page button read
+  **Undo end of game** (back to the last unit), so the undo is explicit
+  (Dale, 2026-09-25: "I can't seem to find a way to un-end a game").
   Ceremony viewed marks are history and are never cleared.
 - Backfill (one-time, `scripts/backfill_mhs_game_ended.js`): records already
   at `complete` when the mark was introduced get `game_ended_at` from their

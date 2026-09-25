@@ -334,7 +334,7 @@
       </table>
     </div>
     <p class="text-[11px] text-gray-400 dark:text-gray-500 -mt-2 mb-4">
-      Set current: marks all earlier units complete and puts the student back in the game (clears End of game). Does not affect downloads or saved game data.
+      Set current: marks all earlier units complete and puts the student back in the game (it undoes End of game). Does not affect downloads or saved game data.
     </p>
 
     <!-- End of game: the mark the end-of-game ceremony hangs off. The game
@@ -342,10 +342,12 @@
          needs it set by hand. Setting any unit as current clears it again. -->
     <div class="flex items-start gap-3 mt-3">
       {{ if .GameEnded }}
-      <span class="w-56 shrink-0 px-3 py-2 text-xs font-medium text-center text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-700 rounded">🏆 Game ended</span>
+      <button id="undo-end-of-game-btn" onclick="mhsUndoEndOfGame()" class="w-56 shrink-0 px-3 py-2 text-xs font-medium bg-indigo-600 text-white rounded hover:bg-indigo-700">
+        ↩ Undo end of game
+      </button>
       <p class="text-[11px] text-gray-400 dark:text-gray-500 pt-1">
-        The game has ended ({{ .GameEndedNote }}); the end-of-game ceremony is available on the Mission HydroSci page.
-        To put the student back in the game, set a unit as current above.
+        The game has {{ .GameEndedNote }}; the end-of-game ceremony is available on the Mission HydroSci page.
+        Undo puts the student back at {{ .LastUnitTitle }} and removes the ceremony link (Set current on any unit does the same).
       </p>
       {{ else }}
       <button id="end-of-game-btn" onclick="mhsEndOfGame()" class="w-56 shrink-0 px-3 py-2 text-xs font-medium bg-indigo-600 text-white rounded hover:bg-indigo-700">
@@ -353,7 +355,7 @@
       </button>
       <p class="text-[11px] text-gray-400 dark:text-gray-500 pt-1">
         Marks every unit complete and ends the game, which makes the end-of-game ceremony available
-        on the Mission HydroSci page. Setting a unit as current undoes this.
+        on the Mission HydroSci page. This button then becomes the undo.
       </p>
       {{ end }}
     </div>
@@ -466,6 +468,7 @@
   var currentUnit = '{{ .CurrentUnit }}';
   var nextUnit = '{{ .NextUnitID }}';
   var isComplete = {{ if .IsComplete }}true{{ else }}false{{ end }};
+  var gameEnded = {{ if .GameEnded }}true{{ else }}false{{ end }}; // the page reloads after any progress change while ended (the note below the table is server-rendered)
   var gated = {{ if .Gated }}true{{ else }}false{{ end }};
   var unlockExpiresAtMs = {{ .UnlockExpiresAtMs }};
   var serverNowMs = {{ .ServerNowMs }};
@@ -967,12 +970,45 @@
     })
     .then(function(data) {
       if (!data) return;
+      if (gameEnded) {          // the server also cleared the end-of-game mark: re-render the whole page
+        try { localStorage.setItem('missionhydrosci-progress-changed', '1'); } catch (e) {}
+        window.location.reload();
+        return;
+      }
       refreshUnlockStatus();
       applyCurrentUnit(unit); // in place — keeps any live download progress
       runPipeline();          // download the new current unit if needed
     })
     .catch(function(err) {
       alert('Failed to set progress: ' + err.message);
+    });
+  };
+
+  // Undo end of game: back to the last unit as the current unit; the server
+  // clears the end-of-game mark on any set-unit. The page reloads.
+  window.mhsUndoEndOfGame = function() {
+    var last = '{{ .LastUnitID }}', title = '{{ .LastUnitTitle }}';
+    if (!last) return;
+    if (!confirm('Undo the end of game? The student goes back to ' + title + ' and the ceremony link is removed.')) return;
+    csrf.fetch('/missionhydrosci/api/progress/set-unit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ unit: last })
+    })
+    .then(function(resp) {
+      if (!resp.ok) {
+        if (handleAuthFailure(resp)) return null;
+        throw new Error('undo failed');
+      }
+      return resp.json();
+    })
+    .then(function(data) {
+      if (!data) return;
+      try { localStorage.setItem('missionhydrosci-progress-changed', '1'); } catch (e) {}
+      window.location.reload();
+    })
+    .catch(function(err) {
+      alert('Failed to undo the end of game: ' + err.message);
     });
   };
 

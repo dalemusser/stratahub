@@ -35,6 +35,8 @@ type ManageData struct {
 	IsComplete     bool
 	GameEnded      bool   // the end-of-game mark (the ceremony gate); set by EndGame or a staff jump, cleared by set-to-unit
 	GameEndedNote  string // "ended by the game on …" / "ended by <name> on …"
+	LastUnitID     string // the collection's last unit: where "Undo end of game" puts the student
+	LastUnitTitle  string
 	NextUnitID     string // current/next are auto-managed; manage JS needs them for manual-download tracking
 
 	CollectionOverride   bool
@@ -160,6 +162,10 @@ func (h *Handler) ServeManage(w http.ResponseWriter, r *http.Request) {
 	collInfo := h.resolveEffectiveCollectionInfo(r)
 
 	data.Units = units
+	if n := len(manifest.Units); n > 0 {
+		data.LastUnitID = manifest.Units[n-1].ID
+		data.LastUnitTitle = manifest.Units[n-1].Title
+	}
 	data.CurrentUnit = currentUnit
 	data.CompletedUnits = completedUnits
 	data.IsComplete = isComplete

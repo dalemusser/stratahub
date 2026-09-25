@@ -1071,6 +1071,7 @@ func (h *Handler) buildProgressRows(ctx context.Context, r *http.Request, member
 			CeremonyViewed:        ceremonyViewed,
 			CeremonyTitle:         ceremonyTitle,
 			CeremonyPreviewURL:    "/missionhydrosci/ceremony?user_id=" + member.ID.Hex(),
+			GameEnded:             mhsProgress[member.ID.Hex()].GameEnded(),
 			Surveys:               surveyCells[member.ID.Hex()],
 		}
 	}

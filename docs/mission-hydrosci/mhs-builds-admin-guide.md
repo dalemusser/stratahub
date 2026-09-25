@@ -244,10 +244,12 @@ does not open it.
   asks for confirmation, marks every unit complete, and ends the game, so
   the ceremony becomes available to the student at once. Use it for a
   student who could not finish, or whose game never reported its end.
-- Setting a unit undoes it. Choosing any unit from the same menu (or **Set
-  current** on the Manage page) puts the student back in the game and
-  clears the end-of-game mark; the ceremony's link disappears until the
-  game ends again. Viewing history (below) is kept.
+- Staff can undo it. Once the game has ended, the same menu entry reads
+  **Undo end of game** and the Manage page button does too: the student goes
+  back to Unit 5 as their current unit and the ceremony's link disappears
+  until the game ends again. Choosing any other unit from the menu (or
+  **Set current** on the Manage page) has the same effect at that unit.
+  Viewing history (below) is kept.
 - The Manage page's progress line says who ended the game and when ("Game
   ended by the game on …" or by the staff member's name).
 
