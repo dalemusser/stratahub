@@ -106,9 +106,15 @@ remain open in §7 and do not block the phases. Nothing has been implemented.*
   the deployed site as a coordinator: the dashboard's set-progress menu ends
   with "🏆 End of game", the manage page shows the button. Testers are
   playing out Unit 5 on build 2.8.1 (the `EndGame`-only path).
-- **Next step:** select v0.2.1 on the Dev MHS collection (MHS Builds → Sync
-  from S3, then the collection's ceremony select) so arrivals autostart; the
-  testers' run and the console simulation of the new path
+- **2026-09-25 (later):** v0.2.1 is selected on the schools' active
+  collection of the MHS workspace (Dale; confirmed in the data). Dale's own
+  check: from the launcher's button the show started on its own ("Loading…",
+  "Starting…", then the cold open). An earlier confusion is worth
+  remembering: the launcher plays the *resolved* collection (user override →
+  group pin → workspace active), and its status card names that collection;
+  editing a collection that is not the resolved one changes nothing for that
+  account.
+- **Next step:** the testers' run and the console simulation of the new path
   (`window.mhsUnitComplete('unit5'); window.mhsEndGame()`); the game team's
   build; grader G2 (the other fourteen checkpoints, true star totals) as the
   team's answers arrive.
