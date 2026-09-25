@@ -501,6 +501,16 @@
 
       function completeAndTransition(nextUnit, isFinal) {
         if (isFinal || !nextUnit) {
+          {{ if .CeremonyURL }}
+          // Final unit, and the collection carries an end-of-game ceremony:
+          // StrataHub owns the ending from here. Leave the game the moment it
+          // reports the last unit complete and go straight to the ceremony —
+          // no in-game end screen, no EndGame needed (a build that still
+          // shows one is simply skipped). mhs-updates/end-of-game-ceremony-092426.
+          cleanupUnity();
+          window.location.href = '{{ .CeremonyURL }}';
+          return;
+          {{ end }}
           // Final unit — the game owns the end-of-game experience (its own end
           // screen / recap) and calls MHSBridge.EndGame() -> mhsEndGame() to
           // return to StrataHub when the player is ready. Unity is intentionally

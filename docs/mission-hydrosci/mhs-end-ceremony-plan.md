@@ -71,9 +71,17 @@ remain open in §7 and do not block the phases. Nothing has been implemented.*
   Fix in the play page: `mhsEndGame` records the completion itself
   (idempotent; 8 s cap, offline queue) before going to the ceremony. Worth
   telling the game team, but stratahub no longer depends on it.
-- **Next step:** the member re-enters Unit 5 and reaches the end screen again
-  (or a re-run by any completed student); grader G2 (the other fourteen
-  checkpoints, true star totals) as the team's answers arrive.
+- **2026-09-24 (later):** Dale wants the in-game end screen gone: Unit 5
+  ends, the ceremony begins. The play page now leaves the game the moment
+  the last unit's completion is recorded (when a ceremony exists) instead of
+  waiting for `EndGame`; hand-off to the game team in
+  `mhs-updates/end-of-game-ceremony-092426/` (remove the Congratulations /
+  Continue screen; call `CompleteUnit("unit5", null)` then `EndGame()` at the
+  portal). Until that build ships, the current build still reaches the
+  ceremony through the `EndGame` path.
+- **Next step:** the testers' re-run on the current build; the game team's
+  build; grader G2 (the other fourteen checkpoints, true star totals) as the
+  team's answers arrive.
 - Related documents: `mhs-gameplay-end/docs/implementation-plan.md` (Phase 5
   is the original stratahub integration spec), `mhs-gameplay-end/docs/partial-nodata-plan.md`
   (on hold), `mhsgrader/docs/updates/ea-scores.md` (the grader brief, decision
