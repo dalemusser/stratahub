@@ -260,7 +260,9 @@ A log request that fails twice ten seconds apart ends the game's logging for the
 rest of that session. Since 2026-09-28 the play page unblocks the saved record
 before each launch, so the next launch sends it and nothing needs clearing.
 StrataHub detects it within about five minutes of play (recording bar, Devices tab
-Logs column, viewer filter), plus an offline bar. The game-side fix is in `mhs-updates/gamelogger-cache-overflow-091626/`
+Logs column, viewer filter), plus an offline bar. Everything still open (the new logger
+builds' defects, overwritten event details since February 2026, duplicates in the
+log data, grading exposure): `mhs-game-logging-issues-092826.md`. The game-side fix is in `mhs-updates/gamelogger-cache-overflow-091626/`
 (reproduction and specimen included) and belongs in the next build. Plan, status
 and open items: `mhs-game-logging-silent-failure-plan.md` §0; **next to build: §5.7** (audit-log entries, an incidents viewer with open/resolved, email + daily digest); support:
 `mhs-logging-support-checklist.md`; teacher text:

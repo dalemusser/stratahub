@@ -23,7 +23,7 @@
 
 **Handoff to the game team.** Give them the whole folder `mhs-updates/gamelogger-cache-overflow-091626/` (also on GitHub). Ask for the `GameLogger.cs` that is actually in the September builds. The drop-in there still needs three additions before use: copy the dictionary on enqueue; skip empty or unreadable entries when loading the cache; diff the shipped logger against the drop-in so the attempt-limit code is not carried forward. The project lead has held bundle code changes until the shipped source is seen.
 
-**Open items.**
+**Open items.** Everything still to fix or decide, across the game, the research data, grading, StrataHub and test clean-up, is listed in one place in `mhs-game-logging-issues-092826.md` (2026-09-28); the list below is the StrataHub side as it stood on 2026-09-18.
 0. **Next work when resuming: §5.7 incident records, admin visibility and notification** (audit-log entries at detection and recovery; an incidents viewer with open/resolved and a follow-up note; email on new incidents plus a daily digest across workspaces). Needs the project lead's go and the notification recipients.
 1. Rebuild the teacher guide PDF with the new section and the Devices view text (`docs/mission-hydrosci-teacher-guide/build-guide-pdf.sh`).
 2. A look on a real Chromebook: normal play shows no bar and the Storage line; the Devices tab with a real class.
