@@ -16,7 +16,7 @@ import (
 
 // loggingRemedy is what a teacher can do on the device. It is the same text
 // the play page shows the teacher under "What to do".
-const loggingRemedy = " What to do: let the student finish (progress and settings are saved on the server), then on this device clear the site data for the MHS site (click the padlock in the address bar, Site settings, Delete data), sign the student in again and reopen the unit (it downloads again). If this comes back on the same device, the school network may be blocking the game's log service. See the Teacher Guide, \"Game activity not recorded\"."
+const loggingRemedy = " What to do: nothing on the device. The game keeps its record there, and the next time the game is opened on this device the page removes what stopped it sending, so the saved record is sent then (use good Wi-Fi); this column shows the result after about five minutes of play. If the device is flagged again after that session, the school network may be blocking the game's log service. See the Teacher Guide, \"Game activity not recorded\"."
 
 // fillLoggingHealth sets the "Logs" fields of a device from the newest
 // launch record on it (nil when none in the window) and the launcher's last

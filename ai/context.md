@@ -852,7 +852,7 @@ func (h *Handler) ServeList(w http.ResponseWriter, r *http.Request) {
 
 ## Testing
 
-StrataHub has two types of tests: Go unit tests and Playwright browser tests.
+StrataHub has three types of tests: Go unit tests, JavaScript unit tests (`tests/js/*.test.mjs`, run with `make test-js`, Node 18+, no packages; they load asset scripts from `internal/app/resources/assets/js/` in a `vm` sandbox), and Playwright browser tests.
 
 ### Go Unit Tests
 

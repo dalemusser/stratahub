@@ -231,22 +231,22 @@
       <!-- Logging notice. Shown when the server reports that no gameplay logs
            are arriving from this launch while the game runs, when the game
            says it cannot save its log cache, or when that cache's store is
-           nearly full. The student's line is calm and the fix is for the
-           teacher (docs/mission-hydrosci/mhs-game-logging-silent-failure-plan.md §5.1). -->
+           nearly full. The student's line is calm; nothing needs clearing,
+           because the next launch unblocks the saved record before the game
+           starts (docs/mission-hydrosci/mhs-game-logging-silent-failure-plan.md §0, §5.1). -->
       <div id="mhs-logging-notice" class="mhs-notice-bar" role="status" aria-live="polite" hidden>
         <div class="mhs-ln-row">
           <span class="mhs-ln-icon" aria-hidden="true">!</span>
-          <span class="mhs-ln-text" id="mhs-ln-text">Game activity is not being recorded on this device. You can keep playing. Please tell your teacher.</span>
+          <span class="mhs-ln-text" id="mhs-ln-text">Your game activity is not reaching the server right now. It is being saved on this device and will be sent the next time the game is opened. You can keep playing.</span>
           <button type="button" class="mhs-ln-btn" id="mhs-ln-how-btn" aria-expanded="false" aria-controls="mhs-ln-how">What to do</button>
           <button type="button" class="mhs-ln-btn mhs-ln-dismiss" id="mhs-ln-dismiss" aria-label="Hide this notice" title="Hide this notice">&times;</button>
         </div>
         <div class="mhs-ln-how" id="mhs-ln-how" hidden>
           <strong>For the teacher.</strong> The game is playing normally, but the record of this student's play is not reaching the research log. <span id="mhs-ln-reason"></span>
           <ol>
-            <li>Let the student finish. Progress and settings are saved on the server and are not affected.</li>
-            <li>When they are done, on this device clear the site data for this site: click the padlock (or the tune icon) in the browser's address bar, choose <em>Site settings</em>, then <em>Delete data</em>. This clears the game's stuck local log store.</li>
-            <li>Sign the student in again and open the unit. The unit downloads again, so use good Wi-Fi.</li>
-            <li>If this notice comes back on this device, the school network may be blocking the game's log service. Tell your program contact and name this device.</li>
+            <li>Let the student keep playing. Progress and settings are saved on the server and are not affected.</li>
+            <li>Nothing needs clearing on the device. The game keeps its record here, and the next time the game is opened on this device the page removes what stopped it sending, so the saved record is sent then. Open it on good Wi-Fi.</li>
+            <li>If this notice comes back in the next session on this device, the school network may be blocking the game's log service. Tell your program contact and name this device.</li>
           </ol>
           Details are in the Teacher Guide under "Game activity not recorded".
         </div>
@@ -259,16 +259,16 @@
       <div id="mhs-offline-notice" class="mhs-notice-bar" role="status" aria-live="polite" hidden>
         <div class="mhs-ln-row">
           <span class="mhs-ln-icon" aria-hidden="true">!</span>
-          <span class="mhs-ln-text" id="mhs-off-text">This device has lost its internet connection. You can keep playing, but your game activity is not being recorded. Please tell your teacher.</span>
+          <span class="mhs-ln-text" id="mhs-off-text">This device has lost its internet connection. You can keep playing. Your game activity is being saved on this device and will be sent later. Please tell your teacher.</span>
           <button type="button" class="mhs-ln-btn" id="mhs-off-how-btn" aria-expanded="false" aria-controls="mhs-off-how">What to do</button>
           <button type="button" class="mhs-ln-btn mhs-ln-dismiss" id="mhs-off-dismiss" aria-label="Hide this notice" title="Hide this notice">&times;</button>
         </div>
         <div class="mhs-ln-how" id="mhs-off-how" hidden>
-          <strong>For the teacher.</strong> The game is playing normally, but this device cannot reach the internet. Progress cannot be saved online while it is offline, and the game's activity record stops for good once the connection has been gone for more than about ten seconds: it does not resume when the connection returns. <span id="mhs-off-detail"></span>
+          <strong>For the teacher.</strong> The game is playing normally, but this device cannot reach the internet. Progress cannot be saved online while it is offline. The game keeps its activity record on the device; once the connection has been gone for more than about ten seconds it stops sending for the rest of this session, and the saved record is sent the next time the game is opened. <span id="mhs-off-detail"></span>
           <ol>
             <li>Check the device's Wi-Fi. If the whole class is affected, the network is down; the game keeps running on every device meanwhile.</li>
             <li>Keep the game tab open until the connection is back, so the game can save progress again.</li>
-            <li>After the session, on this device, clear the site data for this site (padlock in the address bar, Site settings, Delete data) and sign the student in again. Until that is done the game will not record activity on this device, and the Devices tab will show it as Not recorded.</li>
+            <li>Nothing needs clearing afterwards. The next time the game is opened on this device, the saved record is sent. Until then the Devices tab shows this device as Not recorded.</li>
           </ol>
         </div>
       </div>
@@ -1062,16 +1062,22 @@
       //     (its PlayerPrefs store is full or unwritable);
       //  3. the size of that store, read from IndexedDB, nearly at Unity's
       //     1 MB cap.
-      var loggingHealth = { cacheErrors: 0, prefsBytes: null, state: '', shown: '', dismissed: {}, warnedFull: false };
+      var loggingHealth = { cacheErrors: 0, prefsBytes: null, state: '', shown: '', dismissed: {}, warnedFull: false, repaired: false };
       var lnEl = document.getElementById('mhs-logging-notice');
       var lnHow = document.getElementById('mhs-ln-how');
       var lnHowBtn = document.getElementById('mhs-ln-how-btn');
       var lnReason = document.getElementById('mhs-ln-reason');
       var lnReasons = {
         none: 'StrataHub has been watching this session and no gameplay logs have arrived from it.',
-        cache: 'The game reported that it can no longer save its log cache on this device (the store is full).',
+        cache: 'The game reported that it can no longer save its log cache on this device: its store is full, or the browser refuses to keep site data (a private window does this). Activity from here on in this session is not kept; what was saved before is sent next time.',
         full: 'The game’s local log store on this device is nearly full, which means logs have been piling up unsent for a long time.'
       };
+      var lnTexts = {
+        none: 'Your game activity is not reaching the server right now. It is being saved on this device and will be sent the next time the game is opened. You can keep playing.',
+        cache: 'This device cannot save your game activity. You can keep playing. Please tell your teacher.',
+        full: 'Your game activity has not been reaching the server, and the space this device keeps it in is nearly full. It will be sent the next time the game is opened. You can keep playing.'
+      };
+      var lnText = document.getElementById('mhs-ln-text');
       if (lnHowBtn) lnHowBtn.addEventListener('click', function() {
         var open = lnHow.hidden;
         lnHow.hidden = !open;
@@ -1115,6 +1121,7 @@
         if (loggingHealth.shown === reason) return;
         loggingHealth.shown = reason;
         if (lnReason) lnReason.textContent = lnReasons[reason] || '';
+        if (lnText && lnTexts[reason]) lnText.textContent = lnTexts[reason];
         barShow(lnEl);
       }
       function hideLoggingNotice() {
@@ -1178,14 +1185,47 @@
             stepLog.record('storage', pct >= 90 ? 'warn' : 'info', 'Game log cache store: ' + MHSStepLog.unityPrefsText(bytes) +
               (pct >= 90 ? ' — nearly full: gameplay logs have been piling up unsent on this device' : ''));
           }
-          if (pct >= 95 && !loggingHealth.warnedFull) {
+          // Straight after a repair the store is full of the backlog the game
+          // is about to send; the minute-by-minute reads decide.
+          if (pct >= 95 && !loggingHealth.warnedFull && !(first && loggingHealth.repaired)) {
             loggingHealth.warnedFull = true;
             if (!first) stepLog.record('storage', 'warn', 'Game log cache store nearly full: ' + MHSStepLog.unityPrefsText(bytes));
             showLoggingNotice('full');
           }
         }).catch(function() {});
       }
-      readUnityPrefs(true);
+      // Before the game starts: unblock its saved log queue (the schools' build
+      // stops sending for good when an empty entry heads it; see
+      // MHSStepLog.repairUnityLogCache). The loader waits for this, at most
+      // 3.5 seconds; then the store's size is read as before.
+      function onLogQueueRepair(r) {
+        r = r || {};
+        var n = function(k, one, many) { return k + ' ' + (k === 1 ? one : many); };
+        if (r.state === 'repaired') {
+          loggingHealth.repaired = true;
+          stepLog.record('storage', 'ok', 'Unblocked the game’s saved activity record: removed ' + n(r.removed, 'empty entry', 'empty entries') +
+            ' that had stopped the game sending it; ' + n(r.queued, 'saved event', 'saved events') + ' will be sent from this launch',
+            { removed: r.removed, queued: r.queued, stores: r.stores });
+        } else if (r.state === 'clean') {
+          stepLog.record('storage', 'info', 'Game’s saved activity record checked: nothing blocking' +
+            (r.queued ? ' (' + n(r.queued, 'saved event', 'saved events') + ' waiting to be sent)' : ''));
+        } else if (r.state && r.state !== 'absent') {
+          stepLog.record('storage', 'info', 'Could not check the game’s saved activity record (' + r.state + '); the game starts as usual');
+        }
+        if (r.unreadable) stepLog.record('storage', 'warn', n(r.unreadable, 'game store', 'game stores') + ' on this device could not be read and were left as they are');
+      }
+      // Resolves, never rejects: the game must start whatever happens here.
+      var logQueueReady = new Promise(function(resolve) {
+        var settle = function() { resolve(); };
+        setTimeout(settle, 3500);
+        try {
+          (typeof MHSStepLog.repairUnityLogCache === 'function'
+            ? MHSStepLog.repairUnityLogCache(3000) : Promise.resolve({ state: 'unsupported' }))
+            .then(function(r) { try { onLogQueueRepair(r); } catch (e) { /* the step log is best effort */ } }, function() {})
+            .then(settle, settle);
+        } catch (e) { settle(); }
+      });
+      logQueueReady.then(function() { readUnityPrefs(true); });
       setInterval(function() { readUnityPrefs(false); }, 60000);
 
       // ---- Offline ----------------------------------------------------------
@@ -1505,7 +1545,9 @@
         reportCrash('load_error', 'Failed to load Unity loader script: ' + loaderUrl, '', 'loading');
         loadingBar.style.background = '#ef4444';
       };
-      document.body.appendChild(script);
+      // The game reads its store when it starts, so it starts after the
+      // repair (logQueueReady always resolves, within 3.5 seconds).
+      logQueueReady.then(function() { document.body.appendChild(script); });
     })();
 
     // Focus the Unity canvas so it receives keyboard input.

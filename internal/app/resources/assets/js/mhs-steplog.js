@@ -684,5 +684,224 @@
     return Math.round(bytes / 1024) + ' KB of ' + (cap / 1024).toLocaleString() + ' KB (' + pct + '%)';
   };
 
+  // --- Unblocking the game's saved log queue ------------------------------
+  // The schools' build (v2.8.1) empties an unsent log entry in place when a
+  // send has failed twice, then reads an empty entry at the head of its queue
+  // as "nothing to send". It sends nothing more on that device, and since it
+  // saves the queue in its PlayerPrefs store with the empty entry still
+  // first, every later launch is stuck the same way. Removing the empty
+  // entries before the game starts lets it send the whole saved queue on
+  // that launch (verified on v2.8.1, 2026-09-28). See
+  // docs/mission-hydrosci/mhs-game-logging-silent-failure-plan.md §0.
+  MHSStepLog.UNITY_LOG_CACHE_KEY = 'game_logs_cache.json';
+
+  // Unity's WebGL PlayerPrefs file: "UnityPrf" and 8 more header bytes, then
+  // one record per key: the key as a length-prefixed string, a type byte,
+  // the value. 0xFD is a 4-byte float and 0xFE a 4-byte int; any other type
+  // byte starts a string: below 0x80 it is the byte length itself, 0x80 is
+  // followed by a 4-byte little-endian length. Anything else is unknown.
+  function prefsLen(u8, p) {
+    if (p >= u8.length) return null;
+    var b = u8[p];
+    if (b < 0x80) return [b, p + 1];
+    if (b === 0x80 && p + 5 <= u8.length) {
+      return [(u8[p + 1] | (u8[p + 2] << 8) | (u8[p + 3] << 16) | (u8[p + 4] << 24)) >>> 0, p + 5];
+    }
+    return null;
+  }
+
+  // The raw text of each top-level element of the JSON array whose '[' is at
+  // text[open], and the index of its ']'; null if the array does not close.
+  function jsonArrayElements(text, open) {
+    var els = [], depth = 0, inStr = false, esc = false, start = -1;
+    for (var i = open; i < text.length; i++) {
+      var ch = text.charAt(i);
+      if (inStr) {
+        if (esc) esc = false;
+        else if (ch === '\\') esc = true;
+        else if (ch === '"') inStr = false;
+        continue;
+      }
+      if (depth === 1 && start < 0 && !/\s/.test(ch) && ch !== ',' && ch !== ']') start = i;
+      if (ch === '"') { inStr = true; continue; }
+      if (ch === '[' || ch === '{') { depth++; continue; }
+      if (ch === ']' || ch === '}') {
+        depth--;
+        if (depth === 0) {
+          if (start >= 0) els.push(text.slice(start, i).trim());
+          return { els: els, close: i };
+        }
+        continue;
+      }
+      if (depth === 1 && ch === ',') {
+        if (start >= 0) els.push(text.slice(start, i).trim());
+        start = -1;
+      }
+    }
+    return null;
+  }
+
+  function isLogEntry(v) {
+    return !!v && typeof v === 'object' && !Array.isArray(v) && Object.keys(v).length > 0;
+  }
+
+  // Drops the empty (or unreadable) entries from the cache value. Both cache
+  // formats: the schools' build writes {"logs":["<entry json>", …]}, the
+  // newer logger a plain array of entries. Kept entries stay byte for byte.
+  // Returns { text, removed, queued }, or null when the value is not one of
+  // the two formats.
+  function repairLogCacheText(text) {
+    var doc = JSON.parse(text);
+    var legacy = !!doc && !Array.isArray(doc) && typeof doc === 'object' && Array.isArray(doc.logs);
+    if (!legacy && !Array.isArray(doc)) return null;
+    var m = legacy ? /^\s*\{\s*"logs"\s*:\s*\[/.exec(text) : /^\s*\[/.exec(text);
+    if (!m) return null;
+    var open = m.index + m[0].length - 1;
+    var scan = jsonArrayElements(text, open);
+    var total = legacy ? doc.logs.length : doc.length;
+    if (!scan || scan.els.length !== total) return null;
+    var kept = [];
+    for (var i = 0; i < scan.els.length; i++) {
+      var v = JSON.parse(scan.els[i]);
+      if (legacy) {
+        try { v = JSON.parse(v); } catch (e) { v = null; }
+      }
+      if (isLogEntry(v)) kept.push(scan.els[i]);
+    }
+    var out = text.slice(0, open + 1) + kept.join(',') + text.slice(scan.close);
+    var check = JSON.parse(out);
+    if ((legacy ? check.logs.length : check.length) !== kept.length) return null;
+    return { text: out, removed: total - kept.length, queued: kept.length };
+  }
+
+  // Pure: takes a PlayerPrefs file's bytes. Returns null when the file is not
+  // laid out as expected (it must be left alone), else
+  // { removed, queued, bytes } where bytes is the repaired file, or null when
+  // nothing needed removing. Every record other than the log cache is copied
+  // unchanged.
+  MHSStepLog.repairUnityPrefsBytes = function(u8) {
+    try {
+      if (!u8 || u8.length < 16 || String.fromCharCode.apply(null, u8.subarray(0, 8)) !== 'UnityPrf') return null;
+      var dec = new TextDecoder('utf-8', { fatal: true });
+      var p = 16, cache = null;
+      // Walk the whole file first: an unexpected layout anywhere means the
+      // lengths cannot be trusted, and nothing is written.
+      while (p < u8.length) {
+        var kl = prefsLen(u8, p);
+        if (!kl) return null;
+        var kEnd = kl[1] + kl[0];
+        if (kEnd >= u8.length) return null;
+        var t = u8[kEnd], vStart, vEnd, str = !(t === 0xFD || t === 0xFE);
+        if (str) {
+          var vl = prefsLen(u8, kEnd);
+          if (!vl) return null;
+          vStart = vl[1]; vEnd = vStart + vl[0];
+        } else {
+          vStart = kEnd + 1; vEnd = vStart + 4;
+        }
+        if (vEnd > u8.length) return null;
+        if (dec.decode(u8.subarray(kl[1], kEnd)) === MHSStepLog.UNITY_LOG_CACHE_KEY) {
+          if (!str) return null;
+          cache = { typeAt: kEnd, start: vStart, end: vEnd };
+        }
+        p = vEnd;
+      }
+      if (!cache) return { removed: 0, queued: 0, bytes: null };
+      var fixed = repairLogCacheText(dec.decode(u8.subarray(cache.start, cache.end)));
+      if (!fixed) return null;
+      if (!fixed.removed) return { removed: 0, queued: fixed.queued, bytes: null };
+      var vb = new TextEncoder().encode(fixed.text), n = vb.length;
+      var lenBytes = n < 0x80 ? [n] : [0x80, n & 255, (n >>> 8) & 255, (n >>> 16) & 255, (n >>> 24) & 255];
+      var out = new Uint8Array(cache.typeAt + lenBytes.length + n + (u8.length - cache.end));
+      out.set(u8.subarray(0, cache.typeAt), 0);
+      out.set(lenBytes, cache.typeAt);
+      out.set(vb, cache.typeAt + lenBytes.length);
+      out.set(u8.subarray(cache.end), cache.typeAt + lenBytes.length + n);
+      return { removed: fixed.removed, queued: fixed.queued, bytes: out };
+    } catch (e) {
+      return null;
+    }
+  };
+
+  // Repairs every PlayerPrefs store of this site in place. Call before the
+  // Unity loader starts, so the game loads the repaired store. Never creates
+  // the database. Resolves (never rejects) with { state, stores, removed,
+  // queued, unreadable }: state 'repaired', 'clean', 'absent' (the game has
+  // never saved anything here), or 'unsupported' | 'timeout' | 'error' (not
+  // checked; the game starts as usual).
+  MHSStepLog.repairUnityLogCache = function(timeoutMs) {
+    return new Promise(function(resolve) {
+      var done = false;
+      function finish(v) { if (!done) { done = true; resolve(v); } }
+      try {
+        if (!window.indexedDB || typeof indexedDB.databases !== 'function' ||
+            typeof TextDecoder !== 'function' || typeof TextEncoder !== 'function') return finish({ state: 'unsupported' });
+        setTimeout(function() { finish({ state: 'timeout' }); }, timeoutMs || 3000);
+        indexedDB.databases().then(function(list) {
+          var present = false;
+          for (var i = 0; i < (list || []).length; i++) if (list[i] && list[i].name === '/idbfs') present = true;
+          if (!present) return finish({ state: 'absent' });
+          var req = indexedDB.open('/idbfs');
+          req.onerror = function() { finish({ state: 'error' }); };
+          req.onblocked = function() { finish({ state: 'error' }); };
+          req.onupgradeneeded = function() { try { req.transaction.abort(); } catch (e) {} finish({ state: 'error' }); };
+          req.onsuccess = function() {
+            var db = req.result;
+            function close() { try { db.close(); } catch (e) {} }
+            try {
+              if (!db.objectStoreNames.contains('FILE_DATA')) { close(); return finish({ state: 'absent' }); }
+              // Keys first, so the other files the game may keep here are
+              // never loaded.
+              var keys = [];
+              var kc = db.transaction('FILE_DATA', 'readonly').objectStore('FILE_DATA').openKeyCursor();
+              kc.onerror = function() { close(); finish({ state: 'error' }); };
+              kc.onsuccess = function(ev) {
+                var c = ev.target.result;
+                if (c) {
+                  var key = String(c.key || '');
+                  if (key.length >= 12 && key.slice(-12) === '/PlayerPrefs') keys.push(c.key);
+                  c.continue();
+                  return;
+                }
+                if (!keys.length) { close(); return finish({ state: 'absent' }); }
+                var res = { state: 'clean', stores: keys.length, removed: 0, queued: 0, unreadable: 0 };
+                // Read and write in one read-write transaction: IndexedDB runs
+                // it apart from the game's own writes, so a store read here is
+                // never written back over newer contents.
+                var tx = db.transaction('FILE_DATA', 'readwrite');
+                var store = tx.objectStore('FILE_DATA');
+                keys.forEach(function(k) {
+                  var g = store.get(k);
+                  g.onsuccess = function() {
+                    var v = g.result || {}, contents = v.contents;
+                    var u8 = contents instanceof Uint8Array ? contents : (contents ? new Uint8Array(contents) : null);
+                    var r = u8 ? MHSStepLog.repairUnityPrefsBytes(u8) : null;
+                    if (!r) { res.unreadable++; return; }
+                    res.queued += r.queued;
+                    if (!r.bytes) return;
+                    // Same timestamp and mode: the game loads every stored file
+                    // at startup, and a game already running elsewhere keeps
+                    // winning with its own later writes.
+                    var nv = {};
+                    for (var f in v) if (Object.prototype.hasOwnProperty.call(v, f)) nv[f] = v[f];
+                    nv.contents = r.bytes;
+                    store.put(nv, k);
+                    res.removed += r.removed;
+                  };
+                });
+                tx.oncomplete = function() {
+                  close();
+                  if (res.removed > 0) res.state = 'repaired';
+                  finish(res);
+                };
+                tx.onerror = tx.onabort = function() { close(); finish({ state: 'error' }); };
+              };
+            } catch (e) { close(); finish({ state: 'error' }); }
+          };
+        }).catch(function() { finish({ state: 'error' }); });
+      } catch (e) { finish({ state: 'error' }); }
+    });
+  };
+
   window.MHSStepLog = MHSStepLog;
 })();

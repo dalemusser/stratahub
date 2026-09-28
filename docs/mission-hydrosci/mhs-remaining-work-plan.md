@@ -255,11 +255,12 @@ Fallback now has retries/resume/watchdog/lifecycle fixes; remaining is one
 guest/incognito verification run + adding Background-Fetch availability to
 telemetry, then close or re-scope. (`issues/MHS-004-*.md`.)
 
-**RDY-7 — game logging silent failure (2026-09-15 incident).** *(built 2026-09-17/18; game fix pending)*
-A log request that fails twice ten seconds apart ends the game's logging on that
-browser profile until its site data is cleared. StrataHub now detects it within
-about five minutes of play (recording bar, Devices tab Logs column, viewer filter),
-plus an offline bar. The game-side fix is in `mhs-updates/gamelogger-cache-overflow-091626/`
+**RDY-7 — game logging silent failure (2026-09-15 incident).** *(built 2026-09-17/18 and 2026-09-28; game fix pending)*
+A log request that fails twice ten seconds apart ends the game's logging for the
+rest of that session. Since 2026-09-28 the play page unblocks the saved record
+before each launch, so the next launch sends it and nothing needs clearing.
+StrataHub detects it within about five minutes of play (recording bar, Devices tab
+Logs column, viewer filter), plus an offline bar. The game-side fix is in `mhs-updates/gamelogger-cache-overflow-091626/`
 (reproduction and specimen included) and belongs in the next build. Plan, status
 and open items: `mhs-game-logging-silent-failure-plan.md` §0; **next to build: §5.7** (audit-log entries, an incidents viewer with open/resolved, email + daily digest); support:
 `mhs-logging-support-checklist.md`; teacher text:

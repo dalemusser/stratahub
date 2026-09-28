@@ -1,4 +1,4 @@
-.PHONY: build build-linux test test-v test-cover test-store test-handlers test-auth test-safe test-fresh test-e2e test-e2e-setup test-e2e-headed test-e2e-slow css css-watch css-prod clean tidy run help setup setup-tailwind
+.PHONY: build build-linux test test-js test-v test-cover test-store test-handlers test-auth test-safe test-fresh test-e2e test-e2e-setup test-e2e-headed test-e2e-slow css css-watch css-prod clean tidy run help setup setup-tailwind
 
 # Build variables
 BINARY_NAME=stratahub
@@ -53,6 +53,10 @@ test-safe:
 # Run tests without cache
 test-fresh:
 	go test -count=1 ./...
+
+# Run the JavaScript unit tests (Node 18+; no packages to install)
+test-js:
+	node --test tests/js/*.test.mjs
 
 # Set up E2E test environment (run once before running E2E tests)
 test-e2e-setup:
@@ -162,6 +166,7 @@ help:
 	@echo "  test-auth       - Run auth middleware tests"
 	@echo "  test-safe       - Run all tests sequentially (avoids MongoDB issues)"
 	@echo "  test-fresh      - Run tests without cache"
+	@echo "  test-js         - Run JavaScript unit tests (Node)"
 	@echo "  test-e2e        - Run Playwright E2E tests (requires app running)"
 	@echo "  test-e2e-headed - Run E2E tests with visible browser"
 	@echo "  test-e2e-slow   - Run E2E tests with visible browser in slow motion"
