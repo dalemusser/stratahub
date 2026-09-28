@@ -114,6 +114,9 @@
       if (typeof v === 'object' && v !== null) {
         try { v = JSON.stringify(v).slice(0, MAX_DETAIL_STRING); } catch (e) { v = String(v); }
       }
+      // The server keeps detail as strings only; one number would make it
+      // refuse the whole report.
+      if (typeof v !== 'string') v = String(v);
       out[k] = v;
       n++;
     }

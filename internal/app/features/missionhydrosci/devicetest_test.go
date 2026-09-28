@@ -1,6 +1,7 @@
 package missionhydrosci
 
 import (
+	"encoding/json"
 	"testing"
 	"time"
 
@@ -65,14 +66,7 @@ func TestDeriveFromSteps(t *testing.T) {
 	now := time.Now().UTC()
 	req := deviceTestStepsRequest{}
 	add := func(step, state, msg string) {
-		req.Entries = append(req.Entries, struct {
-			T      int64             `json:"t"`
-			At     string            `json:"at"`
-			Step   string            `json:"step"`
-			State  string            `json:"state"`
-			Msg    string            `json:"msg"`
-			Detail map[string]string `json:"detail"`
-		}{T: 1, At: now.Format(time.RFC3339Nano), Step: step, State: state, Msg: msg})
+		req.Entries = append(req.Entries, deviceTestStepEntry{T: 1, At: now.Format(time.RFC3339Nano), Step: step, State: state, Msg: msg})
 	}
 	add("sw", "ok", "registered")
 	add("download", "running", "10%")
@@ -122,5 +116,32 @@ func TestDropStoredSteps(t *testing.T) {
 	}
 	if out := dropStoredSteps(nil, stored); len(out) != 0 {
 		t.Fatalf("empty batch: got %d entries", len(out))
+	}
+}
+
+// A number or boolean in an entry's detail must not make the report fail to
+// decode (the page's log-queue repair line once sent counts as numbers).
+func TestStepsRequestDetailAcceptsAnyScalar(t *testing.T) {
+	body := `{"outcome":"launch-ok","entries":[{"t":1,"at":"2026-09-28T09:24:46.381Z","step":"storage","state":"ok","msg":"Unblocked","detail":{"removed":1,"queued":15,"ok":true,"none":null,"note":"x"}},{"t":2,"at":"2026-09-28T09:24:47Z","step":"launch","state":"ok","msg":"no detail","detail":null}]}`
+	var req deviceTestStepsRequest
+	if err := json.Unmarshal([]byte(body), &req); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	got := req.Entries[0].Detail
+	want := map[string]string{"removed": "1", "queued": "15", "ok": "true", "note": "x"}
+	if len(got) != len(want) {
+		t.Fatalf("detail = %v, want %v", got, want)
+	}
+	for k, v := range want {
+		if got[k] != v {
+			t.Fatalf("detail[%q] = %q, want %q (all: %v)", k, got[k], v, got)
+		}
+	}
+	if req.Entries[1].Detail != nil {
+		t.Fatalf("null detail should be empty, got %v", req.Entries[1].Detail)
+	}
+	steps, _ := deriveFromSteps(req, models.MHSDeviceTestStageRun, time.Now().UTC())
+	if steps[0].Detail["removed"] != "1" {
+		t.Fatalf("stored detail = %v", steps[0].Detail)
 	}
 }

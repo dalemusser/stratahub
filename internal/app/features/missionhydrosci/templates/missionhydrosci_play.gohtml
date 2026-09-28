@@ -1205,7 +1205,7 @@
           loggingHealth.repaired = true;
           stepLog.record('storage', 'ok', 'Unblocked the game’s saved activity record: removed ' + n(r.removed, 'empty entry', 'empty entries') +
             ' that had stopped the game sending it; ' + n(r.queued, 'saved event', 'saved events') + ' will be sent from this launch',
-            { removed: r.removed, queued: r.queued, stores: r.stores });
+            { removed: String(r.removed), queued: String(r.queued), stores: String(r.stores) });
         } else if (r.state === 'clean') {
           stepLog.record('storage', 'info', 'Game’s saved activity record checked: nothing blocking' +
             (r.queued ? ' (' + n(r.queued, 'saved event', 'saved events') + ' waiting to be sent)' : ''));

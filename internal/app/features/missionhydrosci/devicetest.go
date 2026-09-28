@@ -528,14 +528,45 @@ func boundDiagnostics(in map[string]interface{}) map[string]interface{} {
 // deviceTestStepsRequest is a batch from the page's step log.
 type deviceTestStepsRequest struct {
 	Context map[string]interface{} `json:"context"`
-	Entries []struct {
-		T      int64             `json:"t"`
-		At     string            `json:"at"`
-		Step   string            `json:"step"`
-		State  string            `json:"state"`
-		Msg    string            `json:"msg"`
-		Detail map[string]string `json:"detail"`
-	} `json:"entries"`
+	Entries []deviceTestStepEntry  `json:"entries"`
+}
+
+// deviceTestStepEntry is one step-log entry as the page sends it.
+type deviceTestStepEntry struct {
+	T      int64      `json:"t"`
+	At     string     `json:"at"`
+	Step   string     `json:"step"`
+	State  string     `json:"state"`
+	Msg    string     `json:"msg"`
+	Detail stepDetail `json:"detail"`
+}
+
+// stepDetail is an entry's detail. It is stored as strings; a number or a
+// boolean from the page is kept as its JSON text and a null is dropped, so
+// one odd value never makes the whole report fail to decode.
+type stepDetail map[string]string
+
+func (d *stepDetail) UnmarshalJSON(b []byte) error {
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(b, &raw); err != nil || raw == nil {
+		*d = nil // null or not an object: no detail
+		return nil
+	}
+	out := make(stepDetail, len(raw))
+	for k, v := range raw {
+		t := strings.TrimSpace(string(v))
+		if t == "" || t == "null" {
+			continue
+		}
+		var s string
+		if json.Unmarshal(v, &s) == nil {
+			out[k] = s
+			continue
+		}
+		out[k] = t
+	}
+	*d = out
+	return nil
 }
 
 var deviceTestStageRank = map[string]int{
