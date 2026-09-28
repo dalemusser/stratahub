@@ -32,6 +32,8 @@
 5. Decide when the game fix goes into a build. Given the cause, the recommendation is the next build.
 6. Later: members' heartbeats at 60 s; a retention job for launch-record beat arrays; where member launch records live and who sees what.
 
+**2026-09-28: the game team's new logger tested (builds 20260921-12438 and 20260925-12446; handoff note `mhs-updates/gamelogger-cache-overflow-091626/03-builds-12438-12446-test.md`).** The two-failure wedge is fixed: with the log host blocked the new builds keep retrying, keep real events in the store, and drain it when the host returns. Two new defects make both builds unfit for schools: (A) an accepted batch is sent again and again, from the second request of every session, about 8 requests and up to 350 duplicate entries a second until the page closes (about 680,000 duplicate entries already in the log data from dev testing on 2026-09-25); (B) a refused batch is resent at once, forever, growing past the 100-entry limit. A device already wedged by the schools' build (v2.8.1) does not recover on either new build (it hits B on every launch), so clearing site data remains the remedy until the fix also drops empty and id-less entries on load; with that rule a wedged device drains on its first launch without a clear. StrataHub's logging check cannot see A (entries do arrive) and sees B only as "nothing arriving".
+
 **Watching the first week.** Device Tests viewer, Kind = Member load record, Logs = Problem. Each row is a device that needs the support checklist. Several at one school at once means the network is blocking the log host.
 
 ---
