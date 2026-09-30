@@ -12,13 +12,13 @@
 
 | # | Item | Who | Priority | State |
 |---|---|---|---|---|
-| G1 | New logger builds resend every accepted batch and loop on refused ones (`toSend` kept between passes) | Game team | Blocks the new builds | Cause known; one-line fix |
-| G2 | Events' details overwritten by later events (shared `LoggingData` dictionary), in every build since February 2026 | Game team | High (research data) | Cause known; small fix |
-| G3 | Hardening so a future slip cannot flood the log service | Game team | High | Specified in note 03 |
-| G4 | First event of each session sent without a user id and refused | Game team | Medium | Open since 2026-09-08 |
-| G5 | Two logger instances, `_instance` never set in `Awake` | Game team | Medium | Found 2026-09-18 |
-| G6 | Game errors seen in the browser console during test runs | Game team | Low | Observed, not investigated |
-| G7 | Verification the next build must pass | Game team + us | Before any build reaches schools | Steps written |
+| G1 | New logger builds resend every accepted batch and loop on refused ones (`toSend` kept between passes) | Game team | Blocks the new builds | **Fixed in the delivered files** (2026-09-30); awaiting the game team's build |
+| G2 | Events' details overwritten by later events (shared `LoggingData` dictionary), in every build since February 2026 | Game team | High (research data) | **Fixed in the delivered files** (2026-09-30); awaiting the game team's build |
+| G3 | Hardening so a future slip cannot flood the log service | Game team | High | **Done in the delivered files** (2026-09-30) |
+| G4 | First event of each session sent without a user id and refused | Game team | Medium | **Fixed in the delivered files** (2026-09-30): the id is stamped on before sending |
+| G5 | Two logger instances, `_instance` never set in `Awake` | Game team | Medium | **Fixed in the delivered files** (2026-09-30) |
+| G6 | Game errors seen in the browser console during test runs | Game team | Low | Not the logger (2026-09-30): follows each scene load and the save system's settings calls |
+| G7 | Verification the next build must pass | Game team + us | Before any build reaches schools | Run on the delivered fix 2026-09-30 (all pass); to be run again on the team's build |
 | D1 | About 700,000 duplicate entries in the log data from testing the new builds | Us (data) | High | Decision needed |
 | D2 | Overwritten details in the existing data since February 2026 | Us + research partner | High | Decision needed |
 | D3 | Recovered backlogs now arrive with mostly overwritten details | Us (StrataHub) | High | Decision needed |
@@ -33,6 +33,8 @@ The decisions only the project lead can make are collected in §6.
 ---
 
 ## 1. The game (game team)
+
+**Status 2026-09-30.** G1–G5 are fixed and G3 is done in `mhs-updates/gamelogger-fix-093026/Game-Code/Systems/Logging/` (`GameLogger.cs`, `LoggingData.cs`), based on the game team's 2026-09-28 project copy. A Unit 1 build of the fix, made here in Unity 6000.0.74f1 from the release profile, passed the G7 checks on the dev site the same day (`01-changes.md` in that folder has the change-by-change description and the results; two test collections on the dev site hold the builds, nothing is active for students). The game team applies the two files to the mainline, builds, and uploads through MHS Builds; the same checks run again on their build before it is made active. For G6, the exception `JSON must represent an object type` is not from the logger: it follows each scene load and the save system's settings calls, on v2.8.1 and on the fixed build alike.
 
 ### G1. The new logger builds resend every accepted batch, and loop on a refused one
 
@@ -172,7 +174,7 @@ Done on 2026-09-28, for reference: the play page repairs a wedged store before e
 - **T1. Pause play on the new-logger collections.** Every session on ClassifierIssuesTesting or LoggingTest floods the log service while it is open (G1). Three dev accounts still have a personal override to one of them (two on ClassifierIssuesTesting, one on LoggingTest). Reset those overrides, or ask their users not to play until a fixed build exists.
 - **T2. Delete test runs on the dev site:** the seven "Automated check" device-test runs listed in the plan (§0, open item 3) and the run of 2026-09-28 whose id begins `fffffffff54f`.
 - **T3. The project lead's no-network test machine** on the dev site (plan §0, open item 4) no longer needs clearing: its next launch repairs the store. Launching there once confirms it.
-- **T4. The handoff bundle's zip** (`mhs-updates/gamelogger-cache-overflow-091626.zip`) predates note 03 and the simulation; rebuild it before sending. The drop-in `GameLogger.cs` in the bundle still lacks G2 and G3 (held until now by the project lead); update it, or point the game team at note 03.
+- **T4. The handoff bundle.** Superseded 2026-09-30: `mhs-updates/gamelogger-fix-093026/` carries the fixed files with G2 and G3 in, and its `01-changes.md` is the note to send; the September bundle stays as the record of the investigation.
 
 ---
 
