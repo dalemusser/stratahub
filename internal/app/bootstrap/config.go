@@ -93,7 +93,7 @@ var appConfigKeys = []config.AppKey{
 	{Name: "mhs_s3_region", Default: "", Desc: "AWS region for MHS CDN S3 bucket"},
 	{Name: "mhs_s3_bucket", Default: "", Desc: "S3 bucket name for MHS game builds (e.g., adroit-cdn)"},
 	{Name: "mhs_s3_prefix", Default: "mhs/", Desc: "S3 key prefix for MHS builds"},
-	{Name: "mhs_s3_acl", Default: "public-read", Desc: "Default ACL for MHS build uploads"},
+	{Name: "mhs_s3_acl", Default: "", Desc: "Canned ACL for MHS build uploads; leave empty for a bucket with ACLs disabled (object ownership enforced), where access comes from the bucket policy and a PutObject with an ACL is refused"},
 	{Name: "mhs_s3_access_key_id", Default: "", Desc: "AWS access key for MHS S3 (optional, uses default chain if empty)"},
 	{Name: "mhs_s3_secret_access_key", Default: "", Desc: "AWS secret key for MHS S3 (optional)"},
 
