@@ -2,7 +2,7 @@
 
 **Date:** 2026-09-28
 **Scope:** the game's logging (the schools' build and the game team's two new logger builds), the research data already in the log service, grading, StrataHub, and test cleanup. One list, with the evidence for each item and who acts on it.
-**Background:** the investigation and what is already live are in `mhs-game-logging-silent-failure-plan.md` (§0). The game team's handoff is `mhs-updates/gamelogger-cache-overflow-091626/`, especially note `03-builds-12438-12446-test.md`. This document does not repeat the whole story; it lists what is still open.
+**Background:** the investigation and what is already live are in `mhs-game-logging-silent-failure-plan.md` (§0). The game team's handoff is `mhs-updates/gamelogger-fix-093026/` (the fixed files and `03-for-the-game-dev.md`), which supersedes `mhs-updates/gamelogger-cache-overflow-091626/` (the investigation, especially note `03-builds-12438-12446-test.md`). This document does not repeat the whole story; it lists what is still open.
 
 **Builds referred to below.** The schools' collection (MHS-Release_V1.0.0) runs units v2.8.1 (builds of 2026-09-14). The game team's new logger is in build 20260921-12438 (units v2.8.2; collection 20260921-12438-LoggingTest) and build 20260925-12446 (Unit 2 v2.8.3). The collection 20260925-12446-ClassifierIssuesTesting mixes them: Unit 2 from 12446 and Units 1, 3, 4 and 5 from 12438.
 
@@ -17,7 +17,7 @@
 | G3 | Hardening so a future slip cannot flood the log service | Game team | High | **Done in the delivered files** (2026-09-30) |
 | G4 | First event of each session sent without a user id and refused | Game team | Medium | **Fixed in the delivered files** (2026-09-30): the id is stamped on before sending |
 | G5 | Two logger instances, `_instance` never set in `Awake` | Game team | Medium | **Fixed in the delivered files** (2026-09-30) |
-| G6 | Game errors seen in the browser console during test runs | Game team | Low | **Fixed in the delivered files** (2026-09-30, `SettingsSaveManager.cs`): `JsonUtility.FromJson` on the settings load's `null` body; verified gone on the dev site |
+| G6 | Game errors seen in the browser console during test runs | Game team | Low | The `JSON must represent an object type` exception is **fixed in the delivered files** (`SettingsSaveManager.cs`, 2026-09-30) and verified gone on the dev site; the once-seen `ArgumentOutOfRangeException` was not investigated and did not recur in the 2026-10-01 runs |
 | G7 | Verification the next build must pass | Game team + us | Before any build reaches schools | Run on the delivered fix 2026-09-30 and 2026-10-01, versions 1.0–1.2 (all pass); to be run again on the team's build |
 | D1 | About 700,000 duplicate entries in the log data from testing the new builds | Us (data) | High | Decision needed |
 | D2 | Overwritten details in the existing data since February 2026 | Us + research partner | High | Decision needed |
@@ -34,7 +34,7 @@ The decisions only the project lead can make are collected in §6.
 
 ## 1. The game (game team)
 
-**Status 2026-10-01 (version 1.2 of the fix).** G1–G5 are fixed and G3 is done in `mhs-updates/gamelogger-fix-093026/Game-Code/` (`Systems/Logging/GameLogger.cs`, `Systems/Logging/LoggingData.cs`, and `Systems/Save Load System/SettingsSaveManager.cs` for G6), based on the game team's 2026-09-28 project copy. Version 1.1 added the findings of two independent reviews; version 1.2 added per-entry ids (`session_id`, `seq`, `entry_id`), a `recovered` flag on cache-loaded entries, `sent_at`, and `429`/`Retry-After` handling, so the log service can de-duplicate, date and pace entries later without another game build (the server side of that is listed in the bundle's `02-logging-redesign-if-starting-over.md` §8). Unit 1 builds of each version, made here in Unity 6000.0.74f1 from the release profile, passed the G7 checks on the dev site on 2026-09-30 and 2026-10-01 (`01-changes.md` in that folder has the change-by-change description and the results; two test collections on the dev site hold the builds, nothing is active for students). The game team applies the two files to the mainline, builds, and uploads through MHS Builds; the same checks run again on their build before it is made active. For G6, the exception `JSON must represent an object type` is not from the logger: `SettingsSaveManager` parses the save service's settings-load response with `JsonUtility.FromJson`, which throws on the body `null` the service returns for a player without saved settings; the load coroutine dies there on every scene load (defaults apply anyway). The guard before the parse is in the delivered `SettingsSaveManager.cs` (third file of the bundle) and was verified on the dev site; details in the fix bundle's `01-changes.md` §8.
+**Status 2026-10-01 (version 1.2 of the fix).** G1–G5 are fixed and G3 is done in `mhs-updates/gamelogger-fix-093026/Game-Code/` (`Systems/Logging/GameLogger.cs`, `Systems/Logging/LoggingData.cs`, and `Systems/Save Load System/SettingsSaveManager.cs` for G6), based on the game team's 2026-09-28 project copy. Version 1.1 added the findings of two independent reviews; version 1.2 added per-entry ids (`session_id`, `seq`, `entry_id`), a `recovered` flag on cache-loaded entries, `sent_at`, and `429`/`Retry-After` handling, so the log service can de-duplicate, date and pace entries later without another game build (the server side of that is listed in the bundle's `02-logging-redesign-if-starting-over.md` §8). Unit 1 builds of each version, made here in Unity 6000.0.74f1 from the release profile, passed the G7 checks on the dev site on 2026-09-30 and 2026-10-01 (`01-changes.md` in that folder has the change-by-change description and the results; five test collections on the dev site hold the builds (unit1 v2.8.3–v2.8.7), nothing is active for students). The game team applies the three files to the mainline (`03-for-the-game-dev.md` in the bundle says how), builds, and uploads through MHS Builds; the same checks run again on their build before it is made active. For G6, the exception `JSON must represent an object type` is not from the logger: `SettingsSaveManager` parses the save service's settings-load response with `JsonUtility.FromJson`, which throws on the body `null` the service returns for a player without saved settings; the load coroutine dies there on every scene load (defaults apply anyway). The guard before the parse is in the delivered `SettingsSaveManager.cs` (third file of the bundle) and was verified on the dev site; details in the fix bundle's `01-changes.md` §8.
 
 ### G1. The new logger builds resend every accepted batch, and loop on a refused one
 
@@ -63,7 +63,7 @@ The decisions only the project lead can make are collected in §6.
 
 "Within about 5 seconds" is normal play on a working connection; "over 2 minutes late" is a backlog saved on the device and sent later. Every build since 20260209 shows about 1–5% of dialogue-node events overwritten in normal play (the spring study's main build, 20260313-10763: 3.1%, 10,026 entries). The new logger builds do not fix it (build 12446: 85.8%).
 
-**Fix.** Build a new dictionary for every event (in `LoggingData.ExecuteLogData` and `LogPlayerPositionEvent`), have the variable components put the variables' current values, not the variable objects, into it, and as a backstop copy `data` when an entry is queued. It belongs in the same build as G1. The true details of past events cannot be recovered. **Confirmed in the shipped source on 2026-09-30** (the game team's project copies): the schools' logger empties the queued entry with `logData.Clear()` at the top of each pass (`logData` is a class field), and the new logger keeps `toSend` as a class field that is never cleared. The fix work is planned in `mhs-updates/gamelogger-fix-093026/00-plan.md`.
+**Fix.** Build a new dictionary for every event (in `LoggingData.ExecuteLogData` and `LogPlayerPositionEvent`), have the variable components put the variables' current values, not the variable objects, into it, and as a backstop copy `data` when an entry is queued. It belongs in the same build as G1. The true details of past events cannot be recovered. **Confirmed in the shipped source on 2026-09-30** (the game team's project copies): the schools' logger empties the queued entry with `logData.Clear()` at the top of each pass (`logData` is a class field), and the new logger keeps `toSend` as a class field that is never cleared. The fix is delivered: `mhs-updates/gamelogger-fix-093026/01-changes.md` §3.
 
 ### G3. Hardening, so a future slip cannot flood the log service
 
@@ -84,7 +84,7 @@ The `GameLogger` component sits on the console-manager object in both core-syste
 
 ### G6. Game errors seen in the browser console
 
-In headless test runs of v2.8.1 (with and without StrataHub's latest page) the game printed `ArgumentException: JSON must represent an object type.` (several times a session) and once `ArgumentOutOfRangeException: Index was out of range.` Their cause was not investigated; they did not stop play. Worth a look by the game team.
+In headless test runs of v2.8.1 (with and without StrataHub's latest page) the game printed `ArgumentException: JSON must represent an object type.` (several times a session) and once `ArgumentOutOfRangeException: Index was out of range.` Their cause was not investigated at the time; they did not stop play. Status 2026-10-01: the first is the settings load's `null` body, fixed in the delivered `SettingsSaveManager.cs`; the second has not been seen again.
 
 ### G7. What the next build must pass before it reaches schools
 
@@ -174,13 +174,13 @@ Done on 2026-09-28, for reference: the play page repairs a wedged store before e
 - **T1. Pause play on the new-logger collections.** Every session on ClassifierIssuesTesting or LoggingTest floods the log service while it is open (G1). Three dev accounts still have a personal override to one of them (two on ClassifierIssuesTesting, one on LoggingTest). Reset those overrides, or ask their users not to play until a fixed build exists.
 - **T2. Delete test runs on the dev site:** the seven "Automated check" device-test runs listed in the plan (§0, open item 3) and the run of 2026-09-28 whose id begins `fffffffff54f`.
 - **T3. The project lead's no-network test machine** on the dev site (plan §0, open item 4) no longer needs clearing: its next launch repairs the store. Launching there once confirms it.
-- **T4. The handoff bundle.** Superseded 2026-09-30: `mhs-updates/gamelogger-fix-093026/` carries the fixed files with G2 and G3 in, and its `01-changes.md` is the note to send; the September bundle stays as the record of the investigation.
+- **T4. The handoff bundle.** Superseded 2026-09-30: `mhs-updates/gamelogger-fix-093026/` carries the fixed files with G2 and G3 in, its `03-for-the-game-dev.md` is the page to send and `01-changes.md` the detail; the September bundle stays as the record of the investigation.
 
 ---
 
 ## 6. Decisions for the project lead
 
-1. **Send G1, G2, G3 (and G4, G5) to the game team for the next build,** with the G7 verification as the bar for it to reach schools. Recommended: yes, as one build.
+1. **Send G1, G2, G3 (and G4, G5) to the game team for the next build,** with the G7 verification as the bar for it to reach schools. Recommended: yes, as one build. (Files delivered 2026-10-01 as version 1.2; the hand-over itself is still to do.)
 2. **Keep the schools on v2.8.1 until then.** Recommended: yes; StrataHub's repair limits a network drop to one session's delay.
 3. **D1:** delete the duplicates (keep one copy of each event), after a backup. Recommended: yes.
 4. **D2:** the data-quality note for the research team and the research partner; and whether to mark overwritten entries in the existing data.
@@ -189,7 +189,7 @@ Done on 2026-09-28, for reference: the play page repairs a wedged store before e
 7. **R1 / R2:** the rule-by-rule grading check, and a regrade of the dev accounts after D1.
 8. **S1:** build the incident records and notification, and who receives them.
 9. **T1:** reset the three overrides to the new-logger collections.
-10. **T4:** update the bundle's drop-in with G2 and G3, or leave note 03 as the instruction.
+10. **T4:** done 2026-09-30, superseded by `mhs-updates/gamelogger-fix-093026/`.
 
 ---
 
