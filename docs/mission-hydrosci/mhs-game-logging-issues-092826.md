@@ -124,7 +124,7 @@ How an analyst can recognise an overwritten entry:
 - PuzzlePieceVisibleEvent: `data.timestamp` differs from the entry's `timestamp`;
 - any of the affected types: a run of consecutive entries from one account with identical details but different timestamps, or an entry that arrived long after its timestamp.
 
-**Needed:** a data-quality note for the research team and the research partner with the above and the measured rates (§1 G2). **Drafted 2026-10-02:** `mhs-log-data-quality-note-2026-10.md` (for the project lead's review before sending). Optionally, a one-time pass over the log data that marks entries matching the first three signatures, so analyses can filter on a field instead of re-deriving it.
+**Needed:** a data-quality note for the research team and the research partner with the above and the measured rates (§1 G2). **Written 2026-10-02:** `mhs-log-data-quality-note-2026-10.md`. Optionally, a one-time pass over the log data that marks entries matching the first three signatures, so analyses can filter on a field instead of re-deriving it.
 
 ### D3. Recovered backlogs arrive with mostly overwritten details
 

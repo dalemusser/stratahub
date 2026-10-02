@@ -1,6 +1,6 @@
 # Mission HydroSci game log data: a data-quality note
 
-**Draft, 2026-10-02, for review before sending.**
+**Date:** 2026-10-02
 **For:** the research team and the research partner's analysts.
 **About:** the game-event log data collected from Mission HydroSci (the `mhs` entries in the log service), from February 2026 to the present.
 
