@@ -906,5 +906,24 @@
     });
   };
 
+  // What one of StrataHub's answers says about the page's sign-in. status is
+  // the HTTP status of one of the play page's own posts (a heartbeat, the
+  // launch record). A 404 for the launch's own record does not say why, so
+  // the page then asks /api/user and passes its answer as who; pageUserId is
+  // the user the page was rendered for.
+  //   'ok'          the server accepted the post
+  //   'signed-out'  the sign-in has ended (401, or /api/user says so)
+  //   'other-user'  somebody else is signed in on this device now
+  //   ''            nothing can be concluded (leave the state as it is)
+  MHSStepLog.signInState = function(status, who, pageUserId) {
+    if (status === 401) return 'signed-out';
+    if (status >= 200 && status < 300) return 'ok';
+    if (status === 404 && who) {
+      if (!who.isAuthenticated) return 'signed-out';
+      if (who.user_id && pageUserId && who.user_id !== pageUserId) return 'other-user';
+    }
+    return '';
+  };
+
   window.MHSStepLog = MHSStepLog;
 })();

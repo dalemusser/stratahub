@@ -43,8 +43,8 @@
          game (the top edge holds the back and fullscreen buttons), inside
          #unity-container so it survives fullscreen. Amber is right here: a bar
          only appears for a real problem, and the "!" mark keeps it readable
-         without color. Only one bar shows at a time: while the device is
-         offline the offline bar replaces the logging one. */
+         without color. Only one bar shows at a time: the offline bar comes
+         first, then the signed-out bar, then the logging one. */
       .mhs-notice-bar {
         position: absolute;
         bottom: 0; left: 0; right: 0;
@@ -80,6 +80,9 @@
         padding: 2px 8px; font: inherit; font-size: 12px; cursor: pointer;
       }
       .mhs-notice-bar .mhs-ln-btn:hover { background: rgba(255,255,255,0.24); }
+      .mhs-notice-bar a.mhs-ln-btn { text-decoration: none; display: inline-block; }
+      .mhs-notice-bar .mhs-ln-primary { background: #f59e0b; color: #451a03; border-color: #f59e0b; font-weight: 600; }
+      .mhs-notice-bar .mhs-ln-primary:hover { background: #fbbf24; }
       .mhs-notice-bar .mhs-ln-dismiss { position: absolute; top: 4px; right: 8px; font-size: 16px; line-height: 1; padding: 2px 7px; }
       .mhs-notice-bar .mhs-ln-how { margin: 6px 0 2px; padding: 8px 10px; background: rgba(0,0,0,0.25); border-radius: 6px; max-width: 720px; }
       .mhs-notice-bar .mhs-ln-how[hidden] { display: none; }
@@ -272,6 +275,33 @@
           </ol>
         </div>
       </div>
+
+      {{ if not .DeviceTest }}
+      <!-- Signed-out notice. StrataHub answers this page's own posts with 401:
+           the sign-in has ended (it lasts 30 days, and an administrator can
+           end every sign-in). The game is not affected, it logs and saves
+           with the keys this page gave it; what stops is what the page tells
+           StrataHub (its heartbeats, the record that a unit was finished).
+           Signing in again in another tab puts that right without reloading
+           the game. -->
+      <div id="mhs-signedout-notice" class="mhs-notice-bar" role="status" aria-live="polite" hidden>
+        <div class="mhs-ln-row">
+          <span class="mhs-ln-icon" aria-hidden="true">!</span>
+          <span class="mhs-ln-text" id="mhs-so-text">You have been signed out. You can keep playing. Sign in again so your progress is recorded.</span>
+          <a class="mhs-ln-btn mhs-ln-primary" id="mhs-so-signin" href="{{ .SignInURL }}" target="_blank" rel="noopener">Sign in</a>
+          <button type="button" class="mhs-ln-btn" id="mhs-so-how-btn" aria-expanded="false" aria-controls="mhs-so-how">What to do</button>
+          <button type="button" class="mhs-ln-btn mhs-ln-dismiss" id="mhs-so-dismiss" aria-label="Hide this notice" title="Hide this notice">&times;</button>
+        </div>
+        <div class="mhs-ln-how" id="mhs-so-how" hidden>
+          <strong>For the teacher.</strong> <span id="mhs-so-detail">This device is no longer signed in to Mission HydroSci. The game keeps running and keeps saving, but this page cannot report to the server: the dashboard does not see this session, and a finished unit cannot be recorded until someone signs in.</span>
+          <ol>
+            <li>Press <em>Sign in</em>. The sign-in page opens in another tab; the game stays open here.</li>
+            <li>Sign in as the same student, then come back to this tab. This notice goes away by itself.</li>
+            <li>Nothing is lost if the unit ends first: the page keeps the result on this device and sends it after the next sign-in.</li>
+          </ol>
+        </div>
+      </div>
+      {{ end }}
 
       <!-- Help overlay (toggle with ? key, inside container so it's visible in fullscreen) -->
       <div id="help-overlay" role="dialog" aria-modal="true" aria-label="Game controls" style="
@@ -838,7 +868,18 @@
             body: JSON.stringify({ outcome: outcome, unit: unitId, version: unitVersion, context: stepLog.context, entries: stepLog.entries.slice(-300) }),
             keepalive: true
           }).then(function(resp) {
-            if (outcome === 'launch-ok') onHeartbeatReached(); // the server answered: online
+            if (outcome === 'launch-ok') {
+              onHeartbeatReached(); // the server answered: online
+              onSignInStatus(resp.status);
+              if (resp.status === 401) {
+                // Signed out before the launch record could be stored. Keep
+                // trying, so the heartbeats start once the student has
+                // signed in again.
+                memberReported[outcome] = false;
+                if (!launchRecordRetry) launchRecordRetry = setTimeout(function() { launchRecordRetry = null; memberReport('launch-ok'); }, 30000);
+                return null;
+              }
+            }
             return resp.ok ? resp.json() : null;
           }).then(function(data) {
             // The launch record is where this launch's heartbeats go.
@@ -922,7 +963,10 @@
             body: JSON.stringify(heartbeatBody(closing)),
             keepalive: !!closing
           }).then(function(resp) {
-            if (!closing) onHeartbeatReached(); // the server answered: the device is online, whatever the status
+            if (!closing) {
+              onHeartbeatReached(); // the server answered: the device is online, whatever the status
+              onSignInStatus(resp.status);
+            }
             if (closing || !resp || !resp.ok) return null;
             return resp.json().catch(function() { return null; });
           }).then(function(data) {
@@ -1109,7 +1153,7 @@
       // fullscreen changes, re-raise any bar that is showing.
       ['fullscreenchange', 'webkitfullscreenchange'].forEach(function(ev) {
         document.addEventListener(ev, function() {
-          [document.getElementById('mhs-logging-notice'), document.getElementById('mhs-offline-notice')].forEach(function(el) {
+          [document.getElementById('mhs-logging-notice'), document.getElementById('mhs-offline-notice'), document.getElementById('mhs-signedout-notice')].forEach(function(el) {
             if (el && !el.hidden && typeof el.showPopover === 'function') {
               try { if (el.matches(':popover-open')) el.hidePopover(); el.showPopover(); } catch (e) {}
             }
@@ -1119,6 +1163,8 @@
       function showLoggingNotice(reason) {
         if (!lnEl || loggingHealth.dismissed[reason]) return;
         if (loggingHealth.shown === reason) return;
+        // The signed-out bar is showing: keep this one for when it clears.
+        if (signIn && signIn.state !== 'ok') { signIn.loggingWasShown = reason; return; }
         loggingHealth.shown = reason;
         if (lnReason) lnReason.textContent = lnReasons[reason] || '';
         if (lnText && lnTexts[reason]) lnText.textContent = lnTexts[reason];
@@ -1262,6 +1308,7 @@
         }
         // The offline bar explains everything the logging bar would; show one.
         if (loggingHealth.shown) { netHealth.loggingWasShown = loggingHealth.shown; hideLoggingNotice(); }
+        barHide(soEl); // back in hideOffline if the page is still signed out
         barShow(offEl);
       }
       function hideOffline() {
@@ -1273,6 +1320,7 @@
         if (offHow) offHow.hidden = true;
         if (offHowBtn) { offHowBtn.setAttribute('aria-expanded', 'false'); offHowBtn.textContent = 'What to do'; }
         if (netHealth.loggingWasShown) { var was = netHealth.loggingWasShown; netHealth.loggingWasShown = ''; showLoggingNotice(was); }
+        showSignedOutBar();
       }
       function onHeartbeatFailed() {
         netHealth.failures++;
@@ -1302,6 +1350,95 @@
       // cached files with the network down): no transition event will come,
       // so say so now rather than after the first failures.
       if (navigator.onLine === false) showOffline();
+
+      // ---- Signed out -------------------------------------------------------
+      // StrataHub answers this page's own posts with 401 once the sign-in has
+      // ended (it lasts 30 days, and an administrator can end every sign-in).
+      // The game is not affected: it logs and saves with the keys this page
+      // gave it. What stops is everything the page tells StrataHub: its
+      // heartbeats, and the record that a unit was finished (the page keeps
+      // that one in the browser and the launcher sends it after the next
+      // sign-in). The bar says so and opens the sign-in page in another tab;
+      // the first accepted post afterwards clears it. A 404 for this launch's
+      // own record can mean that somebody else has signed in on the device,
+      // which /api/user settles. See MHSStepLog.signInState.
+      var signInWatch = {{ if .DeviceTest }}false{{ else }}true{{ end }}; // a device test has no account
+      var pageUserId = '{{ .UserIDHex }}';
+      var signIn = { state: 'ok', asking: false, dismissed: '', loggingWasShown: '' };
+      var soEl = document.getElementById('mhs-signedout-notice');
+      var soText = document.getElementById('mhs-so-text');
+      var soDetail = document.getElementById('mhs-so-detail');
+      var soLink = document.getElementById('mhs-so-signin');
+      var soHow = document.getElementById('mhs-so-how');
+      var soHowBtn = document.getElementById('mhs-so-how-btn');
+      var soTexts = {
+        'signed-out': 'You have been signed out. You can keep playing. Sign in again so your progress is recorded.',
+        'other-user': 'Someone else is signed in on this device now. You can keep playing. Please tell your teacher.'
+      };
+      var soDetails = {
+        'signed-out': 'This device is no longer signed in to Mission HydroSci. The game keeps running and keeps saving, but this page cannot report to the server: the dashboard does not see this session, and a finished unit cannot be recorded until someone signs in.',
+        'other-user': 'A different account has signed in to Mission HydroSci in this browser while this game was open. The game keeps running and keeps saving for the student who started it, but this page can no longer report for that student. Have the student who is playing sign in again (Sign in), or close this tab and open the game again from their own sign-in.'
+      };
+      if (soHowBtn) soHowBtn.addEventListener('click', function() {
+        var open = soHow.hidden;
+        soHow.hidden = !open;
+        soHowBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        soHowBtn.textContent = open ? 'Hide' : 'What to do';
+      });
+      var soDismiss = document.getElementById('mhs-so-dismiss');
+      if (soDismiss) soDismiss.addEventListener('click', function() { signIn.dismissed = signIn.state; barHide(soEl); });
+      // Shows the bar when the page is signed out, unless the offline bar is
+      // up (it comes first) or the student closed the bar for this state.
+      function showSignedOutBar() {
+        if (!soEl || signIn.state === 'ok' || signIn.dismissed === signIn.state || netHealth.shown) return;
+        barShow(soEl);
+      }
+      function setSignInState(state) {
+        if (!signInWatch || !state || state === signIn.state) return;
+        signIn.state = state;
+        if (state === 'ok') {
+          stepLog.record('game', 'ok', 'Signed in again — this page can report to the server again');
+          barHide(soEl);
+          if (soHow) soHow.hidden = true;
+          if (soHowBtn) { soHowBtn.setAttribute('aria-expanded', 'false'); soHowBtn.textContent = 'What to do'; }
+          signIn.dismissed = '';
+          if (signIn.loggingWasShown) { var was = signIn.loggingWasShown; signIn.loggingWasShown = ''; showLoggingNotice(was); }
+          return;
+        }
+        stepLog.record('game', 'warn', state === 'other-user'
+          ? 'A different account is signed in on this device — the game keeps playing and saving, but this page can no longer report for this student'
+          : 'Signed out — the game keeps playing and saving, but this page cannot report to the server until someone signs in again');
+        if (soText) soText.textContent = soTexts[state];
+        if (soDetail) soDetail.textContent = soDetails[state];
+        // The signed-out bar says what matters now; the logging bar waits.
+        if (loggingHealth.shown) { signIn.loggingWasShown = loggingHealth.shown; hideLoggingNotice(); }
+        showSignedOutBar();
+      }
+      function onSignInStatus(status) {
+        if (!signInWatch) return;
+        if (status !== 404) { setSignInState(MHSStepLog.signInState(status, null, pageUserId)); return; }
+        if (signIn.asking) return;
+        signIn.asking = true;
+        fetch('/api/user', { credentials: 'same-origin', cache: 'no-store' })
+          .then(function(r) { return r.ok ? r.json() : null; })
+          .then(function(who) { signIn.asking = false; if (who) setSignInState(MHSStepLog.signInState(404, who, pageUserId)); })
+          .catch(function() { signIn.asking = false; });
+      }
+      // Check again at once rather than at the next beat: when the student
+      // comes back to this tab, and when the "signed in again" page says so.
+      function recheckSignIn() {
+        if (!signInWatch || signIn.state === 'ok') return;
+        if (hbTimer) { sendHeartbeat(false); return; }
+        if (typeof memberReported !== 'undefined' && !memberReported['launch-ok']) {
+          if (launchRecordRetry) { clearTimeout(launchRecordRetry); launchRecordRetry = null; }
+          memberReport('launch-ok');
+        }
+      }
+      document.addEventListener('visibilitychange', function() { if (document.visibilityState === 'visible') recheckSignIn(); });
+      try {
+        var signInChannel = new BroadcastChannel('mhs-signin');
+        signInChannel.onmessage = function() { recheckSignIn(); };
+      } catch (e) { /* no BroadcastChannel: the next beat finds out */ }
 
       // Aspect-ratio-preserving resize (matches dev build: 1400x800, 7:4 ratio).
       // In fullscreen mode, CSS handles sizing via viewport units (see <style> above)

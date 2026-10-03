@@ -33,6 +33,9 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 		pr.Post("/api/manage/lock", h.HandleManageLock)
 		pr.Get("/api/manage/status", h.ServeManageStatus)
 		pr.Get("/play/{unit}", h.ServePlay)
+		// Where the play page's "Sign in" link lands after a student signs in
+		// again from a running game: go back to the game's tab.
+		pr.Get("/signed-in", h.ServeSignedIn)
 		// End-of-game ceremony (docs/mission-hydrosci/mhs-end-ceremony-plan.md):
 		// the host page, the student's EA scores for it, and the viewed marks.
 		pr.Get("/ceremony", h.ServeCeremony)

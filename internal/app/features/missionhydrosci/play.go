@@ -3,6 +3,7 @@ package missionhydrosci
 
 import (
 	"net/http"
+	"net/url"
 
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
@@ -146,7 +147,9 @@ func (h *Handler) renderPlay(w http.ResponseWriter, r *http.Request, p playRende
 		SaveAuth:        h.Services.SaveAuth,
 		PlayBackURL:     p.BackURL,
 	}
+	data.SignInURL = "/login?return=" + url.QueryEscape(SignedInPath)
 	if p.DeviceTest != nil {
+		data.SignInURL = ""
 		data.DeviceTest = true
 		data.DeviceTestID = p.DeviceTest.ID
 		data.DeviceTestShortID = p.DeviceTest.ShortID

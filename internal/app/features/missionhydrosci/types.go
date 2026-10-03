@@ -68,6 +68,11 @@ type PlayData struct {
 	DeviceTestShortID string // last 6 hex characters, quoted back to us by testers
 	DeviceTestBase    string // "/missionhydrosci/devicetest/run/<id>"
 	PlayBackURL       string // where the back button goes
+
+	// SignInURL is the login page with the "signed in again" page as its
+	// return address: the link of the bar the page shows when its sign-in
+	// has ended during play. Empty for a device test, which has no account.
+	SignInURL string
 }
 
 // CeremonyCardVM is the end-of-game ceremony's row in the unit list: always
