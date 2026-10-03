@@ -97,3 +97,26 @@ func TestCallStratasaveDelete_UpstreamErrorSurfaces(t *testing.T) {
 		t.Fatal("expected error for non-2xx upstream response, got nil")
 	}
 }
+
+// With a delete key configured, the delete call sends it and not the key the
+// game holds: the save service accepts only the admin key for deletes.
+func TestCallStratasaveDelete_UsesAdminAuthWhenSet(t *testing.T) {
+	var gotAuth string
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		gotAuth = r.Header.Get("Authorization")
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{"deleted": 1})
+	}))
+	defer srv.Close()
+
+	h := &Handler{
+		Log:      zap.NewNop(),
+		Services: GameServices{SaveAuth: "Bearer game-key", SaveAdminAuth: "Bearer admin-key"},
+	}
+	if _, err := h.callStratasaveDelete(context.Background(), srv.URL, "69b4449ec6006ac370dad9df"); err != nil {
+		t.Fatalf("callStratasaveDelete() error = %v", err)
+	}
+	if gotAuth != "Bearer admin-key" {
+		t.Errorf("Authorization = %q, want the admin key", gotAuth)
+	}
+}

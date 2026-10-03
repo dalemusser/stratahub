@@ -33,6 +33,20 @@ type GameServices struct {
 	SettingsLoadURL   string
 	SettingsDeleteURL string
 	SaveAuth          string
+	// SaveAdminAuth is the auth header for the save service's delete
+	// endpoints. LogAuth and SaveAuth are rendered into the play page for
+	// the game, so every browser holds them; this one is used only for
+	// calls this server makes and must never reach a template. Empty means
+	// the save service has no separate delete key and SaveAuth is sent.
+	SaveAdminAuth string
+}
+
+// deleteAuth returns the auth header for the save service's delete endpoints.
+func (s GameServices) deleteAuth() string {
+	if s.SaveAdminAuth != "" {
+		return s.SaveAdminAuth
+	}
+	return s.SaveAuth
 }
 
 // Handler is the dependency container for the Mission HydroSci (experimental) feature.

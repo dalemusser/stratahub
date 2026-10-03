@@ -137,6 +137,7 @@ type AppConfig struct {
 	GameMHSSettingsLoadURL   string // Settings load endpoint for MHS
 	GameMHSSettingsDeleteURL string // Settings delete endpoint for MHS
 	GameMHSSaveAuth          string // Save service auth header for MHS (e.g., "Bearer <api-key>")
+	GameMHSSaveAdminAuth     string // Save service auth header for the delete endpoints; server-side only, never rendered into a page ("" = GameMHSSaveAuth)
 
 	// Claude API configuration (for AI-powered student performance summaries)
 	ClaudeAPIKey string // Anthropic API key (e.g., "sk-ant-...")

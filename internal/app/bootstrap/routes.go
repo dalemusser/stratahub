@@ -330,6 +330,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 			SettingsLoadURL:   appCfg.GameMHSSettingsLoadURL,
 			SettingsDeleteURL: appCfg.GameMHSSettingsDeleteURL,
 			SaveAuth:          appCfg.GameMHSSaveAuth,
+			SaveAdminAuth:     appCfg.GameMHSSaveAdminAuth,
 		},
 		sessionMgr,
 		logger,

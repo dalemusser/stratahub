@@ -48,7 +48,7 @@ func (h *Handler) HandleDeleteSavedSettings(w http.ResponseWriter, r *http.Reque
 
 // handleDeleteSaveData is the shared implementation for the two delete handlers.
 // It authorizes the request, then calls the stratasave delete endpoint with the
-// shared save auth header and returns the number of records removed.
+// delete auth header and returns the number of records removed.
 func (h *Handler) handleDeleteSaveData(w http.ResponseWriter, r *http.Request, target, endpoint string) {
 	user, ok := auth.CurrentUser(r)
 	if !ok {
@@ -97,8 +97,9 @@ func (h *Handler) handleDeleteSaveData(w http.ResponseWriter, r *http.Request, t
 }
 
 // callStratasaveDelete POSTs {user_id, game:"mhs"} to a stratasave delete
-// endpoint using the shared save auth header, and returns the deleted count
-// stratasave reports.
+// endpoint using the delete auth header (the server-only admin key when one
+// is configured, see GameServices.SaveAdminAuth), and returns the deleted
+// count stratasave reports.
 func (h *Handler) callStratasaveDelete(ctx context.Context, endpoint, userIDHex string) (int64, error) {
 	body, err := json.Marshal(map[string]string{"user_id": userIDHex, "game": mhsGameID})
 	if err != nil {
@@ -110,8 +111,8 @@ func (h *Handler) callStratasaveDelete(ctx context.Context, endpoint, userIDHex 
 		return 0, err
 	}
 	httpReq.Header.Set("Content-Type", "application/json")
-	if h.Services.SaveAuth != "" {
-		httpReq.Header.Set("Authorization", h.Services.SaveAuth)
+	if auth := h.Services.deleteAuth(); auth != "" {
+		httpReq.Header.Set("Authorization", auth)
 	}
 
 	resp, err := stratasaveClient.Do(httpReq)

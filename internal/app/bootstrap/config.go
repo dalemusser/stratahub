@@ -108,6 +108,7 @@ var appConfigKeys = []config.AppKey{
 	{Name: "game_mhs_settings_load_url", Default: "", Desc: "Settings load endpoint (e.g., https://save.adroit.games/api/settings/load)"},
 	{Name: "game_mhs_settings_delete_url", Default: "", Desc: "Settings delete endpoint (e.g., https://save.adroit.games/api/settings/delete)"},
 	{Name: "game_mhs_save_auth", Default: "", Desc: "Save service auth header for MHS game (e.g., Bearer <api-key>)"},
+	{Name: "game_mhs_save_admin_auth", Default: "", Desc: "Save service auth header for the delete endpoints, sent by this server only and never given to the game (e.g., Bearer <admin-api-key>); when empty, game_mhs_save_auth is used"},
 
 	// Claude API configuration
 	{Name: "claude_api_key", Default: "", Desc: "Anthropic API key for AI summaries (sk-ant-...)"},
@@ -230,6 +231,7 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 		GameMHSSettingsLoadURL:   appValues.String("game_mhs_settings_load_url"),
 		GameMHSSettingsDeleteURL: appValues.String("game_mhs_settings_delete_url"),
 		GameMHSSaveAuth:          appValues.String("game_mhs_save_auth"),
+		GameMHSSaveAdminAuth:     appValues.String("game_mhs_save_admin_auth"),
 
 		// Claude API
 		ClaudeAPIKey: appValues.String("claude_api_key"),
