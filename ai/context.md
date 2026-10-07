@@ -990,7 +990,7 @@ make css-watch
   reports sections, renewable CSRF tokens (`MHSStepLog.csrf`) and a CSRF
   cookie that lives as long as the session (30 d in prod), launch watchdog
   with content-server fallback, SW install that survives a pre-cache 401
-  (never-signed-in devices), direct-path byte-range resume (SW 1.0.15),
+  (never-signed-in devices), direct-path byte-range resume (SW 1.0.15) that keeps resuming while it saves new bytes and announces a refused Background Fetch (`bgfetch-refused`; SW 1.0.16, Unity `cacheControl: 'no-store'`),
   background-switch telemetry (`download-switched`, `bgfetch-frozen`) with a
   1 h direct preference, and a Reset this device button that winds the run
   back under the same test code. Status, open items and headless

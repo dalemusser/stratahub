@@ -782,6 +782,7 @@
 
   manager.init().then(function() {
     runPipeline();
+    manager.dropEngineCache().then(function(names) { if (names.length) updateStorageInfo(); });
     updateStorageInfo();
     updateDownloadButtonVisibility();
   });

@@ -1112,7 +1112,13 @@
       case 'downloading': {
         if (detail.resumedFrom && !this._resumeNoted[unitId + '|' + detail.resumedFrom]) {
           this._resumeNoted[unitId + '|' + detail.resumedFrom] = true;
-          this._step('download', 'info', title + ': picked up at ' + fmtMB(detail.resumedFrom) + ' MB after a dropped connection');
+          // A network that cuts every connection produces dozens of resumes
+          // per unit: log the first few and then every fifth, with the count.
+          var drops = detail.drops || 0;
+          if (drops <= 3 || drops % 5 === 0) {
+            this._step('download', 'info', title + ': picked up at ' + fmtMB(detail.resumedFrom) + ' MB after a dropped connection' +
+              (drops > 1 ? ' (' + drops + ' drops so far)' : ''));
+          }
         }
         if (detail.note) { this._step('download', 'warn', detail.note); return; }
         if (detail.waitingMs >= 5000) {
@@ -2119,6 +2125,41 @@
   };
 
   /**
+   * Removes the Unity loader's own cache — the "UnityCache" IndexedDB
+   * database, a second copy of each unit's .data file that earlier launches
+   * left behind (up to 1 GB, on Chromebooks with 2 GB of browser storage).
+   * The play page now tells the loader to keep none (cacheControl
+   * 'no-store'), so what remains is dead weight. Best effort; pages other
+   * than the play page call it after init, where the loader cannot have the
+   * database open. Resolves to the names removed.
+   */
+  MHSDeliveryManager.prototype.dropEngineCache = async function() {
+    if (typeof indexedDB === 'undefined' || typeof indexedDB.databases !== 'function') return [];
+    var names = [];
+    try {
+      var dbs = await indexedDB.databases();
+      for (var i = 0; i < dbs.length; i++) {
+        var name = (dbs[i] && dbs[i].name) || '';
+        if (name.indexOf('UnityCache') === 0) names.push(name);
+      }
+      for (var j = 0; j < names.length; j++) {
+        await new Promise(function(resolve) {
+          var req = indexedDB.deleteDatabase(names[j]);
+          // 'blocked' (another tab holds it open) completes once that tab
+          // closes — nothing more to do here.
+          req.onsuccess = req.onerror = req.onblocked = function() { resolve(); };
+        });
+      }
+      if (names.length) {
+        this._step('storage', 'info', 'Removed the game engine’s duplicate copy of the unit files (' + names.join(', ') + ')');
+      }
+    } catch (err) {
+      // Best effort
+    }
+    return names;
+  };
+
+  /**
    * Returns the unit info from the manifest.
    */
   MHSDeliveryManager.prototype.getUnit = function(unitId) {
@@ -2292,8 +2333,41 @@
         // file) — refresh so a retry downloads with current sizes.
         this.refreshManifest();
       }
+      if (data.status === 'method') {
+        // Not a unit state: pages' status handlers never see it.
+        this._onDownloadMethod(data.unitId, data.detail || {});
+        return;
+      }
       this._fireStatus(data.unitId, data.status, data.detail);
     }
+  };
+
+  /**
+   * The worker could not start the Background Fetch this page asked for and
+   * is running the direct download instead (startBackgroundFetch's fallback;
+   * seen on managed Chromebooks, where the API exists but fetch() rejects).
+   * Make the page honest about it — its copy ("keep this tab open"), the
+   * stall watchdog's rules, the step-log context and the server telemetry —
+   * and go direct at once next time. Until this, such a device looked like a
+   * background download in every record while its download died with the tab.
+   */
+  MHSDeliveryManager.prototype._onDownloadMethod = function(unitId, detail) {
+    if (detail.path !== 'fallback') return;
+    var unit = this._findUnit(unitId);
+    var state = this._stallState[unitId];
+    if (state) state.fallback = true;
+    this._preferFallback(true);
+    this._logContext('downloadMode', 'direct');
+    var reason = detail.reason || 'no reason given';
+    this._step('method', 'warn', 'The browser refused the background download (' + reason +
+      ') — using the direct download; keep this tab open');
+    this._reportDownloadError(unitId, {
+      errorClass: 'bgfetch-refused',
+      path: 'background',
+      version: unit ? unit.version : (detail.version || ''),
+      error: 'Background download refused by the browser; the direct download took over',
+      rawError: reason
+    });
   };
 
   // Internal: fire all status callbacks

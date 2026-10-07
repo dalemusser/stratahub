@@ -2,7 +2,7 @@
 // This file is concatenated with sw-cache.js and sw-background-fetch.js
 // by the Go handler before being served at /sw.js.
 
-const SW_VERSION = '1.0.15';
+const SW_VERSION = '1.0.16';
 
 // ---- Install ----
 // Pre-caches the app shell one URL at a time and never lets a failure abort
@@ -101,8 +101,21 @@ async function serveMHSContent(request, path) {
     }
   }
 
-  // Not in cache — let it fall through to the Go handler (302 redirect to CDN)
-  return fetch(request);
+  // Not in cache — let it fall through to the Go handler (302 redirect to the
+  // CDN), but as a bare request. The page's own headers must not make the
+  // cross-origin hop: Unity's loader revalidates a copy it keeps in IndexedDB
+  // with If-Modified-Since / If-None-Match + Cache-Control, which are outside
+  // the CORS safelist, so the redirected request is preflighted — and a
+  // preflight the CDN does not answer kills the game's load ("Unity failed to
+  // start" on a device that had played before). A plain GET follows the
+  // redirect without a preflight. The route is public, so no cookies are
+  // needed; HEAD is kept for the loader's validator check.
+  return fetch(new Request(request.url, {
+    method: request.method === 'HEAD' ? 'HEAD' : 'GET',
+    mode: 'cors',
+    credentials: 'omit',
+    redirect: 'follow'
+  }));
 }
 
 /**

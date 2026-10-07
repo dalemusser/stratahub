@@ -1613,6 +1613,16 @@
           productName: 'Mission HydroSci',
           productVersion: '1.0',
           autoSyncPersistentDataPath: true,
+          // The unit's files are already on the device in the service worker's
+          // cache, which also serves them offline. Unity's loader would keep
+          // a second copy of the .data file in IndexedDB (~120 MB per unit,
+          // on Chromebooks with 2 GB of browser storage) and revalidate it
+          // on every launch with If-Modified-Since / If-None-Match +
+          // Cache-Control — headers that force a CORS preflight whenever the
+          // request is not answered from the worker's cache and follows our
+          // redirect to the CDN. 'no-store' turns that machinery off: the
+          // loader fetches plainly and keeps nothing.
+          cacheControl: function() { return 'no-store'; },
         }, function(progress) {
           launchProgress(progress < 0.5 ? 'assets' : (progress < 0.9 ? 'compiling' : 'almost'));
           loadingBar.style.width = (progress * 100) + '%';

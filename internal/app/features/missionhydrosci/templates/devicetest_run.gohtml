@@ -249,6 +249,9 @@
     var parts = [(detail.percent || 0) + '%'];
     if (detail.downloadTotal) parts.push(mhsFormatMB(detail.downloaded) + ' of ' + mhsFormatMB(detail.downloadTotal));
     if (typeof detail.elapsedMs === 'number') parts.push(mhsFormatElapsed(detail.elapsedMs));
+    // A connection the network keeps cutting is resumed, not failed: say so
+    // next to the progress instead of looking stuck.
+    if (detail.drops > 0) parts.push('connection dropped ' + detail.drops + (detail.drops === 1 ? ' time' : ' times') + ' \u2014 resuming');
     return parts.join(' · ');
   }
   function mhsDownloadWaitText(detail) {
@@ -538,6 +541,7 @@
     if (u) unitTotal = u.totalSize || 0;
     sendDiagnostics();
     if (!completed && !expired) runPipeline();
+    manager.dropEngineCache(); // the loader's old duplicate of the unit files, if any
   }).catch(function(err) {
     stepLog.record('sw', 'fail', 'Startup failed: ' + ((err && err.message) || err));
   });

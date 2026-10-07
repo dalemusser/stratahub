@@ -411,6 +411,26 @@ Plan and status: `docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test
   `bgfetch-frozen`, and member pages store a `download-switched` record.
   The "prefer direct" memory is one hour (was 24 h) and clears as soon as a
   background download completes on the device.
+- **Drop-tolerant direct download.** The direct path keeps resuming for as
+  long as it saves new bytes: only attempts that saved nothing count toward
+  giving up (`MAX_FUTILE_ATTEMPTS`, six), the bytes received before a break
+  are flushed as a short resume part so a connection cut after a few MB
+  still moves the resume point, and progress carries the drop count (pages
+  show "connection dropped N times — resuming"; the step log notes the
+  first drops and every fifth). A final failure's telemetry says how many
+  drops preceded it. A network path that cuts long transfers (a school
+  filter under classroom load) now costs time instead of failing units at
+  85%. A Background Fetch the browser refuses to start is announced by the
+  worker (`method` broadcast): the page switches to the direct-download
+  copy and stall rules, logs it, reports `bgfetch-refused` and goes direct
+  next time — before this the records said "background" while the download
+  died with the tab. The worker's cache-miss fallthrough forwards a bare
+  GET/HEAD, so Unity's conditional headers never reach the CDN redirect
+  (they are outside the CORS safelist and the redirect would be
+  preflighted); the play page sets Unity `cacheControl: 'no-store'` (no
+  duplicate IndexedDB copy of the .data file, no revalidation requests) and
+  the units, manage and device-test pages delete the loader's old
+  `UnityCache` database (`dropEngineCache`). SW 1.0.16.
 - **Members' load records.** Launcher and play pages store their step log on
   a download or launch outcome, a crash, or Send report
   (`POST /missionhydrosci/api/steplog`), with heartbeats for launches; they

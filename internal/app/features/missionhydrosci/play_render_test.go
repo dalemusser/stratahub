@@ -150,3 +150,35 @@ func TestSignedInPageRenders(t *testing.T) {
 		t.Errorf("the signed-in page must not offer a way to start a second game")
 	}
 }
+
+// TestUnitsPageScriptsParse runs node --check over the units page's inline
+// scripts, as TestPlayPageScriptsParse does for the play page: the launcher's
+// progress label and the engine-cache cleanup live in them.
+func TestUnitsPageScriptsParse(t *testing.T) {
+	node, err := exec.LookPath("node")
+	if err != nil {
+		t.Skip("node not installed")
+	}
+	bootCeremonyTemplates(t)
+	rec := httptest.NewRecorder()
+	templates.Render(rec, httptest.NewRequest("GET", "/missionhydrosci/units", nil), "missionhydrosci_units", UnitsData{
+		BaseVM: viewdata.BaseVM{Title: "Mission HydroSci"}, CurrentUnit: "unit1",
+	})
+	if rec.Code != 200 {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String())
+	}
+	body := regexp.MustCompile(`(?s)<!--.*?-->`).ReplaceAllString(rec.Body.String(), "")
+	blocks := regexp.MustCompile(`(?s)<script>(.*?)</script>`).FindAllStringSubmatch(body, -1)
+	if len(blocks) == 0 {
+		t.Fatal("found no inline scripts")
+	}
+	for i, b := range blocks {
+		file := filepath.Join(t.TempDir(), "units-script.js")
+		if err := os.WriteFile(file, []byte(b[1]), 0o600); err != nil {
+			t.Fatal(err)
+		}
+		if out, err := exec.Command(node, "--check", file).CombinedOutput(); err != nil {
+			t.Errorf("inline script %d does not parse:\n%s", i+1, out)
+		}
+	}
+}

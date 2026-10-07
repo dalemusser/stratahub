@@ -341,6 +341,9 @@
     var parts = [(detail.percent || 0) + '%'];
     if (detail.downloadTotal) parts.push(mhsFormatMB(detail.downloaded) + ' of ' + mhsFormatMB(detail.downloadTotal));
     if (typeof detail.elapsedMs === 'number') parts.push(mhsFormatElapsed(detail.elapsedMs));
+    // A connection the network keeps cutting is resumed, not failed: say so
+    // next to the progress instead of looking stuck.
+    if (detail.drops > 0) parts.push('connection dropped ' + detail.drops + (detail.drops === 1 ? ' time' : ' times') + ' \u2014 resuming');
     return parts.join(' \u00b7 ');
   }
   function mhsDownloadWaitText(detail) {
@@ -861,6 +864,7 @@
 
     // Start the auto-download pipeline after init
     runPipeline();
+    manager.dropEngineCache(); // the loader's old duplicate of the unit files, if any
   });
 
   // After a deploy, the updated service worker takes control mid-load

@@ -154,7 +154,15 @@ async function startBackgroundFetch(unitId, version, files, cdnBaseUrl, title) {
 
     return true;
   } catch (err) {
+    // The browser refused to start the Background Fetch (seen on managed
+    // Chromebooks: the API is present, fetch() rejects). The pages asked for
+    // a background download and would otherwise go on believing they got
+    // one — "you can close this page" copy, the Background Fetch stall
+    // rules, 'background' in every record — while the download actually
+    // runs in this worker and dies with the tab. Tell them what is running.
+    var reason = err ? ((err.name ? err.name + ': ' : '') + (err.message || String(err))) : 'unknown';
     console.warn('Background Fetch failed, falling back to regular fetch:', err);
+    broadcastStatus(unitId, 'method', { path: 'fallback', reason: reason.slice(0, 300), version: version });
     return await fallbackFetch(unitId, version, files, cdnBaseUrl, title);
   }
 }
@@ -276,8 +284,12 @@ function concatStreams(a, b) {
 }
 
 // Saves the live stream in parts as it arrives, keeping the meta entry
-// current after every completed part so a broken stream loses at most one
-// part's worth of bytes. Resolves when the stream ends; rejects on error.
+// current after every completed part. When the stream breaks, whatever
+// arrived since the last part is saved as a short part before the error is
+// passed on, so a dropped connection loses nothing: a network that cuts
+// every connection after a few MB (less than a part) still moves the resume
+// point forward each time. Parts are read back in index order, so their
+// sizes may differ. Resolves when the stream ends; rejects on error.
 async function writeParts(cache, cacheKey, stream, startIndex, startBytes, etag, expectedSize, contentType) {
   var reader = stream.getReader();
   var index = startIndex, bytes = startBytes;
@@ -291,11 +303,16 @@ async function writeParts(cache, cacheKey, stream, startIndex, startBytes, etag,
     index++; bytes += buf.byteLength;
     await writePartsMeta(cache, cacheKey, { size: expectedSize, etag: etag, count: index, bytes: bytes, type: contentType || '' });
   }
-  for (;;) {
-    var res = await reader.read();
-    if (res.done) break;
-    chunks.push(res.value); buffered += res.value.byteLength;
-    if (buffered >= RESUME_PART_BYTES) await flush();
+  try {
+    for (;;) {
+      var res = await reader.read();
+      if (res.done) break;
+      chunks.push(res.value); buffered += res.value.byteLength;
+      if (buffered >= RESUME_PART_BYTES) await flush();
+    }
+  } catch (err) {
+    try { await flush(); } catch (flushErr) { /* the original error is the one to report */ }
+    throw err;
   }
   await flush();
   return bytes;
@@ -382,29 +399,60 @@ async function fetchAndCacheFile(cache, cacheKey, url, expectedSize, onBytes, si
   headers.set('content-length', String(expectedSize));
   var partWriter = writeParts(cache, cacheKey, branches[1], startIndex, offset, etag, expectedSize, headers.get('content-type'));
   // Either promise rejecting (a broken stream) rejects the whole attempt; the
-  // parts written so far stay for the next one. Both are awaited so a
-  // failure in one cannot leave the other's stream dangling.
-  await Promise.all([
+  // parts written so far stay for the next one. Both are waited for to the
+  // end — not just the first rejection — so the part writer's last flush has
+  // landed before the caller measures the saved bytes or starts the next
+  // attempt, which would otherwise write the same part index concurrently.
+  var results = await Promise.allSettled([
     cache.put(cacheKey, new Response(finalBody, { status: 200, headers: headers })),
     partWriter
   ]);
+  for (var ri = 0; ri < results.length; ri++) {
+    if (results[ri].status === 'rejected') throw results[ri].reason;
+  }
   await dropParts(cache, cacheKey);
 }
 
-// Retries a flaky file a few times with a short backoff before giving up on
-// the whole unit; every retry resumes from the last saved part. Cancellation
-// (aborted signal) is never retried, and an abort that lands during the
-// backoff sleep exits immediately — a canceled loop must not hold its dedupe
-// slot for extra seconds.
-async function fetchAndCacheFileWithRetry(cache, cacheKey, url, expectedSize, onBytes, signal, onResume) {
-  var maxAttempts = 5;
+// Retries a broken transfer for as long as it keeps making progress. Every
+// retry resumes from the last saved part, so a connection that is cut every
+// few seconds (a school's filtering appliance under classroom load — West
+// County, October 2026: 50–70 MB on the first connection, then 8–16 MB per
+// resumed one) costs time, never bytes. A fixed budget of five attempts per
+// file failed such downloads at 85% with a red error while they were
+// converging. Now only attempts that saved nothing new count toward giving up
+// — a dead link, a server refusing the range. A transfer without resume
+// support (size unknown, no streams) saves nothing between attempts and so
+// keeps a fixed budget. Cancellation (aborted signal) is never retried, and an
+// abort that lands during the backoff sleep exits immediately — a canceled
+// loop must not hold its dedupe slot for extra seconds. onDrop(info) hears of
+// every failed attempt that is retried.
+var MAX_FUTILE_ATTEMPTS = 6;
+
+async function savedBytes(cache, cacheKey, expectedSize) {
+  if (!expectedSize) return 0;
+  var meta = await readPartsMeta(cache, cacheKey, expectedSize);
+  return meta ? meta.bytes : 0;
+}
+
+async function fetchAndCacheFileWithRetry(cache, cacheKey, url, expectedSize, onBytes, signal, onResume, onDrop) {
+  var futile = 0; // consecutive attempts that saved nothing new
   for (var attempt = 1; ; attempt++) {
+    var before = await savedBytes(cache, cacheKey, expectedSize);
     try {
       await fetchAndCacheFile(cache, cacheKey, url, expectedSize, onBytes, signal, onResume);
       return;
     } catch (err) {
-      if ((signal && signal.aborted) || attempt >= maxAttempts) throw err;
-      await new Promise(function(resolve) { setTimeout(resolve, attempt * 2000); });
+      if (signal && signal.aborted) throw err;
+      var after = await savedBytes(cache, cacheKey, expectedSize);
+      futile = after > before ? 0 : futile + 1;
+      if (futile >= MAX_FUTILE_ATTEMPTS) throw err;
+      if (onDrop) {
+        try { onDrop({ attempt: attempt, savedBytes: after, futile: futile, error: err }); } catch (e) { /* ignore */ }
+      }
+      // A link that just delivered bytes is usually usable again at once; one
+      // that delivered nothing gets more room each time.
+      var delayMs = futile === 0 ? 1000 : Math.min(2000 * futile, 10000);
+      await new Promise(function(resolve) { setTimeout(resolve, delayMs); });
       if (signal && signal.aborted) {
         throw new DOMException('Fallback download canceled', 'AbortError');
       }
@@ -444,19 +492,28 @@ async function runFallbackFetch(fallbackKey, unitId, version, files, cdnBaseUrl,
   var totalSize = files.reduce(function(sum, f) { return sum + f.size; }, 0);
   var downloaded = 0;
   var lastBroadcast = 0;
+  var drops = 0;          // connections lost and resumed in this run
+  var lastDropError = null;
 
   // All broadcasts from this loop carry the version so pages can ignore
   // statuses for a version they are not on — a canceled old-version loop
   // winding down after a deploy must not clear tracking (or flash statuses)
-  // for a page that is downloading the unit's NEW version.
-  function broadcastProgress(bytes) {
-    var percent = totalSize > 0 ? Math.round((bytes / totalSize) * 100) : 0;
-    broadcastStatus(unitId, 'downloading', {
+  // for a page that is downloading the unit's NEW version. They also carry
+  // the drop count, so pages can say "connection dropped N times — resuming"
+  // instead of looking stuck or failing.
+  function progressDetail(bytes) {
+    var detail = {
       downloaded: bytes,
       downloadTotal: totalSize,
-      percent: percent,
+      percent: totalSize > 0 ? Math.round((bytes / totalSize) * 100) : 0,
       version: version
-    });
+    };
+    if (drops > 0) detail.drops = drops;
+    return detail;
+  }
+
+  function broadcastProgress(bytes) {
+    broadcastStatus(unitId, 'downloading', progressDetail(bytes));
   }
 
   broadcastStatus(unitId, 'downloading', { downloadTotal: totalSize, downloaded: 0, percent: 0, version: version });
@@ -492,11 +549,12 @@ async function runFallbackFetch(fallbackKey, unitId, version, files, cdnBaseUrl,
         broadcastProgress(downloaded + fileReceived);
       }, aborter.signal, function(offset) {
         // A file picked up where a broken attempt left it: tell the pages.
-        broadcastStatus(unitId, 'downloading', {
-          downloaded: downloaded + offset, downloadTotal: totalSize,
-          percent: totalSize > 0 ? Math.round(((downloaded + offset) / totalSize) * 100) : 0,
-          version: version, resumedFrom: downloaded + offset
-        });
+        var detail = progressDetail(downloaded + offset);
+        detail.resumedFrom = downloaded + offset;
+        broadcastStatus(unitId, 'downloading', detail);
+      }, function(info) {
+        drops++;
+        lastDropError = info.error;
       });
 
       downloaded += file.size;
@@ -526,10 +584,21 @@ async function runFallbackFetch(fallbackKey, unitId, version, files, cdnBaseUrl,
     // Reclamation of abandoned partials is handled by pruneStaleCaches
     // (version changes) and the explicit Clear/Reset controls.
     var info = classifyDownloadError(err);
+    var raw = (err && err.message ? String(err.message) : String(err));
+    if (drops > 0) {
+      // The telemetry should say how the transfer behaved, not just how it
+      // ended: N resumed drops before the final failure is the signature of
+      // a network path that cuts long transfers.
+      raw = drops + ' dropped connection' + (drops === 1 ? '' : 's') + ' resumed, then: ' + raw;
+      if (lastDropError && lastDropError.message && lastDropError.message !== (err && err.message)) {
+        raw += ' (last drop: ' + String(lastDropError.message) + ')';
+      }
+    }
     broadcastStatus(unitId, 'error', {
       error: info.message,                                  // friendly, shown in UI
       errorClass: info.cls,                                 // machine-readable, for telemetry
-      rawError: (err && err.message ? String(err.message) : String(err)).slice(0, 500),
+      rawError: raw.slice(0, 500),
+      drops: drops,
       path: 'fallback',
       version: version
     });
