@@ -1001,6 +1001,21 @@ make css-watch
   deferred; a browser check of the reworked questionnaire on dev is open
   (plan §0 item 6); production promotion not started
 
+### Download drops at one school (2026-10-07, fixes live, verification open)
+- `docs/mission-hydrosci/mhs-download-drops-investigation-100726.md` (§0 how to
+  resume): a school's network path cut the unit transfer every few seconds under
+  classroom load and the direct download gave up after five attempts per file.
+  SW 1.0.16 keeps resuming while bytes are saved (`MAX_FUTILE_ATTEMPTS`), flushes
+  partial parts on a break, reports `drops`, announces a refused Background Fetch
+  (`method` broadcast → `bgfetch-refused` telemetry; on Chrome 150+ managed
+  Chromebooks Background Fetch is silently refused everywhere — reason unknown
+  until that telemetry is read), forwards a bare GET on a content cache miss; the
+  play page sets Unity `cacheControl: 'no-store'` and the other pages drop the
+  loader's `UnityCache` IndexedDB. The content CDN now answers CORS preflights and
+  exposes `ETag`/`Last-Modified`/`Content-Range` (console change, runbook outside
+  the repo). Open: DL-10 in the remaining-work plan — read the school's next class
+  and the fleet-wide `bgfetch-refused` reasons
+
 ### Game log first-event rejection (2026-09-08, handed to the game developers)
 - `docs/mission-hydrosci/game-first-log-event-rejected.md`: the game's first
   log event of a session has no `user_id` and the log service rejects it

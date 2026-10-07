@@ -190,7 +190,7 @@ makes the worker's resume send `If-Range`, which is preflighted too. Runbook wit
 inspect/apply/rollback/verify scripts lives outside the repo (`cdn_cors_update/`
 beside the deploy folders); the EC2 role has no CloudFront/bucket-CORS rights.
 
-**DL-10 — school network that cuts transfers.** *(2026-10-07)*
+**DL-10 — school network that cuts transfers.** *(2026-10-07; record and resume notes in `mhs-download-drops-investigation-100726.md` §0/§5)*
 One school's egress path terminated the unit transfer every few seconds under
 classroom load (3.2 resumed drops per download record against 0.01–0.11 at
 other Chromebook schools); with a five-attempt budget the direct download failed
