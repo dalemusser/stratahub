@@ -55,7 +55,7 @@ the code has shifted since (line numbers especially).
 | DL-6 | Two throttle-key derivations that are supposed to be one budget | P3 | S | OPEN |
 | DL-7 | `groupappstore` correlated `$lookup` — DocumentDB risk, error swallowed | P2 | M | OPEN |
 | DL-8 | Double collection resolution per units/manage render | P3 | S | OPEN |
-| DL-9 | Content CDN rejects CORS preflights (OPTIONS 403; ETag not exposed) — runbook prepared, needs AWS credentials | P1 | S | OPEN (2026-10-07) |
+| DL-9 | Content CDN rejects CORS preflights (OPTIONS 403; ETag not exposed) | P1 | S | **DONE 2026-10-07** (console: OPTIONS allowed on both behaviours, ExposeHeaders extended, `/*` invalidated; probes 9/9, Unity revalidation 304, Range+If-Range 206) |
 | DL-10 | Verify the drop-tolerant direct download at the school whose network cuts transfers; read `bgfetch-refused` prevalence | P1 | S | OPEN (2026-10-07) |
 | UX-1 | `aria-live` announces every download percent (~1/s) — SR spam | P2 | M | OPEN |
 | UX-2 | Contrast fix (MHS-A4) nullified at runtime by JS class strings | P3 | S | OPEN |
@@ -183,7 +183,7 @@ service worker does not answer from its cache — a hard reload, an uncontrolled
 page, a cleared or evicted cache — gave "Unity failed to start". SW 1.0.16 forwards
 a bare GET/HEAD on a cache miss and the play page sets Unity `cacheControl:
 'no-store'`, which closes it for controlled pages; the uncontrolled-page case
-needs the CDN change: allow OPTIONS, forward `Origin` +
+needed the CDN change (done 2026-10-07): allow OPTIONS, forward `Origin` +
 `Access-Control-Request-*`, bucket CORS `AllowedHeaders: *` and expose `ETag`,
 `Last-Modified`, `Content-Range`, `Accept-Ranges`. Do it whole: exposing `ETag`
 makes the worker's resume send `If-Range`, which is preflighted too. Runbook with
