@@ -55,6 +55,8 @@ the code has shifted since (line numbers especially).
 | DL-6 | Two throttle-key derivations that are supposed to be one budget | P3 | S | OPEN |
 | DL-7 | `groupappstore` correlated `$lookup` — DocumentDB risk, error swallowed | P2 | M | OPEN |
 | DL-8 | Double collection resolution per units/manage render | P3 | S | OPEN |
+| DL-9 | Content CDN rejects CORS preflights (OPTIONS 403; ETag not exposed) — runbook prepared, needs AWS credentials | P1 | S | OPEN (2026-10-07) |
+| DL-10 | Verify the drop-tolerant direct download at the school whose network cuts transfers; read `bgfetch-refused` prevalence | P1 | S | OPEN (2026-10-07) |
 | UX-1 | `aria-live` announces every download percent (~1/s) — SR spam | P2 | M | OPEN |
 | UX-2 | Contrast fix (MHS-A4) nullified at runtime by JS class strings | P3 | S | OPEN |
 | UX-3 | 429 backoff is a dead-end alert; no `Retry-After` / client handling | P3 | M | OPEN |
@@ -170,6 +172,37 @@ masking group pins. Rewrite as a two-step `$in` query (or the equal-field
 `ServeUnits`/`ServeManage` each call `resolveManifest` + `resolveEffectiveCollectionInfo`,
 both of which call `resolveCollection` → the group-pin aggregation + progress
 upsert run twice per page load. Resolve once and share.
+
+**DL-9 — content CDN CORS preflights.** *(found 2026-10-07)*
+The CDN in front of the unit files answers every `OPTIONS` preflight with 403
+(the behaviour allows GET/HEAD only) and its CORS rule exposes only
+`Content-Length`/`Content-Type`. Any cross-origin content request carrying a
+header outside the CORS safelist fails: Unity's loader revalidating its
+IndexedDB copy (`If-Modified-Since`/`If-None-Match` + `Cache-Control`) when the
+service worker does not answer from its cache — a hard reload, an uncontrolled
+page, a cleared or evicted cache — gave "Unity failed to start". SW 1.0.16 forwards
+a bare GET/HEAD on a cache miss and the play page sets Unity `cacheControl:
+'no-store'`, which closes it for controlled pages; the uncontrolled-page case
+needs the CDN change: allow OPTIONS, forward `Origin` +
+`Access-Control-Request-*`, bucket CORS `AllowedHeaders: *` and expose `ETag`,
+`Last-Modified`, `Content-Range`, `Accept-Ranges`. Do it whole: exposing `ETag`
+makes the worker's resume send `If-Range`, which is preflighted too. Runbook with
+inspect/apply/rollback/verify scripts lives outside the repo (`cdn_cors_update/`
+beside the deploy folders); the EC2 role has no CloudFront/bucket-CORS rights.
+
+**DL-10 — school network that cuts transfers.** *(2026-10-07)*
+One school's egress path terminated the unit transfer every few seconds under
+classroom load (3.2 resumed drops per download record against 0.01–0.11 at
+other Chromebook schools); with a five-attempt budget the direct download failed
+units at 85%. SW 1.0.16 keeps resuming while bytes are saved and announces a
+refused Background Fetch (`bgfetch-refused`, until then invisible: records said
+"background" while the download ran in the tab). Verify on their next class via
+the Devices tab, the `mhs download error` journal lines (`error_class`,
+`drops` in `rawError`) and the step logs' "picked up at … (N drops so far)";
+read how many devices report `bgfetch-refused` fleet-wide and why (Chrome 150+
+on managed Chromebooks shows no Background Fetch activity at all). The school
+was asked to exempt the content, app and API hosts from SSL inspection and
+download scanning.
 
 ### Accessibility / UX
 
