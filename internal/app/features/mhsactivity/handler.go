@@ -83,6 +83,8 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 		g.Use(sm.RequireRole("superadmin", "admin", "analyst", "coordinator"))
 		g.Get("/", h.ServePage)
 		g.Get("/school/{orgID}", h.ServeSchool)
+		g.Get("/schools.csv", h.ServeSchoolsCSV)
+		g.Get("/students.csv", h.ServeStudentsCSV)
 	})
 	r.Group(func(a chi.Router) {
 		a.Use(sm.RequireSignedIn)
@@ -97,7 +99,11 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 
 // ServePage renders the overview, narrowed by the query's org and group.
 func (h *Handler) ServePage(w http.ResponseWriter, r *http.Request) {
-	h.serve(w, r, primitive.NilObjectID)
+	vm, ok := h.load(w, r, primitive.NilObjectID)
+	if !ok {
+		return
+	}
+	h.render(w, r, vm)
 }
 
 // ServeSchool renders the overview with one school opened (the HTMX
@@ -108,22 +114,33 @@ func (h *Handler) ServeSchool(w http.ResponseWriter, r *http.Request) {
 		uierrors.RenderNotFound(w, r, "No such school.", "/mhsactivity")
 		return
 	}
-	h.serve(w, r, id)
+	vm, ok := h.load(w, r, id)
+	if !ok {
+		return
+	}
+	h.render(w, r, vm)
 }
 
-func (h *Handler) serve(w http.ResponseWriter, r *http.Request, pathOrg primitive.ObjectID) {
+func (h *Handler) render(w http.ResponseWriter, r *http.Request, vm *pageVM) {
+	templates.RenderAutoMap(w, r, "mhsactivity_page", map[string]string{"mhsactivity-school": "mhsactivity_school"}, vm)
+}
+
+// load checks access, resolves the scope and the window, gathers the days
+// (stored or computed) and builds the report. When it returns false it has
+// already written the response (an error page).
+func (h *Handler) load(w http.ResponseWriter, r *http.Request, pathOrg primitive.ObjectID) (*pageVM, bool) {
 	if _, _, _, ok := authz.UserCtx(r); !ok {
 		uierrors.RenderUnauthorized(w, r, "/login")
-		return
+		return nil, false
 	}
 	pol := reportpolicy.CanViewMHSActivity(r)
 	if !pol.CanView {
 		uierrors.RenderForbidden(w, r, "You do not have access to MHS Activity.", "/dashboard")
-		return
+		return nil, false
 	}
 	if !h.Config.Enabled {
 		uierrors.RenderNotFound(w, r, "MHS Activity is turned off.", "/dashboard")
-		return
+		return nil, false
 	}
 	ctx, cancel := timeouts.WithTimeout(r.Context(), timeouts.Long(), h.Log, "mhs activity")
 	defer cancel()
@@ -132,7 +149,7 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request, pathOrg primitiv
 	win, err := ParseWindow(r, h.Config.MaxDays, h.now())
 	if err != nil {
 		uierrors.RenderBadRequest(w, r, err.Error(), "/mhsactivity")
-		return
+		return nil, false
 	}
 	q := r.URL.Query()
 	orgID := pathOrg
@@ -146,20 +163,20 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request, pathOrg primitiv
 	if err != nil {
 		if errors.Is(err, viewscope.ErrOutOfScope) || errors.Is(err, viewscope.ErrForbidden) {
 			uierrors.RenderForbidden(w, r, "That school or group is outside your scope.", "/mhsactivity")
-			return
+			return nil, false
 		}
 		h.fail(w, r, "resolve scope", err)
-		return
+		return nil, false
 	}
 	orgOpts, err := scope.Orgs(ctx)
 	if err != nil {
 		h.fail(w, r, "list organizations", err)
-		return
+		return nil, false
 	}
 	groupOpts, err := scope.Groups(ctx)
 	if err != nil {
 		h.fail(w, r, "list groups", err)
-		return
+		return nil, false
 	}
 
 	// Which organizations the page shows: the selected group's, the
@@ -192,7 +209,7 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request, pathOrg primitiv
 	zones, err := activity.ZonesFor(ctx, h.DB, wsID, nil)
 	if err != nil {
 		h.fail(w, r, "zones", err)
-		return
+		return nil, false
 	}
 	now := h.now()
 	var docs []models.MHSActivityDay
@@ -211,7 +228,7 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request, pathOrg primitiv
 				stored, at, partial, err := h.loadStored(ctx, wsID, day, z)
 				if err != nil {
 					h.fail(w, r, "stored "+day, err)
-					return
+					return nil, false
 				}
 				if stored != nil {
 					docs = append(docs, stored...)
@@ -222,7 +239,7 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request, pathOrg primitiv
 			live++
 			if live > h.Config.MaxLiveDays {
 				uierrors.RenderBadRequest(w, r, fmt.Sprintf("This range needs more than %d days computed live; the stored history for it is still being built. Try a shorter range, or run the backfill from the admin page.", h.Config.MaxLiveDays), "/mhsactivity")
-				return
+				return nil, false
 			}
 			zone, dd := z, day
 			key := wsID.Hex() + "|" + z.TZ + "|" + day
@@ -235,7 +252,7 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request, pathOrg primitiv
 			})
 			if err != nil {
 				h.fail(w, r, "compute "+day, err)
-				return
+				return nil, false
 			}
 			docs = append(docs, got...)
 			fresh.live(day, z, at)
@@ -256,7 +273,7 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request, pathOrg primitiv
 		ids, err := scope.UserIDs(ctx)
 		if err != nil {
 			h.fail(w, r, "scope members", err)
-			return
+			return nil, false
 		}
 		allowed := make(map[primitive.ObjectID]bool, len(ids))
 		for _, id := range ids {
@@ -274,9 +291,10 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request, pathOrg primitiv
 	lk, err := loadLookups(ctx, h.DB, docs, orgOpts, groupOpts)
 	if err != nil {
 		h.fail(w, r, "lookups", err)
-		return
+		return nil, false
 	}
-	rep := BuildReport(docs, lk, Options{SelectedOrg: selectedOrg, SelectedGroup: scope.SelectedGroup, ShowStaff: showStaff, MultiDay: multiDay, Now: now})
+	canOpenRecords := authz.IsAdmin(r) || authz.IsAnalyst(r) // the Device Tests viewer's roles
+	rep := BuildReport(docs, lk, Options{SelectedOrg: selectedOrg, SelectedGroup: scope.SelectedGroup, ShowStaff: showStaff, MultiDay: multiDay, Now: now, CanOpenDeviceTests: canOpenRecords})
 
 	missing := map[string]bool{}
 	for _, d := range docs {
@@ -315,7 +333,9 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request, pathOrg primitiv
 		vm.Groups = append(vm.Groups, optionVM{ID: g.ID.Hex(), Name: g.Name, OrgID: g.OrgID.Hex(), Selected: g.ID == scope.SelectedGroup})
 	}
 
-	templates.RenderAutoMap(w, r, "mhsactivity_page", map[string]string{"mhsactivity-school": "mhsactivity_school"}, vm)
+	vm.docs = docs
+	vm.lk = lk
+	return &vm, true
 }
 
 func (h *Handler) fail(w http.ResponseWriter, r *http.Request, what string, err error) {

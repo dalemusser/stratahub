@@ -56,7 +56,11 @@ the code has shifted since (line numbers especially).
 | DL-7 | `groupappstore` correlated `$lookup` — DocumentDB risk, error swallowed | P2 | M | OPEN |
 | DL-8 | Double collection resolution per units/manage render | P3 | S | OPEN |
 | DL-9 | Content CDN rejects CORS preflights (OPTIONS 403; ETag not exposed) | P1 | S | **DONE 2026-10-07** (console: OPTIONS allowed on both behaviours, ExposeHeaders extended, `/*` invalidated; probes 9/9, Unity revalidation 304, Range+If-Range 206) |
-| DL-10 | Verify the drop-tolerant direct download at the school whose network cuts transfers; read `bgfetch-refused` prevalence | P1 | S | OPEN (2026-10-07) |
+| DL-10 | Verify the drop-tolerant direct download at the school whose network cuts transfers; read `bgfetch-refused` prevalence | P1 | S | readable in-app since 2026-10-13: MHS Activity (`/mhsactivity`) shows per school the held / failed downloads and the students whose browser refused the background download; the school's filter was turned off by its district 2026-10-12 |
+| ACT-1 | MHS Activity: student-day timeline (one student's merged, de-duplicated step log for one day across devices) | P2 | M | OPEN (plan phase 4, `docs/mhs-activity/plan.md`) |
+| ACT-2 | Device Tests viewer: let coordinators follow MHS Activity's record links (add `coordinator` to its roles; `viewscope` already restricts rows) | P3 | S | OPEN |
+| ACT-3 | MHS Activity: an organization-level rollup for windows longer than 31 days (today's cap; student-day documents are summed per request) | P3 | M | OPEN |
+| ACT-4 | A `download-held` outcome posted by the units page after some minutes in the tail, so a hold is a record of its own instead of being read from a later record | P2 | S | OPEN |
 | UX-1 | `aria-live` announces every download percent (~1/s) — SR spam | P2 | M | OPEN |
 | UX-2 | Contrast fix (MHS-A4) nullified at runtime by JS class strings | P3 | S | OPEN |
 | UX-3 | 429 backoff is a dead-end alert; no `Retry-After` / client handling | P3 | M | OPEN |
@@ -77,7 +81,7 @@ the code has shifted since (line numbers especially).
 | DOC-1 | Feature `README.md` stale (SW 1.0.7, "no Go tests", missing files/routes) | P2 | M | OPEN |
 | DOC-2 | `issues/README.md` stale (1.0.7, open-issue list, smoke-test checklist) | P2 | M | OPEN |
 | DOC-3 | Formally close / re-scope `issues/MHS-008` (only telemetry half shipped) | P3 | S | superseded → loading-status plan A1/A2 |
-| OPS-1 | No monitoring/alert on `"mhs download error"` log; no teacher runbook | P2 | M | data source → loading-status plan A2; runbook OPEN |
+| OPS-1 | No monitoring/alert on `"mhs download error"` log; no teacher runbook | P2 | M | data source: MHS Activity (`/mhsactivity`, 2026-10-13) shows failed and held downloads, blocked students and fresh-profile churn per school and day; an alert and the runbook OPEN |
 | TEST-1 | Zero automated tests for the newest behaviors; no JS test harness | P2 | L | OPEN |
 
 ---

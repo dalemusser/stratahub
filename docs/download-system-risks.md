@@ -95,7 +95,7 @@ Some school districts configure Chromebooks to wipe browser data (cookies, cache
 - Document this as a requirement for IT administrators: MHS requires persistent browser storage
 - Request persistent storage via `navigator.storage.persist()` to signal to the browser that this data should not be evicted
 - Consider whether units could be pre-loaded on managed Chromebooks via IT policy (e.g., a Chrome extension that pre-populates the cache)
-- Track download frequency server-side to identify students who are re-downloading excessively (indicating data is being cleared)
+- Track download frequency server-side to identify students who are re-downloading excessively (indicating data is being cleared) — done (2026-10): MHS Activity (`/mhsactivity`) counts the browser profiles first seen each day per school and flags "new browser profile every day" when most student-days start on a fresh one (`docs/mhs-activity/plan.md`)
 
 ### 5. Service Worker Registration Failure
 

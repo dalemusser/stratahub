@@ -77,6 +77,7 @@ class TestAdminLogin:
             ("/groups", "Group"),
             ("/resources", "Resource"),
             ("/system-users", "System"),
+            ("/mhsactivity", "MHS Activity"),
         ]
 
         for url, expected_text in nav_links:

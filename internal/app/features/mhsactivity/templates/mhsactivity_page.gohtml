@@ -55,6 +55,17 @@
     <input type="checkbox" name="staff" value="1" {{ if .ShowStaff }}checked{{ end }} class="rounded border-gray-300 dark:border-gray-600"> Show staff rows
   </label>
   <noscript><button type="submit" class="px-3 py-2 rounded bg-indigo-600 text-white text-sm">Apply</button></noscript>
+  <div class="ml-auto flex items-end gap-2">
+    {{/* Downloads are plain requests: no-loader keeps the page's spinner quiet. */}}
+    <form action="/mhsactivity/schools.csv" method="GET" class="no-loader">
+      <input type="hidden" name="range" value="{{ .Window.Range }}"><input type="hidden" name="from" value="{{ .Window.From }}"><input type="hidden" name="to" value="{{ .Window.To }}"><input type="hidden" name="org" value="{{ .SelectedOrg }}"><input type="hidden" name="group" value="{{ .SelectedGroup }}">{{ if .ShowStaff }}<input type="hidden" name="staff" value="1">{{ end }}
+      <button type="submit" class="px-3 py-2 rounded bg-green-600 hover:bg-green-700 text-white text-sm whitespace-nowrap" title="The schools table as CSV">Schools CSV</button>
+    </form>
+    <form action="/mhsactivity/students.csv" method="GET" class="no-loader">
+      <input type="hidden" name="range" value="{{ .Window.Range }}"><input type="hidden" name="from" value="{{ .Window.From }}"><input type="hidden" name="to" value="{{ .Window.To }}"><input type="hidden" name="org" value="{{ .SelectedOrg }}"><input type="hidden" name="group" value="{{ .SelectedGroup }}">{{ if .ShowStaff }}<input type="hidden" name="staff" value="1">{{ end }}
+      <button type="submit" class="px-3 py-2 rounded bg-green-600 hover:bg-green-700 text-white text-sm whitespace-nowrap" title="One row per student, day and download as CSV">Student-days CSV</button>
+    </form>
+  </div>
 </form>
 
 {{ if .Missing }}

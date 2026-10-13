@@ -284,3 +284,47 @@ func TestAdminPageAndBackfill(t *testing.T) {
 		t.Errorf("page after backfill does not use the store")
 	}
 }
+
+func TestCSVExports(t *testing.T) {
+	fx := setup(t)
+	for _, tc := range []struct {
+		target, filename, header, row string
+	}{
+		{"/mhsactivity/schools.csv", "mhs-activity-schools-today.csv", "window,organization,time_zone,students", "Today,School A,America/Chicago,1,1,0,0,1,0,1,0,0,0,0,1,0,0,0,0,0,1,0,no,0,ChromeOS 1,"},
+		{"/mhsactivity/students.csv?org=" + fx.orgA.Hex(), "mhs-activity-students-today.csv", "day,time_zone,organization,groups,user_id,name,role", "2026-10-12,America/Chicago,School A,Period 5," + fx.student.ID.Hex() + ",Ada Student,member,yes,no,no,unit1,held_done,dev-1,213,213,0,0,0,0,,213,900,201,840,no,1,0,0,0,0,0,1,0,ChromeOS,,"},
+	} {
+		req := testutil.NewAuthenticatedRequest(http.MethodGet, tc.target, testutil.AdminUser())
+		req.Host = "mhs.example.com"
+		req = workspace.WithTestWorkspace(req, fx.ws, "mhs", "MHS")
+		rec := httptest.NewRecorder()
+		if strings.HasPrefix(tc.target, "/mhsactivity/schools") {
+			fx.h.ServeSchoolsCSV(rec, req)
+		} else {
+			fx.h.ServeStudentsCSV(rec, req)
+		}
+		if rec.Code != http.StatusOK || !strings.Contains(rec.Header().Get("Content-Type"), "text/csv") || !strings.Contains(rec.Header().Get("Content-Disposition"), tc.filename) {
+			t.Fatalf("%s: status %d, type %q, disposition %q", tc.target, rec.Code, rec.Header().Get("Content-Type"), rec.Header().Get("Content-Disposition"))
+		}
+		body := rec.Body.String()
+		if !strings.HasPrefix(body, "\xEF\xBB\xBF"+tc.header) {
+			t.Errorf("%s: header %q", tc.target, body[:min(80, len(body))])
+		}
+		if !strings.Contains(body, tc.row) {
+			t.Errorf("%s: row not found in:\n%s", tc.target, body)
+		}
+	}
+	// A leader gets no CSV.
+	req := testutil.NewAuthenticatedRequest(http.MethodGet, "/mhsactivity/schools.csv", testutil.LeaderUser(fx.orgA))
+	req.Host = "mhs.example.com"
+	req = workspace.WithTestWorkspace(req, fx.ws, "mhs", "MHS")
+	rec := httptest.NewRecorder()
+	fx.h.ServeSchoolsCSV(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("leader csv: status %d", rec.Code)
+	}
+	// Admins see the record links in the school view; coordinators do not.
+	rec = fx.get(t, "/mhsactivity?org="+fx.orgA.Hex(), testutil.AdminUser())
+	if !strings.Contains(rec.Body.String(), "/views/device-tests?kind=member&amp;when=30d&amp;user="+fx.student.ID.Hex()) {
+		t.Error("admin school view lacks the record link")
+	}
+}

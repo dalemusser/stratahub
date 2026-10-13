@@ -9,8 +9,8 @@ A staff page (`/mhsactivity`, menu "MHS Activity") that answers "who was active 
 | 0 | `internal/app/system/mhssteplog` (step-log parser, per-record summary, hold and crash-notice classifiers); write-time `summary` on member load records; structured `detail` keys on the client's step-log entries | DONE 2026-10-13, deployed 2026-10-13 01:49 PT |
 | 1 | `models.MHSActivityDay`, `internal/app/system/mhsactivity` (`ZonesFor`, `DayBounds`, `ComputeDay`, the merge), the page at `/mhsactivity` computed live for today, yesterday, the last 7 days or a custom range of at most `mhs_activity_live_max_days` (7), cached per zone-day for `mhs_activity_live_cache_ttl` (60 s), policy, routes, menu, config keys | DONE 2026-10-13; verified against a copy of production data for 2026-10-12 and 2026-10-07..09 (see §6) |
 | 2 | `internal/app/store/mhsactivitydays` (`mhs_activity_days`, `mhs_activity_marks`), `RollupDay`, the job `mhs-activity-rollup` (every `mhs_activity_rollup_interval`, the last `mhs_activity_catch_up_days` closed days), the backfill (`/mhsactivity/admin`, admin only: a day range, optional stamping of summaries, optional recompute of final days, progress polled every 5 s, stop), the page's stored path (a closed day whose organizations all have a final mark comes from the store; a request may compute at most `mhs_activity_live_max_days` live; windows up to `mhs_activity_max_days`) | DONE 2026-10-13; backfill run on the local copy for 2026-10-05..12 (see §6) |
-| 3 | CSV exports, Device Tests viewer `user` filter and student links, "School activity" link on the MHS Dashboard | not started |
-| 4 | student-day timeline, docs, e2e updates | not started |
+| 3 | CSV exports (`/mhsactivity/schools.csv`, `/mhsactivity/students.csv`: one row per student-day and download episode), the Device Tests viewer's **Member** filter (`user=`) with a Records link per student for admin/analyst, "School activity →" on the MHS Dashboard's info bar (admin/coordinator), the e2e journeys (admin nav, analyst menu + page, leader refused) | DONE 2026-10-13 |
+| 4 | student-day timeline (one student's merged, de-duplicated step log for one day across devices); docs done 2026-10-13 (`ai/context.md`, `docs/docs_index.md`, the remaining-work plan's ACT-1..4, the download risks note, the drops investigation's §0) | timeline OPEN |
 
 **Decisions (2026-10-13, project owner):**
 - Hybrid data path. An organization-local day that is still open (its end plus `mhs_activity_close_after`, default 6 h, has not passed) is computed live on each request from the raw records, with a short in-process cache. A closed day is rolled up once by the background job into `mhs_activity_days` and never recomputed unless a backfill is re-run. One compute function serves both paths.
@@ -78,7 +78,9 @@ Phase 1: `go test ./internal/app/system/mhsactivity/ ./internal/app/features/mhs
 
 Phase 2: `go test -p 1 ./internal/app/store/mhsactivitydays/ ./internal/app/system/mhsactivity/ ./internal/app/features/mhsactivity/` (the store's idempotent replace and stale-row removal, marks, the job with a fake clock storing a closed day and leaving the open one, a partial day retried and not final, force, the backfill over a range with stamping, the page serving a stored day and refusing a window that needs too many live days, the admin page and a backfill started from it). The packages create every index per test; run them one package at a time on a laptop, or the local database times out. Then the backfill on the local copy for 2026-10-05..12 and a 7-day window read back entirely from the store (§6 numbers unchanged).
 
-Later phases: the CSV exports, the Device Tests `user` filter, the timeline.
+Phase 3: `TestCSVExports` (both files, the admin's record links, a leader refused) and `TestDeviceTestsMemberFilter` in the viewers package; the e2e journeys (`tests/e2e/test_admin_journey.py`, `test_analyst_journey.py`, `test_leader_journey.py`) cover the menu link, the page opening for an analyst and the refusal for a leader.
+
+Later: the timeline.
 
 ## 7. Risks
 

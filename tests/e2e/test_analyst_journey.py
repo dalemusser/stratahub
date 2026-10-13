@@ -79,6 +79,14 @@ class TestAnalystLogin:
         # Analyst should have Members Report link
         expect(analyst_page.locator('a[href="/reports/members"]')).to_be_visible()
 
+        # ... and the MHS Activity overview, which opens for analysts
+        expect(analyst_page.locator('a[href="/mhsactivity"]')).to_be_visible()
+        analyst_page.goto("/mhsactivity")
+        wait_for_htmx(analyst_page)
+        expect(analyst_page.locator("body")).to_contain_text("MHS Activity")
+        analyst_page.goto("/dashboard")
+        wait_for_htmx(analyst_page)
+
         # Analyst should NOT have management links in the menu
         # (These links should not be visible in the sidebar nav)
         nav = analyst_page.locator("aside nav")

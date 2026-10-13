@@ -70,6 +70,7 @@ const (
 	dtSound  = "sound"
 	dtLogs   = "logs"
 	dtID     = "id"
+	dtUser   = "user" // a member's load records (links from MHS Activity)
 )
 
 // gameIDFor is the id the game logs under for a record: the run id of a
@@ -190,6 +191,7 @@ func (v *DeviceTests) Filters() []viewers.FilterSpec {
 			{Value: models.MHSLogsStateNone, Label: "None arrived"},
 			{Value: models.MHSLogsStateSeen, Label: "Seen"},
 		}},
+		{Key: dtUser, Label: "Member", Type: viewers.FilterID, Placeholder: "24-char member id"},
 		{Key: dtID, Label: "Test id", Type: viewers.FilterID, Placeholder: "24-char test id"},
 	}
 }
@@ -232,6 +234,11 @@ func (v *DeviceTests) listQuery(ctx context.Context, scope *viewscope.Scope, f v
 	if id, ok := f.ID(dtID); ok {
 		q.ID = &id
 	} else if f.Has(dtID) {
+		return nil, nil
+	}
+	if id, ok := f.ID(dtUser); ok {
+		q.UserID = &id
+	} else if f.Has(dtUser) {
 		return nil, nil
 	}
 	return q, nil

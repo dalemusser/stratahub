@@ -339,6 +339,7 @@ type ListQuery struct {
 	Sound      string // questionnaire.sound code
 	Logs       string // logging health: "seen", "none", or "problem" (none, cache errors, or a nearly full store)
 	ID         *primitive.ObjectID
+	UserID     *primitive.ObjectID // one member's load records
 
 	After *Position
 	Limit int
@@ -388,6 +389,9 @@ func (q ListQuery) filter() bson.M {
 	}
 	if q.ID != nil {
 		f["_id"] = *q.ID
+	}
+	if q.UserID != nil {
+		f["user_id"] = *q.UserID
 	}
 	if q.After != nil {
 		and = append(and, bson.M{"$or": []bson.M{

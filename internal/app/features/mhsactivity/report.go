@@ -158,11 +158,17 @@ type Report struct {
 
 // Options shape the report.
 type Options struct {
-	SelectedOrg   primitive.ObjectID
-	SelectedGroup primitive.ObjectID
-	ShowStaff     bool
-	MultiDay      bool
-	Now           time.Time
+	SelectedOrg        primitive.ObjectID
+	SelectedGroup      primitive.ObjectID
+	ShowStaff          bool
+	MultiDay           bool
+	Now                time.Time
+	CanOpenDeviceTests bool // link each student to their load records in the Device Tests viewer
+}
+
+// DeviceTestsHref links to a member's load records in the Device Tests viewer.
+func DeviceTestsHref(userID primitive.ObjectID) string {
+	return "/views/device-tests?kind=" + models.MHSDeviceTestKindMember + "&when=" + viewers.RangeMonth + "&user=" + userID.Hex()
 }
 
 // BuildReport aggregates day documents into the page's rows. It is pure: it
@@ -284,6 +290,12 @@ func buildSchool(org primitive.ObjectID, ds []models.MHSActivityDay, staff []mod
 	sort.Slice(v.Groups, func(i, j int) bool { return v.Groups[i].Name < v.Groups[j].Name })
 
 	v.Students = studentRows(ds, lk, loc, false)
+	if opts.CanOpenDeviceTests {
+		for i := range v.Students {
+			id, _ := primitive.ObjectIDFromHex(v.Students[i].UserID)
+			v.Students[i].DeviceTestsHref = DeviceTestsHref(id)
+		}
+	}
 	if opts.ShowStaff {
 		var sds []models.MHSActivityDay
 		for _, d := range staff {

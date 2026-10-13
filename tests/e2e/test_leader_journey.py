@@ -203,6 +203,24 @@ class TestLeaderAccessRestrictions:
 
         assert is_blocked, "Leader should not have access to organizations management"
 
+    def test_leader_cannot_access_mhs_activity(self, leader_page: Page):
+        """Test that the MHS Activity overview is staff-only."""
+        leader_page.goto("/mhsactivity")
+
+        url = leader_page.url
+        content = leader_page.content().lower()
+
+        is_blocked = (
+            "/dashboard" in url or
+            "/login" in url or
+            "forbidden" in content or
+            "unauthorized" in content or
+            "access denied" in content or
+            "do not have access" in content
+        )
+
+        assert is_blocked, "Leader should not have access to MHS Activity"
+
     def test_leader_cannot_access_system_users(self, leader_page: Page):
         """Test that leader cannot manage system users."""
         leader_page.goto("/system-users")

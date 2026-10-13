@@ -1,11 +1,16 @@
 package views
 
 import (
+	"context"
+	"net/url"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/dalemusser/stratahub/internal/app/features/viewers"
+	"github.com/dalemusser/stratahub/internal/app/system/viewscope"
 	"github.com/dalemusser/stratahub/internal/domain/models"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 func TestSurveyHTML(t *testing.T) {
@@ -58,5 +63,21 @@ func TestReportsHTML(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Errorf("missing %q in %s", want, got)
 		}
+	}
+}
+
+// The Member filter (MHS Activity links here) narrows the list to one
+// member's load records; a malformed id matches nothing.
+func TestDeviceTestsMemberFilter(t *testing.T) {
+	v := &DeviceTests{}
+	scope := &viewscope.Scope{WorkspaceID: primitive.NewObjectID(), Role: "admin", All: true}
+	id := primitive.NewObjectID()
+	q, err := v.listQuery(context.Background(), scope, viewers.ParseFilters(v.Filters(), url.Values{"user": {id.Hex()}, "kind": {models.MHSDeviceTestKindMember}}))
+	if err != nil || q == nil || q.UserID == nil || *q.UserID != id || q.Kind != models.MHSDeviceTestKindMember {
+		t.Fatalf("query %+v err %v", q, err)
+	}
+	q, err = v.listQuery(context.Background(), scope, viewers.ParseFilters(v.Filters(), url.Values{"user": {"not-an-id"}}))
+	if err != nil || q != nil {
+		t.Errorf("malformed member id should match nothing: %+v %v", q, err)
 	}
 }

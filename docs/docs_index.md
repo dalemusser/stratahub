@@ -37,6 +37,8 @@ This is the index of all documentation for StrataHub.
 
 - [MHS Developer Sentinel User](mhs-dev-sentinel-user.md) - Well-known `stratahub.users` record seeded at startup so MHS editor/localhost play sessions round-trip cleanly through stratalog, stratasave, and mhsgrader
 
+- [MHS Activity](mhs-activity/plan.md) - The cross-school activity overview at `/mhsactivity` (who opened, downloaded, launched, played, crashed, was blocked, per school, group, student and day; live for open days, stored for closed ones; admin backfill), its definitions, data model, computation and verification; §0 is the status and how to resume
+
 ## Resource URL Identification
 
 How StrataHub appends member/group/org/workspace identity to a resource's launch URL, configurable per resource.

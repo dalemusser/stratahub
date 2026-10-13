@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/domain/models"
 )
 
 // Config is the feature's configuration (bootstrap appconfig).
@@ -68,6 +69,9 @@ type pageVM struct {
 	WindowQuery string
 
 	IsAdmin bool // shows the link to the admin (backfill) page
+
+	docs []models.MHSActivityDay // what the report was built from (the CSV exports)
+	lk   Lookups
 }
 
 type windowVM struct {

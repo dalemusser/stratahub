@@ -9,6 +9,14 @@ the memory entry for this work has them.
 
 ## 0. Status and how to resume
 
+**2026-10-13:** the per-school view of what this document reads by hand (held and
+failed downloads, blocked students, fresh browser profiles, launches, crash
+records) is now a page: MHS Activity at `/mhsactivity` (`docs/mhs-activity/plan.md`).
+The hold signature (a file stopping a few MB before its end, the connection
+picking up at that same point again and again) is classified per download by
+`internal/app/system/mhssteplog`. The school's district turned the filter off on
+2026-10-12; the page showed every download complete that day.
+
 What is done:
 
 - Cause established from production records (§2–§3): the school's network path cuts

@@ -860,6 +860,7 @@
     </div>
     <!-- Right: Refresh controls (hidden on debug/maps tabs) -->
     <div id="mhs-refresh-controls" class="flex items-center gap-2">
+      {{ if .IsAdmin }}<a href="/mhsactivity?org={{ .SelectedOrg }}" class="text-sm text-[#145374] hover:underline whitespace-nowrap mr-2" title="Who was active at this school today: downloads, launches, problems, by group and student">School activity &rarr;</a>{{ end }}
       <button id="mhs-refresh-btn"
               type="button"
               class="text-sm px-2 py-1 border border-[#b1d4e0] rounded hover:bg-white text-[#145374] cursor-pointer"
