@@ -12,61 +12,62 @@
   </div>
 </div>
 
-<form hx-get="/mhsactivity" hx-target="#content" hx-swap="innerHTML" hx-push-url="true" hx-trigger="change, submit"
-      class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-4 flex flex-wrap items-end gap-3">
-  <div>
-    <label for="mhsact-range" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Window</label>
-    <select id="mhsact-range" name="range" class="px-2 py-2 border dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100">
-      <option value="today" {{ if eq .Window.Range "today" }}selected{{ end }}>Today</option>
-      <option value="yesterday" {{ if eq .Window.Range "yesterday" }}selected{{ end }}>Yesterday</option>
-      <option value="7d" {{ if eq .Window.Range "7d" }}selected{{ end }}>Last 7 days</option>
-      <option value="custom" {{ if eq .Window.Range "custom" }}selected{{ end }}>Custom dates</option>
-    </select>
-  </div>
-  {{ if .Window.Custom }}
-  <div>
-    <label for="mhsact-from" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">From</label>
-    <input id="mhsact-from" type="date" name="from" value="{{ .Window.From }}" class="px-2 py-2 border dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100">
-  </div>
-  <div>
-    <label for="mhsact-to" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">To <span class="text-gray-400 dark:text-gray-500">(up to {{ .Window.MaxDays }} days)</span></label>
-    <input id="mhsact-to" type="date" name="to" value="{{ .Window.To }}" class="px-2 py-2 border dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100">
-  </div>
-  {{ end }}
-  {{ if .Orgs }}
-  <div>
-    <label for="mhsact-org" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">School</label>
-    <select id="mhsact-org" name="org" class="px-2 py-2 border dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100 max-w-xs">
-      <option value="" {{ if not .SelectedOrg }}selected{{ end }}>All schools</option>
-      {{ range .Orgs }}<option value="{{ .ID }}" {{ if .Selected }}selected{{ end }}>{{ .Name }}</option>{{ end }}
-    </select>
-  </div>
-  {{ end }}
-  {{ if and .SelectedOrg .Groups }}
-  <div>
-    <label for="mhsact-group" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Group</label>
-    <select id="mhsact-group" name="group" class="px-2 py-2 border dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100 max-w-xs">
-      <option value="" {{ if not .SelectedGroup }}selected{{ end }}>All groups</option>
-      {{ range .Groups }}<option value="{{ .ID }}" {{ if .Selected }}selected{{ end }}>{{ .Name }}</option>{{ end }}
-    </select>
-  </div>
-  {{ end }}
-  <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 pb-2" title="Teachers' and administrators' own launches, never counted as students">
-    <input type="checkbox" name="staff" value="1" {{ if .ShowStaff }}checked{{ end }} class="rounded border-gray-300 dark:border-gray-600"> Show staff rows
-  </label>
-  <noscript><button type="submit" class="px-3 py-2 rounded bg-indigo-600 text-white text-sm">Apply</button></noscript>
-  <div class="ml-auto flex items-end gap-2">
-    {{/* Downloads are plain requests: no-loader keeps the page's spinner quiet. */}}
-    <form action="/mhsactivity/schools.csv" method="GET" class="no-loader">
-      <input type="hidden" name="range" value="{{ .Window.Range }}"><input type="hidden" name="from" value="{{ .Window.From }}"><input type="hidden" name="to" value="{{ .Window.To }}"><input type="hidden" name="org" value="{{ .SelectedOrg }}"><input type="hidden" name="group" value="{{ .SelectedGroup }}">{{ if .ShowStaff }}<input type="hidden" name="staff" value="1">{{ end }}
-      <button type="submit" class="px-3 py-2 rounded bg-green-600 hover:bg-green-700 text-white text-sm whitespace-nowrap" title="The schools table as CSV">Schools CSV</button>
-    </form>
-    <form action="/mhsactivity/students.csv" method="GET" class="no-loader">
-      <input type="hidden" name="range" value="{{ .Window.Range }}"><input type="hidden" name="from" value="{{ .Window.From }}"><input type="hidden" name="to" value="{{ .Window.To }}"><input type="hidden" name="org" value="{{ .SelectedOrg }}"><input type="hidden" name="group" value="{{ .SelectedGroup }}">{{ if .ShowStaff }}<input type="hidden" name="staff" value="1">{{ end }}
-      <button type="submit" class="px-3 py-2 rounded bg-green-600 hover:bg-green-700 text-white text-sm whitespace-nowrap" title="One row per student, day and download as CSV">Student-days CSV</button>
-    </form>
-  </div>
-</form>
+<div class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-4 flex flex-wrap items-end gap-3">
+  {{/* The filter form and the two download forms are siblings: a form inside a form is not HTML. */}}
+  <form id="mhsact-filter" hx-get="/mhsactivity" hx-target="#content" hx-swap="innerHTML" hx-push-url="true" hx-trigger="change, submit"
+        class="flex flex-wrap items-end gap-3 grow">
+    <div>
+      <label for="mhsact-range" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Window</label>
+      <select id="mhsact-range" name="range" class="px-2 py-2 border dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100">
+        <option value="today" {{ if eq .Window.Range "today" }}selected{{ end }}>Today</option>
+        <option value="yesterday" {{ if eq .Window.Range "yesterday" }}selected{{ end }}>Yesterday</option>
+        <option value="7d" {{ if eq .Window.Range "7d" }}selected{{ end }}>Last 7 days</option>
+        <option value="custom" {{ if eq .Window.Range "custom" }}selected{{ end }}>Custom dates</option>
+      </select>
+    </div>
+    {{ if .Window.Custom }}
+    <div>
+      <label for="mhsact-from" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">From</label>
+      <input id="mhsact-from" type="date" name="from" value="{{ .Window.From }}" class="px-2 py-2 border dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100">
+    </div>
+    <div>
+      <label for="mhsact-to" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">To <span class="text-gray-400 dark:text-gray-500">(up to {{ .Window.MaxDays }} days)</span></label>
+      <input id="mhsact-to" type="date" name="to" value="{{ .Window.To }}" class="px-2 py-2 border dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100">
+    </div>
+    {{ end }}
+    {{ if .Orgs }}
+    <div>
+      <label for="mhsact-org" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">School</label>
+      <select id="mhsact-org" name="org" class="px-2 py-2 border dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100 max-w-xs">
+        <option value="" {{ if not .SelectedOrg }}selected{{ end }}>All schools</option>
+        {{ range .Orgs }}<option value="{{ .ID }}" {{ if .Selected }}selected{{ end }}>{{ .Name }}</option>{{ end }}
+      </select>
+    </div>
+    {{ end }}
+    {{ if and .SelectedOrg .Groups }}
+    <div>
+      <label for="mhsact-group" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Group</label>
+      <select id="mhsact-group" name="group" class="px-2 py-2 border dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100 max-w-xs">
+        <option value="" {{ if not .SelectedGroup }}selected{{ end }}>All groups</option>
+        {{ range .Groups }}<option value="{{ .ID }}" {{ if .Selected }}selected{{ end }}>{{ .Name }}</option>{{ end }}
+      </select>
+    </div>
+    {{ end }}
+    <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 pb-2" title="Teachers' and administrators' own launches, never counted as students">
+      <input type="checkbox" name="staff" value="1" {{ if .ShowStaff }}checked{{ end }} class="rounded border-gray-300 dark:border-gray-600"> Show staff rows
+    </label>
+    <noscript><button type="submit" class="px-3 py-2 rounded bg-indigo-600 text-white text-sm">Apply</button></noscript>
+  </form>
+  {{/* Downloads are plain requests carrying the current window: no-loader keeps the page's spinner quiet. */}}
+  <form action="/mhsactivity/schools.csv" method="GET" class="no-loader">
+    <input type="hidden" name="range" value="{{ .Window.Range }}"><input type="hidden" name="from" value="{{ .Window.From }}"><input type="hidden" name="to" value="{{ .Window.To }}"><input type="hidden" name="org" value="{{ .SelectedOrg }}"><input type="hidden" name="group" value="{{ .SelectedGroup }}">{{ if .ShowStaff }}<input type="hidden" name="staff" value="1">{{ end }}
+    <button type="submit" class="px-3 py-2 rounded bg-green-600 hover:bg-green-700 text-white text-sm whitespace-nowrap" title="The schools table as CSV">Schools CSV</button>
+  </form>
+  <form action="/mhsactivity/students.csv" method="GET" class="no-loader">
+    <input type="hidden" name="range" value="{{ .Window.Range }}"><input type="hidden" name="from" value="{{ .Window.From }}"><input type="hidden" name="to" value="{{ .Window.To }}"><input type="hidden" name="org" value="{{ .SelectedOrg }}"><input type="hidden" name="group" value="{{ .SelectedGroup }}">{{ if .ShowStaff }}<input type="hidden" name="staff" value="1">{{ end }}
+    <button type="submit" class="px-3 py-2 rounded bg-green-600 hover:bg-green-700 text-white text-sm whitespace-nowrap" title="One row per student, day and download as CSV">Student-days CSV</button>
+  </form>
+</div>
 
 {{ if .Missing }}
 <div class="mb-4 p-3 rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 text-sm">

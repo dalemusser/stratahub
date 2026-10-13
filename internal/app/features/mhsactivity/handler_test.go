@@ -127,6 +127,12 @@ func TestAdminSeesTheOverviewAndTheSchool(t *testing.T) {
 	if strings.Contains(body, "School B</a>") {
 		t.Error("a school without activity is listed")
 	}
+	// The download forms are siblings of the filter form, never inside it
+	// (nested forms fold their inputs into the outer one).
+	filterEnd := strings.Index(body, "</form>")
+	if csvForm := strings.Index(body, `action="/mhsactivity/schools.csv"`); filterEnd < 0 || csvForm < filterEnd {
+		t.Error("the download forms sit inside the filter form")
+	}
 	if !strings.Contains(body, ">School B</option>") {
 		t.Error("the school filter should still offer every school")
 	}
