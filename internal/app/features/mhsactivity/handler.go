@@ -216,7 +216,7 @@ func (h *Handler) load(w http.ResponseWriter, r *http.Request, pathOrg primitive
 	var docs []models.MHSActivityDay
 	fresh := &freshness{}
 	multiDay := false
-	live := 0
+	liveDays := map[string]bool{} // the cap counts days, not zone-days
 	for _, z := range zones {
 		days := win.DaysIn(z.Loc, now)
 		if len(days) > 1 {
@@ -226,19 +226,19 @@ func (h *Handler) load(w http.ResponseWriter, r *http.Request, pathOrg primitive
 			// A closed day whose organizations are all rolled up comes from
 			// the store; anything else is computed live (and cached).
 			if h.Store != nil && activity.Closed(day, z.Loc, h.Compute.EffectiveCloseAfter(), now) {
-				stored, at, partial, err := h.loadStored(ctx, wsID, day, z)
+				stored, at, partial, outdated, err := h.loadStored(ctx, wsID, day, z)
 				if err != nil {
 					h.fail(w, r, "stored "+day, err)
 					return nil, false
 				}
 				if stored != nil {
 					docs = append(docs, stored...)
-					fresh.stored(day, at, partial)
+					fresh.stored(day, at, partial, outdated)
 					continue
 				}
 			}
-			live++
-			if live > h.Config.MaxLiveDays {
+			liveDays[day] = true
+			if len(liveDays) > h.Config.MaxLiveDays {
 				uierrors.RenderBadRequest(w, r, fmt.Sprintf("This range needs more than %d days computed live; the stored history for it is still being built. Try a shorter range, or run the backfill from the admin page.", h.Config.MaxLiveDays), "/mhsactivity")
 				return nil, false
 			}
@@ -380,34 +380,35 @@ func SchoolHref(orgID string, windowQuery string) string {
 }
 
 // loadStored returns the stored documents of a closed zone-day when every
-// organization of the zone has a final mark of the current version; nil
-// otherwise (the caller computes live). It also returns the oldest
-// computed-at of those marks and whether any is partial.
-func (h *Handler) loadStored(ctx context.Context, wsID primitive.ObjectID, day string, z activity.Zone) ([]models.MHSActivityDay, time.Time, bool, error) {
+// organization of the zone has a final mark; nil otherwise (the caller
+// computes live). It also returns the oldest computed-at of those marks,
+// whether any is partial, and whether any was computed by an earlier
+// reading of the data (the job recomputes those a few per pass; until then
+// the stored day is served and said to be refreshing).
+func (h *Handler) loadStored(ctx context.Context, wsID primitive.ObjectID, day string, z activity.Zone) (docs []models.MHSActivityDay, at time.Time, partial, outdated bool, err error) {
 	marks, err := h.Store.GetMarks(ctx, wsID, day, day, z.OrgIDs)
 	if err != nil {
-		return nil, time.Time{}, false, err
+		return nil, time.Time{}, false, false, err
 	}
-	var at time.Time
-	partial := false
 	for _, org := range z.OrgIDs {
 		m, ok := marks[mhsactivitydays.MarkKey(org, day)]
-		if !ok || !m.Final || m.Version != models.MHSActivityVersion {
-			return nil, time.Time{}, false, nil
+		if !ok || !m.Final {
+			return nil, time.Time{}, false, false, nil
 		}
 		if at.IsZero() || m.ComputedAt.Before(at) {
 			at = m.ComputedAt
 		}
 		partial = partial || m.Partial
+		outdated = outdated || m.Version != models.MHSActivityVersion
 	}
-	docs, err := h.Store.ListDays(ctx, mhsactivitydays.DaysQuery{WorkspaceID: wsID, From: day, To: day, OrgIDs: z.OrgIDs})
+	docs, err = h.Store.ListDays(ctx, mhsactivitydays.DaysQuery{WorkspaceID: wsID, From: day, To: day, OrgIDs: z.OrgIDs})
 	if err != nil {
-		return nil, time.Time{}, false, err
+		return nil, time.Time{}, false, false, err
 	}
 	if docs == nil {
 		docs = []models.MHSActivityDay{}
 	}
-	return docs, at, partial, nil
+	return docs, at, partial, outdated, nil
 }
 
 // freshness collects where each zone-day came from and says it in a line or
@@ -417,10 +418,11 @@ type freshness struct {
 	storedOldest time.Time
 	storedNewest time.Time
 	partial      bool
+	outdated     bool
 	liveDays     map[string][]string // day → "zone h:mm:ss PM MST"
 }
 
-func (f *freshness) stored(day string, at time.Time, partial bool) {
+func (f *freshness) stored(day string, at time.Time, partial, outdated bool) {
 	if f.storedDays == nil {
 		f.storedDays = map[string]bool{}
 	}
@@ -432,6 +434,7 @@ func (f *freshness) stored(day string, at time.Time, partial bool) {
 		f.storedNewest = at
 	}
 	f.partial = f.partial || partial
+	f.outdated = f.outdated || outdated
 }
 
 func (f *freshness) live(day string, z activity.Zone, at time.Time) {
@@ -456,6 +459,9 @@ func (f *freshness) lines() []string {
 		line := fmt.Sprintf("Stored: %s (closed days, stored once; last stored %s UTC)", span, f.storedNewest.UTC().Format("Jan 2 15:04"))
 		if f.partial {
 			line += "; some of it was computed with a source unavailable"
+		}
+		if f.outdated {
+			line += "; some days were stored by an earlier reading of the data and are being recomputed in the background"
 		}
 		out = append(out, line)
 	}

@@ -211,3 +211,33 @@ func TestPlatformAndBrowser(t *testing.T) {
 }
 
 func boolp(b bool) *bool { return &b }
+
+func TestMergeStrayEventsAreNotPlayed(t *testing.T) {
+	b, student, _ := testBuilder(t)
+	b.logAvailable = true
+	b.addLog(student.ID, logdata.UserActivity{Events: 1, First: ct(0, 39, 30), Last: ct(0, 39, 30)})
+	docs := b.finish(time.Now())
+	if len(docs) != 1 {
+		t.Fatalf("docs %d", len(docs))
+	}
+	d := docs[0]
+	if d.Played || d.Opened || !d.Flags.StrayEvents || d.Log.Events != 1 || d.Blocked {
+		t.Errorf("stray day %+v", d)
+	}
+	// With a record that day the events are the student's own.
+	b2, s2, _ := testBuilder(t)
+	b2.logAvailable = true
+	b2.addRecord(rec(s2, "dev-a", "unit1", "launch-ok", ct(12, 0, 0)), &models.MHSMemberSummary{V: 1, Launch: []models.MHSStepLaunchEvent{{At: ct(12, 0, 0), Kind: models.MHSLaunchEventRendering}}})
+	b2.addLog(s2.ID, logdata.UserActivity{Events: 3, First: ct(12, 1, 0), Last: ct(12, 2, 0)})
+	d2 := b2.finish(time.Now())[0]
+	if d2.Flags.StrayEvents || !d2.Opened || d2.Played {
+		t.Errorf("few events after a launch %+v", d2)
+	}
+	// Enough events: played.
+	b3, s3, _ := testBuilder(t)
+	b3.logAvailable = true
+	b3.addLog(s3.ID, logdata.UserActivity{Events: models.MHSActivityMinPlayedEvents, First: ct(12, 1, 0), Last: ct(12, 40, 0)})
+	if d3 := b3.finish(time.Now())[0]; !d3.Played || !d3.Opened || d3.Flags.StrayEvents {
+		t.Errorf("played %+v", d3)
+	}
+}

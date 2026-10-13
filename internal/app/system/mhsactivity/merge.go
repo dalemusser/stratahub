@@ -425,12 +425,18 @@ func (b *builder) addLog(userID primitive.ObjectID, ua logdata.UserActivity) {
 		return
 	}
 	a := b.acc(p)
-	a.doc.Opened = true
-	a.doc.Played = true
 	first, last := ua.First, ua.Last
 	a.doc.Log = models.MHSActivityLog{Available: true, Source: "logdata", Events: ua.Events, First: &first, Last: &last, CrashEvents: ua.Crashes}
 	a.touch(first)
 	a.touch(last)
+	if ua.Events >= models.MHSActivityMinPlayedEvents {
+		a.doc.Opened = true
+		a.doc.Played = true
+		return
+	}
+	// A handful of events and nothing else that day is a tab opened on an
+	// earlier day waking up, not a student at the game.
+	a.doc.Flags.StrayEvents = true
 }
 
 // finish closes every accumulator into its day document.
@@ -498,6 +504,9 @@ func (b *builder) finish(now time.Time) []models.MHSActivityDay {
 		d.Launched = d.Launch.OK > 0
 		if d.Launched || d.Played {
 			d.Opened = true
+		}
+		if d.Opened || d.Records > 0 {
+			d.Flags.StrayEvents = false // something happened today; the events are its own
 		}
 		d.Blocked = d.Opened && !d.Played && problem
 		d.Final = false

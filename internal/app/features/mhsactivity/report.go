@@ -122,6 +122,9 @@ type StudentRow struct {
 	LastSeen        string
 	lastAt          time.Time
 	Pills           []Pill
+	Events          int    // game log events in the window
+	PlaySpan        string // "12:04–12:53 PM" of the latest day with events
+	Stray           bool   // only a few events and nothing else: a tab from an earlier day
 	DashboardHref   string
 	DeviceTestsHref string
 	TimelineHref    string // the student's step log for the row's last day
@@ -435,8 +438,14 @@ func studentRows(ds []models.MHSActivityDay, lk Lookups, loc *time.Location, sta
 			if d.LastAt != nil && d.LastAt.After(row.lastAt) {
 				row.lastAt = *d.LastAt
 			}
+			row.Events += d.Log.Events
+			if d.Log.Events > 0 && d.Log.First != nil && d.Log.Last != nil {
+				row.PlaySpan = spanText(*d.Log.First, *d.Log.Last, loc) // the days are sorted: the latest wins
+			}
+			row.Stray = row.Stray || d.Flags.StrayEvents
 		}
 		row.Blocked = row.Blocked && !row.Played // see aggregate: never got in during the window
+		row.Stray = row.Stray && !row.Opened && !row.Played
 		row.TimelineHref = "/mhsactivity/student/" + id.Hex() + "/day/" + uds[len(uds)-1].Day
 		row.Devices = len(devices)
 		row.Platforms = platformsOf(uds)
@@ -616,6 +625,9 @@ func studentPills(r StudentRow) []Pill {
 	if r.CrashNotice > 0 {
 		p = append(p, Pill{Text: plural(r.CrashNotice, "notice", "notices"), Class: viewers.TextMuted, Title: "Browser notices the game survives"})
 	}
+	if r.Stray {
+		p = append(p, Pill{Text: "earlier tab", Class: viewers.PillGray, Title: "A few game events and nothing else: a game tab opened on an earlier day woke up. No launch, download or page open this day."})
+	}
 	if r.Partial {
 		p = append(p, Pill{Text: "partial", Class: viewers.TextMuted, Title: "A data source was unavailable when this was computed"})
 	}
@@ -681,6 +693,15 @@ func firstGroupOf(lk Lookups, org primitive.ObjectID) primitive.ObjectID {
 
 func formatAt(t time.Time, loc *time.Location) string {
 	return t.In(loc).Format("Jan 2, 3:04 PM MST")
+}
+
+// spanText is "12:04–12:53 PM" for two instants of one day.
+func spanText(first, last time.Time, loc *time.Location) string {
+	f, l := first.In(loc), last.In(loc)
+	if f.Format("PM") == l.Format("PM") {
+		return f.Format("3:04") + "–" + l.Format("3:04 PM")
+	}
+	return f.Format("3:04 PM") + "–" + l.Format("3:04 PM")
 }
 
 func mmss(sec int) string {

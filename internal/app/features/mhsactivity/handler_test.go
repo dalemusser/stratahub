@@ -402,6 +402,17 @@ func TestStudentDayTimeline(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), "/mhsactivity/student/"+sid.Hex()+"/day/2026-10-12") {
 		t.Error("school view lacks the timeline link")
 	}
+	// A day without records names the last record before it.
+	req = testutil.NewAuthenticatedRequest(http.MethodGet, "/mhsactivity/student/"+sid.Hex()+"/day/2026-10-13", testutil.AdminUser())
+	req.Host = "mhs.example.com"
+	req = workspace.WithTestWorkspace(req, fx.ws, "mhs", "MHS")
+	req = withRouteParams(req, map[string]string{"userID": sid.Hex(), "day": "2026-10-13"})
+	rec = httptest.NewRecorder()
+	fx.h.ServeStudentDay(rec, req)
+	body = rec.Body.String()
+	if rec.Code != http.StatusOK || !strings.Contains(body, "0 load records") || !strings.Contains(body, "the last one before it is from Oct 12, 12:20 PM CDT (launch-ok, unit1, device …dev-1)") || !strings.Contains(body, "game log not available") {
+		t.Errorf("day without records: %d %s", rec.Code, body[strings.Index(body, "Game log:"):min(len(body), strings.Index(body, "Game log:")+300)])
+	}
 }
 
 // withRouteParams sets several chi URL parameters on one request.

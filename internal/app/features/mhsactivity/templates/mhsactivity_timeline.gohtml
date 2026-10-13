@@ -16,6 +16,12 @@
   </div>
 </div>
 
+<div class="mb-3 text-sm text-gray-700 dark:text-gray-300">
+  <span class="font-medium">Game log:</span>
+  {{ if .LogNote }}{{ .LogNote }}{{ else if .LogEvents }}{{ .LogEvents }} events, {{ .LogSpan }}{{ else }}nothing received this day{{ end }}
+  {{ if .LastRecord }}<span class="ml-2 text-gray-500 dark:text-gray-400">· no load record this day; the last one before it is from {{ .LastRecord }}{{ if .LogEvents }}, so these events come from a game tab opened then{{ end }}</span>{{ end }}
+</div>
+
 <div class="bg-white dark:bg-gray-800 rounded shadow overflow-auto">
   {{ if not .Entries }}
   <div class="p-4 text-sm text-gray-500 dark:text-gray-400">No load records carry entries for this day.</div>

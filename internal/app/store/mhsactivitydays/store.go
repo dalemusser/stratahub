@@ -149,3 +149,19 @@ func (s *Store) DeleteRange(ctx context.Context, wsID primitive.ObjectID, from, 
 	_, err := s.marks.DeleteMany(ctx, f)
 	return err
 }
+
+// OutdatedMarks returns up to limit marks whose Version is older than
+// version (days computed by an earlier reading), oldest day first.
+func (s *Store) OutdatedMarks(ctx context.Context, wsID primitive.ObjectID, version, limit int) ([]models.MHSActivityMark, error) {
+	cur, err := s.marks.Find(ctx, bson.M{"workspace_id": wsID, "version": bson.M{"$lt": version}},
+		options.Find().SetSort(bson.D{{Key: "day", Value: 1}}).SetLimit(int64(limit)))
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	var out []models.MHSActivityMark
+	if err := cur.All(ctx, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}

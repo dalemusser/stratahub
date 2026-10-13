@@ -1,6 +1,7 @@
 package mhsactivity
 
 import (
+	"fmt"
 	"net/http"
 	"sort"
 	"strings"
@@ -9,6 +10,7 @@ import (
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/features/viewers"
 	"github.com/dalemusser/stratahub/internal/app/policy/reportpolicy"
+	"github.com/dalemusser/stratahub/internal/app/store/logdata"
 	"github.com/dalemusser/stratahub/internal/app/store/mhsdevicetests"
 	organizationstore "github.com/dalemusser/stratahub/internal/app/store/organizations"
 	userstore "github.com/dalemusser/stratahub/internal/app/store/users"
@@ -40,6 +42,11 @@ type timelineVM struct {
 	Next        string
 	BackHref    string
 	RecordsHref string
+
+	LogEvents  int    // game log events that day (0 when none or unavailable)
+	LogSpan    string // "12:04–12:53 PM"
+	LogNote    string // the game log's availability
+	LastRecord string // the latest load record before the day, when the day has none
 }
 
 type timelineEntry struct {
@@ -140,22 +147,46 @@ func (h *Handler) ServeStudentDay(w http.ResponseWriter, r *http.Request) {
 	}
 	entries, devices := mergeSteps(ids, deviceOf, steps, day, loc)
 
+	// What the game itself sent that day, and, when no record carries
+	// entries, where the running tab came from.
+	logEvents, logSpan, logNote := 0, "", "game log not available"
+	if h.Compute.LogDB != nil {
+		if act, err := logdata.New(h.Compute.LogDB).ActivityByUsers(ctx, activity.Game, []string{userID.Hex()}, start, end); err == nil {
+			logNote = ""
+			if ua, ok := act[userID.Hex()]; ok {
+				logEvents = ua.Events
+				logSpan = spanText(ua.First, ua.Last, loc)
+			}
+		}
+	}
+	lastRecord := ""
+	if len(ids) == 0 {
+		if prev, _, err := store.ListFull(ctx, mhsdevicetests.ListQuery{WorkspaceID: wsID, Kind: models.MHSDeviceTestKindMember, UserID: &userID, To: start, Limit: 1}); err == nil && len(prev) > 0 { // full: the outcome lives in diagnostics, which the list projection drops
+			r := prev[0]
+			lastRecord = fmt.Sprintf("%s (%s, %s%s)", formatAt(r.StartedAt, loc), outcomeOf(r), r.UnitID, deviceTail(r.DeviceID))
+		}
+	}
+
 	prev, _ := activity.AddDays(day, -1)
 	next, _ := activity.AddDays(day, 1)
 	vm := timelineVM{
-		BaseVM:    viewdata.NewBaseVM(r, h.DB, "MHS Activity: "+u.FullName, "/mhsactivity"),
-		UserIDHex: userID.Hex(),
-		Name:      u.FullName,
-		OrgName:   orgName,
-		TZ:        loc.String(),
-		Day:       day,
-		DayLabel:  prettyDay(day),
-		Records:   len(ids),
-		Devices:   devices,
-		Entries:   entries,
-		Prev:      prev,
-		Next:      next,
-		BackHref:  "/mhsactivity?range=custom&from=" + day + "&to=" + day + "&org=" + u.OrganizationID.Hex(),
+		BaseVM:     viewdata.NewBaseVM(r, h.DB, "MHS Activity: "+u.FullName, "/mhsactivity"),
+		UserIDHex:  userID.Hex(),
+		Name:       u.FullName,
+		OrgName:    orgName,
+		TZ:         loc.String(),
+		Day:        day,
+		DayLabel:   prettyDay(day),
+		Records:    len(ids),
+		Devices:    devices,
+		Entries:    entries,
+		Prev:       prev,
+		Next:       next,
+		BackHref:   "/mhsactivity?range=custom&from=" + day + "&to=" + day + "&org=" + u.OrganizationID.Hex(),
+		LogEvents:  logEvents,
+		LogSpan:    logSpan,
+		LogNote:    logNote,
+		LastRecord: lastRecord,
 	}
 	if authz.IsAdmin(r) || authz.IsAnalyst(r) {
 		vm.RecordsHref = DeviceTestsHref(userID)
@@ -213,6 +244,20 @@ func mergeSteps(ids []primitive.ObjectID, deviceOf map[primitive.ObjectID]string
 		})
 	}
 	return entries, devices
+}
+
+func outcomeOf(rec models.MHSDeviceTest) string {
+	if o, ok := rec.Diagnostics["outcome"].(string); ok {
+		return o
+	}
+	return "record"
+}
+
+func deviceTail(id string) string {
+	if id == "" {
+		return ""
+	}
+	return ", device …" + tail(id)
 }
 
 func stateClass(state string) string {

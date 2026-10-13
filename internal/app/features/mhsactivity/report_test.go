@@ -96,6 +96,36 @@ func TestBuildReport(t *testing.T) {
 	}
 }
 
+func TestStudentStatusText(t *testing.T) {
+	chicago, _ := time.LoadLocation("America/Chicago")
+	org, u1, u2 := primitive.NewObjectID(), primitive.NewObjectID(), primitive.NewObjectID()
+	lk := Lookups{Orgs: map[primitive.ObjectID]OrgInfo{org: {Name: "School A", Loc: chicago}}, Users: map[primitive.ObjectID]string{u1: "Ada", u2: "Bo"}}
+	f1, l1 := time.Date(2026, 10, 12, 17, 4, 0, 0, time.UTC), time.Date(2026, 10, 12, 17, 53, 0, 0, time.UTC)
+	f2 := time.Date(2026, 10, 13, 5, 39, 30, 0, time.UTC)
+	docs := []models.MHSActivityDay{
+		{UserID: u1, OrganizationID: org, Role: "member", Day: "2026-10-12", Opened: true, Played: true, Log: models.MHSActivityLog{Available: true, Events: 312, First: &f1, Last: &l1}},
+		{UserID: u2, OrganizationID: org, Role: "member", Day: "2026-10-13", Log: models.MHSActivityLog{Available: true, Events: 1, First: &f2, Last: &f2}, Flags: models.MHSActivityFlags{StrayEvents: true}},
+	}
+	rep := BuildReport(docs, lk, Options{SelectedOrg: org, MultiDay: true})
+	if rep.Summary.Opened != 1 || rep.Summary.Played != 1 || rep.Summary.Students != 2 {
+		t.Errorf("summary %+v", rep.Summary)
+	}
+	st := rep.School.Students
+	if len(st) != 2 {
+		t.Fatalf("students %d", len(st))
+	}
+	ada, bo := st[0], st[1]
+	if ada.Name != "Ada" || !ada.Played || ada.Events != 312 || ada.PlaySpan != "12:04–12:53 PM" || ada.Stray {
+		t.Errorf("Ada %+v", ada)
+	}
+	if bo.Name != "Bo" || bo.Played || bo.Opened || !bo.Stray || bo.Events != 1 || bo.PlaySpan != "12:39–12:39 AM" || !strings.Contains(pillTexts(bo.Pills), "earlier tab") {
+		t.Errorf("Bo %+v pills %s", bo, pillTexts(bo.Pills))
+	}
+	if got := spanText(time.Date(2026, 10, 12, 16, 50, 0, 0, time.UTC), l1, chicago); got != "11:50 AM–12:53 PM" {
+		t.Errorf("span across noon %q", got)
+	}
+}
+
 func TestChurnFlag(t *testing.T) {
 	org := primitive.NewObjectID()
 	var docs []models.MHSActivityDay

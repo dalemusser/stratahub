@@ -105,6 +105,7 @@ func RollupDay(ctx context.Context, deps Deps, store *mhsactivitydays.Store, wsI
 type JobConfig struct {
 	Interval    time.Duration // how often the job looks for closed days (default 15 min)
 	CatchUpDays int           // how many days back it looks (default 3)
+	OutdatedPer int           // stored zone-days of an older version recomputed per pass (default 12)
 	Now         func() time.Time
 }
 
@@ -117,6 +118,9 @@ func RollupJob(deps Deps, store *mhsactivitydays.Store, wsStore *workspacestore.
 	}
 	if cfg.CatchUpDays <= 0 {
 		cfg.CatchUpDays = 3
+	}
+	if cfg.OutdatedPer <= 0 {
+		cfg.OutdatedPer = 24
 	}
 	if cfg.Now == nil {
 		cfg.Now = func() time.Time { return time.Now().UTC() }
@@ -169,6 +173,65 @@ func RunRollup(ctx context.Context, deps Deps, store *mhsactivitydays.Store, wsS
 				}
 			}
 		}
+		// Days stored by an earlier reading of the data: a few per pass,
+		// oldest first, until none are left.
+		if n, err := recomputeOutdated(ctx, deps, store, ws.ID, zones, cfg.OutdatedPer); err != nil {
+			errs = append(errs, fmt.Errorf("%s outdated: %w", ws.Subdomain, err))
+		} else if n > 0 {
+			log.Info("mhs activity rollup: recomputed outdated days", zap.String("workspace", ws.Subdomain), zap.Int("zone_days", n))
+		}
 	}
 	return errors.Join(errs...)
+}
+
+// recomputeOutdated rolls up again, at most limit zone-days, the days whose
+// marks carry a version older than models.MHSActivityVersion.
+func recomputeOutdated(ctx context.Context, deps Deps, store *mhsactivitydays.Store, wsID primitive.ObjectID, zones []Zone, limit int) (int, error) {
+	marks, err := store.OutdatedMarks(ctx, wsID, models.MHSActivityVersion, limit*8)
+	if err != nil || len(marks) == 0 {
+		return 0, err
+	}
+	zoneOf := map[primitive.ObjectID]int{}
+	for i, z := range zones {
+		for _, org := range z.OrgIDs {
+			zoneOf[org] = i
+		}
+	}
+	type zd struct {
+		zone int
+		day  string
+	}
+	seen := map[zd]bool{}
+	var todo []zd
+	for _, m := range marks {
+		zi, ok := zoneOf[m.OrganizationID]
+		if !ok {
+			// An organization that is gone: mark it current so it stops
+			// coming back.
+			m.Version = models.MHSActivityVersion
+			_ = store.SetMark(ctx, m)
+			continue
+		}
+		k := zd{zi, m.Day}
+		if !seen[k] {
+			seen[k] = true
+			todo = append(todo, k)
+		}
+	}
+	n := 0
+	var errs []error
+	for _, k := range todo {
+		if n >= limit {
+			break
+		}
+		dctx, cancel := context.WithTimeout(ctx, timeouts.Batch())
+		_, err := RollupDay(dctx, deps, store, wsID, k.day, zones[k.zone], true)
+		cancel()
+		if err != nil {
+			errs = append(errs, fmt.Errorf("%s %s: %w", zones[k.zone].TZ, k.day, err))
+			continue
+		}
+		n++
+	}
+	return n, errors.Join(errs...)
 }

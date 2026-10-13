@@ -8,8 +8,18 @@ import (
 )
 
 // MHSActivityVersion is the version of the activity computation. A stored
-// day whose Version is older is recomputed by the next backfill.
-const MHSActivityVersion = 1
+// day whose Version is older is recomputed by the rollup job (a few per
+// pass) or by the next backfill.
+//
+//	1 (2026-10-13): first release
+//	2 (2026-10-13): a day with fewer than MHSActivityMinPlayedEvents game
+//	   events is "stray events" (a tab opened on an earlier day), not played
+const MHSActivityVersion = 2
+
+// MHSActivityMinPlayedEvents is how many game log events a day needs to count
+// as played. A game tab left open from an earlier day sends a handful when
+// the laptop wakes; a session that is played sends dozens a minute.
+const MHSActivityMinPlayedEvents = 10
 
 // Who a day document is about.
 const (
@@ -164,6 +174,7 @@ type MHSActivityFlags struct {
 	StorageNotPersisted bool `bson:"storage_not_persisted,omitempty" json:"storage_not_persisted,omitempty"`
 	NewDevice           bool `bson:"new_device,omitempty" json:"new_device,omitempty"`
 	LoggingProblem      bool `bson:"logging_problem,omitempty" json:"logging_problem,omitempty"` // launched and heartbeating but no log events
+	StrayEvents         bool `bson:"stray_events,omitempty" json:"stray_events,omitempty"`       // a few game events and nothing else: a tab opened on an earlier day
 }
 
 // HasProblem reports whether the day shows something staff would act on.
