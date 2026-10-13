@@ -1,0 +1,33 @@
+{{ define "mhsactivity_admin" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📡 MHS Activity: stored days</h1>
+  <a href="/mhsactivity" class="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">← Activity</a>
+</div>
+
+<div class="bg-white dark:bg-gray-800 rounded shadow p-4 mb-4 text-sm text-gray-700 dark:text-gray-300 max-w-3xl">
+  <p class="mb-2">A school's day is computed live while it is open and stored once it has been closed for six hours (the background job does that for the last few days). The backfill stores older days, or recomputes days after the computation changes. It runs in the background; this page follows its progress.</p>
+  <p class="text-gray-500 dark:text-gray-400">Stamping writes a summary onto every load record of the range that has none, so later computations never read the records' step logs again. Recomputing final days is only needed after the computation itself changed.</p>
+</div>
+
+<form hx-post="/mhsactivity/admin/backfill" hx-target="#mhsactivity-backfill-status" hx-swap="innerHTML" method="POST" action="/mhsactivity/admin/backfill"
+      class="bg-white dark:bg-gray-800 rounded shadow p-4 mb-4 flex flex-wrap items-end gap-3 max-w-3xl">
+  <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+  <div>
+    <label for="bf-from" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">From</label>
+    <input id="bf-from" type="date" name="from" value="{{ .From }}" class="px-2 py-2 border dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100">
+  </div>
+  <div>
+    <label for="bf-to" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">To</label>
+    <input id="bf-to" type="date" name="to" value="{{ .To }}" class="px-2 py-2 border dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100">
+  </div>
+  <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 pb-2"><input type="checkbox" name="stamp" value="1" checked class="rounded border-gray-300 dark:border-gray-600"> Stamp summaries onto load records</label>
+  <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 pb-2"><input type="checkbox" name="force" value="1" class="rounded border-gray-300 dark:border-gray-600"> Recompute days that are already final</label>
+  <button type="submit" class="px-3 py-2 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm">Start backfill</button>
+</form>
+
+<div id="mhsactivity-backfill-status">{{ template "mhsactivity_admin_status" . }}</div>
+{{ end }}

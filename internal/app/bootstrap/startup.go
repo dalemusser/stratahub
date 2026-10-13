@@ -14,10 +14,12 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/store/activity"
 	"github.com/dalemusser/stratahub/internal/app/store/audit"
 	"github.com/dalemusser/stratahub/internal/app/store/emailverify"
+	"github.com/dalemusser/stratahub/internal/app/store/mhsactivitydays"
 	"github.com/dalemusser/stratahub/internal/app/store/oauthstate"
 	"github.com/dalemusser/stratahub/internal/app/store/sessions"
 	workspacestore "github.com/dalemusser/stratahub/internal/app/store/workspaces"
 	"github.com/dalemusser/stratahub/internal/app/system/authutil"
+	"github.com/dalemusser/stratahub/internal/app/system/mhsactivity"
 	"github.com/dalemusser/stratahub/internal/app/system/staffauth"
 	"github.com/dalemusser/stratahub/internal/app/system/tasks"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
@@ -143,6 +145,16 @@ func Startup(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, 
 
 	// Cleanup expired OAuth states (backup for TTL index)
 	deps.TaskRunner.Register(tasks.OAuthStateCleanupJob(oauthStateStore, logger))
+
+	// MHS Activity: store each school's closed days (docs/mhs-activity/plan.md)
+	if appCfg.MHSActivityEnabled {
+		deps.TaskRunner.Register(mhsactivity.RollupJob(
+			mhsactivity.Deps{DB: deps.StrataHubMongoDatabase, LogDB: deps.StratalogDatabase, GradesDB: deps.MHSGraderDatabase, Log: logger, CloseAfter: appCfg.MHSActivityCloseAfter},
+			mhsactivitydays.New(deps.StrataHubMongoDatabase),
+			workspacestore.New(deps.StrataHubMongoDatabase),
+			mhsactivity.JobConfig{Interval: appCfg.MHSActivityRollupEvery, CatchUpDays: appCfg.MHSActivityCatchUpDays},
+		))
+	}
 
 	deps.TaskRunner.Start()
 

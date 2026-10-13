@@ -10,6 +10,7 @@ import (
 
 	_ "github.com/dalemusser/stratahub/internal/app/features/missionhydrosci" // registers a template func the shared layout uses
 	appresources "github.com/dalemusser/stratahub/internal/app/resources"
+	"github.com/dalemusser/stratahub/internal/app/store/mhsactivitydays"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
@@ -88,8 +89,8 @@ func setup(t *testing.T) fixture {
 	if _, err := db.Collection("mhs_device_tests").InsertOne(ctx, rec); err != nil {
 		t.Fatal(err)
 	}
-	h := NewHandler(db, nil, nil, nil, zap.NewNop(), Config{Enabled: true, CloseAfter: 6 * time.Hour, CacheTTL: time.Minute, MaxLiveDays: 7})
-	h.now = func() time.Time { return time.Date(2026, 10, 12, 20, 0, 0, 0, time.UTC) } // 3 pm in Chicago on the 12th
+	h := NewHandler(db, nil, nil, nil, zap.NewNop(), Config{Enabled: true, CloseAfter: 6 * time.Hour, CacheTTL: time.Minute, MaxLiveDays: 7, MaxDays: 31})
+	h.setNow(func() time.Time { return time.Date(2026, 10, 12, 20, 0, 0, 0, time.UTC) }) // 3 pm in Chicago on the 12th
 	return fixture{db: db, ws: ws, orgA: orgA.ID, orgB: orgB.ID, student: student, h: h}
 }
 
@@ -116,7 +117,7 @@ func TestAdminSeesTheOverviewAndTheSchool(t *testing.T) {
 		t.Fatalf("status %d: %s", rec.Code, rec.Body.String()[:min(600, rec.Body.Len())])
 	}
 	body := rec.Body.String()
-	for _, want := range []string{"MHS Activity", "School A", "1 hold released", "name=\"range\"", "Computed live", "the game log service"} {
+	for _, want := range []string{"MHS Activity", "School A", "1 hold released", "name=\"range\"", "computed", "the game log service"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("overview lacks %q", want)
 		}
@@ -190,5 +191,96 @@ func TestCoordinatorScope(t *testing.T) {
 	rec = fx.getAs(t, "/mhsactivity?org="+fx.orgA.Hex(), co)
 	if rec.Code != http.StatusForbidden {
 		t.Errorf("out-of-scope school: status %d", rec.Code)
+	}
+}
+
+// TestStoredDayReplacesLiveComputation stores a different picture of the
+// 12th than the raw records give and asks for it after it has closed: the
+// page must show the stored one and say so.
+func TestStoredDayReplacesLiveComputation(t *testing.T) {
+	fx := setup(t)
+	ctx, cancel := testutil.TestContext()
+	defer cancel()
+	store := mhsactivitydays.New(fx.db)
+	other := primitive.NewObjectID()
+	docs := []models.MHSActivityDay{{WorkspaceID: fx.ws, UserID: other, OrganizationID: fx.orgB, Role: models.MHSActivityRoleMember, Day: "2026-10-12", TZ: "America/Chicago", Opened: true, Played: true, Version: models.MHSActivityVersion, ComputedAt: time.Now()}}
+	if err := store.ReplaceDay(ctx, fx.ws, "2026-10-12", []primitive.ObjectID{fx.orgA, fx.orgB}, docs); err != nil {
+		t.Fatal(err)
+	}
+	for _, org := range []primitive.ObjectID{fx.orgA, fx.orgB} {
+		if err := store.SetMark(ctx, models.MHSActivityMark{WorkspaceID: fx.ws, OrganizationID: org, Day: "2026-10-12", TZ: "America/Chicago", Final: true, Version: models.MHSActivityVersion, ComputedAt: time.Date(2026, 10, 13, 11, 12, 0, 0, time.UTC)}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	// Before the day closes (3 pm Chicago on the 12th) the live picture wins.
+	rec := fx.get(t, "/mhsactivity", testutil.AdminUser())
+	if body := rec.Body.String(); !strings.Contains(body, "School A</a>") || strings.Contains(body, "School B</a>") || !strings.Contains(body, "Live: Oct 12, 2026, computed") {
+		t.Errorf("open day did not compute live")
+	}
+	// After it closes (noon UTC on the 13th), the stored picture wins.
+	fx.h.setNow(func() time.Time { return time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC) })
+	rec = fx.get(t, "/mhsactivity?range=yesterday", testutil.AdminUser())
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "School B</a>") || strings.Contains(body, "School A</a>") || !strings.Contains(body, "Stored: Oct 12, 2026 (closed days, stored once; last stored Oct 13 11:12 UTC)") {
+		t.Errorf("closed day did not come from the store: %s", body[strings.Index(body, "Data:"):min(len(body), strings.Index(body, "Data:")+300)])
+	}
+	// A window needing more live days than allowed is refused.
+	fx.h.Config.MaxLiveDays = 1
+	rec = fx.get(t, "/mhsactivity?range=7d", testutil.AdminUser())
+	if rec.Code != http.StatusBadRequest {
+		t.Errorf("live cap: status %d", rec.Code)
+	}
+}
+
+func TestAdminPageAndBackfill(t *testing.T) {
+	fx := setup(t)
+	// With a (empty) log service and grader the computation is complete, so
+	// the backfill's result is final and the page serves it from the store.
+	fx.h = NewHandler(fx.db, fx.db, fx.db, nil, zap.NewNop(), fx.h.Config)
+	fx.h.setNow(func() time.Time { return time.Date(2026, 10, 12, 20, 0, 0, 0, time.UTC) })
+	get := func(target string, user testutil.TestUser, method string) *httptest.ResponseRecorder {
+		req := testutil.NewAuthenticatedRequest(method, target, user)
+		req.Host = "mhs.example.com"
+		req = workspace.WithTestWorkspace(req, fx.ws, "mhs", "MHS")
+		rec := httptest.NewRecorder()
+		switch {
+		case target == "/mhsactivity/admin":
+			fx.h.ServeAdmin(rec, req)
+		case strings.HasPrefix(target, "/mhsactivity/admin/backfill"):
+			fx.h.HandleBackfill(rec, req)
+		case target == "/mhsactivity/admin/status":
+			fx.h.ServeAdminStatus(rec, req)
+		}
+		return rec
+	}
+	rec := get("/mhsactivity/admin", testutil.AdminUser(), http.MethodGet)
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "No backfill has run") {
+		t.Fatalf("admin page: %d", rec.Code)
+	}
+	if rec := get("/mhsactivity/admin", testutil.AnalystUser(), http.MethodGet); rec.Code != http.StatusForbidden {
+		t.Errorf("analyst on the admin page: %d", rec.Code)
+	}
+	// Start a backfill of the 12th (closed by the 13th noon) and wait for it.
+	fx.h.setNow(func() time.Time { return time.Date(2026, 10, 13, 12, 0, 0, 0, time.UTC) })
+	rec = get("/mhsactivity/admin/backfill?from=2026-10-12&to=2026-10-12&stamp=1", testutil.AdminUser(), http.MethodPost)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("start: %d %s", rec.Code, rec.Body.String()[:min(300, rec.Body.Len())])
+	}
+	deadline := time.Now().Add(30 * time.Second)
+	for fx.h.Backfill.Status().Running && time.Now().Before(deadline) {
+		time.Sleep(50 * time.Millisecond)
+	}
+	rec = get("/mhsactivity/admin/status", testutil.AdminUser(), http.MethodGet)
+	body := rec.Body.String()
+	if !strings.Contains(body, "Finished") || !strings.Contains(body, "2026-10-12 to 2026-10-12") || !strings.Contains(body, "1 student-days stored") {
+		t.Errorf("status after backfill: %s", body)
+	}
+	// The stored day now serves the page.
+	rec = fx.get(t, "/mhsactivity?range=yesterday", testutil.AdminUser())
+	if !strings.Contains(rec.Body.String(), "Stored: Oct 12, 2026") || !strings.Contains(rec.Body.String(), "Ada Student") && !strings.Contains(rec.Body.String(), "School A</a>") {
+		t.Errorf("page after backfill does not use the store")
 	}
 }

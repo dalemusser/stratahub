@@ -152,4 +152,8 @@ type AppConfig struct {
 	MHSActivityCloseAfter   time.Duration // a school's day stays open (computed live) this long after it ends
 	MHSActivityLiveCacheTTL time.Duration
 	MHSActivityLiveMaxDays  int
+	MHSActivityMaxDays      int
+	MHSActivityRollupEvery  time.Duration
+	MHSActivityCatchUpDays  int
+	MHSActivityBackfillFrom string
 }

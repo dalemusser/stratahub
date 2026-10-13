@@ -96,6 +96,12 @@ func EnsureAll(ctx context.Context, db *mongo.Database) error {
 	if err := ensureMHSDeviceTests(ctx, db); err != nil {
 		problems = append(problems, "mhs_device_tests: "+err.Error())
 	}
+	if err := ensureMHSActivityDays(ctx, db); err != nil {
+		problems = append(problems, "mhs_activity_days: "+err.Error())
+	}
+	if err := ensureMHSActivityMarks(ctx, db); err != nil {
+		problems = append(problems, "mhs_activity_marks: "+err.Error())
+	}
 
 	if len(problems) > 0 {
 		return errors.New(strings.Join(problems, "; "))
@@ -1118,6 +1124,64 @@ func ensureMHSDeviceTests(ctx context.Context, db *mongo.Database) error {
 				{Key: "started_at", Value: -1},
 			},
 			Options: options.Index().SetName("idx_mhsdevicetest_ws_user_started"),
+		},
+	})
+}
+
+// MHS activity rollups (docs/mhs-activity/plan.md): one document per
+// workspace, user and organization-local day, written by the rollup job for
+// closed days; plain compound indexes only (DocumentDB).
+func ensureMHSActivityDays(ctx context.Context, db *mongo.Database) error {
+	c := db.Collection("mhs_activity_days")
+	return ensureIndexSet(ctx, c, []mongo.IndexModel{
+		// Upsert key; one student's history
+		{
+			Keys: bson.D{
+				{Key: "workspace_id", Value: 1},
+				{Key: "user_id", Value: 1},
+				{Key: "day", Value: 1},
+			},
+			Options: options.Index().
+				SetUnique(true).
+				SetName("uniq_mhsactivity_ws_user_day"),
+		},
+		// A window across the workspace (organization narrowed in the range)
+		{
+			Keys: bson.D{
+				{Key: "workspace_id", Value: 1},
+				{Key: "day", Value: 1},
+				{Key: "organization_id", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_mhsactivity_ws_day_org"),
+		},
+		// A coordinator's or one school's window; the stale-row delete
+		{
+			Keys: bson.D{
+				{Key: "workspace_id", Value: 1},
+				{Key: "organization_id", Value: 1},
+				{Key: "day", Value: 1},
+			},
+			Options: options.Index().
+				SetName("idx_mhsactivity_ws_org_day"),
+		},
+	})
+}
+
+// Marks: which organization-days are rolled up, one per (workspace,
+// organization, day).
+func ensureMHSActivityMarks(ctx context.Context, db *mongo.Database) error {
+	c := db.Collection("mhs_activity_marks")
+	return ensureIndexSet(ctx, c, []mongo.IndexModel{
+		{
+			Keys: bson.D{
+				{Key: "workspace_id", Value: 1},
+				{Key: "organization_id", Value: 1},
+				{Key: "day", Value: 1},
+			},
+			Options: options.Index().
+				SetUnique(true).
+				SetName("uniq_mhsactivitymark_ws_org_day"),
 		},
 	})
 }

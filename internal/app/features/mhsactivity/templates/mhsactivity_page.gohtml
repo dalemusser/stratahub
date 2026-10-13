@@ -8,6 +8,7 @@
   <div class="text-sm text-gray-600 dark:text-gray-400">
     {{ .Window.Label }}{{ if .Report.School }} · {{ .Report.School.Name }}{{ end }}
     <span class="ml-2 text-gray-400 dark:text-gray-500" title="Each school's day runs on its own clock. Today means the school's local today.">(school-local days)</span>
+    {{ if .IsAdmin }}<a href="/mhsactivity/admin" class="ml-3 text-indigo-600 dark:text-indigo-400 hover:underline" title="Stored days and the backfill">stored days</a>{{ end }}
   </div>
 </div>
 
@@ -75,9 +76,7 @@
 
 {{ if .Freshness }}
 <div class="mt-4 text-xs text-gray-500 dark:text-gray-400">
-  <span class="font-medium">Computed live:</span>
-  {{ range $i, $f := .Freshness }}{{ if $i }} · {{ end }}{{ $f }}{{ end }}
-  <span class="ml-1">(reused for a minute)</span>
+  {{ range .Freshness }}<div>{{ . }}</div>{{ end }}
 </div>
 {{ end }}
 {{ end }}

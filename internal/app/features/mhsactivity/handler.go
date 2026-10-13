@@ -6,11 +6,14 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
+	"sort"
 	"strings"
 	"time"
 
 	uierrors "github.com/dalemusser/stratahub/internal/app/features/errors"
 	"github.com/dalemusser/stratahub/internal/app/policy/reportpolicy"
+	"github.com/dalemusser/stratahub/internal/app/store/mhsactivitydays"
+	"github.com/dalemusser/stratahub/internal/app/store/mhsdevicetests"
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/authz"
 	activity "github.com/dalemusser/stratahub/internal/app/system/mhsactivity"
@@ -28,11 +31,13 @@ import (
 
 // Handler serves the MHS Activity page.
 type Handler struct {
-	DB      *mongo.Database
-	Compute activity.Deps
-	Config  Config
-	Log     *zap.Logger
-	ErrLog  *uierrors.ErrorLogger
+	DB       *mongo.Database
+	Compute  activity.Deps
+	Store    *mhsactivitydays.Store // stored (rolled-up) days; nil disables the stored path
+	Backfill *activity.Backfiller
+	Config   Config
+	Log      *zap.Logger
+	ErrLog   *uierrors.ErrorLogger
 
 	cache *dayCache
 	now   func() time.Time
@@ -43,15 +48,29 @@ func NewHandler(db, logDB, gradesDB *mongo.Database, errLog *uierrors.ErrorLogge
 	if cfg.MaxLiveDays <= 0 {
 		cfg.MaxLiveDays = 7
 	}
-	return &Handler{
-		DB:      db,
-		Compute: activity.Deps{DB: db, LogDB: logDB, GradesDB: gradesDB, Log: logger, CloseAfter: cfg.CloseAfter},
-		Config:  cfg,
-		Log:     logger,
-		ErrLog:  errLog,
-		cache:   newDayCache(cfg.CacheTTL),
-		now:     func() time.Time { return time.Now().UTC() },
+	if cfg.MaxDays < cfg.MaxLiveDays {
+		cfg.MaxDays = cfg.MaxLiveDays
 	}
+	deps := activity.Deps{DB: db, LogDB: logDB, GradesDB: gradesDB, Log: logger, CloseAfter: cfg.CloseAfter}
+	store := mhsactivitydays.New(db)
+	h := &Handler{
+		DB:       db,
+		Compute:  deps,
+		Store:    store,
+		Backfill: activity.NewBackfiller(deps, store, mhsdevicetests.New(db)),
+		Config:   cfg,
+		Log:      logger,
+		ErrLog:   errLog,
+		cache:    newDayCache(cfg.CacheTTL),
+	}
+	h.setNow(func() time.Time { return time.Now().UTC() })
+	return h
+}
+
+// setNow installs the clock the page and the backfill use (tests).
+func (h *Handler) setNow(now func() time.Time) {
+	h.now = now
+	h.Backfill.Now = now
 }
 
 // Routes mounts the page. Staff only: superadmin, admin and analyst see the
@@ -64,6 +83,14 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 		g.Use(sm.RequireRole("superadmin", "admin", "analyst", "coordinator"))
 		g.Get("/", h.ServePage)
 		g.Get("/school/{orgID}", h.ServeSchool)
+	})
+	r.Group(func(a chi.Router) {
+		a.Use(sm.RequireSignedIn)
+		a.Use(sm.RequireRole("superadmin", "admin"))
+		a.Get("/admin", h.ServeAdmin)
+		a.Get("/admin/status", h.ServeAdminStatus)
+		a.Post("/admin/backfill", h.HandleBackfill)
+		a.Post("/admin/stop", h.HandleBackfillStop)
 	})
 	return r
 }
@@ -102,7 +129,7 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request, pathOrg primitiv
 	defer cancel()
 	wsID := workspace.IDFromRequest(r)
 
-	win, err := ParseWindow(r, h.Config.MaxLiveDays, h.now())
+	win, err := ParseWindow(r, h.Config.MaxDays, h.now())
 	if err != nil {
 		uierrors.RenderBadRequest(w, r, err.Error(), "/mhsactivity")
 		return
@@ -169,14 +196,34 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request, pathOrg primitiv
 	}
 	now := h.now()
 	var docs []models.MHSActivityDay
-	var fresh []string
+	fresh := &freshness{}
 	multiDay := false
+	live := 0
 	for _, z := range zones {
 		days := win.DaysIn(z.Loc, now)
 		if len(days) > 1 {
 			multiDay = true
 		}
 		for _, day := range days {
+			// A closed day whose organizations are all rolled up comes from
+			// the store; anything else is computed live (and cached).
+			if h.Store != nil && activity.Closed(day, z.Loc, h.Compute.EffectiveCloseAfter(), now) {
+				stored, at, partial, err := h.loadStored(ctx, wsID, day, z)
+				if err != nil {
+					h.fail(w, r, "stored "+day, err)
+					return
+				}
+				if stored != nil {
+					docs = append(docs, stored...)
+					fresh.stored(day, at, partial)
+					continue
+				}
+			}
+			live++
+			if live > h.Config.MaxLiveDays {
+				uierrors.RenderBadRequest(w, r, fmt.Sprintf("This range needs more than %d days computed live; the stored history for it is still being built. Try a shorter range, or run the backfill from the admin page.", h.Config.MaxLiveDays), "/mhsactivity")
+				return
+			}
 			zone, dd := z, day
 			key := wsID.Hex() + "|" + z.TZ + "|" + day
 			got, at, err := h.cache.Get(key, now, func() ([]models.MHSActivityDay, error) {
@@ -191,7 +238,7 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request, pathOrg primitiv
 				return
 			}
 			docs = append(docs, got...)
-			fresh = append(fresh, fmt.Sprintf("%s (%s): computed %s", prettyDay(day), z.TZ, at.In(z.Loc).Format("3:04:05 PM MST")))
+			fresh.live(day, z, at)
 		}
 	}
 
@@ -248,11 +295,12 @@ func (h *Handler) serve(w http.ResponseWriter, r *http.Request, pathOrg primitiv
 	}
 	vm := pageVM{
 		BaseVM:        viewdata.NewBaseVM(r, h.DB, "MHS Activity", "/dashboard"),
-		Window:        windowVM{Range: win.Range, From: win.From, To: win.To, Label: win.Label(), Custom: win.Range == RangeCustom, MaxDays: h.Config.MaxLiveDays},
+		Window:        windowVM{Range: win.Range, From: win.From, To: win.To, Label: win.Label(), Custom: win.Range == RangeCustom, MaxDays: h.Config.MaxDays},
+		IsAdmin:       authz.IsAdmin(r),
 		SelectedOrg:   hexOrEmpty(selectedOrg),
 		SelectedGroup: hexOrEmpty(scope.SelectedGroup),
 		ShowStaff:     showStaff,
-		Freshness:     fresh,
+		Freshness:     fresh.lines(),
 		Missing:       missingList,
 		Report:        rep,
 		WindowQuery:   wq.Encode(),
@@ -308,4 +356,97 @@ func SchoolHref(orgID string, windowQuery string) string {
 	v, _ := url.ParseQuery(windowQuery)
 	v.Set("org", orgID)
 	return "/mhsactivity?" + v.Encode()
+}
+
+// loadStored returns the stored documents of a closed zone-day when every
+// organization of the zone has a final mark of the current version; nil
+// otherwise (the caller computes live). It also returns the oldest
+// computed-at of those marks and whether any is partial.
+func (h *Handler) loadStored(ctx context.Context, wsID primitive.ObjectID, day string, z activity.Zone) ([]models.MHSActivityDay, time.Time, bool, error) {
+	marks, err := h.Store.GetMarks(ctx, wsID, day, day, z.OrgIDs)
+	if err != nil {
+		return nil, time.Time{}, false, err
+	}
+	var at time.Time
+	partial := false
+	for _, org := range z.OrgIDs {
+		m, ok := marks[mhsactivitydays.MarkKey(org, day)]
+		if !ok || !m.Final || m.Version != models.MHSActivityVersion {
+			return nil, time.Time{}, false, nil
+		}
+		if at.IsZero() || m.ComputedAt.Before(at) {
+			at = m.ComputedAt
+		}
+		partial = partial || m.Partial
+	}
+	docs, err := h.Store.ListDays(ctx, mhsactivitydays.DaysQuery{WorkspaceID: wsID, From: day, To: day, OrgIDs: z.OrgIDs})
+	if err != nil {
+		return nil, time.Time{}, false, err
+	}
+	if docs == nil {
+		docs = []models.MHSActivityDay{}
+	}
+	return docs, at, partial, nil
+}
+
+// freshness collects where each zone-day came from and says it in a line or
+// two instead of one entry per zone-day.
+type freshness struct {
+	storedDays   map[string]bool
+	storedOldest time.Time
+	storedNewest time.Time
+	partial      bool
+	liveDays     map[string][]string // day → "zone h:mm:ss PM MST"
+}
+
+func (f *freshness) stored(day string, at time.Time, partial bool) {
+	if f.storedDays == nil {
+		f.storedDays = map[string]bool{}
+	}
+	f.storedDays[day] = true
+	if f.storedOldest.IsZero() || at.Before(f.storedOldest) {
+		f.storedOldest = at
+	}
+	if at.After(f.storedNewest) {
+		f.storedNewest = at
+	}
+	f.partial = f.partial || partial
+}
+
+func (f *freshness) live(day string, z activity.Zone, at time.Time) {
+	if f.liveDays == nil {
+		f.liveDays = map[string][]string{}
+	}
+	f.liveDays[day] = append(f.liveDays[day], z.TZ+" "+at.In(z.Loc).Format("3:04:05 PM MST"))
+}
+
+func (f *freshness) lines() []string {
+	var out []string
+	if len(f.storedDays) > 0 {
+		days := make([]string, 0, len(f.storedDays))
+		for d := range f.storedDays {
+			days = append(days, d)
+		}
+		sort.Strings(days)
+		span := prettyDay(days[0])
+		if len(days) > 1 {
+			span += " – " + prettyDay(days[len(days)-1])
+		}
+		line := fmt.Sprintf("Stored: %s (closed days, stored once; last stored %s UTC)", span, f.storedNewest.UTC().Format("Jan 2 15:04"))
+		if f.partial {
+			line += "; some of it was computed with a source unavailable"
+		}
+		out = append(out, line)
+	}
+	if len(f.liveDays) > 0 {
+		days := make([]string, 0, len(f.liveDays))
+		for d := range f.liveDays {
+			days = append(days, d)
+		}
+		sort.Strings(days)
+		for _, d := range days {
+			out = append(out, fmt.Sprintf("Live: %s, computed %s (reused for a minute)", prettyDay(d), strings.Join(f.liveDays[d], " · ")))
+		}
+	}
+	return out
 }

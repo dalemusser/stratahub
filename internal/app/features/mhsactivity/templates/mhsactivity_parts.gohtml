@@ -220,3 +220,32 @@
   </table>
 </div>
 {{ end }}
+
+{{/* mhsactivity_admin_status: the backfill's progress; polled while it runs. */}}
+{{ define "mhsactivity_admin_status" }}
+<div class="bg-white dark:bg-gray-800 rounded shadow p-4 text-sm text-gray-700 dark:text-gray-300 max-w-3xl"
+     {{ if .Status.Running }}hx-get="/mhsactivity/admin/status" hx-trigger="every 5s" hx-target="#mhsactivity-backfill-status" hx-swap="innerHTML"{{ end }}>
+  {{ if .StartError }}<div class="mb-2 p-2 rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200">{{ .StartError }}</div>{{ end }}
+  {{ if not .Status.Ran }}
+  <div class="text-gray-500 dark:text-gray-400">No backfill has run since the service started.</div>
+  {{ else }}
+  <div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+    <div><span class="font-medium">{{ if .Status.Running }}Running{{ else if .Status.Stopped }}Stopped{{ else }}Finished{{ end }}</span> · {{ .Status.Range }}{{ if .Status.Options }} · {{ .Status.Options }}{{ end }}</div>
+    {{ if .Status.Running }}
+    <form hx-post="/mhsactivity/admin/stop" hx-target="#mhsactivity-backfill-status" hx-swap="innerHTML" method="POST" action="/mhsactivity/admin/stop">
+      <input type="hidden" name="csrf_token" value="{{ .CSRFToken }}">
+      <button type="submit" class="px-2 py-1 rounded border border-gray-300 dark:border-gray-600 text-xs hover:bg-gray-50 dark:hover:bg-gray-700">Stop</button>
+    </form>
+    {{ end }}
+  </div>
+  <div class="w-full h-2 rounded bg-gray-200 dark:bg-gray-700 mb-2"><div class="h-2 rounded bg-indigo-500" style="width: {{ .Status.Percent }}%"></div></div>
+  <div class="text-xs text-gray-500 dark:text-gray-400">
+    {{ .Status.Done }} of {{ .Status.Total }} school-zone days{{ if .Status.Current }} · now {{ .Status.Current }}{{ end }} · {{ .Status.Skipped }} already final{{ if .Status.Open }} · {{ .Status.Open }} still open{{ end }} · {{ .Status.Written }} student-days stored{{ if .Status.Stamped }} · {{ .Status.Stamped }} records stamped{{ end }}
+    · started {{ .Status.StartedAt }}{{ if .Status.FinishedAt }} · finished {{ .Status.FinishedAt }}{{ end }}
+  </div>
+  {{ if .Status.Errors }}
+  <ul class="mt-2 text-xs text-amber-800 dark:text-amber-200 list-disc ml-4">{{ range .Status.Errors }}<li>{{ . }}</li>{{ end }}</ul>
+  {{ end }}
+  {{ end }}
+</div>
+{{ end }}

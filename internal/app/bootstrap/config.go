@@ -93,7 +93,11 @@ var appConfigKeys = []config.AppKey{
 	{Name: "mhs_activity_enabled", Default: true, Desc: "Serve the MHS Activity page"},
 	{Name: "mhs_activity_close_after", Default: "6h", Desc: "How long after a school's local day ends it stays open (computed live); never below 6h, the pages' step-log retention"},
 	{Name: "mhs_activity_live_cache_ttl", Default: "60s", Desc: "How long a live day's computation is reused across requests"},
-	{Name: "mhs_activity_live_max_days", Default: 7, Desc: "The longest window the page computes live (days)"},
+	{Name: "mhs_activity_live_max_days", Default: 7, Desc: "How many days one page request may compute live (the rest must be stored)"},
+	{Name: "mhs_activity_max_days", Default: 31, Desc: "The longest window the page shows (days)"},
+	{Name: "mhs_activity_rollup_interval", Default: "15m", Desc: "How often the rollup job stores closed days"},
+	{Name: "mhs_activity_catch_up_days", Default: 3, Desc: "How many days back the rollup job looks; older days are the backfill's"},
+	{Name: "mhs_activity_backfill_start", Default: "2026-09-08", Desc: "The first day the admin backfill offers (the first day with load records)"},
 
 	// MHS S3 storage (separate from materials storage — may use a different bucket/credentials)
 	{Name: "mhs_s3_region", Default: "", Desc: "AWS region for MHS CDN S3 bucket"},
@@ -251,6 +255,10 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 		MHSActivityCloseAfter:   appValues.Duration("mhs_activity_close_after", 6*time.Hour),
 		MHSActivityLiveCacheTTL: appValues.Duration("mhs_activity_live_cache_ttl", time.Minute),
 		MHSActivityLiveMaxDays:  appValues.Int("mhs_activity_live_max_days"),
+		MHSActivityMaxDays:      appValues.Int("mhs_activity_max_days"),
+		MHSActivityRollupEvery:  appValues.Duration("mhs_activity_rollup_interval", 15*time.Minute),
+		MHSActivityCatchUpDays:  appValues.Int("mhs_activity_catch_up_days"),
+		MHSActivityBackfillFrom: appValues.String("mhs_activity_backfill_start"),
 	}
 
 	// Auto-derive session domain in multi-workspace mode if not explicitly set.

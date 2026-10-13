@@ -82,7 +82,11 @@ mhsgrader_database = "mhsgrader"
 # mhs_activity_enabled = true
 # mhs_activity_close_after = "6h"      # a school's day stays open (computed live) this long after it ends; never below 6h
 # mhs_activity_live_cache_ttl = "60s"  # a live day's computation is reused this long
-# mhs_activity_live_max_days = 7       # the longest window computed live
+# mhs_activity_live_max_days = 7       # how many days one request may compute live (the rest come from stored days)
+# mhs_activity_max_days = 31           # the longest window the page shows
+# mhs_activity_rollup_interval = "15m" # how often the job stores closed days
+# mhs_activity_catch_up_days = 3       # how many days back the job looks; older days are the admin backfill's
+# mhs_activity_backfill_start = "2026-09-08"  # the first day the backfill offers
 
 # Database connection timeout
 db_connect_timeout = "10s"

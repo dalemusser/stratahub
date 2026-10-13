@@ -641,10 +641,12 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		// coordinator). Reads load records, device rows, page views, the
 		// game log and the grader (docs/mhs-activity/plan.md).
 		mhsActivityHandler := mhsactivityfeature.NewHandler(deps.StrataHubMongoDatabase, deps.StratalogDatabase, deps.MHSGraderDatabase, errLog, logger, mhsactivityfeature.Config{
-			Enabled:     appCfg.MHSActivityEnabled,
-			CloseAfter:  appCfg.MHSActivityCloseAfter,
-			CacheTTL:    appCfg.MHSActivityLiveCacheTTL,
-			MaxLiveDays: appCfg.MHSActivityLiveMaxDays,
+			Enabled:       appCfg.MHSActivityEnabled,
+			CloseAfter:    appCfg.MHSActivityCloseAfter,
+			CacheTTL:      appCfg.MHSActivityLiveCacheTTL,
+			MaxLiveDays:   appCfg.MHSActivityLiveMaxDays,
+			MaxDays:       appCfg.MHSActivityMaxDays,
+			BackfillStart: appCfg.MHSActivityBackfillFrom,
 		})
 		wsr.Mount("/mhsactivity", mhsactivityfeature.Routes(mhsActivityHandler, sessionMgr))
 
