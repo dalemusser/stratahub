@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
+	"github.com/dalemusser/stratahub/internal/app/system/mhssteplog"
 	"github.com/dalemusser/stratahub/internal/app/system/timeouts"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
@@ -111,6 +112,15 @@ func (h *Handler) HandleMemberStepLog(w http.ResponseWriter, r *http.Request) {
 	if derived.gameplayAt != nil {
 		rec.GameplayReachedAt = derived.gameplayAt
 	}
+	// The log read as facts, so reports never need the steps of this record.
+	sum := mhssteplog.Summarize(steps, req.Outcome, mhssteplog.Context{
+		UnitID:          rec.UnitID,
+		DeviceID:        rec.DeviceID,
+		SWVersion:       str("swVersion"),
+		DeliveryVersion: str("deliveryVersion"),
+		DownloadMode:    str("downloadMode"),
+	})
+	rec.Summary = &sum
 	if note := models.ClipRunes(strings.TrimSpace(req.Note), deviceTestMaxNotes); note != "" {
 		rec.ProblemReports = []models.MHSDeviceTestReport{{At: now, Note: note}}
 	}

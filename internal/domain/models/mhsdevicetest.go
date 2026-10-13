@@ -294,6 +294,13 @@ type MHSDeviceTest struct {
 	PlayerPrefsBytesAtLaunch int64 `bson:"playerprefs_bytes_at_launch,omitempty" json:"playerprefs_bytes_at_launch,omitempty"`
 	// Cumulative time the page saw the device offline this session.
 	OfflineMs int64 `bson:"offline_ms,omitempty" json:"offline_ms,omitempty"`
+
+	// Summary is what the step log says, read once when a member record is
+	// stored (internal/app/system/mhssteplog): per-unit download facts,
+	// launch events and crashes with their own times. Reports read it
+	// instead of the steps; older records have none until a backfill stamps
+	// it. Device-test runs do not carry one.
+	Summary *MHSMemberSummary `bson:"summary,omitempty" json:"summary,omitempty"`
 }
 
 // LoggingProblem reports whether this launch shows the game's logging
@@ -344,4 +351,114 @@ func (t *MHSDeviceTest) StoppedResponding(now time.Time) bool {
 		return false // only the game page beats; silence elsewhere is not a crash
 	}
 	return now.Sub(*t.LastHeartbeatAt) > MHSDeviceTestHeartbeatGrace
+}
+
+// MHSMemberSummaryVersion is bumped when Summarize's reading of the step log
+// changes in a way that should make a backfill re-stamp stored records.
+const MHSMemberSummaryVersion = 1
+
+// MHSMemberSummary is a member record's step log read as facts (see
+// MHSDeviceTest.Summary). Times are the entries' own wall clock, so a
+// consumer can place each fact on the day it happened even when the record
+// was stored after midnight.
+type MHSMemberSummary struct {
+	V       int       `bson:"v" json:"v"`
+	Outcome string    `bson:"outcome" json:"outcome"`
+	FirstAt time.Time `bson:"first_at" json:"first_at"`
+	LastAt  time.Time `bson:"last_at" json:"last_at"`
+	Steps   int       `bson:"steps" json:"steps"`
+
+	Units   []MHSStepUnitSummary `bson:"units,omitempty" json:"units,omitempty"`
+	Launch  []MHSStepLaunchEvent `bson:"launch,omitempty" json:"launch,omitempty"`
+	Crashes []MHSStepCrash       `bson:"crashes,omitempty" json:"crashes,omitempty"`
+	Storage *MHSStepStorage      `bson:"storage,omitempty" json:"storage,omitempty"`
+
+	// From the page's log context.
+	DeviceID        string `bson:"device_id,omitempty" json:"device_id,omitempty"`
+	SWVersion       string `bson:"sw_version,omitempty" json:"sw_version,omitempty"`
+	DeliveryVersion string `bson:"delivery_version,omitempty" json:"delivery_version,omitempty"`
+	DownloadMode    string `bson:"download_mode,omitempty" json:"download_mode,omitempty"`
+}
+
+// MHSStepUnitSummary is one unit's download as the log tells it: how far it
+// got, how often the connection dropped, whether it finished, and whether it
+// was held near the end (a scanning web filter that withholds the tail of a
+// large file until its scan finishes looks like this: the last progress line
+// sits within HoldTailMB of the total, the connection drops and resumes at
+// that same point, and nothing arrives).
+type MHSStepUnitSummary struct {
+	Unit    string `bson:"unit" json:"unit"`
+	Title   string `bson:"title,omitempty" json:"title,omitempty"`
+	Version string `bson:"version,omitempty" json:"version,omitempty"`
+
+	FirstAt time.Time `bson:"first_at" json:"first_at"`
+	LastAt  time.Time `bson:"last_at" json:"last_at"`
+
+	Requested bool `bson:"requested,omitempty" json:"requested,omitempty"` // a "Requesting …" line was seen
+	Cached    bool `bson:"cached,omitempty" json:"cached,omitempty"`       // already on the device; nothing was downloaded
+	TotalMB   int  `bson:"total_mb,omitempty" json:"total_mb,omitempty"`
+	MaxMB     int  `bson:"max_mb,omitempty" json:"max_mb,omitempty"` // furthest progress seen
+	Progress  int  `bson:"progress,omitempty" json:"progress,omitempty"`
+	Drops     int  `bson:"drops,omitempty" json:"drops,omitempty"`     // dropped connections (the page's own count)
+	Stalls    int  `bson:"stalls,omitempty" json:"stalls,omitempty"`   // "no data received … restarting" lines
+	Retries   int  `bson:"retries,omitempty" json:"retries,omitempty"` // "Retrying in N s (attempt N)" lines
+	Fails     int  `bson:"fails,omitempty" json:"fails,omitempty"`
+
+	LastErrorClass string `bson:"last_error_class,omitempty" json:"last_error_class,omitempty"`
+	LastErrorText  string `bson:"last_error_text,omitempty" json:"last_error_text,omitempty"`
+	LastPath       string `bson:"last_path,omitempty" json:"last_path,omitempty"` // fallback | background
+
+	Complete        bool       `bson:"complete,omitempty" json:"complete,omitempty"`
+	CompleteAt      *time.Time `bson:"complete_at,omitempty" json:"complete_at,omitempty"`
+	CompleteMB      int        `bson:"complete_mb,omitempty" json:"complete_mb,omitempty"`
+	CompleteSeconds int        `bson:"complete_s,omitempty" json:"complete_s,omitempty"`
+	CompleteMBps    float64    `bson:"complete_mbps,omitempty" json:"complete_mbps,omitempty"`
+
+	Held           bool       `bson:"held,omitempty" json:"held,omitempty"`
+	HeldAtMB       int        `bson:"held_at_mb,omitempty" json:"held_at_mb,omitempty"`
+	HeldAt         *time.Time `bson:"held_at,omitempty" json:"held_at,omitempty"` // the last progress before the hold
+	HoldSeconds    int        `bson:"hold_s,omitempty" json:"hold_s,omitempty"`   // hold → complete, when it completed in this log
+	BgfetchRefused bool       `bson:"bgfetch_refused,omitempty" json:"bgfetch_refused,omitempty"`
+	BgfetchFrozen  bool       `bson:"bgfetch_frozen,omitempty" json:"bgfetch_frozen,omitempty"`
+}
+
+// Launch event kinds (MHSStepLaunchEvent.Kind).
+const (
+	MHSLaunchEventLoaderOK     = "loader_ok"
+	MHSLaunchEventLoaderFail   = "loader_fail"
+	MHSLaunchEventUnityOK      = "unity_ok"
+	MHSLaunchEventUnityFail    = "unity_fail"
+	MHSLaunchEventWatchdogWarn = "watchdog_warn" // no loader progress for 30 s
+	MHSLaunchEventWatchdogFail = "watchdog_fail" // still none at 90 s
+	MHSLaunchEventRendering    = "rendering"     // the game's first frame
+)
+
+// MHSStepLaunchEvent is one launch milestone or problem from the play page.
+type MHSStepLaunchEvent struct {
+	At      time.Time `bson:"at" json:"at"`
+	Kind    string    `bson:"kind" json:"kind"`
+	Unit    string    `bson:"unit,omitempty" json:"unit,omitempty"`
+	Seconds float64   `bson:"seconds,omitempty" json:"seconds,omitempty"` // unity_ok: start time; watchdog: idle time
+	Source  string    `bson:"source,omitempty" json:"source,omitempty"`   // loader_ok: cache | network
+	Phase   string    `bson:"phase,omitempty" json:"phase,omitempty"`     // watchdog: what the page was doing
+	Reason  string    `bson:"reason,omitempty" json:"reason,omitempty"`   // failures
+}
+
+// MHSStepCrash is one "Crash (…)" entry. Notice marks the browser notices
+// (pointer lock, fullscreen, audio) that the game survives.
+type MHSStepCrash struct {
+	At      time.Time `bson:"at" json:"at"`
+	Type    string    `bson:"type" json:"type"`
+	Phase   string    `bson:"phase,omitempty" json:"phase,omitempty"`
+	Unit    string    `bson:"unit,omitempty" json:"unit,omitempty"`
+	Notice  bool      `bson:"notice,omitempty" json:"notice,omitempty"`
+	Message string    `bson:"message,omitempty" json:"message,omitempty"`
+}
+
+// MHSStepStorage is the latest "Storage: …" line.
+type MHSStepStorage struct {
+	At        time.Time `bson:"at" json:"at"`
+	UsedMB    int       `bson:"used_mb,omitempty" json:"used_mb,omitempty"`
+	QuotaMB   int       `bson:"quota_mb,omitempty" json:"quota_mb,omitempty"`
+	Persisted *bool     `bson:"persisted,omitempty" json:"persisted,omitempty"`
 }

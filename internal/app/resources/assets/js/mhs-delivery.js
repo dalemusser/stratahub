@@ -494,7 +494,7 @@
     this._cachedNoted[unit.id] = true;
     var title = unit.title || unit.id;
     this._step('method', 'info', 'Not needed — ' + title + ' is already on this device');
-    this._step('download', 'ok', title + ': already on this device (downloaded earlier)');
+    this._step('download', 'ok', title + ': already on this device (downloaded earlier)', { unit: unit.id, cached: '1' });
     await this._verifyForLog(unit.id);
     // Soft: the unit can be played without the content server, so an
     // unreachable one is a warning here, not the failure a download gets.
@@ -900,7 +900,8 @@
     var pending = { kind: kind, dueAt: Date.now() + delayS * 1000, attempt: attempt, base: base, timer: null, tick: null };
     this._pendingRetries[unitId] = pending;
     this._step('download', 'warn', (base.error || 'Download interrupted.') + ' Retrying ' +
-      (delayS > 0 ? 'in ' + delayS + ' s' : 'now') + ' (attempt ' + attempt + ')');
+      (delayS > 0 ? 'in ' + delayS + ' s' : 'now') + ' (attempt ' + attempt + ')',
+      { unit: unitId, attempt: attempt, in_s: delayS, error_class: base.errorClass || '', path: base.path || '' });
 
     function announce(remainingMs) {
       var d = {};
@@ -1073,7 +1074,8 @@
         (persisted === null ? '' : ' · persisted: ' + (persisted ? 'yes' : 'no'));
       this._logContext('storage', text);
       this._step('storage', persisted === false ? 'warn' : 'ok', 'Storage: ' + text +
-        (persisted === false ? ' — the browser may evict downloads under pressure' : ''));
+        (persisted === false ? ' — the browser may evict downloads under pressure' : ''),
+        { used_mb: fmtMB(est.usage), quota_mb: fmtMB(est.quota), persisted: persisted === null ? '' : (persisted ? 'yes' : 'no') });
     } catch (e) { /* ignore */ }
   };
 
@@ -1117,15 +1119,15 @@
           var drops = detail.drops || 0;
           if (drops <= 3 || drops % 5 === 0) {
             this._step('download', 'info', title + ': picked up at ' + fmtMB(detail.resumedFrom) + ' MB after a dropped connection' +
-              (drops > 1 ? ' (' + drops + ' drops so far)' : ''));
+              (drops > 1 ? ' (' + drops + ' drops so far)' : ''), { unit: unitId, resumed_mb: fmtMB(detail.resumedFrom), drops: drops || 1 });
           }
         }
-        if (detail.note) { this._step('download', 'warn', detail.note); return; }
+        if (detail.note) { this._step('download', 'warn', detail.note, { unit: unitId, note: '1' }); return; }
         if (detail.waitingMs >= 5000) {
           var wmsg = 'No data for ' + Math.round(detail.waitingMs / 1000) + ' s';
           if (typeof detail.switchInMs === 'number') wmsg += ' — switching to the direct download in ' + Math.round(detail.switchInMs / 1000) + ' s';
           else if (typeof detail.resumeInMs === 'number') wmsg += ' — restarting in ' + Math.round(detail.resumeInMs / 1000) + ' s';
-          this._step('download', 'warn', wmsg);
+          this._step('download', 'warn', wmsg, { unit: unitId, waiting_s: Math.round(detail.waitingMs / 1000) });
           return;
         }
         if (typeof detail.downloaded !== 'number') return;
@@ -1134,29 +1136,32 @@
         var pct = detail.percent || 0;
         var bucket = Math.floor(pct / 10);
         if (sample && now - sample.at < 5000 && bucket === sample.bucket) return;
-        var rate = '';
+        var rate = '', mbps = '';
         if (sample && detail.downloaded > sample.bytes && now > sample.at) {
           var bps = (detail.downloaded - sample.bytes) / ((now - sample.at) / 1000);
-          rate = ' · ' + (bps / 1048576).toFixed(1) + ' MB/s';
+          mbps = (bps / 1048576).toFixed(1);
+          rate = ' · ' + mbps + ' MB/s';
           if (detail.downloadTotal && bps > 0) {
             rate += ' · ' + fmtDuration(((detail.downloadTotal - detail.downloaded) / bps) * 1000) + ' left';
           }
         }
         this._logSamples[unitId] = { at: now, bytes: detail.downloaded, bucket: bucket };
         this._step('download', 'running', title + ': ' + pct + '% · ' + fmtMB(detail.downloaded) + ' of ' +
-          fmtMB(detail.downloadTotal) + ' MB' + rate);
+          fmtMB(detail.downloadTotal) + ' MB' + rate,
+          { unit: unitId, mb: fmtMB(detail.downloaded), total_mb: fmtMB(detail.downloadTotal), pct: pct, mbps: mbps });
         return;
       }
       case 'stalled':
         this._step('download', 'warn', title + ': no data received for ' + Math.round((detail.quietMs || 0) / 1000) +
-          ' s — restarting the download');
+          ' s — restarting the download', { unit: unitId, quiet_s: Math.round((detail.quietMs || 0) / 1000) });
         return;
       case 'retrying':
         return;
       case 'error':
         this._step('download', 'fail', title + ': ' + (detail.error || 'Download failed') +
           (detail.errorClass ? ' [' + detail.errorClass + (detail.failureReason ? ':' + detail.failureReason : '') + ']' : '') +
-          (detail.rawError ? ' — ' + detail.rawError : ''), { path: detail.path || '' });
+          (detail.rawError ? ' — ' + detail.rawError : ''),
+          { path: detail.path || '', unit: unitId, version: unit ? unit.version : '', error_class: detail.errorClass || '', reason: detail.failureReason || '' });
         this.reportStepLog('download-failed', unitId, unit ? unit.version : '', { minGapMs: 10 * 60 * 1000 });
         return;
       case 'cached': {
@@ -1172,12 +1177,18 @@
         var total = unit ? (unit.totalSize || 0) : 0;
         var took = st ? Date.now() - st.startedAt : 0;
         var msg = title + ': download complete';
-        if (total) msg += ' — ' + fmtMB(total) + ' MB';
+        var done = { unit: unitId, version: unit ? unit.version : '' };
+        if (total) { msg += ' — ' + fmtMB(total) + ' MB'; done.mb = fmtMB(total); }
         if (took > 0) {
           msg += ' in ' + fmtDuration(took);
-          if (total) msg += ' (' + ((total / 1048576) / (took / 1000)).toFixed(1) + ' MB/s)';
+          done.seconds = Math.round(took / 1000);
+          if (total) {
+            var mbpsDone = ((total / 1048576) / (took / 1000)).toFixed(1);
+            msg += ' (' + mbpsDone + ' MB/s)';
+            done.mbps = mbpsDone;
+          }
         }
-        this._step('download', 'ok', msg);
+        this._step('download', 'ok', msg, done);
         var mgr = this;
         this._verifyForLog(unitId).catch(function() {}).then(function() {
           mgr.reportStepLog('download-complete', unitId, unit ? unit.version : '');
@@ -1565,8 +1576,10 @@
         // The switch is an event worth counting: the step carries the device
         // state at that moment, the download-error telemetry makes it visible
         // in the server log, and member pages store a load record for it.
+        var frozenDetail = { kind: 'bgfetch-frozen', unit: unitId, quiet_s: Math.round(quietMs / 1000), mb: fmtMB(frozenAt) };
+        for (var sk in switchCtx) frozenDetail[sk] = switchCtx[sk];
         this._step('method', 'warn', 'Background download stopped receiving data for ' + Math.round(quietMs / 1000) +
-          ' s — switched to the direct download (keep this tab open)', switchCtx);
+          ' s — switched to the direct download (keep this tab open)', frozenDetail);
         this._reportDownloadError(unitId, {
           errorClass: 'bgfetch-frozen', path: 'background', version: unit.version,
           error: 'Background download silent for ' + Math.round(quietMs / 1000) + ' s at ' + fmtMB(frozenAt) + ' MB; switched to direct',
@@ -1981,7 +1994,8 @@
     if (lateManifest) this.checkAllCacheStatus().catch(function() {});
 
     var totalSize = unit.totalSize || unit.files.reduce(function(sum, f) { return sum + f.size; }, 0);
-    this._step('download', 'running', 'Requesting ' + unit.title + ' v' + unit.version + ' (' + fmtMB(totalSize) + ' MB)');
+    this._step('download', 'running', 'Requesting ' + unit.title + ' v' + unit.version + ' (' + fmtMB(totalSize) + ' MB)',
+      { unit: unitId, version: unit.version, total_mb: fmtMB(totalSize) });
     this._fireStatus(unitId, 'downloading', { percent: 0, downloaded: 0, downloadTotal: totalSize });
 
     try {
@@ -2360,7 +2374,7 @@
     this._logContext('downloadMode', 'direct');
     var reason = detail.reason || 'no reason given';
     this._step('method', 'warn', 'The browser refused the background download (' + reason +
-      ') — using the direct download; keep this tab open');
+      ') — using the direct download; keep this tab open', { unit: unitId, kind: 'bgfetch-refused', reason: reason });
     this._reportDownloadError(unitId, {
       errorClass: 'bgfetch-refused',
       path: 'background',

@@ -1020,7 +1020,7 @@
         if (crashReported) return;
         crashReported = true;
         stepLog.record('game', 'fail', 'Crash (' + (type || 'unknown') + ', ' + (phase || crashPhase) + '): ' +
-          String(message || '').slice(0, 200));
+          String(message || '').slice(0, 200), { type: type || 'unknown', phase: phase || crashPhase, unit: unitId });
         if ((phase || crashPhase) !== 'running') showStepLogOnFailure();
         {{ if .DeviceTest }}deviceTestSummary({ crash: true });{{ end }}
         memberReport('crash');
@@ -1570,7 +1570,8 @@
         if (!watchdogWarned && idle >= WATCHDOG_WARN_MS) {
           watchdogWarned = true;
           probeLoader().then(function(probe) {
-            stepLog.record('launch', 'warn', 'No progress for ' + Math.round(idle / 1000) + ' s while ' + phaseText() + ' — ' + probe);
+            stepLog.record('launch', 'warn', 'No progress for ' + Math.round(idle / 1000) + ' s while ' + phaseText() + ' — ' + probe,
+              { idle_s: Math.round(idle / 1000), phase: launchPhase, unit: unitId });
             if (loadingHint) loadingHint.textContent = 'This is taking longer than usual. The page will try another way if it does not move soon. ' + resetAdvice();
             showStepLogOnFailure();
             memberReport('launch-stalled');
@@ -1583,7 +1584,8 @@
           if (loadingHint) loadingHint.textContent = 'The game is not loading on this device. ' + resetAdvice();
           loadingBar.style.background = '#ef4444';
           stepLog.record('launch', 'fail', 'Still no progress after ' + Math.round(idle / 1000) + ' s — stuck ' + phaseText() +
-            (fallbackStarted ? ', even straight from the content server' : '') + '. The game files are not reaching the page on this device.');
+            (fallbackStarted ? ', even straight from the content server' : '') + '. The game files are not reaching the page on this device.',
+            { idle_s: Math.round(idle / 1000), phase: launchPhase, fallback: fallbackStarted ? '1' : '0', unit: unitId });
           showStepLogOnFailure();
           memberReport('launch-failed');
           reportCrash('load_stalled', 'No launch progress after ' + Math.round(idle / 1000) + ' s: ' + phaseText(), '', crashPhase);
@@ -1600,7 +1602,9 @@
         launchProgress('starting');
         loadingText.textContent = 'Starting Unity...';
         crashPhase = 'compiling';
-        stepLog.record('launch', 'ok', 'Game loader loaded' + loaderSource());
+        var loaderFrom = loaderSource();
+        stepLog.record('launch', 'ok', 'Game loader loaded' + loaderFrom,
+          { source: /downloaded files/.test(loaderFrom) ? 'cache' : (/network/.test(loaderFrom) ? 'network' : ''), unit: unitId });
         stepLog.record('launch', 'running', 'Starting Unity…');
         {{ if .DeviceTest }}deviceTestLoaderMs = Date.now() - launchStartedAt;{{ end }}
 
@@ -1647,7 +1651,8 @@
           canvas = instance.Module.canvas;
           loadingOverlay.classList.add('hidden');
           onResize();
-          stepLog.record('launch', 'ok', 'Unity started in ' + ((Date.now() - launchStartedAt) / 1000).toFixed(1) + ' s');
+          stepLog.record('launch', 'ok', 'Unity started in ' + ((Date.now() - launchStartedAt) / 1000).toFixed(1) + ' s',
+            { unity_s: ((Date.now() - launchStartedAt) / 1000).toFixed(1), unit: unitId });
 
           // Tell MHSBridge this is PWA mode — game will use mhsUnitComplete callback.
           // Pass identity JSON for new builds; old builds ignore the parameter.
@@ -1658,7 +1663,7 @@
           stepLog.record('game', 'running', 'Game running — identity sent to the game');
           requestAnimationFrame(function() {
             requestAnimationFrame(function() {
-              stepLog.record('game', 'ok', 'Game is rendering');
+              stepLog.record('game', 'ok', 'Game is rendering', { unit: unitId });
               memberReport('launch-ok');
               {{ if .DeviceTest }}
               deviceTestSummary({
@@ -1672,7 +1677,7 @@
         }).catch(function(err) {
           stopWatchdog();
           loadingText.textContent = 'Error: ' + err.message;
-          stepLog.record('launch', 'fail', 'Unity failed to start: ' + err.message);
+          stepLog.record('launch', 'fail', 'Unity failed to start: ' + err.message, { reason: String(err.message || '').slice(0, 200), unit: unitId });
           showStepLogOnFailure();
           memberReport('launch-failed');
           loadingBar.style.width = '100%';
@@ -1685,7 +1690,7 @@
         if (this !== activeScript) return;
         stopWatchdog();
         loadingText.textContent = 'Failed to load game. Is this unit downloaded?';
-        stepLog.record('launch', 'fail', 'The game loader failed to load — the unit may not be downloaded, or the content server is unreachable');
+        stepLog.record('launch', 'fail', 'The game loader failed to load — the unit may not be downloaded, or the content server is unreachable', { reason: 'loader-script-error', unit: unitId });
         showStepLogOnFailure();
         memberReport('launch-failed');
         loadingBar.style.width = '100%';
