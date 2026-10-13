@@ -196,6 +196,14 @@ has no CloudFront rights — the console is how CDN changes get made.
 
 ### 6.1 Why is Background Fetch refused on managed student Chromebooks?
 
+**Answered 2026-10-13:** it is universal, not district policy. Chrome 149 restricts
+`backgroundFetch.fetch()` from service worker contexts (policy
+`RestrictBackgroundFetchFromServiceWorkerEnabled`, default on, removed after Chrome 152,
+so permanent from 153); every Chrome 149–155 device at every school refused it in the
+2026-10-07 to 09 window, and the direct path carried every download. Details and the
+pending retire-or-move decision: `mhs-background-fetch-refused-101326.md`. The text
+below is the question as first asked.
+
 Count and read the reasons once a school day has passed:
 `journalctl -u stratahub … | grep "mhs download error" | grep bgfetch-refused` — the
 `message` field carries the browser's rejection text; group by user agent. Hypotheses:
