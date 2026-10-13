@@ -177,7 +177,8 @@
         <td class="px-3 py-2 whitespace-nowrap text-xs">{{ .CurrentUnit }}</td>
         <td class="px-3 py-2 whitespace-nowrap text-xs">{{ .LastSeen }}</td>
         <td class="px-2 py-2 whitespace-nowrap text-xs">
-          {{ if .DashboardHref }}<a href="{{ .DashboardHref }}" class="text-indigo-600 dark:text-indigo-400 hover:underline">Dashboard</a>{{ end }}
+          {{ if .TimelineHref }}<a href="{{ .TimelineHref }}" class="text-indigo-600 dark:text-indigo-400 hover:underline" title="This student's step log for the day, every device merged">Timeline</a>{{ end }}
+          {{ if .DashboardHref }} · <a href="{{ .DashboardHref }}" class="text-indigo-600 dark:text-indigo-400 hover:underline">Dashboard</a>{{ end }}
           {{ if .DeviceTestsHref }} · <a href="{{ .DeviceTestsHref }}" class="text-indigo-600 dark:text-indigo-400 hover:underline">Records</a>{{ end }}
         </td>
       </tr>

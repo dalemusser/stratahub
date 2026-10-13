@@ -124,6 +124,7 @@ type StudentRow struct {
 	Pills           []Pill
 	DashboardHref   string
 	DeviceTestsHref string
+	TimelineHref    string // the student's step log for the row's last day
 	Partial         bool
 }
 
@@ -436,6 +437,7 @@ func studentRows(ds []models.MHSActivityDay, lk Lookups, loc *time.Location, sta
 			}
 		}
 		row.Blocked = row.Blocked && !row.Played // see aggregate: never got in during the window
+		row.TimelineHref = "/mhsactivity/student/" + id.Hex() + "/day/" + uds[len(uds)-1].Day
 		row.Devices = len(devices)
 		row.Platforms = platformsOf(uds)
 		names := make([]string, 0, len(groupNames))

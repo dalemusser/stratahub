@@ -85,6 +85,7 @@ func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 		g.Get("/school/{orgID}", h.ServeSchool)
 		g.Get("/schools.csv", h.ServeSchoolsCSV)
 		g.Get("/students.csv", h.ServeStudentsCSV)
+		g.Get("/student/{userID}/day/{day}", h.ServeStudentDay)
 	})
 	r.Group(func(a chi.Router) {
 		a.Use(sm.RequireSignedIn)

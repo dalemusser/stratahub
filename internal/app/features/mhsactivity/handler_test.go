@@ -1,6 +1,7 @@
 package mhsactivity
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -16,6 +17,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/stratahub/internal/testutil"
 	"github.com/dalemusser/waffle/pantry/templates"
+	"github.com/go-chi/chi/v5"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
@@ -327,4 +329,80 @@ func TestCSVExports(t *testing.T) {
 	if !strings.Contains(rec.Body.String(), "/views/device-tests?kind=member&amp;when=30d&amp;user="+fx.student.ID.Hex()) {
 		t.Error("admin school view lacks the record link")
 	}
+}
+
+func TestStudentDayTimeline(t *testing.T) {
+	fx := setup(t)
+	ctx, cancel := testutil.TestContext()
+	defer cancel()
+	// A second record from the same tab repeats the first's entries (and one
+	// of them moved by the page's repeat collapsing) and adds a launch.
+	sid := fx.student.ID
+	at := time.Date(2026, 10, 12, 17, 20, 0, 0, time.UTC)
+	first := []models.MHSDeviceTestStep{
+		{At: at.Add(-10 * time.Minute), Step: "page", State: "info", Msg: "Opened the units page"},
+		{At: at.Add(-9 * time.Minute), Step: "download", State: "running", Msg: "Requesting Unit 1: Water Cycle v2.8.1 (213 MB)", Detail: map[string]string{"unit": "unit1", "total_mb": "213"}},
+	}
+	rec1 := models.MHSDeviceTest{ID: primitive.NewObjectID(), WorkspaceID: fx.ws, Kind: models.MHSDeviceTestKindMember, UserID: &sid, OrganizationID: &fx.orgA,
+		UnitID: "unit1", DeviceID: "dev-1", StartedAt: at.Add(-8 * time.Minute), ExpiresAt: at.Add(6 * time.Hour), Diagnostics: map[string]interface{}{"outcome": "download-complete"}, Steps: append(first, models.MHSDeviceTestStep{At: at.Add(-8 * time.Minute), Step: "download", State: "ok", Msg: "Unit 1: Water Cycle: download complete — 213 MB in 0:22 (9.7 MB/s)"})}
+	rec2 := models.MHSDeviceTest{ID: primitive.NewObjectID(), WorkspaceID: fx.ws, Kind: models.MHSDeviceTestKindMember, UserID: &sid, OrganizationID: &fx.orgA,
+		UnitID: "unit1", DeviceID: "dev-1", StartedAt: at, ExpiresAt: at.Add(6 * time.Hour), Diagnostics: map[string]interface{}{"outcome": "launch-ok"}, Steps: append(append([]models.MHSDeviceTestStep{}, rec1.Steps...), models.MHSDeviceTestStep{At: at, Step: "game", State: "ok", Msg: "Game is rendering"})}
+	for _, rec := range []models.MHSDeviceTest{rec1, rec2} {
+		if _, err := fx.db.Collection("mhs_device_tests").InsertOne(ctx, rec); err != nil {
+			t.Fatal(err)
+		}
+	}
+	req := testutil.NewAuthenticatedRequest(http.MethodGet, "/mhsactivity/student/"+sid.Hex()+"/day/2026-10-12", testutil.AdminUser())
+	req.Host = "mhs.example.com"
+	req = workspace.WithTestWorkspace(req, fx.ws, "mhs", "MHS")
+	req = withRouteParams(req, map[string]string{"userID": sid.Hex(), "day": "2026-10-12"})
+	rec := httptest.NewRecorder()
+	fx.h.ServeStudentDay(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("status %d: %s", rec.Code, rec.Body.String()[:min(400, rec.Body.Len())])
+	}
+	body := rec.Body.String()
+	// The fixture's own launch-ok record (setup) has no steps; these two add
+	// four distinct entries, each once, in time order, with the detail shown.
+	for _, want := range []string{"Ada Student", "3 load records", "Opened the units page", "Requesting Unit 1", "download complete", "Game is rendering", "total_mb=213", "12:10:00 PM", "…dev-1"} {
+		if !strings.Contains(body, want) {
+			t.Errorf("timeline lacks %q", want)
+		}
+	}
+	if n := strings.Count(body, "Requesting Unit 1"); n != 1 {
+		t.Errorf("the repeated entry appears %d times", n)
+	}
+	if strings.Index(body, "Opened the units page") > strings.Index(body, "Game is rendering") {
+		t.Error("entries out of time order")
+	}
+	// A coordinator for another school may not see it.
+	co := &auth.SessionUser{ID: primitive.NewObjectID().Hex(), Name: "Co", LoginID: "co@example.com", Role: "coordinator", OrganizationIDs: []string{fx.orgB.Hex()}}
+	coID, _ := primitive.ObjectIDFromHex(co.ID)
+	if _, err := fx.db.Collection("coordinator_assignments").InsertOne(ctx, bson.M{"user_id": coID, "organization_id": fx.orgB, "created_at": time.Now()}); err != nil {
+		t.Fatal(err)
+	}
+	req = httptest.NewRequest(http.MethodGet, "/mhsactivity/student/"+sid.Hex()+"/day/2026-10-12", nil)
+	req.Host = "mhs.example.com"
+	req = auth.WithTestUser(req, co)
+	req = workspace.WithTestWorkspace(req, fx.ws, "mhs", "MHS")
+	req = withRouteParams(req, map[string]string{"userID": sid.Hex(), "day": "2026-10-12"})
+	rec = httptest.NewRecorder()
+	fx.h.ServeStudentDay(rec, req)
+	if rec.Code != http.StatusForbidden {
+		t.Errorf("coordinator outside scope: status %d", rec.Code)
+	}
+	// The school view links to it.
+	rec = fx.get(t, "/mhsactivity?org="+fx.orgA.Hex(), testutil.AdminUser())
+	if !strings.Contains(rec.Body.String(), "/mhsactivity/student/"+sid.Hex()+"/day/2026-10-12") {
+		t.Error("school view lacks the timeline link")
+	}
+}
+
+// withRouteParams sets several chi URL parameters on one request.
+func withRouteParams(req *http.Request, params map[string]string) *http.Request {
+	rctx := chi.NewRouteContext()
+	for k, v := range params {
+		rctx.URLParams.Add(k, v)
+	}
+	return req.WithContext(context.WithValue(req.Context(), chi.RouteCtxKey, rctx))
 }

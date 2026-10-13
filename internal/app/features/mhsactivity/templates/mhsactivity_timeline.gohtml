@@ -1,0 +1,47 @@
+{{ define "mhsactivity_timeline" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+  <div>
+    <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📡 {{ .Name }}</h1>
+    <div class="text-sm text-gray-600 dark:text-gray-400">{{ .OrgName }} · {{ .DayLabel }} · {{ .TZ }} · {{ .Records }} load records{{ if .Devices }} · devices {{ range $i, $d := .Devices }}{{ if $i }}, {{ end }}…{{ $d }}{{ end }}{{ end }}</div>
+  </div>
+  <div class="text-sm flex items-center gap-3">
+    <a href="/mhsactivity/student/{{ .UserIDHex }}/day/{{ .Prev }}" class="text-indigo-600 dark:text-indigo-400 hover:underline" title="The day before">← {{ .Prev }}</a>
+    <a href="/mhsactivity/student/{{ .UserIDHex }}/day/{{ .Next }}" class="text-indigo-600 dark:text-indigo-400 hover:underline" title="The day after">{{ .Next }} →</a>
+    {{ if .RecordsHref }}<a href="{{ .RecordsHref }}" class="text-indigo-600 dark:text-indigo-400 hover:underline">Records</a>{{ end }}
+    <a href="{{ .BackHref }}" class="text-indigo-600 dark:text-indigo-400 hover:underline">← Activity</a>
+  </div>
+</div>
+
+<div class="bg-white dark:bg-gray-800 rounded shadow overflow-auto">
+  {{ if not .Entries }}
+  <div class="p-4 text-sm text-gray-500 dark:text-gray-400">No load records carry entries for this day.</div>
+  {{ else }}
+  <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+    <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs sticky top-0">
+      <tr class="border-b border-gray-300 dark:border-gray-600">
+        <th class="px-3 py-2 whitespace-nowrap">Time</th>
+        <th class="px-3 py-2 whitespace-nowrap" title="The browser profile the entry came from">Device</th>
+        <th class="px-3 py-2 whitespace-nowrap">Step</th>
+        <th class="px-3 py-2 whitespace-nowrap">State</th>
+        <th class="px-3 py-2">What happened</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range .Entries }}
+      <tr class="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 align-top">
+        <td class="px-3 py-1.5 whitespace-nowrap font-mono text-xs">{{ .Time }}</td>
+        <td class="px-3 py-1.5 whitespace-nowrap font-mono text-xs text-gray-500 dark:text-gray-400">…{{ .Device }}</td>
+        <td class="px-3 py-1.5 whitespace-nowrap text-xs">{{ .Step }}</td>
+        <td class="px-3 py-1.5 whitespace-nowrap"><span class="{{ .Class }}">{{ .State }}</span></td>
+        <td class="px-3 py-1.5">{{ .Msg }}{{ if .Detail }}<div class="text-xs text-gray-400 dark:text-gray-500 font-mono">{{ .Detail }}</div>{{ end }}</td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+  {{ end }}
+</div>
+{{ end }}
