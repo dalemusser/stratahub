@@ -1,0 +1,222 @@
+{{/* mhsactivity_pills: a list of status markers; the text carries the meaning. */}}
+{{ define "mhsactivity_pills" }}{{ range . }}<span class="{{ .Class }}" {{ if .Title }}title="{{ .Title }}"{{ end }}>{{ .Text }}</span>{{ end }}{{ end }}
+
+{{/* mhsactivity_summary: the strip of totals for the window. */}}
+{{ define "mhsactivity_summary" }}
+{{ with .Report }}
+<div class="grid gap-3 grid-cols-2 md:grid-cols-3 xl:grid-cols-6 mb-4 text-sm">
+  <div class="bg-white dark:bg-gray-800 rounded shadow p-3">
+    <div class="text-xs uppercase text-gray-500 dark:text-gray-400 mb-1">Students</div>
+    <div class="text-gray-900 dark:text-gray-100"><span class="text-2xl font-semibold">{{ .Summary.Opened }}</span> opened</div>
+    <div class="text-gray-700 dark:text-gray-300">{{ .Summary.Played }} played{{ if .Summary.Blocked }} · <span class="text-amber-700 dark:text-amber-300 font-medium">{{ .Summary.Blocked }} blocked</span>{{ end }}</div>
+  </div>
+  <div class="bg-white dark:bg-gray-800 rounded shadow p-3">
+    <div class="text-xs uppercase text-gray-500 dark:text-gray-400 mb-1">Downloads</div>
+    <div class="text-gray-900 dark:text-gray-100"><span class="text-2xl font-semibold">{{ .Summary.DlComplete }}</span> done</div>
+    <div class="text-gray-700 dark:text-gray-300">
+      {{ if .Summary.DlHeldDone }}{{ .Summary.DlHeldDone }} held then done · {{ end }}
+      {{ if .Summary.DlHeld }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .Summary.DlHeld }} held</span> · {{ end }}
+      {{ if .Summary.DlFailed }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .Summary.DlFailed }} failed</span>{{ else }}0 failed{{ end }}
+      {{ if .Summary.DlInProgress }} · {{ .Summary.DlInProgress }} unfinished{{ end }}
+    </div>
+  </div>
+  <div class="bg-white dark:bg-gray-800 rounded shadow p-3">
+    <div class="text-xs uppercase text-gray-500 dark:text-gray-400 mb-1">Launches</div>
+    <div class="text-gray-900 dark:text-gray-100"><span class="text-2xl font-semibold">{{ .Summary.LaunchOK }}</span> started</div>
+    <div class="text-gray-700 dark:text-gray-300">{{ .Summary.LaunchStalled }} slow{{ if .Summary.LaunchRecovered }} ({{ .Summary.LaunchRecovered }} recovered){{ end }} · {{ if .Summary.LaunchFailed }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .Summary.LaunchFailed }} failed</span>{{ else }}0 failed{{ end }}</div>
+  </div>
+  <div class="bg-white dark:bg-gray-800 rounded shadow p-3">
+    <div class="text-xs uppercase text-gray-500 dark:text-gray-400 mb-1">Crash records</div>
+    <div class="text-gray-900 dark:text-gray-100"><span class="text-2xl font-semibold {{ if .Summary.CrashReal }}text-amber-700 dark:text-amber-300{{ end }}">{{ .Summary.CrashReal }}</span> real</div>
+    <div class="text-gray-700 dark:text-gray-300" title="Pointer-lock, fullscreen or audio refusals the game survives">{{ .Summary.CrashNotice }} browser notices</div>
+  </div>
+  <div class="bg-white dark:bg-gray-800 rounded shadow p-3">
+    <div class="text-xs uppercase text-gray-500 dark:text-gray-400 mb-1">Devices</div>
+    <div class="text-gray-900 dark:text-gray-100"><span class="text-2xl font-semibold">{{ .Summary.DevicesSeen }}</span> seen</div>
+    <div class="text-gray-700 dark:text-gray-300">{{ .Summary.DevicesNew }} new profiles · {{ .Summary.StudentDays }} student-days</div>
+  </div>
+  <div class="bg-white dark:bg-gray-800 rounded shadow p-3">
+    <div class="text-xs uppercase text-gray-500 dark:text-gray-400 mb-1">Schools</div>
+    <div class="text-gray-900 dark:text-gray-100"><span class="text-2xl font-semibold">{{ .SchoolsActive }}</span> active</div>
+    <div class="text-gray-700 dark:text-gray-300">{{ if .SchoolsWithProblems }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .SchoolsWithProblems }} with problems</span>{{ else }}none with problems{{ end }}{{ if .StaffLaunches }} · {{ .StaffLaunches }} staff launches{{ end }}</div>
+  </div>
+</div>
+{{ end }}
+{{ end }}
+
+{{/* mhsactivity_schools: one row per active organization. */}}
+{{ define "mhsactivity_schools" }}
+<div class="bg-white dark:bg-gray-800 rounded shadow overflow-auto mb-4">
+  {{ if not .Report.Schools }}
+  <div class="p-4 text-sm text-gray-500 dark:text-gray-400">No Mission HydroSci activity in this window.</div>
+  {{ else }}
+  <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+    <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs">
+      <tr class="border-b border-gray-300 dark:border-gray-600">
+        <th class="px-3 py-2">School</th>
+        <th class="px-3 py-2 whitespace-nowrap" title="Students who opened the units page / played the game / were blocked">Students opened · played · blocked</th>
+        <th class="px-3 py-2 whitespace-nowrap" title="Download episodes: done / held near the end / failed">Downloads done · held · failed</th>
+        <th class="px-3 py-2 whitespace-nowrap" title="Game launches: started / slow start (30 s watchdog) / failed">Launches ok · slow · failed</th>
+        <th class="px-3 py-2 whitespace-nowrap" title="Real crash records (browser notices in parentheses)">Crashes</th>
+        <th class="px-3 py-2 whitespace-nowrap" title="Distinct browser profiles / profiles first seen in the window">Devices seen · new</th>
+        <th class="px-3 py-2 whitespace-nowrap">Last activity</th>
+        <th class="px-2 py-2"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range .Report.Schools }}
+      <tr class="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 align-top">
+        <td class="px-3 py-2 min-w-[16rem] max-w-md">
+          <a href="{{ .Href }}&{{ $.WindowQuery }}" hx-get="{{ .Href }}&{{ $.WindowQuery }}" hx-target="#content" hx-push-url="true" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium whitespace-nowrap">{{ .Name }}</a>
+          <div class="text-xs text-gray-400 dark:text-gray-500">{{ .TZ }}{{ if .Platforms }} · {{ .Platforms }}{{ end }}</div>
+          {{ if .Pills }}<div class="mt-1 flex flex-wrap gap-1">{{ template "mhsactivity_pills" .Pills }}</div>{{ end }}
+        </td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ .Opened }} · {{ .Played }} · {{ if .Blocked }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .Blocked }}</span>{{ else }}0{{ end }}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ .DlComplete }}{{ if .DlHeldDone }} (+{{ .DlHeldDone }} after a hold){{ end }} · {{ if .DlHeld }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .DlHeld }}</span>{{ else }}0{{ end }} · {{ if .DlFailed }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .DlFailed }}</span>{{ else }}0{{ end }}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ .LaunchOK }} · {{ .LaunchStalled }} · {{ if .LaunchFailed }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .LaunchFailed }}</span>{{ else }}0{{ end }}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ if .CrashReal }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .CrashReal }}</span>{{ else }}0{{ end }}{{ if .CrashNotice }} <span class="text-gray-400 dark:text-gray-500">({{ .CrashNotice }})</span>{{ end }}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ .DevicesSeen }} · {{ .DevicesNew }}</td>
+        <td class="px-3 py-2 whitespace-nowrap text-xs">{{ .LastActivity }}</td>
+        <td class="px-2 py-2 whitespace-nowrap text-xs">{{ if .DashboardHref }}<a href="{{ .DashboardHref }}" class="text-indigo-600 dark:text-indigo-400 hover:underline" title="Open this school's first group in the MHS Dashboard">Dashboard</a>{{ end }}</td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+  {{ end }}
+</div>
+{{ end }}
+
+{{/* mhsactivity_school: the selected school's groups and students. */}}
+{{ define "mhsactivity_school" }}
+{{ with .Report.School }}
+<div class="flex items-center justify-between flex-wrap gap-2 mb-2">
+  <h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100">{{ .Name }} <span class="text-sm font-normal text-gray-500 dark:text-gray-400">{{ .TZ }}</span></h2>
+  <a href="/mhsactivity?{{ $.WindowQuery }}" hx-get="/mhsactivity?{{ $.WindowQuery }}" hx-target="#content" hx-push-url="true" class="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">← All schools</a>
+</div>
+
+<div class="bg-white dark:bg-gray-800 rounded shadow overflow-auto mb-4">
+  <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+    <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs">
+      <tr class="border-b border-gray-300 dark:border-gray-600">
+        <th class="px-3 py-2">Group</th>
+        <th class="px-3 py-2 whitespace-nowrap">Students opened · played · blocked</th>
+        <th class="px-3 py-2 whitespace-nowrap">Downloads done · held · failed</th>
+        <th class="px-3 py-2 whitespace-nowrap">Launches ok · slow · failed</th>
+        <th class="px-3 py-2 whitespace-nowrap">Crashes</th>
+        <th class="px-3 py-2 whitespace-nowrap">Devices seen · new</th>
+        <th class="px-2 py-2"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range .Groups }}
+      <tr class="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 align-top">
+        <td class="px-3 py-2 min-w-[14rem] max-w-md">
+          <span class="font-medium whitespace-nowrap">{{ .Name }}</span>
+          {{ if .Pills }}<div class="mt-1 flex flex-wrap gap-1">{{ template "mhsactivity_pills" .Pills }}</div>{{ end }}
+        </td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ .Opened }} · {{ .Played }} · {{ if .Blocked }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .Blocked }}</span>{{ else }}0{{ end }}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ .DlComplete }}{{ if .DlHeldDone }} (+{{ .DlHeldDone }} after a hold){{ end }} · {{ if .DlHeld }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .DlHeld }}</span>{{ else }}0{{ end }} · {{ if .DlFailed }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .DlFailed }}</span>{{ else }}0{{ end }}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ .LaunchOK }} · {{ .LaunchStalled }} · {{ if .LaunchFailed }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .LaunchFailed }}</span>{{ else }}0{{ end }}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ if .CrashReal }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .CrashReal }}</span>{{ else }}0{{ end }}{{ if .CrashNotice }} <span class="text-gray-400 dark:text-gray-500">({{ .CrashNotice }})</span>{{ end }}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ .DevicesSeen }} · {{ .DevicesNew }}</td>
+        <td class="px-2 py-2 whitespace-nowrap text-xs">{{ if .DashboardHref }}<a href="{{ .DashboardHref }}" class="text-indigo-600 dark:text-indigo-400 hover:underline">Dashboard</a>{{ end }}</td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+</div>
+
+<h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">Students <span class="text-sm font-normal text-gray-500 dark:text-gray-400">({{ len .Students }} with activity)</span></h3>
+{{ template "mhsactivity_student_table" .Students }}
+
+{{ if .Staff }}
+<h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2 mt-4">Staff <span class="text-sm font-normal text-gray-500 dark:text-gray-400">(teachers' and administrators' own launches; not counted above)</span></h3>
+{{ template "mhsactivity_student_table" .Staff }}
+{{ end }}
+{{ end }}
+{{ end }}
+
+{{/* mhsactivity_student_table: one row per person over the window. */}}
+{{ define "mhsactivity_student_table" }}
+<div class="bg-white dark:bg-gray-800 rounded shadow overflow-auto mb-4">
+  {{ if not . }}
+  <div class="p-4 text-sm text-gray-500 dark:text-gray-400">No one in this window.</div>
+  {{ else }}
+  <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+    <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs">
+      <tr class="border-b border-gray-300 dark:border-gray-600">
+        <th class="px-3 py-2">Name</th>
+        <th class="px-3 py-2">Group</th>
+        <th class="px-3 py-2">Status</th>
+        <th class="px-3 py-2">Units</th>
+        <th class="px-3 py-2 whitespace-nowrap" title="started · slow · failed">Launches</th>
+        <th class="px-3 py-2 whitespace-nowrap" title="Distinct browser profiles (new that day in parentheses)">Devices</th>
+        <th class="px-3 py-2">Platform</th>
+        <th class="px-3 py-2 whitespace-nowrap" title="The grader's current unit">Current</th>
+        <th class="px-3 py-2 whitespace-nowrap">Last seen</th>
+        <th class="px-2 py-2"></th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range . }}
+      <tr class="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 align-top">
+        <td class="px-3 py-2 min-w-[14rem] max-w-sm">
+          <span class="font-medium whitespace-nowrap">{{ .Name }}</span>{{ if .Staff }} <span class="text-xs text-gray-400 dark:text-gray-500">staff</span>{{ end }}{{ if gt .Days 1 }} <span class="text-xs text-gray-400 dark:text-gray-500">{{ .Days }} days</span>{{ end }}
+          {{ if .Pills }}<div class="mt-1 flex flex-wrap gap-1">{{ template "mhsactivity_pills" .Pills }}</div>{{ end }}
+        </td>
+        <td class="px-3 py-2 whitespace-nowrap text-xs">{{ .Groups }}</td>
+        <td class="px-3 py-2 whitespace-nowrap">
+          {{ if .Played }}<span class="text-green-700 dark:text-green-300">played</span>{{ else if .Blocked }}<span class="text-amber-700 dark:text-amber-300 font-medium">blocked</span>{{ else if .Opened }}<span class="text-gray-500 dark:text-gray-400">opened, did not play</span>{{ else }}<span class="text-gray-400 dark:text-gray-500">—</span>{{ end }}
+        </td>
+        <td class="px-3 py-2">
+          {{ range .Units }}<span class="inline-block mr-2 mb-1 whitespace-nowrap" {{ if .Title }}title="{{ .Title }}"{{ end }}><span class="font-medium text-gray-600 dark:text-gray-400">{{ .Label }}</span> <span class="{{ .Class }}">{{ .Text }}</span>{{ if gt .Devices 1 }} <span class="text-xs text-gray-400 dark:text-gray-500">×{{ .Devices }} devices</span>{{ end }}</span>{{ end }}
+        </td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ .Launch.OK }} · {{ .Launch.Stalled }} · {{ if .Launch.Failed }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .Launch.Failed }}</span>{{ else }}0{{ end }}{{ if .Launch.UnitySecondsMax }} <span class="text-xs text-gray-400 dark:text-gray-500" title="Longest time for Unity to start">{{ printf "%.0f" .Launch.UnitySecondsMax }} s</span>{{ end }}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ .Devices }}{{ if .NewDevices }} <span class="text-gray-400 dark:text-gray-500">({{ .NewDevices }} new)</span>{{ end }}</td>
+        <td class="px-3 py-2 whitespace-nowrap text-xs">{{ .Platforms }}</td>
+        <td class="px-3 py-2 whitespace-nowrap text-xs">{{ .CurrentUnit }}</td>
+        <td class="px-3 py-2 whitespace-nowrap text-xs">{{ .LastSeen }}</td>
+        <td class="px-2 py-2 whitespace-nowrap text-xs">
+          {{ if .DashboardHref }}<a href="{{ .DashboardHref }}" class="text-indigo-600 dark:text-indigo-400 hover:underline">Dashboard</a>{{ end }}
+          {{ if .DeviceTestsHref }} · <a href="{{ .DeviceTestsHref }}" class="text-indigo-600 dark:text-indigo-400 hover:underline">Records</a>{{ end }}
+        </td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+  {{ end }}
+</div>
+{{ end }}
+
+{{/* mhsactivity_days: organization × day when the window spans several days. */}}
+{{ define "mhsactivity_days" }}
+<h3 class="text-base font-semibold text-gray-900 dark:text-gray-100 mb-2">By day</h3>
+<div class="bg-white dark:bg-gray-800 rounded shadow overflow-auto mb-4">
+  <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+    <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs">
+      <tr class="border-b border-gray-300 dark:border-gray-600">
+        <th class="px-3 py-2">Day</th>
+        <th class="px-3 py-2">School</th>
+        <th class="px-3 py-2 whitespace-nowrap">Students opened · played · blocked</th>
+        <th class="px-3 py-2 whitespace-nowrap">Downloads done · held · failed</th>
+        <th class="px-3 py-2 whitespace-nowrap">Launches ok · slow · failed</th>
+        <th class="px-3 py-2 whitespace-nowrap">Crashes</th>
+        <th class="px-3 py-2 whitespace-nowrap">Devices seen · new</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range .Report.Days }}
+      <tr class="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50">
+        <td class="px-3 py-2 whitespace-nowrap font-mono text-xs">{{ .Day }}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ .OrgName }}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ .Opened }} · {{ .Played }} · {{ if .Blocked }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .Blocked }}</span>{{ else }}0{{ end }}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ .DlComplete }}{{ if .DlHeldDone }} (+{{ .DlHeldDone }} after a hold){{ end }} · {{ if .DlHeld }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .DlHeld }}</span>{{ else }}0{{ end }} · {{ if .DlFailed }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .DlFailed }}</span>{{ else }}0{{ end }}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ .LaunchOK }} · {{ .LaunchStalled }} · {{ if .LaunchFailed }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .LaunchFailed }}</span>{{ else }}0{{ end }}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ if .CrashReal }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .CrashReal }}</span>{{ else }}0{{ end }}{{ if .CrashNotice }} <span class="text-gray-400 dark:text-gray-500">({{ .CrashNotice }})</span>{{ end }}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ .DevicesSeen }} · {{ .DevicesNew }}</td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+</div>
+{{ end }}

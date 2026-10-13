@@ -109,3 +109,19 @@ func (s *Store) DeleteByUser(ctx context.Context, workspaceID, userID primitive.
 	_, err := s.c.DeleteMany(ctx, filter)
 	return err
 }
+
+// ListSeenSince returns the workspace's device rows last seen at or after
+// since (idx_mhsdevice_workspace_lastseen). A row's created_at never comes
+// after its last_seen, so this also returns every row created since then.
+func (s *Store) ListSeenSince(ctx context.Context, workspaceID primitive.ObjectID, since time.Time) ([]models.MHSDeviceStatus, error) {
+	cur, err := s.c.Find(ctx, bson.M{"workspace_id": workspaceID, "last_seen": bson.M{"$gte": since.UTC()}})
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	var out []models.MHSDeviceStatus
+	if err := cur.All(ctx, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}

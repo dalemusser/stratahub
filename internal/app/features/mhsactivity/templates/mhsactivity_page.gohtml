@@ -1,0 +1,83 @@
+{{ define "mhsactivity_page" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">📡 MHS Activity</h1>
+  <div class="text-sm text-gray-600 dark:text-gray-400">
+    {{ .Window.Label }}{{ if .Report.School }} · {{ .Report.School.Name }}{{ end }}
+    <span class="ml-2 text-gray-400 dark:text-gray-500" title="Each school's day runs on its own clock. Today means the school's local today.">(school-local days)</span>
+  </div>
+</div>
+
+<form hx-get="/mhsactivity" hx-target="#content" hx-swap="innerHTML" hx-push-url="true" hx-trigger="change, submit"
+      class="bg-white dark:bg-gray-800 rounded shadow p-3 mb-4 flex flex-wrap items-end gap-3">
+  <div>
+    <label for="mhsact-range" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Window</label>
+    <select id="mhsact-range" name="range" class="px-2 py-2 border dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100">
+      <option value="today" {{ if eq .Window.Range "today" }}selected{{ end }}>Today</option>
+      <option value="yesterday" {{ if eq .Window.Range "yesterday" }}selected{{ end }}>Yesterday</option>
+      <option value="7d" {{ if eq .Window.Range "7d" }}selected{{ end }}>Last 7 days</option>
+      <option value="custom" {{ if eq .Window.Range "custom" }}selected{{ end }}>Custom dates</option>
+    </select>
+  </div>
+  {{ if .Window.Custom }}
+  <div>
+    <label for="mhsact-from" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">From</label>
+    <input id="mhsact-from" type="date" name="from" value="{{ .Window.From }}" class="px-2 py-2 border dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100">
+  </div>
+  <div>
+    <label for="mhsact-to" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">To <span class="text-gray-400 dark:text-gray-500">(up to {{ .Window.MaxDays }} days)</span></label>
+    <input id="mhsact-to" type="date" name="to" value="{{ .Window.To }}" class="px-2 py-2 border dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100">
+  </div>
+  {{ end }}
+  {{ if .Orgs }}
+  <div>
+    <label for="mhsact-org" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">School</label>
+    <select id="mhsact-org" name="org" class="px-2 py-2 border dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100 max-w-xs">
+      <option value="" {{ if not .SelectedOrg }}selected{{ end }}>All schools</option>
+      {{ range .Orgs }}<option value="{{ .ID }}" {{ if .Selected }}selected{{ end }}>{{ .Name }}</option>{{ end }}
+    </select>
+  </div>
+  {{ end }}
+  {{ if and .SelectedOrg .Groups }}
+  <div>
+    <label for="mhsact-group" class="block text-sm text-gray-600 dark:text-gray-400 mb-1">Group</label>
+    <select id="mhsact-group" name="group" class="px-2 py-2 border dark:border-gray-600 rounded dark:bg-gray-700 dark:text-gray-100 max-w-xs">
+      <option value="" {{ if not .SelectedGroup }}selected{{ end }}>All groups</option>
+      {{ range .Groups }}<option value="{{ .ID }}" {{ if .Selected }}selected{{ end }}>{{ .Name }}</option>{{ end }}
+    </select>
+  </div>
+  {{ end }}
+  <label class="flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 pb-2" title="Teachers' and administrators' own launches, never counted as students">
+    <input type="checkbox" name="staff" value="1" {{ if .ShowStaff }}checked{{ end }} class="rounded border-gray-300 dark:border-gray-600"> Show staff rows
+  </label>
+  <noscript><button type="submit" class="px-3 py-2 rounded bg-indigo-600 text-white text-sm">Apply</button></noscript>
+</form>
+
+{{ if .Missing }}
+<div class="mb-4 p-3 rounded border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-900/30 text-amber-800 dark:text-amber-200 text-sm">
+  Some data was unavailable while this was computed: {{ range $i, $m := .Missing }}{{ if $i }}; {{ end }}{{ $m }}{{ end }}. Reload in a minute to try again.
+</div>
+{{ end }}
+
+{{ template "mhsactivity_summary" . }}
+
+{{ if .Report.School }}
+  <div id="mhsactivity-school">{{ template "mhsactivity_school" . }}</div>
+{{ else }}
+  {{ template "mhsactivity_schools" . }}
+  <div id="mhsactivity-school"></div>
+{{ end }}
+
+{{ if .Report.Days }}{{ template "mhsactivity_days" . }}{{ end }}
+
+{{ if .Freshness }}
+<div class="mt-4 text-xs text-gray-500 dark:text-gray-400">
+  <span class="font-medium">Computed live:</span>
+  {{ range $i, $f := .Freshness }}{{ if $i }} · {{ end }}{{ $f }}{{ end }}
+  <span class="ml-1">(reused for a minute)</span>
+</div>
+{{ end }}
+{{ end }}

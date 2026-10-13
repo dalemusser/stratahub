@@ -6,9 +6,9 @@ A staff page (`/mhsactivity`, menu "MHS Activity") that answers "who was active 
 
 | Phase | Ships | State |
 |---|---|---|
-| 0 | `internal/app/system/mhssteplog` (step-log parser, per-record summary, hold and crash-notice classifiers); write-time `summary` on member load records; structured `detail` keys on the client's step-log entries | DONE 2026-10-13 (this commit), not yet deployed |
-| 1 | models, store, indexes, `ComputeDay`, the page for today / yesterday (live, cached), policy, routes, menu | not started |
-| 2 | rollup job, marks, backfill (admin page), 7-day and custom windows, per-day table | not started |
+| 0 | `internal/app/system/mhssteplog` (step-log parser, per-record summary, hold and crash-notice classifiers); write-time `summary` on member load records; structured `detail` keys on the client's step-log entries | DONE 2026-10-13, deployed 2026-10-13 01:49 PT |
+| 1 | `models.MHSActivityDay`, `internal/app/system/mhsactivity` (`ZonesFor`, `DayBounds`, `ComputeDay`, the merge), the page at `/mhsactivity` computed live for today, yesterday, the last 7 days or a custom range of at most `mhs_activity_live_max_days` (7), cached per zone-day for `mhs_activity_live_cache_ttl` (60 s), policy, routes, menu, config keys | DONE 2026-10-13; verified against a copy of production data for 2026-10-12 and 2026-10-07..09 (see §6) |
+| 2 | rollup job, marks, backfill (admin page), windows past the live limit (up to 31 days), stored closed days | not started |
 | 3 | CSV exports, Device Tests viewer `user` filter and student links, "School activity" link on the MHS Dashboard | not started |
 | 4 | student-day timeline, docs, e2e updates | not started |
 
@@ -17,7 +17,7 @@ A staff page (`/mhsactivity`, menu "MHS Activity") that answers "who was active 
 - Audience: superadmin, admin and analyst see the whole workspace; coordinators see their assigned organizations (viewscope, as the Members Report does); leaders and members get 403 and no menu link.
 - Day boundaries follow each organization's `time_zone`; "Today" on the page means each school's local today.
 
-**To resume:** read this section, then §2 (definitions) and §3 (data model). Phase 0's parser is the contract everything else builds on: `mhssteplog.Parse` turns one step-log entry into a typed event (preferring the entry's `detail` map, falling back to the sentence), `mhssteplog.Summarize` folds a record's entries into `models.MHSMemberSummary`, and `templates_pin_test.go` fails when a page sentence the parser depends on changes. Before changing a sentence in `mhs-delivery.js` or the play page, change the parser and the pin test with it.
+**To resume:** read this section, then §2 (definitions) and §3 (data model). Phase 2 starts from `internal/app/system/mhsactivity/compute.go` (`ComputeDay` is what the job persists) and `internal/app/features/mhsactivity/handler.go` (`loadDays` is where stored days replace live ones). Phase 0's parser is the contract everything else builds on: `mhssteplog.Parse` turns one step-log entry into a typed event (preferring the entry's `detail` map, falling back to the sentence), `mhssteplog.Summarize` folds a record's entries into `models.MHSMemberSummary`, and `templates_pin_test.go` fails when a page sentence the parser depends on changes. Before changing a sentence in `mhs-delivery.js` or the play page, change the parser and the pin test with it.
 
 **Why the measurements rule out live computation for multi-day windows (production, 2026-10-13):** member load records average 18 KB (their step logs); a day has about 260 of them, a week 3000, a month 8800. The game log collection holds about 100 k Mission HydroSci events per school day; a per-student aggregate over 7 days took 8 s and over 30 days 187 s. One day is cheap; a window is not.
 
@@ -66,13 +66,17 @@ Phases 1–2 (planned): `mhs_activity_days` (one document per workspace, user an
 
 `ComputeDay(ctx, deps, workspace, day, location, orgIDs)` builds the day documents for every student and staff member of the organizations sharing one time zone: people and groups, member records (summary when present, otherwise parsed), device status, page views, game log activity, current unit. Optional sources never fail the day; they set `partial` and `missing`. The page computes open days live (cache 60 s, keyed by workspace, zone and day; scope is applied afterwards in memory). The job `mhs-activity-rollup` finalises closed days and retries partial ones; the admin backfill page recomputes a date range and can stamp summaries onto older records.
 
-## 5. Configuration (planned)
+## 5. Configuration
 
-`mhs_activity_enabled` (true), `mhs_activity_rollup_interval` (15m), `mhs_activity_close_after` (6h, never below the client's 6 h log retention), `mhs_activity_catch_up_days` (3), `mhs_activity_backfill_start` (the first day with member records), `mhs_activity_live_cache_ttl` (60s). Defaults are safe; the deployment configuration needs no change.
+Phase 1 (live): `mhs_activity_enabled` (true), `mhs_activity_close_after` (6h, never below the client's 6 h log retention), `mhs_activity_live_cache_ttl` (60s), `mhs_activity_live_max_days` (7). Phase 2 (planned): `mhs_activity_rollup_interval` (15m), `mhs_activity_catch_up_days` (3), `mhs_activity_backfill_start` (the first day with member records). Defaults are safe; the deployment configuration needs no change.
 
 ## 6. Verification
 
-Phase 0: `go test ./internal/app/system/mhssteplog/` (sentence and detail parsing, hold classification including held then done and the far-from-the-end stop, crash notices, the pin test against the page sources), `go test ./internal/app/features/missionhydrosci/`, `make test-js`. Later phases: see the approved implementation plan (store and compute tests on a local database, role-gating and render tests, a comparison of the page's numbers with the October 2026 hand reports for 2026-10-07 to 2026-10-12).
+Phase 0: `go test ./internal/app/system/mhssteplog/` (sentence and detail parsing, hold classification including held then done and the far-from-the-end stop, crash notices, the pin test against the page sources), `go test ./internal/app/features/missionhydrosci/`, `make test-js`.
+
+Phase 1: `go test ./internal/app/system/mhsactivity/ ./internal/app/features/mhsactivity/` (day bounds across the November 2026 daylight-saving change, the merge of overlapping records, stall recovery, day attribution, a database-backed `ComputeDay` with a student, a teacher and another school, the pure report aggregation, role gates for admin, analyst, leader, member and coordinator, the coordinator's organization scope, and the rendered page). Then a comparison against a local copy of production data (the collections the computation reads, exported with `mongosh` as Extended JSON and imported with `mongoimport`; the game log reduced to id, user, time and event type) for the days the October 2026 hand reports covered. The page agreed with the hand counts where the definitions match: for the Monday the schools' students, groups, downloads, fresh browser profiles and the one recovered slow start were identical; for the three days before, the students who never got in differed by one per school because the hand count included a student without any download signal, and the hold classification found 44 of 62 unit downloads held at the school with the scanning filter against the hand count of 54, with the same completion counts. After the first comparison the hold classifier was changed to judge the hold at the point where the connection keeps picking up again, not at the final progress line, and "blocked" over a window was redefined as a problem day with no play at all in the window.
+
+Later phases: store tests for the rollups and marks, the job's day selection with a fake clock, the backfill, and the CSV exports.
 
 ## 7. Risks
 

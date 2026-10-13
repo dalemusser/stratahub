@@ -146,4 +146,10 @@ type AppConfig struct {
 	// MHS active gap threshold: gaps longer than this are excluded from active duration.
 	// Must match mhsgrader's active_gap_threshold for consistent results.
 	MHSActiveGapThreshold time.Duration
+
+	// MHS Activity (features/mhsactivity): the cross-school activity overview.
+	MHSActivityEnabled      bool
+	MHSActivityCloseAfter   time.Duration // a school's day stays open (computed live) this long after it ends
+	MHSActivityLiveCacheTTL time.Duration
+	MHSActivityLiveMaxDays  int
 }

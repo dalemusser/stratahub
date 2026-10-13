@@ -3,6 +3,7 @@ package logdata
 
 import (
 	"context"
+	"encoding/binary"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson"
@@ -108,4 +109,73 @@ func (s *Store) CountForUser(ctx context.Context, game, userID string) (int64, e
 		"user_id": userID,
 	}
 	return s.c.CountDocuments(ctx, filter)
+}
+
+// UserActivity is one user's game log over a window.
+type UserActivity struct {
+	Events  int
+	First   time.Time
+	Last    time.Time
+	Crashes int // entries with eventType "crash"
+}
+
+// activityChunk bounds the $in list of one aggregate.
+const activityChunk = 200
+
+// ActivityByUsers counts each user's entries received in [from, to), with
+// the first and last receive times and the crash events among them. Entry
+// ids are time-ordered ObjectIDs assigned on insert, so the range is an
+// _id range per user on the {game, user_id, _id} index. Users without
+// entries are absent from the result.
+func (s *Store) ActivityByUsers(ctx context.Context, game string, userIDs []string, from, to time.Time) (map[string]UserActivity, error) {
+	out := make(map[string]UserActivity, len(userIDs))
+	lo, hi := ObjectIDAt(from), ObjectIDAt(to)
+	for start := 0; start < len(userIDs); start += activityChunk {
+		end := start + activityChunk
+		if end > len(userIDs) {
+			end = len(userIDs)
+		}
+		pipeline := mongo.Pipeline{
+			{{Key: "$match", Value: bson.M{
+				"game":    game,
+				"user_id": bson.M{"$in": userIDs[start:end]},
+				"_id":     bson.M{"$gte": lo, "$lt": hi},
+			}}},
+			{{Key: "$group", Value: bson.M{
+				"_id":     "$user_id",
+				"n":       bson.M{"$sum": 1},
+				"first":   bson.M{"$min": "$serverTimestamp"},
+				"last":    bson.M{"$max": "$serverTimestamp"},
+				"crashes": bson.M{"$sum": bson.M{"$cond": bson.A{bson.M{"$eq": bson.A{"$eventType", "crash"}}, 1, 0}}},
+			}}},
+		}
+		cur, err := s.c.Aggregate(ctx, pipeline)
+		if err != nil {
+			return nil, err
+		}
+		var rows []struct {
+			ID      string    `bson:"_id"`
+			N       int       `bson:"n"`
+			First   time.Time `bson:"first"`
+			Last    time.Time `bson:"last"`
+			Crashes int       `bson:"crashes"`
+		}
+		err = cur.All(ctx, &rows)
+		cur.Close(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range rows {
+			out[r.ID] = UserActivity{Events: r.N, First: r.First, Last: r.Last, Crashes: r.Crashes}
+		}
+	}
+	return out, nil
+}
+
+// ObjectIDAt is the smallest ObjectID whose embedded time is t (seconds),
+// for exact time-range bounds on _id.
+func ObjectIDAt(t time.Time) primitive.ObjectID {
+	var id primitive.ObjectID
+	binary.BigEndian.PutUint32(id[0:4], uint32(t.Unix()))
+	return id
 }

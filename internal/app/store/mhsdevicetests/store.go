@@ -527,3 +527,67 @@ func (s *Store) Summarize(ctx context.Context, q ListQuery) (Summary, error) {
 	}
 	return sum, nil
 }
+
+// activityProjection is what the activity report reads from a member record:
+// everything but the bulky arrays. Steps are fetched separately for the
+// records that have no summary yet (StepsByIDs).
+var activityProjection = bson.M{"steps": 0, "heartbeats": 0, "problem_reports": 0, "questionnaire": 0}
+
+// ListMemberBetween returns the workspace's member records whose started_at
+// is in [from, to), oldest first, without steps or heartbeats.
+func (s *Store) ListMemberBetween(ctx context.Context, wsID primitive.ObjectID, from, to time.Time) ([]models.MHSDeviceTest, error) {
+	filter := bson.M{
+		"workspace_id": wsID,
+		"kind":         models.MHSDeviceTestKindMember,
+		"started_at":   bson.M{"$gte": from.UTC(), "$lt": to.UTC()},
+	}
+	opts := options.Find().SetSort(bson.D{{Key: "started_at", Value: 1}}).SetProjection(activityProjection)
+	cur, err := s.c.Find(ctx, filter, opts)
+	if err != nil {
+		return nil, err
+	}
+	defer cur.Close(ctx)
+	var runs []models.MHSDeviceTest
+	if err := cur.All(ctx, &runs); err != nil {
+		return nil, err
+	}
+	return runs, nil
+}
+
+// StepsByIDs returns the step logs of the given records.
+func (s *Store) StepsByIDs(ctx context.Context, wsID primitive.ObjectID, ids []primitive.ObjectID) (map[primitive.ObjectID][]models.MHSDeviceTestStep, error) {
+	out := make(map[primitive.ObjectID][]models.MHSDeviceTestStep, len(ids))
+	const chunk = 200
+	for start := 0; start < len(ids); start += chunk {
+		end := start + chunk
+		if end > len(ids) {
+			end = len(ids)
+		}
+		cur, err := s.c.Find(ctx, bson.M{"workspace_id": wsID, "_id": bson.M{"$in": ids[start:end]}},
+			options.Find().SetProjection(bson.M{"steps": 1}))
+		if err != nil {
+			return nil, err
+		}
+		var rows []struct {
+			ID    primitive.ObjectID         `bson:"_id"`
+			Steps []models.MHSDeviceTestStep `bson:"steps"`
+		}
+		err = cur.All(ctx, &rows)
+		cur.Close(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range rows {
+			out[r.ID] = r.Steps
+		}
+	}
+	return out, nil
+}
+
+// SetSummary stamps a summary onto a record (a backfill of records stored
+// before summaries existed). It is not gated by expires_at: the record's
+// own writes may be closed, the summary is derived from what is there.
+func (s *Store) SetSummary(ctx context.Context, wsID, id primitive.ObjectID, sum models.MHSMemberSummary) error {
+	_, err := s.c.UpdateOne(ctx, bson.M{"_id": id, "workspace_id": wsID}, bson.M{"$set": bson.M{"summary": sum}})
+	return err
+}

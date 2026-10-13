@@ -89,6 +89,12 @@ var appConfigKeys = []config.AppKey{
 	{Name: "mhs_device_test_start_limit", Default: 10, Desc: "Unit 2 device test: new runs one client IP may start per window (a school behind one address shares it)"},
 	{Name: "mhs_device_test_start_window", Default: "10m", Desc: "Unit 2 device test: the window for mhs_device_test_start_limit (e.g. 10m, 1h)"},
 
+	// MHS Activity (the cross-school activity overview at /mhsactivity)
+	{Name: "mhs_activity_enabled", Default: true, Desc: "Serve the MHS Activity page"},
+	{Name: "mhs_activity_close_after", Default: "6h", Desc: "How long after a school's local day ends it stays open (computed live); never below 6h, the pages' step-log retention"},
+	{Name: "mhs_activity_live_cache_ttl", Default: "60s", Desc: "How long a live day's computation is reused across requests"},
+	{Name: "mhs_activity_live_max_days", Default: 7, Desc: "The longest window the page computes live (days)"},
+
 	// MHS S3 storage (separate from materials storage — may use a different bucket/credentials)
 	{Name: "mhs_s3_region", Default: "", Desc: "AWS region for MHS CDN S3 bucket"},
 	{Name: "mhs_s3_bucket", Default: "", Desc: "S3 bucket name for MHS game builds (e.g., adroit-cdn)"},
@@ -239,6 +245,12 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 
 		// MHS active gap threshold
 		MHSActiveGapThreshold: appValues.Duration("mhs_active_gap_threshold", 2*time.Minute),
+
+		// MHS Activity
+		MHSActivityEnabled:      appValues.Bool("mhs_activity_enabled"),
+		MHSActivityCloseAfter:   appValues.Duration("mhs_activity_close_after", 6*time.Hour),
+		MHSActivityLiveCacheTTL: appValues.Duration("mhs_activity_live_cache_ttl", time.Minute),
+		MHSActivityLiveMaxDays:  appValues.Int("mhs_activity_live_max_days"),
 	}
 
 	// Auto-derive session domain in multi-workspace mode if not explicitly set.

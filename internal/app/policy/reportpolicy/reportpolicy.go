@@ -60,3 +60,30 @@ func CanViewMembersReport(r *http.Request) ReportScope {
 		return ReportScope{CanView: false}
 	}
 }
+
+// CanViewMHSActivity determines what the current user may see on the MHS
+// Activity page (the cross-school activity overview).
+//
+// Authorization:
+//   - Superadmin/Admin/Analyst: every organization in the workspace
+//   - Coordinator: their assigned organizations
+//   - Leader, member and others: no access (the page is a staff overview;
+//     teachers use the MHS Dashboard for their own groups)
+func CanViewMHSActivity(r *http.Request) ReportScope {
+	role, _, _, ok := authz.UserCtx(r)
+	if !ok {
+		return ReportScope{CanView: false}
+	}
+	switch role {
+	case "superadmin", "admin", "analyst":
+		return ReportScope{CanView: true, AllOrgs: true}
+	case "coordinator":
+		orgIDs := authz.UserOrgIDs(r)
+		if len(orgIDs) == 0 {
+			return ReportScope{CanView: false}
+		}
+		return ReportScope{CanView: true, OrgIDs: orgIDs}
+	default:
+		return ReportScope{CanView: false}
+	}
+}

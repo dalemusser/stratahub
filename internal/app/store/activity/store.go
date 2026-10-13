@@ -250,3 +250,56 @@ func (s *Store) CountByUserInTimeRange(ctx context.Context, userID primitive.Obj
 	}
 	return s.c.CountDocuments(ctx, filter)
 }
+
+// PageViewSummary is one user's views of one page over a window.
+type PageViewSummary struct {
+	Count int
+	First time.Time
+	Last  time.Time
+}
+
+// PageViewsByUsers counts each user's page_view events for pagePath in
+// [start, end) ({user_id, timestamp} index). Users without views are absent.
+func (s *Store) PageViewsByUsers(ctx context.Context, userIDs []primitive.ObjectID, pagePath string, start, end time.Time) (map[primitive.ObjectID]PageViewSummary, error) {
+	out := make(map[primitive.ObjectID]PageViewSummary)
+	const chunk = 500
+	for i := 0; i < len(userIDs); i += chunk {
+		j := i + chunk
+		if j > len(userIDs) {
+			j = len(userIDs)
+		}
+		pipeline := mongo.Pipeline{
+			{{Key: "$match", Value: bson.M{
+				"user_id":    bson.M{"$in": userIDs[i:j]},
+				"event_type": EventPageView,
+				"page_path":  pagePath,
+				"timestamp":  bson.M{"$gte": start.UTC(), "$lt": end.UTC()},
+			}}},
+			{{Key: "$group", Value: bson.M{
+				"_id":   "$user_id",
+				"n":     bson.M{"$sum": 1},
+				"first": bson.M{"$min": "$timestamp"},
+				"last":  bson.M{"$max": "$timestamp"},
+			}}},
+		}
+		cur, err := s.c.Aggregate(ctx, pipeline)
+		if err != nil {
+			return nil, err
+		}
+		var rows []struct {
+			ID    primitive.ObjectID `bson:"_id"`
+			N     int                `bson:"n"`
+			First time.Time          `bson:"first"`
+			Last  time.Time          `bson:"last"`
+		}
+		err = cur.All(ctx, &rows)
+		cur.Close(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, r := range rows {
+			out[r.ID] = PageViewSummary{Count: r.N, First: r.First, Last: r.Last}
+		}
+	}
+	return out, nil
+}

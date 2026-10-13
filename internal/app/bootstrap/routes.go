@@ -30,6 +30,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/store/emailverify"
 	"github.com/dalemusser/stratahub/internal/app/system/staffauth"
 
+	mhsactivityfeature "github.com/dalemusser/stratahub/internal/app/features/mhsactivity"
 	organizationsfeature "github.com/dalemusser/stratahub/internal/app/features/organizations"
 	pagesfeature "github.com/dalemusser/stratahub/internal/app/features/pages"
 	reportsfeature "github.com/dalemusser/stratahub/internal/app/features/reports"
@@ -635,6 +636,17 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		// Reports
 		reportsHandler := reportsfeature.NewHandler(deps.StrataHubMongoDatabase, errLog, logger)
 		wsr.Mount("/reports", reportsfeature.Routes(reportsHandler, sessionMgr))
+
+		// MHS Activity: the cross-school activity overview (admin, analyst,
+		// coordinator). Reads load records, device rows, page views, the
+		// game log and the grader (docs/mhs-activity/plan.md).
+		mhsActivityHandler := mhsactivityfeature.NewHandler(deps.StrataHubMongoDatabase, deps.StratalogDatabase, deps.MHSGraderDatabase, errLog, logger, mhsactivityfeature.Config{
+			Enabled:     appCfg.MHSActivityEnabled,
+			CloseAfter:  appCfg.MHSActivityCloseAfter,
+			CacheTTL:    appCfg.MHSActivityLiveCacheTTL,
+			MaxLiveDays: appCfg.MHSActivityLiveMaxDays,
+		})
+		wsr.Mount("/mhsactivity", mhsactivityfeature.Routes(mhsActivityHandler, sessionMgr))
 
 		// Site Settings (admin and superadmin)
 		settingsHandler := settingsfeature.NewHandler(deps.StrataHubMongoDatabase, deps.FileStorage, errLog, auditLogger, logger)

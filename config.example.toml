@@ -77,6 +77,13 @@ mongo_min_pool_size = 10
 # Used by MHS Dashboard to display student progress
 mhsgrader_database = "mhsgrader"
 
+# MHS Activity: the cross-school activity overview at /mhsactivity (admin,
+# analyst, coordinator). Defaults are right for production.
+# mhs_activity_enabled = true
+# mhs_activity_close_after = "6h"      # a school's day stays open (computed live) this long after it ends; never below 6h
+# mhs_activity_live_cache_ttl = "60s"  # a live day's computation is reused this long
+# mhs_activity_live_max_days = 7       # the longest window computed live
+
 # Database connection timeout
 db_connect_timeout = "10s"
 

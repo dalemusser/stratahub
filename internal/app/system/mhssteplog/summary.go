@@ -14,10 +14,9 @@ import (
 // 16 leaves room for one resumed-connection part.
 const HoldTailMB = 16
 
-// holdMinSeconds is the least time between the last progress and the
-// completion for a near-the-end stop to be a hold rather than the ordinary
-// last part arriving.
-const holdMinSeconds = 20
+// holdMinSeconds is the least time between reaching the tail and completing
+// for a stop there to be a hold rather than the ordinary last part arriving.
+const holdMinSeconds = 10
 
 // Caps on the lists a summary keeps.
 const (
@@ -34,13 +33,16 @@ type Context struct {
 	DownloadMode    string
 }
 
+type mbAt struct {
+	mb int
+	at time.Time
+}
+
 type unitAcc struct {
 	models.MHSStepUnitSummary
-	lastProgressAt time.Time
-	resumedMBs     []int
-	stallsAfter    int // stalls and retries after the last progress line
-	retriesAfter   int
-	resumedAtMax   int
+	progress []mbAt      // progress lines (bytes reached)
+	resumes  []mbAt      // "picked up at" lines
+	signals  []time.Time // stalls, waits and retries
 }
 
 // Summarize reads a record's steps into a summary. It never fails: entries
@@ -153,12 +155,10 @@ func (u *unitAcc) apply(ev Event) {
 		if ev.TotalMB > u.TotalMB {
 			u.TotalMB = ev.TotalMB
 		}
-		if ev.MB >= u.MaxMB {
+		if ev.MB > u.MaxMB {
 			u.MaxMB = ev.MB
 		}
-		// Every progress line resets the "nothing since" window.
-		u.lastProgressAt = ev.At
-		u.stallsAfter, u.retriesAfter = 0, 0
+		u.progress = append(u.progress, mbAt{ev.MB, ev.At})
 	case KindResumed:
 		if ev.Drops > u.Drops {
 			u.Drops = ev.Drops
@@ -166,16 +166,16 @@ func (u *unitAcc) apply(ev Event) {
 		if ev.MB > u.MaxMB {
 			u.MaxMB = ev.MB
 		}
-		u.resumedMBs = append(u.resumedMBs, ev.MB)
+		u.resumes = append(u.resumes, mbAt{ev.MB, ev.At})
 	case KindNoData:
 		u.Stalls++
-		u.stallsAfter++
+		u.signals = append(u.signals, ev.At)
 	case KindWaiting:
-		// Background-fetch silence before a switch; counted as a stall signal.
-		u.stallsAfter++
+		// Background-fetch silence before a switch: a stall signal too.
+		u.signals = append(u.signals, ev.At)
 	case KindRetry:
 		u.Retries++
-		u.retriesAfter++
+		u.signals = append(u.signals, ev.At)
 		if ev.ErrorClass != "" {
 			u.LastErrorClass = ev.ErrorClass
 		}
@@ -215,31 +215,64 @@ func (u *unitAcc) apply(ev Event) {
 	}
 }
 
-// finish decides whether the download was held near its end.
+// finish decides whether the download was held near its end: progress
+// reached the tail (the last HoldTailMB of the file) and then the connection
+// kept dropping and picking up at the same point, or stalled, instead of
+// finishing. A tail that arrives after the usual pause of the last part is
+// not a hold; one resumed connection that completes at once is not either.
 func (u *unitAcc) finish() {
-	if u.Cached || u.TotalMB <= 0 || u.MaxMB < u.TotalMB-HoldTailMB {
+	if u.Cached || u.TotalMB <= 0 {
 		return
 	}
-	for _, mb := range u.resumedMBs {
-		if mb >= u.MaxMB-1 {
-			u.resumedAtMax++
+	tailStart := u.TotalMB - HoldTailMB
+	var reachedAt time.Time
+	holdMB := 0
+	for _, p := range u.progress {
+		if p.mb >= tailStart && p.mb < u.TotalMB {
+			reachedAt, holdMB = p.at, p.mb
+			break
 		}
 	}
-	signals := u.resumedAtMax >= 2 || u.stallsAfter > 0 || u.retriesAfter > 0
-	if !signals {
+	tailResumes := 0
+	for _, r := range u.resumes {
+		if r.mb < tailStart {
+			continue
+		}
+		tailResumes++
+		if tailResumes == 1 {
+			// The pick-up point is where the file stopped.
+			holdMB = r.mb
+			if reachedAt.IsZero() || r.at.Before(reachedAt) {
+				reachedAt = r.at
+			}
+		}
+	}
+	if reachedAt.IsZero() {
+		return // the download never reached the tail
+	}
+	signals := 0
+	for _, at := range u.signals {
+		if at.Before(reachedAt) {
+			continue
+		}
+		if u.Complete && u.CompleteAt != nil && !at.Before(*u.CompleteAt) {
+			continue
+		}
+		signals++
+	}
+	held := tailResumes >= 2 || (tailResumes == 1 && signals > 0) || (!u.Complete && signals > 0)
+	if !held {
 		return
 	}
-	if u.Complete && u.CompleteAt != nil && !u.lastProgressAt.IsZero() {
-		gap := u.CompleteAt.Sub(u.lastProgressAt)
+	if u.Complete && u.CompleteAt != nil {
+		gap := u.CompleteAt.Sub(reachedAt)
 		if gap < holdMinSeconds*time.Second {
 			return
 		}
 		u.HoldSeconds = int(gap / time.Second)
 	}
 	u.Held = true
-	u.HeldAtMB = u.MaxMB
-	if !u.lastProgressAt.IsZero() {
-		at := u.lastProgressAt
-		u.HeldAt = &at
-	}
+	u.HeldAtMB = holdMB
+	at := reachedAt
+	u.HeldAt = &at
 }
