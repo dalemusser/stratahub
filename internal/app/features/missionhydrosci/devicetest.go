@@ -886,6 +886,12 @@ type deviceTestHeartbeatRequest struct {
 	PlayerPrefsBytes int64 `json:"playerprefs_bytes"`
 	CacheErrors      int   `json:"cache_errors"`
 	OfflineMs        int64 `json:"offline_ms"`
+	// Device state (optional; see models.MHSDeviceTestHeartbeat).
+	OtherWindows  int    `json:"other_windows"`
+	CPUPressure   string `json:"cpu_pressure"`
+	Stalls        int    `json:"stalls"`
+	MaxStallMs    int64  `json:"max_stall_ms"`
+	GLContextLost int    `json:"gl_context_lost"`
 }
 
 func (r deviceTestHeartbeatRequest) beat() models.MHSDeviceTestHeartbeat {
@@ -901,6 +907,11 @@ func (r deviceTestHeartbeatRequest) beat() models.MHSDeviceTestHeartbeat {
 		PlayerPrefsBytes: r.PlayerPrefsBytes,
 		CacheErrors:      r.CacheErrors,
 		OfflineMs:        r.OfflineMs,
+		OtherWindows:     r.OtherWindows,
+		CPUPressure:      models.ClipRunes(r.CPUPressure, 16),
+		Stalls:           r.Stalls,
+		MaxStallMs:       r.MaxStallMs,
+		GLContextLost:    r.GLContextLost,
 	}
 }
 

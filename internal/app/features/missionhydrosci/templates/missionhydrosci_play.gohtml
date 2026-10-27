@@ -919,6 +919,86 @@
       // ("Aw, Snap") kills the page with nothing left to report, so the trend
       // up to the last beat is the evidence; the server marks a run whose
       // beats stop without a closing beat as "page stopped responding".
+      // Device state, for telling a struggling machine from a slow one (the
+      // Oct 2026 freeze loop on two Chromebooks of a model that plays fine
+      // elsewhere): other game windows open on this device, the CPU pressure
+      // Chrome reports, main-thread stalls while visible, a lost graphics
+      // context (a blank white or green game), and a page the browser had
+      // discarded for memory. Sent with each heartbeat; the notable ones are
+      // also written to the step log.
+      var devState = { pageId: Math.random().toString(36).slice(2) + Date.now().toString(36), others: {}, othersLogged: 0,
+        cpu: '', cpuLogged: {}, stalls: 0, maxStallMs: 0, stallsLogged: 0, glLost: 0 };
+      function otherGameWindows() {
+        var n = 0, now = Date.now();
+        for (var k in devState.others) {
+          if (now - devState.others[k] < 150000) n++; // a hidden tab's timers can run once a minute
+          else delete devState.others[k];
+        }
+        return n;
+      }
+      try {
+        var playChannel = new BroadcastChannel('mhs-play-windows');
+        playChannel.onmessage = function(ev) {
+          var m = ev.data || {};
+          if (!m.id || m.id === devState.pageId) return;
+          if (m.kind === 'bye') { delete devState.others[m.id]; return; }
+          devState.others[m.id] = Date.now();
+          if (m.kind === 'hello') playChannel.postMessage({ kind: 'here', id: devState.pageId, unit: unitId });
+          var n = otherGameWindows();
+          if (n > devState.othersLogged && devState.othersLogged < 3) {
+            devState.othersLogged = n;
+            stepLog.record('game', 'warn', 'Another game window is open on this device (' + n + ' besides this one)', { unit: unitId, other_windows: n });
+          }
+        };
+        playChannel.postMessage({ kind: 'hello', id: devState.pageId, unit: unitId });
+        setInterval(function() { playChannel.postMessage({ kind: 'here', id: devState.pageId, unit: unitId }); }, 20000);
+        window.addEventListener('pagehide', function() { try { playChannel.postMessage({ kind: 'bye', id: devState.pageId }); } catch (e) {} });
+      } catch (e) { /* BroadcastChannel not available */ }
+      try {
+        if ('PressureObserver' in window) {
+          var pressure = new PressureObserver(function(records) {
+            var r = records[records.length - 1];
+            if (!r) return;
+            devState.cpu = r.state;
+            if ((r.state === 'serious' || r.state === 'critical') && !devState.cpuLogged[r.state]) {
+              devState.cpuLogged[r.state] = true;
+              stepLog.record('game', 'warn', 'The device reports ' + r.state + ' CPU pressure', { unit: unitId, cpu_pressure: r.state });
+            }
+          });
+          var observed = pressure.observe('cpu', { sampleInterval: 2000 });
+          if (observed && observed.catch) observed.catch(function() {});
+        }
+      } catch (e) { /* Compute Pressure not available */ }
+      (function watchStalls() {
+        var last = performance.now();
+        setInterval(function() {
+          var now = performance.now(), gap = now - last;
+          last = now;
+          if (document.visibilityState !== 'visible' || gap < 3500) return;
+          devState.stalls++;
+          if (gap > devState.maxStallMs) devState.maxStallMs = Math.round(gap);
+          if (gap >= 10000 && devState.stallsLogged < 3) {
+            devState.stallsLogged++;
+            stepLog.record('game', 'warn', 'The page was frozen for ' + Math.round(gap / 1000) + ' s', { unit: unitId, stall_s: Math.round(gap / 1000) });
+          }
+        }, 500);
+      })();
+      try {
+        var glCanvas = document.getElementById('unity-canvas');
+        if (glCanvas) {
+          glCanvas.addEventListener('webglcontextlost', function() {
+            devState.glLost++;
+            if (devState.glLost <= 3) stepLog.record('game', 'warn', 'The graphics context was lost (the game screen may go blank)', { unit: unitId, gl_lost: devState.glLost });
+          }, false);
+          glCanvas.addEventListener('webglcontextrestored', function() {
+            stepLog.record('game', 'info', 'The graphics context was restored', { unit: unitId });
+          }, false);
+        }
+      } catch (e) { /* not available */ }
+      try {
+        if (document.wasDiscarded) stepLog.record('page', 'warn', 'The browser had discarded this page earlier (usually when the device is short of memory) and reloaded it', { unit: unitId });
+      } catch (e) { /* not available */ }
+
       var hbFrames = 0, hbLastAt = Date.now(), hbTimer = null;
       var heartbeatUrl = {{ if .DeviceTest }}'{{ .DeviceTestBase }}/heartbeat'{{ else }}''{{ end }}; // members: set once the launch record exists
       (function countFrames() { hbFrames++; requestAnimationFrame(countFrames); })();
@@ -938,9 +1018,16 @@
           cache_errors: loggingHealth.cacheErrors,
           // Cumulative time this page has seen the device offline (its own
           // beats failing); only ever delivered once the connection is back.
-          offline_ms: netHealth.offlineMs + (netHealth.offlineSince ? (now - netHealth.offlineSince) : 0)
+          offline_ms: netHealth.offlineMs + (netHealth.offlineSince ? (now - netHealth.offlineSince) : 0),
+          // Device state since the previous beat (see devState above).
+          other_windows: otherGameWindows(),
+          cpu_pressure: devState.cpu,
+          stalls: devState.stalls,
+          max_stall_ms: devState.maxStallMs,
+          gl_context_lost: devState.glLost
         };
         hbFrames = 0; hbLastAt = now;
+        devState.stalls = 0; devState.maxStallMs = 0;
         try {
           if (performance.memory) {
             body.js_heap_mb = Math.round(performance.memory.usedJSHeapSize / 1048576);

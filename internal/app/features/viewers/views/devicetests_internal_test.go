@@ -81,3 +81,22 @@ func TestDeviceTestsMemberFilter(t *testing.T) {
 		t.Errorf("malformed member id should match nothing: %+v %v", q, err)
 	}
 }
+
+func TestHeartbeatDeviceState(t *testing.T) {
+	cases := []struct {
+		hb   models.MHSDeviceTestHeartbeat
+		want string
+	}{
+		{models.MHSDeviceTestHeartbeat{}, ""},
+		{models.MHSDeviceTestHeartbeat{CPUPressure: "fair"}, ""},
+		{models.MHSDeviceTestHeartbeat{OtherWindows: 1}, "1 other game window"},
+		{models.MHSDeviceTestHeartbeat{OtherWindows: 2, CPUPressure: "serious", Stalls: 3, MaxStallMs: 12400, GLContextLost: 1},
+			"2 other game windows · CPU serious · 3 stalls, longest 12 s · graphics lost 1×"},
+		{models.MHSDeviceTestHeartbeat{Stalls: 1, MaxStallMs: 3600}, "1 stall, longest 4 s"},
+	}
+	for _, c := range cases {
+		if got := heartbeatDeviceState(c.hb); got != c.want {
+			t.Errorf("heartbeatDeviceState(%+v) = %q, want %q", c.hb, got, c.want)
+		}
+	}
+}

@@ -503,6 +503,32 @@ func heartbeatMemory(b *models.MHSDeviceTestHeartbeat) string {
 }
 
 // heartbeatText renders one beat for the detail.
+// heartbeatDeviceState is the device-state part of a heartbeat in a few
+// words ("2 other game windows · CPU serious · 3 stalls, longest 12 s ·
+// graphics lost 1×"), or "" when the page reported nothing unusual.
+func heartbeatDeviceState(b models.MHSDeviceTestHeartbeat) string {
+	var parts []string
+	if b.OtherWindows == 1 {
+		parts = append(parts, "1 other game window")
+	} else if b.OtherWindows > 1 {
+		parts = append(parts, fmt.Sprintf("%d other game windows", b.OtherWindows))
+	}
+	if b.CPUPressure == "serious" || b.CPUPressure == "critical" {
+		parts = append(parts, "CPU "+b.CPUPressure)
+	}
+	if b.Stalls > 0 {
+		s := fmt.Sprintf("%d stall", b.Stalls)
+		if b.Stalls > 1 {
+			s += "s"
+		}
+		parts = append(parts, fmt.Sprintf("%s, longest %.0f s", s, float64(b.MaxStallMs)/1000))
+	}
+	if b.GLContextLost > 0 {
+		parts = append(parts, fmt.Sprintf("graphics lost %d×", b.GLContextLost))
+	}
+	return strings.Join(parts, " · ")
+}
+
 func heartbeatText(b *models.MHSDeviceTestHeartbeat) string {
 	if b == nil {
 		return ""
@@ -877,7 +903,7 @@ func (v *DeviceTests) detailHTML(t *models.MHSDeviceTest, g gameplay) string {
 	// Heartbeats (newest last; the memory trend before a crash)
 	if len(t.Heartbeats) > 0 {
 		b.WriteString(`<div><div class="font-medium text-gray-700 dark:text-gray-300">Heartbeats (` + fmt.Sprint(len(t.Heartbeats)) + `, newest last)</div>`)
-		b.WriteString(`<div class="overflow-auto max-h-64"><table class="text-xs w-full"><thead><tr class="text-gray-500 dark:text-gray-400"><th class="text-left pr-2">Time (UTC)</th><th class="text-left pr-2">Into launch</th><th class="text-left pr-2">Game memory</th><th class="text-left pr-2">JS heap</th><th class="text-left pr-2">FPS</th><th class="text-left">Tab</th></tr></thead><tbody>`)
+		b.WriteString(`<div class="overflow-auto max-h-64"><table class="text-xs w-full"><thead><tr class="text-gray-500 dark:text-gray-400"><th class="text-left pr-2">Time (UTC)</th><th class="text-left pr-2">Into launch</th><th class="text-left pr-2">Game memory</th><th class="text-left pr-2">JS heap</th><th class="text-left pr-2">FPS</th><th class="text-left pr-2">Tab</th><th class="text-left">Device</th></tr></thead><tbody>`)
 		start := 0
 		if len(t.Heartbeats) > 40 {
 			start = len(t.Heartbeats) - 40
@@ -888,7 +914,8 @@ func (v *DeviceTests) detailHTML(t *models.MHSDeviceTest, g gameplay) string {
 			b.WriteString(`<td class="pr-2 whitespace-nowrap tabular-nums">` + esc(mbOrDash(hb.WasmHeapMB)) + `</td>`)
 			b.WriteString(`<td class="pr-2 whitespace-nowrap tabular-nums">` + esc(mbOrDash(hb.JSHeapMB)) + `</td>`)
 			b.WriteString(`<td class="pr-2 whitespace-nowrap tabular-nums">` + esc(fmt.Sprintf("%.0f", hb.FPS)) + `</td>`)
-			b.WriteString(`<td class="whitespace-nowrap">` + esc(hb.Visibility) + `</td></tr>`)
+			b.WriteString(`<td class="pr-2 whitespace-nowrap">` + esc(hb.Visibility) + `</td>`)
+			b.WriteString(`<td class="whitespace-nowrap">` + esc(heartbeatDeviceState(hb)) + `</td></tr>`)
 		}
 		b.WriteString(`</tbody></table></div></div>`)
 	}

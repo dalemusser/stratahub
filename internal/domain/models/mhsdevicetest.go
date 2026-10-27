@@ -137,6 +137,18 @@ type MHSDeviceTestHeartbeat struct {
 	// Time the page has seen the device offline so far this session (its own
 	// heartbeats failing), cumulative; reported once the connection is back.
 	OfflineMs int64 `bson:"offline_ms,omitempty" json:"offline_ms,omitempty"`
+	// Device state read by the page, for telling a struggling machine from a
+	// slow one (optional; older pages omit them): other game windows open on
+	// the same device (BroadcastChannel between play pages), the CPU pressure
+	// state Chrome reports (nominal / fair / serious / critical), main-thread
+	// stalls of 3 s or more since the previous beat while the tab was visible
+	// and the longest of them, and how many times the graphics (WebGL)
+	// context was lost so far.
+	OtherWindows  int    `bson:"other_windows,omitempty" json:"other_windows,omitempty"`
+	CPUPressure   string `bson:"cpu_pressure,omitempty" json:"cpu_pressure,omitempty"`
+	Stalls        int    `bson:"stalls,omitempty" json:"stalls,omitempty"`
+	MaxStallMs    int64  `bson:"max_stall_ms,omitempty" json:"max_stall_ms,omitempty"`
+	GLContextLost int    `bson:"gl_context_lost,omitempty" json:"gl_context_lost,omitempty"`
 }
 
 // Logging-health states of a launch (MHSDeviceTest.LogsState): whether the
