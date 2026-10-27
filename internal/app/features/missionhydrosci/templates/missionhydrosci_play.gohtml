@@ -1015,8 +1015,24 @@
       // --- Crash reporting ---
       var crashPhase = 'loading'; // tracks current phase: loading, compiling, running
       var crashReported = false;  // prevent duplicate reports
+      var noticesLogged = 0;      // browser notices written to the step log (capped)
+
+      // Browser notices: promise rejections the game raises while it keeps
+      // running (pointer lock without a user gesture or refused by a
+      // permissions check, fullscreen and AudioContext refusals). Same rule as
+      // mhssteplog.IsCrashNotice. They are not crashes: the launch stays
+      // launch-ok, nothing is sent to the log service, and a real crash later
+      // is still reported.
+      var crashNoticeRe = /pointer lock|permissions check failed|too many pointer lock|fullscreen|audiocontext/i;
 
       function reportCrash(type, message, stack, phase) {
+        if (type === 'unhandled_rejection' && crashNoticeRe.test(String(message || ''))) {
+          if (noticesLogged >= 5) return;
+          noticesLogged++;
+          stepLog.record('game', 'warn', 'Browser notice (' + type + ', ' + (phase || crashPhase) + '): ' +
+            String(message || '').slice(0, 200), { type: type, phase: phase || crashPhase, unit: unitId });
+          return;
+        }
         if (crashReported) return;
         crashReported = true;
         stepLog.record('game', 'fail', 'Crash (' + (type || 'unknown') + ', ' + (phase || crashPhase) + '): ' +

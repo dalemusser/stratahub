@@ -51,6 +51,7 @@ func TestPagesStillWriteTheSentencesWeParse(t *testing.T) {
 
 	playPhrases := []string{
 		"'Crash (' + (type || 'unknown') + ', ' + (phase || crashPhase) + '): '",
+		"'Browser notice (' + type + ', ' + (phase || crashPhase) + '): '",
 		"'No progress for ' + Math.round(idle / 1000) + ' s while ' + phaseText() + ' — ' + probe",
 		"'Still no progress after ' + Math.round(idle / 1000) + ' s — stuck ' + phaseText()",
 		"', even straight from the content server'",

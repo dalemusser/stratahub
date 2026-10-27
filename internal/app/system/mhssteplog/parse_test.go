@@ -127,6 +127,8 @@ func TestParseMethodStorageLaunchGame(t *testing.T) {
 			Event{Kind: KindCrash, CrashType: "unhandled_rejection", Phase: "game", Message: "A user gesture is required to request Pointer Lock.", Notice: true}},
 		{"crash real", step("game", "fail", "Crash (runtime_error, running): RuntimeError: memory access out of bounds", nil),
 			Event{Kind: KindCrash, CrashType: "runtime_error", Phase: "running", Message: "RuntimeError: memory access out of bounds"}},
+		{"browser notice", step("game", "warn", "Browser notice (unhandled_rejection, running): Permissions check failed", map[string]string{"type": "unhandled_rejection", "phase": "running", "unit": "unit2"}),
+			Event{Kind: KindCrash, Unit: "unit2", CrashType: "unhandled_rejection", Phase: "running", Message: "Permissions check failed", Notice: true}},
 		{"game warn ignored", step("game", "warn", "Connection lost — the game keeps playing", nil), Event{}},
 		{"page", step("page", "info", "Opened the play page for unit1 v2.8.1", nil), Event{Kind: KindPage, Unit: "unit1", Version: "2.8.1"}},
 		{"page units", step("page", "info", "Opened the units page", nil), Event{Kind: KindPage}},

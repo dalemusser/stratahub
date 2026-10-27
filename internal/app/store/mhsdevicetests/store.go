@@ -558,6 +558,37 @@ func (s *Store) ListMemberBetween(ctx context.Context, wsID primitive.ObjectID, 
 	return runs, nil
 }
 
+// HeartbeatsByIDs returns the frame-rate trend of the given records (only the
+// heartbeat fields MHSRunFroze reads).
+func (s *Store) HeartbeatsByIDs(ctx context.Context, wsID primitive.ObjectID, ids []primitive.ObjectID) (map[primitive.ObjectID][]models.MHSDeviceTestHeartbeat, error) {
+	out := make(map[primitive.ObjectID][]models.MHSDeviceTestHeartbeat, len(ids))
+	const chunk = 200
+	for start := 0; start < len(ids); start += chunk {
+		end := start + chunk
+		if end > len(ids) {
+			end = len(ids)
+		}
+		cur, err := s.c.Find(ctx, bson.M{"workspace_id": wsID, "_id": bson.M{"$in": ids[start:end]}},
+			options.Find().SetProjection(bson.M{"heartbeats.elapsed_ms": 1, "heartbeats.wasm_heap_mb": 1, "heartbeats.fps": 1}))
+		if err != nil {
+			return nil, err
+		}
+		var docs []struct {
+			ID         primitive.ObjectID              `bson:"_id"`
+			Heartbeats []models.MHSDeviceTestHeartbeat `bson:"heartbeats"`
+		}
+		err = cur.All(ctx, &docs)
+		cur.Close(ctx)
+		if err != nil {
+			return nil, err
+		}
+		for _, d := range docs {
+			out[d.ID] = d.Heartbeats
+		}
+	}
+	return out, nil
+}
+
 // StepsByIDs returns the step logs of the given records.
 func (s *Store) StepsByIDs(ctx context.Context, wsID primitive.ObjectID, ids []primitive.ObjectID) (map[primitive.ObjectID][]models.MHSDeviceTestStep, error) {
 	out := make(map[primitive.ObjectID][]models.MHSDeviceTestStep, len(ids))

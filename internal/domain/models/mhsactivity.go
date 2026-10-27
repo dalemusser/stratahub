@@ -14,7 +14,8 @@ import (
 //	1 (2026-10-13): first release
 //	2 (2026-10-13): a day with fewer than MHSActivityMinPlayedEvents game
 //	   events is "stray events" (a tab opened on an earlier day), not played
-const MHSActivityVersion = 2
+//	3 (2026-10-26): runs that froze (Launch.Froze) and the freeze loop flag
+const MHSActivityVersion = 3
 
 // MHSActivityMinPlayedEvents is how many game log events a day needs to count
 // as played. A game tab left open from an earlier day sends a handful when
@@ -144,6 +145,11 @@ type MHSActivityLaunch struct {
 	LoaderNetwork    int     `bson:"loader_network,omitempty" json:"loader_network,omitempty"`
 	UnitySecondsLast float64 `bson:"unity_s_last,omitempty" json:"unity_s_last,omitempty"`
 	UnitySecondsMax  float64 `bson:"unity_s_max,omitempty" json:"unity_s_max,omitempty"`
+	// Froze counts the day's runs that froze once the game had loaded and
+	// ended within a few minutes (MHSRunFroze): on a slow or troubled device
+	// the student relaunches, and a run that ends before the first save
+	// starts the unit over each time.
+	Froze int `bson:"froze,omitempty" json:"froze,omitempty"`
 }
 
 // MHSActivityCrashes splits the day's "Crash (…)" entries into browser
@@ -175,11 +181,12 @@ type MHSActivityFlags struct {
 	NewDevice           bool `bson:"new_device,omitempty" json:"new_device,omitempty"`
 	LoggingProblem      bool `bson:"logging_problem,omitempty" json:"logging_problem,omitempty"` // launched and heartbeating but no log events
 	StrayEvents         bool `bson:"stray_events,omitempty" json:"stray_events,omitempty"`       // a few game events and nothing else: a tab opened on an earlier day
+	FreezeLoop          bool `bson:"freeze_loop,omitempty" json:"freeze_loop,omitempty"`         // MHSFreezeLoopRuns or more runs froze that day: the student is stuck relaunching
 }
 
 // HasProblem reports whether the day shows something staff would act on.
 func (d MHSActivityDay) HasProblem() bool {
-	return d.Blocked || d.Flags.DownloadFailed || d.Flags.Held || d.Flags.LaunchFailed || d.Crashes.Real > 0
+	return d.Blocked || d.Flags.DownloadFailed || d.Flags.Held || d.Flags.LaunchFailed || d.Crashes.Real > 0 || d.Flags.FreezeLoop
 }
 
 // MHSActivityMark records that an organization's day has been rolled up
@@ -198,4 +205,37 @@ type MHSActivityMark struct {
 	Students       int                `bson:"students" json:"students"`
 	ComputedAt     time.Time          `bson:"computed_at" json:"computed_at"`
 	Version        int                `bson:"version" json:"version"`
+}
+
+// MHSFreezeLoopRuns is how many frozen runs in a day make a freeze loop.
+const MHSFreezeLoopRuns = 3
+
+// Thresholds of MHSRunFroze.
+const (
+	mhsFrozeLoadedWasmMB = 400    // the game's memory reaches this once a unit scene has loaded
+	mhsFrozeFPS          = 5      // below this the game is frozen, not slow
+	mhsFrozeMaxRunMs     = 300000 // the run ended within five minutes
+)
+
+// MHSRunFroze reports whether a run's heartbeats show the game freezing once
+// a unit scene had loaded (a beat under mhsFrozeFPS after the game's memory
+// reached its loaded size) and the run ending within five minutes. Checked
+// against the production data of Sept 14 – Oct 26 2026: three or more such
+// runs on one day matched the two students reported stuck at the start of
+// Unit 2 and nobody else.
+func MHSRunFroze(hbs []MHSDeviceTestHeartbeat) bool {
+	loaded, froze := false, false
+	var longest int64
+	for _, h := range hbs {
+		if h.ElapsedMs > longest {
+			longest = h.ElapsedMs
+		}
+		if h.WasmHeapMB >= mhsFrozeLoadedWasmMB {
+			loaded = true
+		}
+		if loaded && h.FPS > 0 && h.FPS < mhsFrozeFPS {
+			froze = true
+		}
+	}
+	return froze && longest > 0 && longest < mhsFrozeMaxRunMs
 }

@@ -45,7 +45,7 @@ const (
 	KindWatchdogWarn   Kind = "watchdog_warn"   // launch/warn "No progress for N s while <phase> — <probe>"
 	KindWatchdogFail   Kind = "watchdog_fail"   // launch/fail "Still no progress after N s — stuck <phase>…"
 	KindRendering      Kind = "rendering"       // game/ok "Game is rendering"
-	KindCrash          Kind = "crash"           // game/fail "Crash (<type>, <phase>): <message>"
+	KindCrash          Kind = "crash"           // game/fail "Crash (<type>, <phase>): <message>", or game/warn "Browser notice (<type>, <phase>): <message>" (a notice)
 )
 
 // Event is one parsed entry. Fields not meaningful for the Kind are zero.
@@ -101,6 +101,7 @@ var (
 	watchWarnRe  = regexp.MustCompile(`^No progress for (\d+) s while (.*?)(?: — (.*))?$`)
 	watchFailRe  = regexp.MustCompile(`^Still no progress after (\d+) s — stuck (.*?)(, even straight from the content server)?\.`)
 	crashRe      = regexp.MustCompile(`^Crash \(([^,]+), ([^)]+)\): (.*)$`)
+	noticeRe     = regexp.MustCompile(`^Browser notice \(([^,]+), ([^)]+)\): (.*)$`)
 	pageRe       = regexp.MustCompile(`^Opened the (\S+) page(?: for (\S+)(?: v(\S+))?)?`)
 )
 
@@ -221,6 +222,18 @@ func Parse(st models.MHSDeviceTestStep) (ev Event, ok bool) {
 				ev.Phase = pick(d, "phase", m[2])
 				ev.Message = m[3]
 				ev.Notice = IsCrashNotice(ev.CrashType, ev.Message)
+				return ev, true
+			}
+		}
+		if st.State == "warn" {
+			// A browser notice the page told apart itself: counted with the
+			// crash entries, as a notice.
+			if m := noticeRe.FindStringSubmatch(msg); m != nil {
+				ev.Kind = KindCrash
+				ev.CrashType = pick(d, "type", m[1])
+				ev.Phase = pick(d, "phase", m[2])
+				ev.Message = m[3]
+				ev.Notice = true
 				return ev, true
 			}
 		}

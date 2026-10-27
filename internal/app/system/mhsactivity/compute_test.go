@@ -167,3 +167,55 @@ func TestComputeDayEndToEnd(t *testing.T) {
 		t.Errorf("zones for one org %+v", zones)
 	}
 }
+
+func TestComputeDayCountsFrozenRuns(t *testing.T) {
+	db := testutil.SetupTestDB(t)
+	ctx, cancel := testutil.TestContext()
+	defer cancel()
+	f := testutil.NewFixtures(t, db)
+	ws := primitive.NewObjectID()
+	org := f.CreateOrganizationWithDetails(ctx, "School F", "Anytown", "MO", "America/Chicago")
+	if _, err := db.Collection("organizations").UpdateByID(ctx, org.ID, bson.M{"$set": bson.M{"workspace_id": ws}}); err != nil {
+		t.Fatal(err)
+	}
+	student := f.CreateUserInWorkspace(ctx, "Fran Student", "fran@example.com", "member", ws, &org.ID)
+	sid := student.ID
+	hb := func(at time.Time, elapsedS int64, wasm int, fps float64) models.MHSDeviceTestHeartbeat {
+		return models.MHSDeviceTestHeartbeat{At: at, ElapsedMs: elapsedS * 1000, Phase: "game", JSHeapMB: 300, WasmHeapMB: wasm, FPS: fps, Visibility: "visible"}
+	}
+	var recs []interface{}
+	for i := 0; i < 3; i++ {
+		start := utc(19, 47+i*4)
+		recs = append(recs, models.MHSDeviceTest{ID: primitive.NewObjectID(), WorkspaceID: ws, Kind: models.MHSDeviceTestKindMember, UserID: &sid, OrganizationID: &org.ID,
+			UnitID: "unit2", DeviceID: "dev-arm", StartedAt: start, ExpiresAt: start.Add(6 * time.Hour), Diagnostics: map[string]interface{}{"outcome": "launch-ok"},
+			HeartbeatCount: 4, Heartbeats: []models.MHSDeviceTestHeartbeat{hb(start, 10, 96, 43), hb(start.Add(30*time.Second), 40, 115, 58), hb(start.Add(time.Minute), 70, 495, 47), hb(start.Add(90*time.Second), 100, 495, 1.6)},
+			Steps: []models.MHSDeviceTestStep{{At: start, Step: "game", State: "ok", Msg: "Game is rendering", Detail: map[string]string{"unit": "unit2"}}}})
+	}
+	// A slow but steady run with a browser notice written the new way.
+	slow := utc(20, 5)
+	recs = append(recs, models.MHSDeviceTest{ID: primitive.NewObjectID(), WorkspaceID: ws, Kind: models.MHSDeviceTestKindMember, UserID: &sid, OrganizationID: &org.ID,
+		UnitID: "unit2", DeviceID: "dev-arm", StartedAt: slow, ExpiresAt: slow.Add(6 * time.Hour), Diagnostics: map[string]interface{}{"outcome": "launch-ok"},
+		HeartbeatCount: 3, Heartbeats: []models.MHSDeviceTestHeartbeat{hb(slow, 10, 96, 30), hb(slow.Add(time.Minute), 70, 495, 12), hb(slow.Add(10*time.Minute), 600, 495, 13)},
+		Steps: []models.MHSDeviceTestStep{
+			{At: slow, Step: "game", State: "ok", Msg: "Game is rendering", Detail: map[string]string{"unit": "unit2"}},
+			{At: slow.Add(2 * time.Minute), Step: "game", State: "warn", Msg: "Browser notice (unhandled_rejection, running): Permissions check failed", Detail: map[string]string{"type": "unhandled_rejection", "phase": "running", "unit": "unit2"}},
+		}})
+	if _, err := db.Collection("mhs_device_tests").InsertMany(ctx, recs); err != nil {
+		t.Fatal(err)
+	}
+	zone := Zone{TZ: "America/Chicago", Loc: chicago, OrgIDs: []primitive.ObjectID{org.ID}}
+	docs, err := ComputeDay(ctx, Deps{DB: db, Log: zap.NewNop()}, ws, "2026-10-12", zone)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(docs) != 1 {
+		t.Fatalf("docs %+v", docs)
+	}
+	d := docs[0]
+	if d.Launch.OK != 4 || d.Launch.Froze != 3 || !d.Flags.FreezeLoop || !d.HasProblem() {
+		t.Errorf("launch %+v flags %+v", d.Launch, d.Flags)
+	}
+	if d.Crashes.Notice != 1 || d.Crashes.Real != 0 {
+		t.Errorf("crashes %+v", d.Crashes)
+	}
+}

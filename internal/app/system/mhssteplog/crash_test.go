@@ -1,6 +1,19 @@
 package mhssteplog
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
+
+// The play page tells notices apart itself (so they never mark a launch as
+// crashed); its pattern must stay the one IsCrashNotice uses.
+func TestPlayPageUsesTheSameNoticePattern(t *testing.T) {
+	play := readSource(t, "..", "..", "features", "missionhydrosci", "templates", "missionhydrosci_play.gohtml")
+	want := "var crashNoticeRe = /" + strings.TrimPrefix(crashNoticeRe.String(), "(?i)") + "/i;"
+	if !strings.Contains(play, want) {
+		t.Errorf("the play page's notice pattern differs from crashNoticeRe; want %q", want)
+	}
+}
 
 func TestIsCrashNotice(t *testing.T) {
 	tests := []struct {

@@ -42,6 +42,9 @@ type Counts struct {
 	CrashReal   int
 	CrashNotice int
 
+	LaunchFroze int // runs that froze once loaded and ended within minutes
+	FreezeLoop  int // students with a freeze loop on some day of the window
+
 	DevicesSeen int // distinct device ids
 	DevicesNew  int // device rows created in the window (fresh browser profiles)
 
@@ -50,7 +53,7 @@ type Counts struct {
 
 // Problem reports whether the counts show something to act on.
 func (c Counts) Problem() bool {
-	return c.Blocked > 0 || c.DlHeld > 0 || c.DlFailed > 0 || c.LaunchFailed > 0
+	return c.Blocked > 0 || c.DlHeld > 0 || c.DlFailed > 0 || c.LaunchFailed > 0 || c.FreezeLoop > 0
 }
 
 // Downloads is the number of download episodes that moved data.
@@ -115,6 +118,7 @@ type StudentRow struct {
 	Launch          models.MHSActivityLaunch
 	CrashReal       int
 	CrashNotice     int
+	FreezeLoop      bool // some day of the window: the game froze MHSFreezeLoopRuns+ times
 	Devices         int
 	NewDevices      int
 	Platforms       string
@@ -325,12 +329,12 @@ func hasGroup(d models.MHSActivityDay, g primitive.ObjectID) bool {
 // users; downloads, launches and crashes add up; devices are distinct ids.
 func aggregate(ds []models.MHSActivityDay) Counts {
 	var c Counts
-	users := map[primitive.ObjectID]*struct{ opened, played, blocked, bgfetch bool }{}
+	users := map[primitive.ObjectID]*struct{ opened, played, blocked, bgfetch, freezeLoop bool }{}
 	devices := map[string]bool{}
 	for _, d := range ds {
 		u := users[d.UserID]
 		if u == nil {
-			u = &struct{ opened, played, blocked, bgfetch bool }{}
+			u = &struct{ opened, played, blocked, bgfetch, freezeLoop bool }{}
 			users[d.UserID] = u
 		}
 		u.opened = u.opened || d.Opened
@@ -360,6 +364,10 @@ func aggregate(ds []models.MHSActivityDay) Counts {
 		c.LaunchFailed += d.Launch.Failed
 		c.CrashReal += d.Crashes.Real
 		c.CrashNotice += d.Crashes.Notice
+		c.LaunchFroze += d.Launch.Froze
+		if d.Flags.FreezeLoop {
+			u.freezeLoop = true
+		}
 		for _, dev := range d.Devices {
 			devices[dev.DeviceID] = true
 			if dev.New {
@@ -382,6 +390,9 @@ func aggregate(ds []models.MHSActivityDay) Counts {
 		}
 		if u.bgfetch {
 			c.BgfetchRefused++
+		}
+		if u.freezeLoop {
+			c.FreezeLoop++
 		}
 	}
 	c.DevicesSeen = len(devices)
@@ -410,6 +421,8 @@ func studentRows(ds []models.MHSActivityDay, lk Lookups, loc *time.Location, sta
 			row.Launch.Stalled += d.Launch.Stalled
 			row.Launch.StalledRecovered += d.Launch.StalledRecovered
 			row.Launch.Failed += d.Launch.Failed
+			row.Launch.Froze += d.Launch.Froze
+			row.FreezeLoop = row.FreezeLoop || d.Flags.FreezeLoop
 			row.Launch.LoaderCache += d.Launch.LoaderCache
 			row.Launch.LoaderNetwork += d.Launch.LoaderNetwork
 			if d.Launch.UnitySecondsLast > 0 {
@@ -569,6 +582,9 @@ func unitLabel(unit string) string {
 	return unit
 }
 
+// freezeLoopTitle explains the freeze-loop pills.
+const freezeLoopTitle = "The game froze after loading and the run ended within minutes, three or more times in a day. A run that ends before the game's first save starts the unit over. Try another device; restarting this one may help."
+
 func schoolPills(c Counts, churn bool) []Pill {
 	var p []Pill
 	if c.Blocked > 0 {
@@ -585,6 +601,9 @@ func schoolPills(c Counts, churn bool) []Pill {
 	}
 	if c.CrashReal > 0 {
 		p = append(p, Pill{Text: plural(c.CrashReal, "crash", "crashes"), Class: viewers.PillAmber})
+	}
+	if c.FreezeLoop > 0 {
+		p = append(p, Pill{Text: plural(c.FreezeLoop, "student", "students") + " stuck relaunching", Class: viewers.PillAmber, Title: freezeLoopTitle})
 	}
 	if churn {
 		p = append(p, Pill{Text: "new browser profile every day", Class: viewers.PillAmber, Title: "Most student-days used a device whose browser data was new that day: downloads do not survive between sessions"})
@@ -611,6 +630,11 @@ func studentPills(r StudentRow) []Pill {
 	}
 	if r.CrashReal > 0 {
 		p = append(p, Pill{Text: plural(r.CrashReal, "crash", "crashes"), Class: viewers.PillAmber})
+	}
+	if r.FreezeLoop {
+		p = append(p, Pill{Text: "game froze " + plural(r.Launch.Froze, "time", "times"), Class: viewers.PillAmber, Title: freezeLoopTitle})
+	} else if r.Launch.Froze > 0 {
+		p = append(p, Pill{Text: "game froze " + plural(r.Launch.Froze, "time", "times"), Class: viewers.PillGray, Title: "The game froze after loading and the run ended within minutes"})
 	}
 	if r.Launch.Stalled > 0 {
 		t := plural(r.Launch.Stalled, "slow start", "slow starts")

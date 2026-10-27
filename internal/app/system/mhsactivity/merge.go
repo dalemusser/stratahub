@@ -439,6 +439,18 @@ func (b *builder) addLog(userID primitive.ObjectID, ua logdata.UserActivity) {
 	a.doc.Flags.StrayEvents = true
 }
 
+// addFrozenRun counts a run of the day that froze (models.MHSRunFroze).
+func (b *builder) addFrozenRun(rec models.MHSDeviceTest) {
+	if rec.UserID == nil {
+		return
+	}
+	p := b.people[*rec.UserID]
+	if p == nil {
+		return
+	}
+	b.acc(p).doc.Launch.Froze++
+}
+
 // finish closes every accumulator into its day document.
 func (b *builder) finish(now time.Time) []models.MHSActivityDay {
 	docs := make([]models.MHSActivityDay, 0, len(b.accs))
@@ -497,6 +509,7 @@ func (b *builder) finish(now time.Time) []models.MHSActivityDay {
 			d.Flags.LaunchFailed = true
 			problem = true
 		}
+		d.Flags.FreezeLoop = d.Launch.Froze >= models.MHSFreezeLoopRuns
 		for t := range a.types {
 			d.Crashes.Types = append(d.Crashes.Types, t)
 		}

@@ -368,6 +368,8 @@ func missingLabel(m string) string {
 		return "device status rows"
 	case activity.MissingPageViews:
 		return "page views"
+	case activity.MissingHeartbeats:
+		return "heartbeats (frozen runs not counted)"
 	}
 	return m
 }

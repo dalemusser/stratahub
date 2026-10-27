@@ -241,3 +241,28 @@ func TestMergeStrayEventsAreNotPlayed(t *testing.T) {
 		t.Errorf("played %+v", d3)
 	}
 }
+
+func TestMergeFreezeLoop(t *testing.T) {
+	b, student, teacher := testBuilder(t)
+	for i := 0; i < 3; i++ {
+		r := rec(student, "dev-a", "unit2", "launch-ok", ct(14, 47+i*3, 0))
+		b.addRecord(r, &models.MHSMemberSummary{V: models.MHSMemberSummaryVersion})
+		b.addFrozenRun(r)
+	}
+	for i := 0; i < 2; i++ {
+		b.addFrozenRun(rec(teacher, "dev-t", "unit2", "launch-ok", ct(14, 50+i, 0)))
+	}
+	docs := b.finish(time.Now())
+	for _, d := range docs {
+		switch d.UserID {
+		case student.ID:
+			if d.Launch.Froze != 3 || !d.Flags.FreezeLoop || !d.HasProblem() {
+				t.Errorf("student: froze %d loop %v problem %v", d.Launch.Froze, d.Flags.FreezeLoop, d.HasProblem())
+			}
+		case teacher.ID:
+			if d.Launch.Froze != 2 || d.Flags.FreezeLoop {
+				t.Errorf("two frozen runs are not a loop: froze %d loop %v", d.Launch.Froze, d.Flags.FreezeLoop)
+			}
+		}
+	}
+}

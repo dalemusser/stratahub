@@ -34,6 +34,7 @@ const (
 	MissingGrader       = "grader"
 	MissingDeviceStatus = "device_status"
 	MissingPageViews    = "page_views"
+	MissingHeartbeats   = "heartbeats"
 )
 
 // Deps are the databases a computation reads. LogDB and GradesDB may be
@@ -145,6 +146,26 @@ func ComputeDay(ctx context.Context, deps Deps, wsID primitive.ObjectID, day str
 			sum = &s
 		}
 		b.addRecord(rec, sum)
+	}
+
+	// Frame-rate trends of the day's launches: runs that froze.
+	var launched []primitive.ObjectID
+	for _, rec := range recs {
+		if outcomeOf(rec) == "launch-ok" && rec.HeartbeatCount > 0 && b.inDay(rec.StartedAt) {
+			launched = append(launched, rec.ID)
+		}
+	}
+	if len(launched) > 0 {
+		if hbs, err := tests.HeartbeatsByIDs(ctx, wsID, launched); err != nil {
+			log.Warn("mhs activity: heartbeats unavailable", zap.Error(err))
+			b.missing(MissingHeartbeats)
+		} else {
+			for _, rec := range recs {
+				if h, ok := hbs[rec.ID]; ok && models.MHSRunFroze(h) {
+					b.addFrozenRun(rec)
+				}
+			}
+		}
 	}
 
 	// Device rows: a row created in the day is a fresh browser profile; one
