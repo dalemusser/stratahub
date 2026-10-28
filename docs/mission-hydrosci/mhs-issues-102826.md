@@ -81,7 +81,7 @@ Trade-off: switching the window away from a running unit A drops what happened s
 
 - **Play page: a discard notice** (detailed below, discussed 2026-10-28).
 - **MHS Activity: count discards and second game windows** (detailed below, discussed 2026-10-28).
-- **Game team:** the Unit 2 memory findings apply to Unit 3 (initial WebGL heap 512 MB so the heap does not grow in copy steps at the scene load; lighter assets); a resume that re-activates the quest and replays its hint makes a resume look like a restart.
+- **Game team: memory, and the resume that looks like a restart** (detailed below, discussed 2026-10-28).
 
 ### Candidate in detail: a discard notice on the play page (discussed 2026-10-28)
 
@@ -109,6 +109,40 @@ Draft wording for the student: "Chrome closed the game to free up memory while a
 **Data path.** The three device-state steps (`5af3f12`) are plain `page/warn` and `game/warn` steps with structured detail: "The browser had discarded this page earlier …" (`unit`), "Another game window is open on this device (N besides this one)" (`other_windows`), "The page was frozen for N s" (`stall_s`). The parser (`mhssteplog`) does not know them yet; it would gain three kinds (discarded, other window, page frozen), `Summarize` three fields (discards, most other windows seen, page freezes), and `MHSMemberSummaryVersion` goes to 2 (records with a version-1 summary are re-parsed from their steps at compute time, which is the existing path). The day doc gains `Launch.Discarded`, `Launch.PageFrozen`, `Flags.SecondGameWindow` and a problem flag at two or more discards in a day (one discard is ordinary: Chrome's memory saver unloads a tab left in the background over lunch); `HasProblem` includes it; `MHSActivityVersion` goes to 4 so the job recomputes the stored days gradually, as it did for version 3. Pills: student row "Chrome closed the game N times" (amber at 2+, gray at 1) and "2 game windows open" (amber); school row "N students had the game closed by Chrome"; CSV columns for each. The message prefixes join the pin test that guards the parser against wording changes in the page. The data exists only from 2026-10-27 01:41 CDT, so earlier days show nothing; the pill title should say so.
 
 **The attention gap is a separate item.** A page nobody opens surfaces nothing. If the goal is "we hear about it before the teacher writes", the page needs a push: a daily digest of problem days (students with a problem flag, by school) sent to staff, or a morning check as routine. Noted here, not designed.
+
+### Candidate in detail: items for the game team (discussed 2026-10-28)
+
+**A. Memory.** The Unit 2 review of 2026-10-27 (local folder `mhs-reports-102726-unit2-review/`) measured all five builds from the build reports in the project's `Assets/BuildReports/` (2026-10-27 builds). Unit 3 against the others, MB in the packed build:
+
+| content | Unit 1 | Unit 2 | Unit 3 | Unit 4 | Unit 5 |
+|---|---|---|---|---|---|
+| total | 222 | 284 | 228 | 204 | 207 |
+| dialogue voice audio | 20 | 79 | 46 | 40 | 34 |
+| occlusion culling data | 1.4 | 29 | 21 (16 overworld + 4.6 dungeon) | 2.7 | 10 |
+| textures | 125 | 97 | 102 | 95 | 96 |
+| sandbox folders shipped | 35 | 37 | 11 | 21 | 29 |
+
+Field data (students, 2026-10-05 → 10-26): runs that froze on ARM 4 GB devices, Unit 1 2.5 %, Unit 2 3.2 %, **Unit 3 0.3 %**, Unit 4 0.3 %, Unit 5 0.5 %; JS heap median Unit 3 228 MB against Unit 2's 289 MB. Unit 3 is a middle-weight unit. What tipped the 2026-10-27 student was the device's state (a second game window, switching away during freezes), not Unit 3's content. The general suggestions still apply to every unit, and two Unit-3-specific ones exist:
+
+1. **Start the WebGL heap at 512 MB** in each Release profile (today 32 MB, growing 20 % at a time to the 495 MB every unit ends at; each step allocates and copies). The 20–24 s freezes logged yesterday sat exactly at the scene load, where that growth happens. A settings change; test on one ARM Chromebook first.
+2. **Texture format on Mali.** The builds carry DXT textures only; if the Mali GPUs lack `WEBGL_compressed_texture_s3tc`, Unity unpacks every texture at load. Unverified. Cheap StrataHub step to answer it for the whole fleet: the play page logs the WebGL extension list (or just that one flag) in the device details once per device. If missing, an ASTC/ETC2 texture variant chosen by the page at launch.
+3. **Unit 3's occlusion bake** (16 MB overworld, same 0.2 m smallest hole as Unit 2's): rebake coarser or turn occlusion off for open terrain.
+4. **Dialogue audio**: Unit 3 ships 1,311 clips, six player voices of ~151 lines each; a student hears one voice, so ~750 clips never play for them. Ship the chosen voice only (Addressables or one bundle per voice); consider 22 kHz for speech.
+5. **Strip sandbox folders** from release builds (11 MB in Unit 3, up to 37 MB elsewhere).
+6. Build size is memory on a 4 GB device: every MB of the data file stays in the page for the session.
+
+**B. The resume that looks like a restart.** Code path in the project copy (the shipped v2.9.x builds):
+
+- `CheckpointSaver.ApplyData` (Save Load System / CustomSavers) restores the scene checkpoint, invokes the checkpoint events `events[0..id]`, then at end of frame `ApplyWaypoints()` raises the quest-entry event (`QuestEntryData … Active`) for every active entry of the tracked quest.
+- `QuestEventValueListener.ProcessValueResponses` (Quest Listener) receives it. `response.QuestActivated` is a plain field, false in the freshly loaded scene and not part of the save, so the restored quest is treated as **newly activated**: the quest's `OnQuestActivated` events fire, `questActiveEvent` is written to the game log, waypoints are set again, and when `SaveOnActivation` is on, `DoAutoSave` sets the scene checkpoint variable to `AutoCheckpointOnActivation` and saves (that is the checkpoint rewind on load noted 2026-10-15 in the save-fix findings §8). Then each active entry's `OnQuestEntryActivated` events run again.
+- Supply Run (`Prefabs/Mini-games/TeraCrate/Quest1-Supply Run.prefab`): the quest-level `OnQuestActivated` list is empty and `SaveOnActivation` is off, so for this quest the visible effects are the entry activations: colliders re-enabled and variables set. Among the re-enabled colliders are four "boundary" triggers (East/South/North/West Boundary, Dialogue System triggers on enter) that start the conversation `U3/Tera` at entries 207 ("Head upstream of our location while I look for the exact crate locations."), 205 ("Nice. You're headed in the right direction…") and 206 ("Whoa there, TK, I said the crates were upstream…"). After a resume the boundaries are armed again, so Tera's directional guidance plays again as the student moves; the 2026-10-27 resumed runs show entry 207 then 205 within a minute of the scene load. With the quest tracker showing the quest again, this is "starting Level 3 over" from the student's chair, though position and variables are restored.
+- Data side effect: every resume logs a `questActiveEvent`, so activation counts are inflated (Supply Run activations per student: median 2, 90th percentile 4, maximum 42). Check with the grading rules whether anything counts activations.
+
+Proposed change for the game team: make the restore path distinguishable from a real activation. `CheckpointSaver.ApplyWaypoints` raises the entry event with a *restored* flag (or calls a dedicated method on the listener); on a restored event the listener sets `QuestActivated = true`, re-applies the waypoints, and skips `OnQuestActivated`, the `questActiveEvent` log entry and `DoAutoSave`. Entry activation events run only where they restore unsaved scene state (colliders, variables) — a per-quest review of the prefabs; hint boundaries could carry a "said once" variable so a line does not replay after a resume. Two scripts plus a review of the quest prefabs.
+
+**C. Skip the main menu after a discard reload.** The page knows `document.wasDiscarded`; the bridge already passes identity and service configuration into the game. One more flag could let the game go straight to START's resume path instead of showing the menu. Game change; must fit the save fix's START logic (which waits for the save service's answer). A decision for the team, not a request yet.
+
+**D. Hand-over form.** If these go to the team, an `mhs-updates` package in the usual shape (`03-for-the-game-dev.md`: Part 1 what to do, Part 2 other developer actions, Part 3 supporting information; anything the game needs is listed as required, never optional). A is settings and asset work with build checks; B is a code change with an editor repro (place a save mid-quest, reload, watch the quest tracker and Tera's lines); C is a design question.
 
 ### Where the evidence is
 
