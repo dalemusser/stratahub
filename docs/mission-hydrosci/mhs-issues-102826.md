@@ -14,6 +14,10 @@ Status key: **documented** = written down, nothing changed · **planned** = in t
 
 2026-10-27, a teacher at one school: one student "will be in the middle of playing the game (Level 3) and the game itself pauses her and restarts at the beginning of Level 3. I sat with her and watched it happen. Everyone else has been able to proceed today except her. She was the one who had the most issues on Friday as well." The game build was the version before the garden-box and save fixes (unit3 v2.9.5).
 
+### The same issue, seen before
+
+This is the Unit 2 "lag and exits" report from another school on 2026-10-26, now observable. There, two students on the same ARM 4 GB Chromebook class looped at the Unit 2 opening: 40–58 fps at the menu, the scene load took the heap to 495 MB, the frame rate fell to 0.1–6, the window lost focus and the run ended within 60–110 s, several times with no `pagehide` (the teacher saw the screen go green or white and the game "exit"). They never reached the first save point, so every relaunch really did restart the unit. The hypothesis recorded then was memory exhaustion on 4 GB ARM devices once the heap reaches 495 MB, worsened by leftover game windows; the device-state logging deployed 2026-10-27 01:41 CDT (`5af3f12`: `wasDiscarded`, freezes, other windows, CPU pressure) exists to test it, and the 2026-10-27 student below is its first confirmation. The only difference is that she had save points, so her restarts were apparent rather than real. The tester's note of 2026-10-19 from the week review, "If you pause in the game, it restarts the unit", is the same thing from the student's chair. Related memory/report folder: `mhs-reports-102626-unit2-lag/` (local).
+
 ### What the records show (read-only, 2026-10-27, Central time)
 
 Device: one Chromebook all week, ARM (MediaTek, Mali-G72 GPU), 4 GB RAM, Chrome 154, the game running in the installed PWA window. The user agent says `x86_64` because Chrome freezes that string; the game's own device report (`device.gdName`) is the reliable source. Same hardware class as the freeze-loop machines at another school on 2026-10-26.
