@@ -80,7 +80,7 @@ Trade-off: switching the window away from a running unit A drops what happened s
 ### Other candidate actions (not decided)
 
 - **Play page: a discard notice** (detailed below, discussed 2026-10-28).
-- **MHS Activity:** count discards per student the way freezes are counted (`Launch.Froze`, `Flags.FreezeLoop`, stratahub `3f346ff`): a "game window discarded N times" pill and CSV column, so these students surface without a teacher's email.
+- **MHS Activity: count discards and second game windows** (detailed below, discussed 2026-10-28).
 - **Game team:** the Unit 2 memory findings apply to Unit 3 (initial WebGL heap 512 MB so the heap does not grow in copy steps at the scene load; lighter assets); a resume that re-activates the quest and replays its hint makes a resume look like a restart.
 
 ### Candidate in detail: a discard notice on the play page (discussed 2026-10-28)
@@ -94,6 +94,21 @@ Draft wording for the student: "Chrome closed the game to free up memory while a
 **What it can and cannot do.** It cannot prevent the discard (Chrome decides, the page is not running at that moment), cannot press START for the student, does not know how long the window was gone, and cannot know whether the last save reached the service: on the current build a save in flight at the moment of the discard is lost (the save fix keeps an unsent save on the device and sends it at the next launch). So the wording says "last save point", never "where you were". It is information for two readers: the student, who otherwise thinks the game threw them back to the start of the unit, and the teacher, who gets the device advice on the spot instead of by email. Amber fits: a discard is a real problem, not a normal state.
 
 **Game-side option, not StrataHub.** With a flag from the page (the bridge already carries the identity and the service configuration), the game could skip the main menu after a discard reload and resume directly. That is a game change; noted for the game team, not part of this item.
+
+### Candidate in detail: discards and second game windows on the MHS Activity page (discussed 2026-10-28)
+
+**How freezes are counted today** (`3f346ff`, 2026-10-26, activity version 3). A run "froze" when its heartbeats show a beat under 5 fps after the game's memory passed 400 MB (a unit scene had loaded) and the run ended within five minutes (`models.MHSRunFroze`); the day's count is `Launch.Froze`; three or more in a day set `Flags.FreezeLoop`, which makes the day a problem (`HasProblem`). Pills: student row "game froze N times" (amber with the flag, gray without), school row "N students stuck relaunching"; CSV columns `launches_froze`, `students_freeze_loop` / `freeze_loop`.
+
+**It already surfaced this student.** Her stored day for 2026-10-27 (computed 06:12 CDT on 10-28, final, version 3): launches ok 11, `froze: 6`, `freeze_loop: true`, crash notices 3, blocked false. So her row read "game froze 6 times" in amber and the school row "1 student stuck relaunching" while the class was still running; the classmate on the same device model shows `froze: 2`, no flag. The teacher's email arrived anyway because nobody opens the page during the school day. Two conclusions: the symptom detection works; what is missing is the *cause* on the page, and someone's attention.
+
+**What the discard count adds.**
+- *Cause, not symptom.* "Froze" says the game stopped moving; "Chrome closed the game" says why the student is at the menu again, and "2 game windows open" names the thing to fix. Those are the words a coordinator can act on without reading heartbeats.
+- *Runs the freeze rule misses.* Two of her eight discards followed 11-minute runs; a run longer than five minutes is never "froze", so a student who is discarded once per long run never reaches the flag.
+- *The second game window* is a direct cause and a direct instruction ("close the other one"), today only visible in the step log.
+
+**Data path.** The three device-state steps (`5af3f12`) are plain `page/warn` and `game/warn` steps with structured detail: "The browser had discarded this page earlier …" (`unit`), "Another game window is open on this device (N besides this one)" (`other_windows`), "The page was frozen for N s" (`stall_s`). The parser (`mhssteplog`) does not know them yet; it would gain three kinds (discarded, other window, page frozen), `Summarize` three fields (discards, most other windows seen, page freezes), and `MHSMemberSummaryVersion` goes to 2 (records with a version-1 summary are re-parsed from their steps at compute time, which is the existing path). The day doc gains `Launch.Discarded`, `Launch.PageFrozen`, `Flags.SecondGameWindow` and a problem flag at two or more discards in a day (one discard is ordinary: Chrome's memory saver unloads a tab left in the background over lunch); `HasProblem` includes it; `MHSActivityVersion` goes to 4 so the job recomputes the stored days gradually, as it did for version 3. Pills: student row "Chrome closed the game N times" (amber at 2+, gray at 1) and "2 game windows open" (amber); school row "N students had the game closed by Chrome"; CSV columns for each. The message prefixes join the pin test that guards the parser against wording changes in the page. The data exists only from 2026-10-27 01:41 CDT, so earlier days show nothing; the pill title should say so.
+
+**The attention gap is a separate item.** A page nobody opens surfaces nothing. If the goal is "we hear about it before the teacher writes", the page needs a push: a daily digest of problem days (students with a problem flag, by school) sent to staff, or a morning check as routine. Noted here, not designed.
 
 ### Where the evidence is
 
