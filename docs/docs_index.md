@@ -39,7 +39,7 @@ This is the index of all documentation for StrataHub.
 
 - [MHS Activity](mhs-activity/plan.md) - The cross-school activity overview at `/mhsactivity` (who opened, downloaded, launched, played, crashed, was blocked, per school, group, student and day; live for open days, stored for closed ones; admin backfill), its definitions, data model, computation and verification; §0 is the status and how to resume
 - [Background Fetch refused](mission-hydrosci/mhs-background-fetch-refused-101326.md) - Why Chrome 149+ refuses the service worker's Background Fetch, how the download system falls back to the direct path and reports it (`bgfetch-refused`, the activity page pill), what the October 2026 data showed, and the pending retire-or-move decision
-- [MHS issues under discussion (2026-10-28)](mission-hydrosci/mhs-issues-102826.md) - Working record of the issues walked through on 2026-10-28, one section each with the evidence and the design discussed (Issue 1: Chrome discarding the game window on 4 GB ARM Chromebooks, the second game window, "the game restarted the unit"), followed by the plan and the work
+- [MHS issues under discussion (2026-10-28)](mission-hydrosci/mhs-issues-102826.md) - Working record of the issues walked through on 2026-10-28, one section each with the evidence and the design discussed (Issue 1: Chrome discarding the game window on 4 GB ARM Chromebooks, the second game window, "the game restarted the unit"; Issue 2: the 12 MB tail hold, why it is the same few students, and the solutions to explore), followed by the plan and the work
 
 ## Resource URL Identification
 

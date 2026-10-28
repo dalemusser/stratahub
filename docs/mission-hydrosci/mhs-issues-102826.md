@@ -150,6 +150,66 @@ Dale's local report folder for 2026-10-27 (`mhs-reports-102726-<school>-restart/
 
 ---
 
+## Issue 2 — Unit downloads still stop at 91 % with 12 MB to go; it is the same few students at a school; what else can be done
+
+**Status:** documented (2026-10-28). Nothing changed.
+
+### The report
+
+Dale, 2026-10-28: students' downloads still stop at 91 %, 12 MB short. Some districts have changed their filter settings and the downloads then work. Where a school has the problem it is always a handful of students who have it persistently. A series of smaller files instead of one large one was discussed earlier; other solutions should be explored.
+
+### What we already knew
+
+- The signature (first seen 2026-10-07 to 09 at School A, record in `mhs-download-drops-investigation-100726.md`): a unit file arrives at full speed until exactly `total − 12 MB` (132 → 120, 213 → 201, 156 → 144), then nothing. A web filter on the managed Chromebooks scans large downloads and withholds the last part until it has finished; the district technician's hotspot test on 2026-10-12 showed the filter travels with the managed device, not the school network, so the fix lives in the filtering vendor's console or the Google Admin console. School A's district made that change on 2026-10-12 and School A has had one hold in the two weeks since (176 episodes, 168 complete).
+- Our side as of service worker 1.0.16: downloads resume from 8 MB parts with a `Range` request; "never give up" retries; the MHS Activity page shows held / held-then-done / failed per school, student and day.
+- The structural idea on record: serve the large `.data` files as ≤ 8 MB objects so there is no tail to hold (week review 2026-10-23, item 6).
+
+### What the last two weeks show (stored Activity days, 2026-10-14 → 10-27, students only)
+
+| school | class days | students | download episodes | complete | held | held then done | students with a hold | note |
+|---|---|---|---|---|---|---|---|---|
+| School B | 1 (first day) | 50 | 66 | 3 | 25 | 0 | 20 | plus 37 "quota" failures, see below |
+| School C | 8 | 21 | 102 | 76 | 17 | 2 (67 min) | 8 | 5 students hold on 2–4 days |
+| School D | 2 | 32 | 61 | 36 | 14 | 2 (41 min) | 11 | 2 repeat students |
+| School E | 1 | 14 | 23 | 15 | 5 | 2 (5 min) | 5 | never contacted |
+| Schools F, G, A | — | — | 390 | 372 | 5 | 2 | 5 | one hold each, no repeats |
+| eight other schools | — | — | 459 | 405 | 0 | 0 | 0 | |
+
+Every hold sits at `total − 12 MB` (median and 90th percentile both 12). Two patterns:
+
+**Pattern 1, whole school on its first days.** School B's first day: 20 of 43 students who downloaded were held, 3 completed; classmates in the same period were 0 complete / 6 held, 1 / 5, 1 / 6. School A looked like this on 2026-10-07 to 09. This is the filter as shipped, before the district changes anything.
+
+**Pattern 2, the persistent handful.** At School C, 5 of 21 students in one class held on 2, 2, 3, 3 and 4 different days while 13, 4, 6 and 8 classmates completed on those same days. The per-episode detail of those five says what "persistent" is:
+
+- It is **not the student's account**: the same student completed one unit and was held on the next on the same device within minutes, and completed on a second device the same afternoon while the first device was held.
+- It is **not the hardware class**: the held devices (2-core 8 GB Chrome 154/156, 2-core 4 GB Chrome 149/154) are the same models that completed around them.
+- It **is a device profile carrying a stuck partial**. The held devices are the persisted profiles created on the first day and used every day since (the rest of the class gets a fresh profile each period). One of them held Unit 3 at 144 of 156 MB on 10-22, 10-26 and 10-27: the partial sat there for five days and every day's attempt asked the content server for the same last 12 MB. Another held Unit 1 at 120 of 132 MB on 10-20 and 10-21 and completed it on a different, fresh profile the next day.
+
+**Why a stuck partial stays stuck: our resume policy meets the filter.** The service worker saves the body in 8 MB parts; when the stream breaks or the page's stall watchdog fires (`FALLBACK_STALL_MS` = 45 s of no progress), the loop is restarted and the next attempt sends `Range: bytes=<saved>-`, a request for only the last 12 MB. A filter that scans whole objects before releasing their tail is now asked for a tail by itself, and holds it. Six consecutive attempts that save nothing (`MAX_FUTILE_ATTEMPTS`) end the run as `network`; the page schedules another run a minute later, which asks for the same tail. The partial is never discarded, so on a persisted profile the hold is re-created every day. A fresh profile starts from zero, the filter sees the whole object, and 76 of 102 episodes at School C completed. The 25–67 minute "held then done" cases are the filter eventually releasing a tail-only request. (What we cannot see from the client: whether the first break at `total − 12 MB` is the filter closing the connection or only pausing it until the scan finishes; the step logs record both "picked up after a dropped connection" and "no data received for N s, restarting", and both lead to the same tail request.)
+
+**School B's other failure, found while gathering (a separate item).** 37 of its 66 episodes failed with `quota` at 61–94 %: "Not enough free space on this device … Quota exceeded", while the browser reported a quota of 10.2–10.6 GB with at most 316 MB in use. Chrome raises that error when the device's disk itself is nearly full, whatever the per-origin estimate says; the school's 100 devices are all 8-core 4 GB Chromebooks with storage not persisted. The message to the student is right; the advice to the school (free disk space on the Chromebooks, old user profiles are the usual cause) is not on the page. To be its own issue.
+
+### Solutions to explore, in the order I would try them
+
+1. **Stop asking for the tail by itself.** When a run is in the last 16 MB and the stream goes quiet, do not cut it at 45 s: hold the connection open for several minutes and tell the student the download is being checked by the school's filter and will finish by itself ("checking the file … 2:40"). If it still breaks, and once a file has had N tail-only attempts (or its partial is older than today), discard the partial and restart the file from zero, so the filter scans a whole object again. Client-only, no district action, directly aimed at Pattern 2 and at the daily re-creation of the hold. It makes a slow scan slower to fail, so the cap matters.
+2. **Smaller objects on the content server.** At build upload, store each large unit file as a sequence of ≤ 8 MB objects and list them in the manifest; the service worker fetches them in order (or two at a time), stores them as the parts it already uses, and assembles the single cached response the Unity loader expects. Every object is scanned whole in seconds; there is no tail; a retry costs at most 8 MB; the 8 MB part flush becomes the natural unit. Server side a split step and a manifest field; client side the fetch loop; nothing for the game team. This is the "series of smaller files" idea, made concrete. Whether the filter treats an 8 MB `Range` response (206) the same as a whole 8 MB object is unknown, so separate objects are the safer form; the Range form could be tested first at School E or School D without a server change.
+3. **A one-page note for districts, sent before the first class day.** The filter is on the managed Chromebook, so the change is made where the device policy lives, not on the firewall; name the content host; ask what School A's technician changed so the note can quote the vendor's setting. School B's first day shows every new school starts in Pattern 1.
+4. **Make the hold visible as a hold, with its age.** The Activity page already shows held episodes; a per-student "partial stuck at the tail since <day>" flag would have named School C's five students on day two. Folds into item 1's rule.
+5. **The disk-full failure at School B** as its own item: the page's teacher paragraph gets the "free disk space on the Chromebook" advice, and the Activity page shows `quota` failures distinctly (they already carry the error class).
+
+What I would not do: anything that disguises the files from the filter. The scan is the school's policy; the fix is to let it finish (item 1) or to give it objects it can finish quickly (item 2), and to tell IT what to exempt (item 3).
+
+### Open questions for Dale
+
+- Which districts made the filter change, and do we know what they changed (vendor, setting)? School A's technician is the one person who has done it.
+- School E has never been contacted; School D and School C have the problem now. Who is the contact at each?
+
+### Where the evidence is
+
+Local folder `mhs-reports-102826-issues/` on Dale's desktop (outside the repository): `school-key.md` maps the letters above to the schools, `queries/holds.js`, `holds2.js`, `fortsmith.js`, raw output in `data/raw/`. Earlier: `mhs-reports-101126/` and `-101226/` (School A, October 7–12), the week review of 2026-10-23.
+
+---
+
 ## Plan
 
 To be written once all issues are on the page.
