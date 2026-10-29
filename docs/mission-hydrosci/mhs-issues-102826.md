@@ -8,7 +8,7 @@ Status key: **documented** = written down, nothing changed · **planned** = in t
 
 ## Issue 1 — Chrome discards the game window on low-memory Chromebooks; a second game window makes it worse; the reload looks like "the game restarted the unit"
 
-**Status:** documented (2026-10-28). Nothing changed in StrataHub or the game.
+**Status:** documented (2026-10-28); step 1, advice and documentation on the issue as it stands, written 2026-10-29: [`mhs-low-memory-chromebooks.md`](mhs-low-memory-chromebooks.md). Nothing changed in StrataHub or the game; mitigation (step 2) waits for the plan.
 
 ### The report
 
@@ -67,7 +67,7 @@ Dale answered the school's follow-up (the teacher had sent a screenshot of the C
 1. **Best advice and documentation on the issue as it stands** (before any fix): what teachers and students should do today on low-memory Chromebooks, what the symptom is and why, what IT can do, backed by what the device-state logging shows across the fleet since it went live.
 2. **Mitigation** so the problem is less likely to occur (the one-window launch, the discard notice, the Activity flags, the game-team items above), after step 1.
 
-Step 1 output: `docs/mission-hydrosci/mhs-low-memory-chromebooks.md` (see below, once written) and a fleet analysis of 2026-10-27/28 in the local folder.
+Step 1 output (2026-10-29): [`mhs-low-memory-chromebooks.md`](mhs-low-memory-chromebooks.md) (teachers, students, school IT: the symptom, the cause, what to do today, the Admin console setting) and the fleet analysis below.
 
 ### Design discussed for the second game window (2026-10-28)
 
@@ -155,9 +155,27 @@ Proposed change for the game team: make the restore path distinguishable from a 
 
 **D. Hand-over form.** If these go to the team, an `mhs-updates` package in the usual shape (`03-for-the-game-dev.md`: Part 1 what to do, Part 2 other developer actions, Part 3 supporting information; anything the game needs is listed as required, never optional). A is settings and asset work with build checks; B is a code change with an editor repro (place a save mid-quest, reload, watch the quest tracker and Tera's lines); C is a design question.
 
+### What the fleet shows since the device-state logging went live (2026-10-27 06:41 UTC → 2026-10-29 midday)
+
+About 900 student-days at 14 schools (students only, de-duplicated steps). The discards are a property of one device class:
+
+| Device class | Student-days | Launches | Discards | Per 100 launches | Days with ≥ 2 discards | Freezes ≥ 10 s | Days with a 2nd game window | Days with CPU pressure | Median fps |
+|---|---|---|---|---|---|---|---|---|---|
+| 4 GB / 8 cores / ChromeOS (ARM MediaTek) | 306 | 616 | 138 | 22.4 | 26 | 32 | 12 | 163 | 17 |
+| 4 GB / 2 cores / ChromeOS (Intel, AMD) | 231 | 324 | 1 | 0.3 | 0 | 7 | 14 | 158 | 30 |
+| 8 GB / ChromeOS (8, 4 or 2 cores) | 61 | 138 | 1 | 0.7 | 0 | 4 | 5 | 55 | 26–60 |
+| iPad | 287 | 520 | 0 | 0 | 0 | 26 (tab suspended in the background, not stalls) | 17 | 0 | 11 |
+
+- **CPU pressure is not the discriminator**: serious/critical pressure is reported on most 4 GB machines of both kinds. Memory is (ARM Mali graphics share main memory; the ARM machines also run at half the frame rate).
+- **A second game window matters**: on the ARM 4 GB class, 9 of 12 student-days with a second window had discards (25 discards) against 60 of 294 without (113).
+- **101 of 140 discards followed a record whose window was hidden**; the reload came within 60 s of the previous run's last heartbeat in 101 of 136 cases, and the previous run had lasted under 5 minutes in 88 of 136. Chrome never discards the visible page or the active tab of a window; every discard is a student (or a second window) putting something in front of the game for under a minute on a machine at the memory limit.
+- **Where**: 10 of 14 active schools had none. School F (the report above): 10 discards on 10-27, 2 on 10-28, 1 on 10-29, always the same two or three ARM machines in the room. **School B, in its first week with 100 ARM 4 GB Chromebooks: 22 discards among 15 students on 10-28 and 100 among 47 students on 10-29** (357 launches for 100 students that day; the worst students had 11, 7, 7, 7, 6 discards in one period, i.e. the report's loop at the scale of a school). School C and School G, same machines in part of the fleet: 1–3 a day.
+- **School B also wipes its browser data between launches since its second day**: 374 device ids for 116 students in three days (45 on day one, 133, 196); on days two and three half the student-days had 2 to 9 device ids, all created that day, same hardware fingerprint, a few minutes apart; the stored data at the start of a record was 0 MB (median) on days two and three against 201 MB on day one; Unit 1 was downloaded again at the first record of 357 of 375 device ids (307 complete, 38 "quota exceeded"), and the Unit 2 background download (213 MB) started again in 487 of 490 launched runs and mostly ended the run at 83–94 %. Every reload after a discard kept its device id; the new ids appear after a run ended with the window hidden, i.e. the student closed and reopened, and the browser came back empty. Day one did not churn: something about those devices or the way students open the game changed after Monday (ephemeral or guest sessions, incognito, a clear-on-exit or browsing-data-lifetime policy, or a force-installed web app in an ephemeral profile are the candidates; 260 of the 374 ids were in a standalone (installed app) window). On a 4 GB ARM machine that is the worst case: a 132 MB download, then a 213 MB download running in the background for the rest of the period, on every launch. It is also 100 machines × up to 345 MB per launch through the district's filter. **Question for School B's IT: what changed between Monday and Tuesday, and are these sessions ephemeral?**
+- Chrome facts checked for the advice (2026-10-29): the enterprise policy `TabDiscardingExceptions` (ChromeOS and Chrome ≥ 108; Admin console "Exceptions to tab discarding" under Users & browsers → Other settings) excludes URL patterns from discarding "for memory pressure and high efficiency mode discarding"; Chromium's discard eligibility code applies the opt-out list, the visible-page and active-tab protections to urgent discards as well as proactive ones; there is no event at discard time, `document.wasDiscarded` is the only signal, and state must be saved on `visibilitychange` (hidden), not on `beforeunload`/`pagehide`, which do not fire on a discard. That last point is a game-side mitigation to add to the list: **save when the page becomes hidden**, so a discard loses nothing.
+
 ### Where the evidence is
 
-Dale's local report folder for 2026-10-27 (`mhs-reports-102726-<school>-restart/`) (outside the repository; it names people): the launch-by-launch table, the class comparison, the reply draft, the mongosh queries (`find.js`, `class.js`, `savecheck.js`) and raw output. The same investigation method and a related case: the 2026-10-26 Unit 2 lag / freeze-loop report folder `mhs-reports-102626-unit2-lag/`.
+Dale's local report folder for 2026-10-27 (`mhs-reports-102726-<school>-restart/`) (outside the repository; it names people): the launch-by-launch table, the class comparison, the reply draft, the mongosh queries (`find.js`, `class.js`, `savecheck.js`) and raw output. The fleet analysis of 2026-10-29: `mhs-reports-102826-issues/` (`devstate-102926.md`; queries `devstate.js`, `fsdiscards.js`, `fsdevices.js`, `fsdetail.js`; raw output in `data/raw/`). The same investigation method and a related case: the 2026-10-26 Unit 2 lag / freeze-loop report folder `mhs-reports-102626-unit2-lag/`.
 
 ---
 
@@ -199,6 +217,10 @@ Every hold sits at `total − 12 MB` (median and 90th percentile both 12). Two p
 **Why a stuck partial stays stuck: our resume policy meets the filter.** The service worker saves the body in 8 MB parts; when the stream breaks or the page's stall watchdog fires (`FALLBACK_STALL_MS` = 45 s of no progress), the loop is restarted and the next attempt sends `Range: bytes=<saved>-`, a request for only the last 12 MB. A filter that scans whole objects before releasing their tail is now asked for a tail by itself, and holds it. Six consecutive attempts that save nothing (`MAX_FUTILE_ATTEMPTS`) end the run as `network`; the page schedules another run a minute later, which asks for the same tail. The partial is never discarded, so on a persisted profile the hold is re-created every day. A fresh profile starts from zero, the filter sees the whole object, and 76 of 102 episodes at School C completed. The 25–67 minute "held then done" cases are the filter eventually releasing a tail-only request. (What we cannot see from the client: whether the first break at `total − 12 MB` is the filter closing the connection or only pausing it until the scan finishes; the step logs record both "picked up after a dropped connection" and "no data received for N s, restarting", and both lead to the same tail request.)
 
 **School B's other failure, found while gathering (a separate item).** 37 of its 66 episodes failed with `quota` at 61–94 %: "Not enough free space on this device … Quota exceeded", while the browser reported a quota of 10.2–10.6 GB with at most 316 MB in use. Chrome raises that error when the device's disk itself is nearly full, whatever the per-origin estimate says; the school's 100 devices are all 8-core 4 GB Chromebooks with storage not persisted. The message to the student is right; the advice to the school (free disk space on the Chromebooks, old user profiles are the usual cause) is not on the page. To be its own issue.
+
+### Update 2026-10-29: School B's "quota" failures are not a full disk
+
+The device-state analysis for Issue 1 (above) shows what School B's devices do since the second day: the browser's stored data is gone between launches (new device id, 0 MB stored, Unit 1 downloaded again, the Unit 2 background download restarted), with every device reporting exactly 10,240 MB of quota and none persisted. The 38 "quota exceeded" failures happen while a 132 MB unit and a 213 MB background download are being written into storage that is wiped at the end of the session, which points at an ephemeral or in-memory profile rather than a full disk. The item stays, re-labelled: **why School B's browser data does not persist, and what that costs** (bandwidth through the filter on every launch, memory on 4 GB machines). The question is in Issue 1's fleet section.
 
 ### Solutions to explore, in the order I would try them
 
