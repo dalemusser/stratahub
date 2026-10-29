@@ -58,6 +58,17 @@ Before every discard the last heartbeat shows `visibility: hidden`: another wind
 
 An Intel Chromebook if one is free (the same switch fixed the same symptom at the other school); otherwise restart the Chromebook before class, keep only the game open, never a second copy of the game, and when the game freezes wait 30 s without switching windows or tabs.
 
+### Reply sent to the school, and how this issue proceeds (2026-10-28)
+
+Dale answered the school's follow-up (the teacher had sent a screenshot of the Chromebook's **file storage**, which looked fine). The reply, in short: the storage that matters here is memory (RAM), not file storage; browsers do not let us read available RAM, but the checks added on 2026-10-27 give a sense of it, and the last couple of days will be analyzed; did the student reboot before trying again; the two big things on a low-resource machine are (1) nothing else running, which is what the reboot is for, and (2) never the game in two tabs or windows; the second one is being made impossible by having launch reuse an existing game window, and the school will be told when that is in place.
+
+**Decision (Dale):** this issue is handled in two steps, in this order.
+
+1. **Best advice and documentation on the issue as it stands** (before any fix): what teachers and students should do today on low-memory Chromebooks, what the symptom is and why, what IT can do, backed by what the device-state logging shows across the fleet since it went live.
+2. **Mitigation** so the problem is less likely to occur (the one-window launch, the discard notice, the Activity flags, the game-team items above), after step 1.
+
+Step 1 output: `docs/mission-hydrosci/mhs-low-memory-chromebooks.md` (see below, once written) and a fleet analysis of 2026-10-27/28 in the local folder.
+
 ### Design discussed for the second game window (2026-10-28)
 
 Goal (Dale): never two game windows on one device, whatever the units involved. Question asked: unit A is open and the student clicks Play for unit B — what do they end up with? Answer: one window showing unit B; the unit A game is unloaded (its memory freed, its record closed by `pagehide`), never a second copy.
