@@ -1,4 +1,4 @@
-# MHS issues under discussion, 2026-10-28
+# MHS issues under discussion, 2026-10-28 (updated 2026-11-04)
 
 A working record. Each issue is written down as it is discussed so the details are not lost; once all of them are on the page a plan follows (§ "Plan", to be written), then the work. School, teacher and student names stay out of this document (the repository is public); the local report folders named below hold them.
 
@@ -243,6 +243,124 @@ Local folder `mhs-reports-102826-issues/` on Dale's desktop (outside the reposit
 
 ---
 
-## Plan
+## Issue 3 — At two schools the game's activity and saves never reach the servers from the school's Chromebooks; with the 2026-11-02 build, START then does nothing
 
-To be written once all issues are on the page.
+**Status:** documented (2026-11-04). Urgent: a whole class cannot play, and a second school has had no recorded activity since its first day.
+
+### The report
+
+A coordinator's thread titled "Progress Not Recorded" (2026-11-04): at School J, one teacher's class shows nothing in the dashboard, "the save data doesn't seem to be working, and all students are still being forced to repeat U1"; the coordinator set the class to Unit 2; the teacher then sent a screenshot and wrote "Nothing happens when they click start. This is the only thing that shows up on their screens." A student's problem report from the play page the same morning: "It won't let anyone in the game save or a lot of people cant go past start."
+
+### What the records show (read-only, 2026-11-04)
+
+| | School J (class in the report) | School L |
+|---|---|---|
+| Students | 25 (47 in the school) | 107 |
+| Class days with launches | 10-29 (build 2.9.x), 11-04 (build 3.0.x) | 10-28, 11-02 (build 2.9.x) |
+| Launch records with the game running | 34 on 10-29, 37 on 11-04 | 21 on 11-02 |
+| Students whose game events ever reached stratalog | **3 of 47** (two of them on 8 GB Windows laptops, one on a Chromebook) | **0 of 107** |
+| Students with any save ever | 3 | 0 |
+| The game's unsent-log cache (reported by the page) | 96 KB per student on 10-29, 250–377 KB on 11-04, growing all period | 99–158 KB |
+| Page-level reachability probe of log and save hosts | passes every time (it is a `no-cors` GET; it cannot see a blocked POST) | passes |
+| Refused requests in the stratalog ledger from these students | none | none |
+| Events arriving under a wrong or placeholder user id | none fleet-wide since 10-29 | none |
+
+The other schools that started this week deliver normally (School Q 20 of 20 students with events, School P 54 of 54, School O 195 of 199). At School J the three students whose devices do deliver played normally both days; one of them played Unit 2 on the new build for 18 minutes this morning with two saves, which is the START that "does nothing" for everyone else in the room.
+
+### What "nothing happens when they click start" is
+
+Inferred, not observed in code (the 3.0.x build is the game team's): the 2026-11-02 release carries the save-system update, whose START reads the player's save from the save service before entering the unit. On the devices where the game's requests never get through, that read never completes, and START waits. On the one Chromebook in the room where the requests do get through, START worked. On the old build the same block was silent: the game played, nothing was saved, and the next day Unit 1 started from the beginning, which is the "forced to repeat U1" of the report. Setting the class to Unit 2 moved them from the silent failure to the visible one.
+
+### Cause (most likely)
+
+The district's filter on the managed Chromebooks lets the page's simple GET through and blocks the game's API requests to the log and save hosts (POST with a JSON body and an API-key header, which the browser precedes with an OPTIONS preflight). The same district blocked the content host on its first day (10-27: "Cannot reach the game content server … A school firewall or content filter may be blocking it") and allowed it the next day; the two API hosts were never exercised by that change. School L has the same signature from its first day. The same filter class (device-level, managed Chromebooks) explains why the two Windows laptops and one Chromebook at School J are fine.
+
+### Actions
+
+District (today, by message):
+
+- Allow the log and save hosts for all methods, including OPTIONS and POST, with no body inspection, the same way the content host was allowed. Then run the public Device Test on a managed Chromebook: its record says whether the game's logs arrived. The coordinator can confirm from the dashboard the next class day.
+- Tell the teacher what the START symptom is, that nothing was lost in the game's own progress table (Unit 1 was marked complete by the coordinator), and that Unit 2 will start once the hosts are allowed. Until then the class cannot play.
+
+Ours (in the plan):
+
+- The play page's probe must test what the game does: a POST with the game's headers to a no-op endpoint on each service. When it fails, a notice bar that names the two hosts and says the school's filter is blocking the game's activity, so the student is not blamed and IT gets the hosts.
+- The Activity page: a school-level flag when launches run but no game events arrive from any device at a school for a whole day (School L sat unnoticed for a week), and the per-student "none arrived" state already exists.
+- Game team: START must not wait on the save service without a message and a way on; after a timeout, start with a local or new save and say so.
+
+### Where the evidence is
+
+`mhs-reports-110426/` (local, names people): the school and class queries, `orphans.js`, `week.js`, raw output, and `mhs-review-110426.md`.
+
+---
+
+## Issue 4 — The 2026-11-02 release made every device download every unit again; holds and "quota" failures came back at the filter schools; two loader problems
+
+**Status:** documented (2026-11-04).
+
+- **Release:** collection `MHS-Release_V1.3.0` (build 20261102-12543: unit1 3.0.5, unit2 3.0.6, unit3 3.0.3, unit4 3.0.2, unit5 2.9.7) is what every school ran from 11-03. The page removes the old versions ("Removed an old download: unit1-v2.9.3 …") and downloads the new ones: in two days School O 222 download episodes, School K 82, School P 59, School D 41, School C 38.
+- **Holds (Issue 2) with it:** 11-03 School D 18 held + 3 released of 38 students (15 blocked that day), School K 4 held + 2 released and two student reports "stops at 91 %", School C 6, School L 3. The same tail, the same schools.
+- **"Quota" failures at the tail on Windows laptops:** School O (new, 8 GB Windows laptops, storage not persisted): 14 Unit 2 episodes failed with "Not enough free space on this device" at 88–94 % after five dropped connections, with 10.5 GB of quota reported and 320 MB in use. Same signature as School B's first day (Issue 2 update). The final write of a resumed file briefly needs twice the file's size (parts plus the assembled file); whether that, or something the filter does to the tail, raises the quota error is the open question. The failed Unit 2 is then opened anyway by the "next unit" flow, which fails with "Failed to load Unity loader script" (16 crash records at School O and School H).
+- **A poisoned loader in the cache:** School D, two students, Chrome 144, 11-04: "Game loader loaded" then "Uncaught ReferenceError: createUnityInstance is not defined", 12 times between the two of them within the hour, with the cache check reporting "All 9 files present; largest file size verified". Only the largest file's size is verified; the loader (a few KB) is not, so whatever the filter or a dropped connection stored under the loader's key stays there and every launch fails the same way until the site data is cleared.
+- **For the plan:** verify every file's size and the loader's content before declaring a unit downloaded; on "createUnityInstance is not defined" delete the unit's cache and download again; never open the play page for a unit whose download has failed (show the download failure instead); investigate the quota-at-the-tail error; and confirm with the game team what the release contains (garden-box fix, logger 1.3, save fix) since the debug collections carry "Save System Update" descriptions.
+
+---
+
+## Issue 5 — School O (new, Windows laptops): "Script error." crash records, and a masked error that silences the crash reporter
+
+**Status:** documented (2026-11-04).
+
+School O, 219 students on 8 GB Windows laptops, first week: 47 crash records in two days, 20 of them `runtime_error: Script error.` with no detail (the browser masks errors raised by scripts from another origin, which on these managed laptops is most likely a filter or monitoring extension injecting code). Some runs went on normally after it (one student logged 37 events in the following ten minutes), others ended. The page's `window.onerror` reports it as a crash, latches `crashReported`, and from then on suppresses every real crash report for that page, as the comment at the fullscreen handler already warns. Also at School O: 70 freezes of 10 s or more (Windows, not ARM), 8 students with a second game window, and 3 students stuck at "almost ready" with a previous game window still running.
+
+For the plan: do not latch on an unattributable "Script error."; record it as a notice with the source when available; keep crash reporting live; load the Unity scripts with `crossorigin="anonymous"` wherever they are served cross-origin so real messages arrive.
+
+---
+
+## Issue 6 — The logging-health check times out, so "quiet" and "none" states are partly noise
+
+**Status:** documented (2026-11-04). Minor.
+
+The StrataHub journal shows 125 "failed to count events: context deadline exceeded" lines this week: the heartbeat reply's event count against stratalog times out on DocumentDB, and the record's `logs_state` stays empty or "quiet" (278 empty and 46 "quiet" of 1,159 running records this week). Issue 3 shows how much that state now matters. For the plan: replace the count with a bounded existence query (first event after the launch time, limit 1, on the `{game, user_id, _id}` index), and index the field the count filters on if it is not covered.
+
+---
+
+## Issue 1, continued (week of 11-02)
+
+Discards this week: School C 9 (6 students), School K 8 (2 students), School O 4, School D 1. Second game windows: School K 7 students, School O 8, School D 6, School C 3. School K's student with three "almost ready" stalls in one afternoon had a previous game window still sending heartbeats each time. School B (Issue 1's 100-discard day) had 2 students this week; whether the school paused is a question for the coordinator.
+
+---
+
+## Plan — proposed 2026-11-04, to be discussed
+
+Ordered by what unblocks students soonest. Each item names its issue and its check.
+
+**A. Today, messages, no code**
+
+1. School J and School L districts: allow the log and save hosts for all methods (OPTIONS, POST), no body inspection; verify with the public Device Test on a managed Chromebook. (Issue 3) Check: the next class day shows events and saves on the dashboard.
+2. The School J teacher and coordinator: what the START symptom is, why Unit 1 restarted every day, nothing to redo once the hosts are allowed. (Issue 3)
+3. School D: the two students with the poisoned Unit 2 loader clear the site's data (or get a fresh profile) and download again; the code fix follows in B.2. (Issue 4)
+4. The 4 GB Chromebook advice and the Admin console setting to Schools B, F, C, K (already written). (Issue 1)
+
+**B. StrataHub, in this order**
+
+1. **API probe and notice** (Issue 3): a POST with the game's headers to a no-op endpoint on log and save at page load; on failure, a notice bar naming the hosts and "the school's filter is blocking the game's activity", a `services/fail` step, and the heartbeat carries it. Activity page: a school-level "no game activity is reaching the server from N students" flag. Check: a Device Test run on a School J Chromebook shows the notice; a normal device shows nothing.
+2. **Download integrity** (Issue 4): verify every file's size, and that the loader contains `createUnityInstance`, before "downloaded"; on the ReferenceError, purge and re-download once, then show the failure; never open the play page for a failed download. Check: a cache with a 2 KB loader is detected and repaired on the next launch.
+3. **Tail hold** (Issue 2, solution 1): after N tail-only attempts or a partial older than today, discard the partial and restart from zero; hold a quiet connection longer in the last 16 MB with a "checking the file" status; a "stuck at the tail since <day>" flag on Activity. Investigate the quota error at the tail (the final write's double footprint). Check: School D's held students complete on the first retry from zero.
+4. **One game window + discard notice + Activity discard flags** (Issue 1, step 2): named window target and the `mhs-play-windows` channel (unit A open, unit B requested → one window switched to B); the fourth notice bar; parser kinds for discard / frozen / second window, `Launch.Discarded`, `Flags.SecondGameWindow`, problem at ≥ 2 discards a day; MHSActivityVersion 4. Check: two launches from the units page give one window; a discarded reload shows the bar.
+5. **Crash reporter** (Issue 5): no latch on "Script error." without a source; notice instead of crash; `crossorigin="anonymous"` on the Unity scripts. Check: an injected cross-origin error leaves the run's crash reporting live.
+6. **Logging-health count** (Issue 6): bounded existence query. Check: the journal shows no more deadline lines; `logs_state` is set on every running record.
+7. **Smaller objects on the content server** (Issue 2, solution 2) once 3 has been in the field for a week.
+
+**C. Game team (one hand-off package)**
+
+- START must not block on the save service: timeout, message, continue with a local or new save (Issue 3).
+- Save when the page becomes hidden (`visibilitychange`), since nothing fires at a discard (Issue 1).
+- Memory: initial WebGL memory, one player voice, occlusion data, Unit 3 as well as Unit 2; the resume that re-activates the quest (Issue 1).
+- Confirm the release contents: garden-box fix in Unit 4 3.0.2, logger 1.3, the save fix (Issue 4).
+
+**D. Districts**
+
+- One page for IT before day one: the three hosts (content, log, save), all methods, no body inspection, no tail scanning; the tab-discarding exception; keep site data for the host; 8 GB or Intel devices where possible. (Issues 1, 2, 3)
+
+**Open questions for Dale:** the order of B.1 to B.3 (B.1 is the smallest and unblocks two schools); whether B.4 ships as one piece or the one-window change first; who sends A.1 to the two districts.
+
