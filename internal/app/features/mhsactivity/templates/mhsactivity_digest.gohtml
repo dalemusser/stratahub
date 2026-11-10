@@ -1,0 +1,51 @@
+{{/* MHS Daily Digest: the recent days, the ones with something to look at
+     marked, each linking to its digest (mhsactivity/digest.go). */}}
+{{ define "mhsactivity_digest" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">🗓️ MHS Daily Digest</h1>
+  <a href="/mhsactivity" class="text-sm text-indigo-600 dark:text-indigo-400 hover:underline">MHS Activity</a>
+</div>
+<p class="text-sm text-gray-600 dark:text-gray-400 mb-3">
+  The last days of Mission HydroSci, newest first. A day marked <span class="inline-flex items-center gap-1 font-medium text-amber-800 dark:text-amber-300"><span aria-hidden="true">●</span> look at this</span> had a school with something to look at (students blocked, the school's filter blocking the game, downloads held or failed, launches failed, crashes, the game freezing or closed by Chrome). Select a day for its digest. Days are each school's local day.
+</p>
+
+<div class="bg-white dark:bg-gray-800 rounded shadow overflow-auto mb-4">
+  <table class="min-w-full text-sm text-left text-gray-700 dark:text-gray-300">
+    <thead class="bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 uppercase text-xs">
+      <tr class="border-b border-gray-300 dark:border-gray-600">
+        <th class="px-3 py-2">Day</th>
+        <th class="px-3 py-2">Status</th>
+        <th class="px-3 py-2 whitespace-nowrap" title="Schools with student activity / schools with something to look at">Schools · to look at</th>
+        <th class="px-3 py-2 whitespace-nowrap" title="Students with any activity / students who played">Students · played</th>
+        <th class="px-3 py-2">What happened</th>
+      </tr>
+    </thead>
+    <tbody>
+      {{ range .Days }}
+      <tr class="border-b border-gray-100 dark:border-gray-700 align-top {{ if .Problem }}bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30{{ else }}hover:bg-gray-50 dark:hover:bg-gray-700/50{{ end }}">
+        <td class="px-3 py-2 whitespace-nowrap">
+          <a href="{{ .Href }}" class="font-medium {{ if .Active }}text-indigo-600 dark:text-indigo-400 hover:underline{{ else }}text-gray-400 dark:text-gray-500 hover:underline{{ end }}">{{ .Label }}</a>
+        </td>
+        <td class="px-3 py-2 whitespace-nowrap">
+          {{ if .Problem }}
+            <span class="inline-flex items-center gap-1 font-medium text-amber-800 dark:text-amber-300"><span aria-hidden="true">●</span> Look at this</span>
+          {{ else if .Active }}
+            <span class="inline-flex items-center gap-1 text-green-700 dark:text-green-400"><span aria-hidden="true">✓</span> No problems</span>
+          {{ else }}
+            <span class="text-gray-400 dark:text-gray-500">No activity{{ if .Weekend }} (weekend){{ end }}</span>
+          {{ end }}
+        </td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ if .Active }}{{ .Schools }} · {{ if .ProblemSchools }}<span class="text-amber-700 dark:text-amber-300 font-medium">{{ .ProblemSchools }}</span>{{ else }}0{{ end }}{{ end }}</td>
+        <td class="px-3 py-2 whitespace-nowrap">{{ if .Active }}{{ .Students }} · {{ .Played }}{{ end }}</td>
+        <td class="px-3 py-2">{{ if .Highlights }}<div class="flex flex-wrap gap-1">{{ template "mhsactivity_pills" .Highlights }}</div>{{ end }}</td>
+      </tr>
+      {{ end }}
+    </tbody>
+  </table>
+</div>
+{{ range .Freshness }}<p class="text-xs text-gray-500 dark:text-gray-400">{{ . }}</p>{{ end }}
+{{ end }}

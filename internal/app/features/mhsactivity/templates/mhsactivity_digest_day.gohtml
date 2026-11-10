@@ -1,0 +1,64 @@
+{{/* One day's digest: the schools with something to look at, then the quiet
+     ones; each links into MHS Activity for that school and day
+     (mhsactivity/digest.go). */}}
+{{ define "mhsactivity_digest_day" }}
+  {{ template "layout" . }}
+{{ end }}
+
+{{ define "content" }}
+<div class="flex items-center justify-between flex-wrap gap-2 mb-3">
+  <h1 class="text-2xl font-bold text-gray-900 dark:text-gray-100">🗓️ {{ .Day.Label }}</h1>
+  <div class="text-sm">
+    <a href="/mhsactivity/digest" class="text-indigo-600 dark:text-indigo-400 hover:underline">All days</a>
+    <a href="/mhsactivity?{{ .WindowQuery }}" class="ml-3 text-indigo-600 dark:text-indigo-400 hover:underline">This day in MHS Activity</a>
+  </div>
+</div>
+
+{{ if not .Day.Active }}
+<div class="bg-white dark:bg-gray-800 rounded shadow p-4 mb-4 text-sm text-gray-500 dark:text-gray-400">No Mission HydroSci student activity on this day{{ if .Day.Weekend }} (a weekend){{ end }}.</div>
+{{ else }}
+<div class="bg-white dark:bg-gray-800 rounded shadow p-4 mb-4 text-sm text-gray-700 dark:text-gray-300">
+  {{ if .Day.Problem }}
+    <p class="font-medium text-amber-800 dark:text-amber-300"><span aria-hidden="true">●</span> {{ .Day.ProblemSchools }} of {{ .Day.Schools }} school{{ if ne .Day.Schools 1 }}s{{ end }} had something to look at.</p>
+  {{ else }}
+    <p class="text-green-700 dark:text-green-400"><span aria-hidden="true">✓</span> No problems at {{ .Day.Schools }} school{{ if ne .Day.Schools 1 }}s{{ end }}.</p>
+  {{ end }}
+  <p class="mt-1">{{ .Day.Students }} student{{ if ne .Day.Students 1 }}s{{ end }} active, {{ .Day.Played }} played.</p>
+  {{ if .Day.Highlights }}<div class="mt-2 flex flex-wrap gap-1">{{ template "mhsactivity_pills" .Day.Highlights }}</div>{{ end }}
+</div>
+
+{{ if .Problems }}
+<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">To look at</h2>
+<div class="space-y-3 mb-4">
+  {{ range .Problems }}
+  <div class="bg-white dark:bg-gray-800 rounded shadow p-4 border-l-4 border-amber-500">
+    <div class="flex items-baseline justify-between flex-wrap gap-2">
+      <a href="{{ .Href }}&{{ $.WindowQuery }}" class="text-indigo-600 dark:text-indigo-400 hover:underline font-medium">{{ .Name }}</a>
+      <span class="text-xs text-gray-500 dark:text-gray-400">{{ .TZ }}{{ if .Platforms }} · {{ .Platforms }}{{ end }}</span>
+    </div>
+    {{ if .Pills }}<div class="mt-2 flex flex-wrap gap-1">{{ template "mhsactivity_pills" .Pills }}</div>{{ end }}
+    <p class="mt-2 text-xs text-gray-600 dark:text-gray-400">
+      Students {{ .Opened }} opened · {{ .Played }} played{{ if .Blocked }} · <span class="text-amber-700 dark:text-amber-300 font-medium">{{ .Blocked }} blocked</span>{{ end }}.
+      Downloads {{ .DlComplete }} done{{ if .DlHeld }} · <span class="text-amber-700 dark:text-amber-300 font-medium">{{ .DlHeld }} held</span>{{ end }}{{ if .DlFailed }} · <span class="text-amber-700 dark:text-amber-300 font-medium">{{ .DlFailed }} failed</span>{{ end }}.
+      Launches {{ .LaunchOK }} ok{{ if .LaunchFailed }} · <span class="text-amber-700 dark:text-amber-300 font-medium">{{ .LaunchFailed }} failed</span>{{ end }}{{ if .CrashReal }} · <span class="text-amber-700 dark:text-amber-300 font-medium">{{ .CrashReal }} crash{{ if ne .CrashReal 1 }}es{{ end }}</span>{{ end }}.
+    </p>
+  </div>
+  {{ end }}
+</div>
+{{ end }}
+
+{{ if .Quiet }}
+<h2 class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-2">No problems</h2>
+<div class="bg-white dark:bg-gray-800 rounded shadow p-4 mb-4 text-sm text-gray-700 dark:text-gray-300">
+  <ul class="space-y-1">
+    {{ range .Quiet }}
+    <li><a href="{{ .Href }}&{{ $.WindowQuery }}" class="text-indigo-600 dark:text-indigo-400 hover:underline">{{ .Name }}</a> <span class="text-xs text-gray-500 dark:text-gray-400">· {{ .Opened }} opened · {{ .Played }} played</span>{{ if .Pills }} <span class="inline-flex flex-wrap gap-1 align-middle">{{ template "mhsactivity_pills" .Pills }}</span>{{ end }}</li>
+    {{ end }}
+  </ul>
+</div>
+{{ end }}
+{{ end }}
+
+{{ range .Missing }}<p class="text-xs text-gray-500 dark:text-gray-400">Not available when computed: {{ . }}</p>{{ end }}
+{{ range .Freshness }}<p class="text-xs text-gray-500 dark:text-gray-400">{{ . }}</p>{{ end }}
+{{ end }}

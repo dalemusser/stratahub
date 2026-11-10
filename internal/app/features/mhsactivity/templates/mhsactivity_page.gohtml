@@ -8,6 +8,7 @@
   <div class="text-sm text-gray-600 dark:text-gray-400">
     {{ .Window.Label }}{{ if .Report.School }} · {{ .Report.School.Name }}{{ end }}
     <span class="ml-2 text-gray-400 dark:text-gray-500" title="Each school's day runs on its own clock. Today means the school's local today.">(school-local days)</span>
+    <a href="/mhsactivity/digest" class="ml-3 text-indigo-600 dark:text-indigo-400 hover:underline" title="The recent days with the ones that need a look marked">daily digest</a>
     {{ if .IsAdmin }}<a href="/mhsactivity/admin" class="ml-3 text-indigo-600 dark:text-indigo-400 hover:underline" title="Stored days and the backfill">stored days</a>{{ end }}
   </div>
 </div>
