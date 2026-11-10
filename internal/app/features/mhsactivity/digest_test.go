@@ -93,6 +93,7 @@ func TestDigestPagesRender(t *testing.T) {
 
 	rep := BuildReport([]models.MHSActivityDay{blocked, played}, lk, Options{})
 	day := digestDayVM{Day: digestDayOf("2026-11-05", []models.MHSActivityDay{blocked, played}, lk), WindowQuery: "range=custom&from=2026-11-05&to=2026-11-05"}
+	day.BackURL = "/mhsactivity/digest"
 	for _, s := range rep.Schools {
 		if s.Problem() {
 			day.Problems = append(day.Problems, s)
@@ -103,7 +104,7 @@ func TestDigestPagesRender(t *testing.T) {
 	rec = httptest.NewRecorder()
 	templates.Render(rec, httptest.NewRequest("GET", "/mhsactivity/digest/2026-11-05", nil), "mhsactivity_digest_day", day)
 	body = rec.Body.String()
-	for _, want := range []string{"Thu, Nov 5", "1 of 2 schools had something to look at", "To look at", "School J", "No problems", "School P", "This day in MHS Activity", "range=custom&amp;from=2026-11-05"} {
+	for _, want := range []string{"Thu, Nov 5", "1 of 2 schools had something to look at", "To look at", "School J", "No problems", "School P", "This day in MHS Activity", "range=custom&amp;from=2026-11-05", `href="/mhsactivity/digest"`, "← Back"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("day page lacks %q", want)
 		}
