@@ -80,6 +80,12 @@ Written as a `03-for-the-game-dev` page in the hand-off structure (Part 1 what t
 
 Check: their build passes the hand-off's build checks on the dev site before it is activated for schools.
 
+**How game changes are done (Dale, 2026-11-09).** Measure first. If a change is warranted: (1) a document for the game developers describing the change (a hand-off package in `mhs-updates`), (2) the same change made on our local copy of the Unity project and tested there, (3) a test build on the dev site that others can play, test and comment on. The game team will most likely make the change on their own copy, so the document and the tested build are the deliverables, not the local change alone.
+
+**Measured 2026-11-09 (read-only, production data since 2026-10-27; local queries).**
+- *G-2, play lost at a discard.* 255 discards found; in the 209 whose run had game events, the play between the student's last accepted save and their last game event before the window went away was: median 3 min, upper quarter 12 min or more, worst tenth 24 min or more; 63 discards (30 %) lost more than 10 minutes. 146 discards came from runs with no accepted save at all before the window went away (median run 2 min, worst tenth 26 min). **A change is warranted.**
+- *G-3, memory.* The game's WebAssembly heap is a fixed 495 MB in almost every run of every unit (594 MB in some), plus 210–300 MB of the page's JavaScript heap: about 750 MB per game window. Discards per 100 launches on 4 GB Chromebooks: Unit 1 27.6, Unit 3 18.8, Unit 2 11.1, Unit 4 4.6, Unit 5 2.3; on devices with more memory at most 1.4. The fixed heap points at the build's starting memory setting rather than each unit's need. **A change is warranted**, starting with the starting memory size.
+
 ---
 
 ## 4. Schools and districts
