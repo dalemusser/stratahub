@@ -1,5 +1,7 @@
 # MHS issues under discussion, 2026-10-28 (updated 2026-11-09)
 
+**Remaining work** after the 2026-11-09 releases is planned in [`mhs-issues-remaining-plan-110926.md`](mhs-issues-remaining-plan-110926.md).
+
 A working record. Each issue is written down as it is discussed so the details are not lost; once all of them are on the page a plan follows (§ "Plan", proposed 2026-11-04), then the work. School, teacher and student names stay out of this document (the repository is public); the local report folders named below hold them.
 
 Status key: **documented** = written down, nothing changed · **planned** = in the plan below · **done** = fixed and deployed, with the commit.
