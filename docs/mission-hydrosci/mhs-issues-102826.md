@@ -360,7 +360,7 @@ Ordered by what unblocks students soonest. Each item names its issue and its che
 
 **C. Game team (one hand-off package)**
 
-- START must not block on the save service: timeout, message, continue with a local or new save (Issue 3).
+- ~~START must not block on the save service: timeout, message, continue with a local or new save (Issue 3).~~ **Reversed 2026-11-09 (Dale):** a student whose log and save do not reach the servers must not play. Unrecorded play is the same as not taking part in the study; if students can play anyway, the school has no reason to fix its filter and the data never arrives; and the game's store of unsent log entries fills up and drops entries. So START must not continue without the save service either: after a timeout it says plainly that the game cannot start because its progress cannot be saved, and asks the student to tell the teacher. No "continue anyway". Blocking play when the hosts are blocked is on the StrataHub side too (see "Play gate" below).
 - Save when the page becomes hidden (`visibilitychange`), since nothing fires at a discard (Issue 1).
 - Memory: initial WebGL memory, one player voice, occlusion data, Unit 3 as well as Unit 2; the resume that re-activates the quest (Issue 1).
 - Confirm the release contents: garden-box fix in Unit 4 3.0.2, logger 1.3, the save fix (Issue 4).
