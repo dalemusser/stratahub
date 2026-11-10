@@ -211,3 +211,27 @@ func TestPlayPageProbesGameServices(t *testing.T) {
 		t.Errorf("play page without probes: %q", body[strings.Index(body, "var probes"):strings.Index(body, "var probes")+60])
 	}
 }
+
+// The play page repairs a damaged loader (removes it from the downloaded
+// files, loads from the content server, fails plainly if that copy is
+// damaged too), and a next-unit download that did not finish goes to the
+// units page, never to the next unit's play page.
+func TestPlayPageDamagedLoaderAndFailedNextUnit(t *testing.T) {
+	body := renderPlayPage(t, memberPlayData())
+	for _, want := range []string{
+		`if (typeof window.createUnityInstance !== 'function') { onDamagedLoader(); return; }`,
+		`c.delete(cachedLoaderKey)`,
+		`if (retryFromContentServer()) return;`,
+		`The game loader failed to load — it arrived damaged`,
+		`reason: 'loader-damaged'`,
+		`window.location.href = '/missionhydrosci/units';`,
+		`mgr.isCached(nextUnit).then(function(state) {`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("play page lacks %q", want)
+		}
+	}
+	if strings.Contains(body, `setTimeout(function() { navigateToNext(nextUnit); }, 1500);`) {
+		t.Error("a failed next-unit download still opens the next unit's play page")
+	}
+}

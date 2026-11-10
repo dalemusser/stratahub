@@ -632,10 +632,9 @@
 
         // Unity is already torn down by the time this overlay runs, so any
         // status the chain below doesn't resolve strands the student on a
-        // frozen overlay with no exit. Every terminal state must navigate;
-        // the play page's cache-miss path falls through to a CDN redirect,
-        // so navigating is the correct degraded behavior when the download
-        // didn't complete.
+        // frozen overlay with no exit. Every terminal state must navigate: to
+        // the next unit once its files are on the device and intact, to the
+        // units page (which shows why and keeps retrying) otherwise.
         var downloadStarted = false;   // gates 'not_cached'/'partial' — init fires them before the download begins
         var stallRedirectTimer = null; // one-shot exit for a 'stalled' that never recovers
         var redirecting = false;
@@ -647,12 +646,17 @@
           }
         }
 
+        // The download did not finish: go to the units page, which shows
+        // why and keeps retrying. Opening the next unit's play page without
+        // its files only fails again ("Failed to load Unity loader script",
+        // Nov 2026), or plays it from the network through a filter that
+        // just failed the download.
         function redirectSoon(message) {
           if (redirecting) return;
           redirecting = true;
           clearStallRedirect();
           if (msg) msg.textContent = message;
-          setTimeout(function() { navigateToNext(nextUnit); }, 1500);
+          setTimeout(function() { window.location.href = '/missionhydrosci/units'; }, 2500);
         }
 
         mgr.onStatus(function(uid, status, detail) {
@@ -674,10 +678,21 @@
             if (barText) barText.textContent = pct + '%';
           } else if (status === 'cached') {
             clearStallRedirect();
-            if (msg) msg.textContent = 'Ready!';
             if (barFill) barFill.style.width = '100%';
-            // Cleanup completed unit then navigate
-            mgr.autoCleanup([nextUnit]).then(function() {
+            // Confirm every file arrived intact (the check removes damaged
+            // ones) before opening the unit; then clean up and navigate.
+            mgr.isCached(nextUnit).then(function(state) {
+              if (state !== 'cached') {
+                redirectSoon('A file of the next unit arrived damaged. Opening the units page, which downloads it again...');
+                return;
+              }
+              if (msg) msg.textContent = 'Ready!';
+              mgr.autoCleanup([nextUnit]).then(function() {
+                navigateToNext(nextUnit);
+              }, function() {
+                navigateToNext(nextUnit);
+              });
+            }, function() {
               navigateToNext(nextUnit);
             });
           } else if (status === 'stalled') {
@@ -688,15 +703,15 @@
             if (msg) msg.textContent = 'Download stalled — still trying...';
             if (!stallRedirectTimer) {
               stallRedirectTimer = setTimeout(function() {
-                redirectSoon('Download stalled. Redirecting...');
+                redirectSoon('The download is stalled. Opening the units page, which keeps trying...');
               }, 30000);
             }
           } else if (status === 'error') {
-            redirectSoon('Download failed. Redirecting...');
+            redirectSoon('The download did not finish. Opening the units page, which keeps trying...');
           } else if ((status === 'not_cached' || status === 'partial') && downloadStarted) {
             // A canceled fallback loop or a cross-tab delete surfaced
             // mid-download; tracking is cleared, no further status will come.
-            redirectSoon('Download interrupted. Redirecting...');
+            redirectSoon('The download was interrupted. Opening the units page, which keeps trying...');
           }
         });
 
@@ -708,7 +723,7 @@
           mgr.downloadUnit(nextUnit);
         }).catch(function() {
           // SW registration / init failed — don't strand on the overlay.
-          redirectSoon('Could not start the download. Redirecting...');
+          redirectSoon('Could not start the download. Opening the units page, which keeps trying...');
         });
       }
 
@@ -1794,6 +1809,42 @@
         }
       }, 5000);
 
+      // A loader that loads but does not define createUnityInstance: a
+      // filter's reply or a cut transfer stored under the loader's key (seen
+      // Nov 2026; every launch then failed with "createUnityInstance is not
+      // defined" until the site data was cleared). Remove it from the
+      // downloaded files, so the units page's check sees the unit as partial
+      // and downloads the loader again, and run this launch straight from
+      // the content server. If that copy is damaged too, say so plainly.
+      var cachedLoaderKey = loaderUrl;
+      function onDamagedLoader() {
+        var from = loaderSource();
+        if (!fallbackStarted) {
+          stepLog.record('launch', 'warn', 'The game loader' + from + ' is damaged: it does not define createUnityInstance. ' +
+            'Removing it from the downloaded files (it is downloaded again from the units page) and loading the game straight from the content server…',
+            { reason: 'loader-damaged', unit: unitId });
+          try {
+            if ('caches' in window) {
+              caches.open('missionhydrosci-unit-' + unitId + '-v' + unitVersion).then(function(c) { return c.delete(cachedLoaderKey); })
+                .then(function(removed) { stepLog.record('launch', 'info', removed ? 'Damaged loader removed from the downloaded files' : 'The damaged loader was not in the downloaded files'); })
+                .catch(function() {});
+            }
+          } catch (e) { /* best effort */ }
+          if (retryFromContentServer()) return;
+        }
+        stopWatchdog();
+        loadingText.textContent = 'The game loader arrived damaged';
+        if (loadingHint) loadingHint.textContent = 'A web filter or security program on this device may be changing the game\'s files. ' + resetAdvice();
+        stepLog.record('launch', 'fail', 'The game loader failed to load — it arrived damaged (it does not define createUnityInstance)' +
+          (fallbackStarted ? ', from the content server as well' : '') + '; a web filter or security program on this device may be changing it',
+          { reason: 'loader-damaged', unit: unitId });
+        showStepLogOnFailure();
+        memberReport('launch-failed');
+        loadingBar.style.width = '100%';
+        loadingBar.style.background = '#ef4444';
+        reportCrash('load_error', 'Game loader damaged: createUnityInstance is not defined (' + loaderUrl + ')', '', 'loading');
+      }
+
       // Load the Unity loader script
       stepLog.record('launch', 'running', 'Loading the game loader (' + unitId + '.loader.js)…');
       var script = document.createElement('script');
@@ -1801,6 +1852,7 @@
       activeScript = script;
       script.onload = function() {
         if (this !== activeScript) return; // the first request answered after the content-server retry took over
+        if (typeof window.createUnityInstance !== 'function') { onDamagedLoader(); return; }
         launchProgress('starting');
         loadingText.textContent = 'Starting Unity...';
         crashPhase = 'compiling';

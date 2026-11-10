@@ -502,7 +502,24 @@
   };
 
   /**
-   * Checks if all files for a unit are cached.
+   * Checks whether all files for a unit are cached and intact.
+   *
+   * Every present file is checked, not only the largest: its size against the
+   * manifest (the stored content-length, or the stored bytes when that header
+   * disagrees), and the Unity loader's text for `createUnityInstance`. Both
+   * download paths skip a file that is already in the cache whatever its
+   * size, so a damaged entry (a filter's reply or a cut transfer stored under
+   * the loader's key, seen in Nov 2026: "createUnityInstance is not defined"
+   * on every launch until the site data was cleared) would never be replaced.
+   * Damaged entries are therefore removed here, which makes the unit
+   * 'partial' and lets the next download fetch just those files again.
+   *
+   * Guard: a file removed for its size twice for this version on this device
+   * that comes back with the same size is kept from then on (logged), so a
+   * size in the manifest that does not match the real file can never cause
+   * endless downloads. The loader check has no such limit (a loader without
+   * createUnityInstance can never start the game).
+   *
    * @returns {Promise<string>} 'cached', 'not_cached', or 'partial'
    */
   MHSDeliveryManager.prototype._checkUnitCache = async function(unit) {
@@ -512,19 +529,36 @@
     try {
       var cache = await caches.open(cacheName);
       var found = 0;
+      var damaged = [];
 
       for (var i = 0; i < unit.files.length; i++) {
-        var key = this._contentPrefix + unit.files[i].path;
+        var file = unit.files[i];
+        var key = this._contentPrefix + file.path;
         var match = await cache.match(key);
-        if (match) found++;
+        if (!match) continue;
+        var why = await this._fileDamage(cache, key, match, file);
+        if (why && why.size && this._sizeRepairsExhausted(unit, file, why.got)) {
+          this._step('verify', 'warn', file.path + ': stored size ' + why.got + ' bytes differs from the expected ' + file.size +
+            ' again after fresh downloads — kept (the expected size may be wrong)', { unit: unit.id, path: file.path });
+          why = null;
+        }
+        if (!why) { found++; continue; }
+        damaged.push({ file: file, key: key, why: why });
       }
 
-      if (found === unit.files.length) {
-        // Spot-check the largest file's cached size so eviction or partial
-        // artifacts can't produce a false "Ready to play".
-        var ok = await this._verifyLargestFile(cache, unit.files);
-        return ok ? 'cached' : 'partial';
+      if (damaged.length) {
+        for (var d = 0; d < damaged.length; d++) {
+          try { await cache.delete(damaged[d].key); } catch (e) { /* best effort */ }
+          if (damaged[d].why.size) this._noteSizeRepair(unit, damaged[d].file, damaged[d].why.got);
+        }
+        this._step('verify', 'warn', 'Removed ' + damaged.length + ' damaged file' + (damaged.length > 1 ? 's' : '') +
+          ' from ' + (unit.title || unit.id) + ' so ' + (damaged.length > 1 ? 'they are' : 'it is') + ' downloaded again: ' +
+          damaged.map(function(x) { return x.file.path.split('/').pop() + ' (' + x.why.text + ')'; }).join('; '),
+          { unit: unit.id, version: unit.version, damaged: String(damaged.length),
+            paths: damaged.map(function(x) { return x.file.path.split('/').pop(); }).join(',') });
       }
+
+      if (found === unit.files.length) return 'cached';
       if (found === 0) return 'not_cached';
       return 'partial';
     } catch (err) {
@@ -533,49 +567,75 @@
   };
 
   /**
-   * Verifies the largest file's cached size against its manifest size.
-   * Returns true when the size matches or cannot be determined.
+   * What is wrong with one cached file, or null when it is intact (or
+   * cannot be judged). A wrong size returns {size: true, got, text}; a loader
+   * without createUnityInstance {loader: true, text}.
    */
-  MHSDeliveryManager.prototype._verifyLargestFile = async function(cache, files) {
-    var largest = null;
-    for (var i = 0; i < files.length; i++) {
-      if (!largest || (files[i].size || 0) > (largest.size || 0)) largest = files[i];
+  MHSDeliveryManager.prototype._fileDamage = async function(cache, key, match, file) {
+    if (/\.loader\.js$/.test(file.path)) {
+      try {
+        var text = await match.clone().text();
+        if (text.indexOf('createUnityInstance') === -1) {
+          return { loader: true, text: 'the loader does not define createUnityInstance (' + text.length + ' characters stored)' };
+        }
+      } catch (e) {
+        return null; // unreadable here: leave it to the launch check
+      }
     }
-    if (!largest || !largest.size) return true;
-
-    var match = await cache.match(this._contentPrefix + largest.path);
-    if (!match) return false;
+    if (!file.size) return null;
     var len = match.headers.get('content-length');
-    if (len === null) return true; // size unknown (e.g. chunked) — accept
-    if (parseInt(len, 10) === largest.size) return true;
+    if (len !== null && parseInt(len, 10) === file.size) return null;
 
-    // The header can disagree with the stored body (e.g. transfer
-    // compression keeps a compressed content-length on a decoded body).
-    // Count the actual stored bytes before declaring the unit incomplete —
-    // this rare path must not condemn a good unit to endless re-downloads.
+    // No header, or one that disagrees with the stored body (transfer
+    // compression can leave a compressed content-length on a decoded body):
+    // count the stored bytes before calling the file damaged.
     try {
       var blob = await match.clone().blob();
-      if (blob.size !== largest.size) return false;
-      // The header/body mismatch is persistent for the life of the entry,
-      // so without a repair every future check re-reads this entire file —
-      // a multi-hundred-MB read per check on a low-end device. We already
-      // hold the bytes: rewrite the entry with a corrected content-length
-      // so future checks take the header fast-path.
-      try {
-        var headers = new Headers(match.headers);
-        headers.set('content-length', String(blob.size));
-        await cache.put(this._contentPrefix + largest.path, new Response(blob, {
-          status: match.status,
-          statusText: match.statusText,
-          headers: headers
-        }));
-      } catch (repairErr) {
-        // Verification already passed — the repair is only an optimization
+      if (blob.size !== file.size) {
+        return { size: true, got: blob.size, text: blob.size + ' of ' + file.size + ' bytes' };
       }
-      return true;
+      if (len !== null) {
+        // Rewrite the entry with the right content-length so later checks
+        // take the header fast path instead of re-reading the file (a
+        // multi-hundred-MB read on a low-end device for the .data file).
+        try {
+          var headers = new Headers(match.headers);
+          headers.set('content-length', String(blob.size));
+          await cache.put(key, new Response(blob, { status: match.status, statusText: match.statusText, headers: headers }));
+        } catch (repairErr) { /* only an optimization */ }
+      }
+      return null;
     } catch (err) {
-      return true; // can't verify — don't block a possibly-good unit
+      return null; // can't verify — don't condemn a possibly-good file
     }
+  };
+
+  // Size repairs per file and version on this device (see _checkUnitCache):
+  // localStorage 'mhs-size-repairs' = { "<unit>-v<version>|<path>": {n, got} }.
+  var SIZE_REPAIR_KEY = 'mhs-size-repairs', SIZE_REPAIR_LIMIT = 2;
+  function readSizeRepairs() {
+    try { return JSON.parse(localStorage.getItem(SIZE_REPAIR_KEY) || '{}') || {}; } catch (e) { return {}; }
+  }
+  MHSDeliveryManager.prototype._sizeRepairsExhausted = function(unit, file, got) {
+    var r = readSizeRepairs()[unit.id + '-v' + unit.version + '|' + file.path];
+    return !!(r && r.n >= SIZE_REPAIR_LIMIT && r.got === got);
+  };
+  MHSDeliveryManager.prototype._noteSizeRepair = function(unit, file, got) {
+    try {
+      var all = readSizeRepairs();
+      var k = unit.id + '-v' + unit.version + '|' + file.path;
+      var r = all[k] || { n: 0, got: got };
+      r.n = (r.got === got) ? r.n + 1 : 1;
+      r.got = got;
+      all[k] = r;
+      // Keep only the current versions' entries.
+      var keep = {};
+      var units = (this.manifest && this.manifest.units) || [];
+      for (var key in all) {
+        if (units.some(function(u) { return key.indexOf(u.id + '-v' + u.version + '|') === 0; })) keep[key] = all[key];
+      }
+      localStorage.setItem(SIZE_REPAIR_KEY, JSON.stringify(keep));
+    } catch (e) { /* storage refused: the guard then never trips, which only costs downloads */ }
   };
 
   /**
@@ -1170,10 +1230,11 @@
     try {
       var state = await this._checkUnitCache(unit);
       if (state === 'cached') {
-        this._step('verify', 'ok', 'All ' + unit.files.length + ' files present; largest file size verified');
+        this._step('verify', 'ok', 'All ' + unit.files.length + ' files present; every file size verified and the loader checked');
       } else {
-        this._step('verify', 'warn', 'Files missing or a size mismatch (' + state + ')');
+        this._step('verify', 'warn', 'Files missing or damaged (' + state + ')');
       }
+      return state;
     } catch (e) {
       this._step('verify', 'warn', 'Could not verify files: ' + ((e && e.message) || e));
     }
@@ -1272,8 +1333,12 @@
         }
         this._step('download', 'ok', msg, done);
         var mgr = this;
-        this._verifyForLog(unitId).catch(function() {}).then(function() {
+        this._verifyForLog(unitId).catch(function() {}).then(function(state) {
           mgr.reportStepLog('download-complete', unitId, unit ? unit.version : '');
+          // A download that finished with a damaged file (removed by the
+          // check) is not playable: say so, so the pages download it again
+          // instead of offering Play.
+          if (state === 'partial' || state === 'not_cached') mgr._fireStatus(unitId, state, { damaged: true });
         });
         return;
       }
