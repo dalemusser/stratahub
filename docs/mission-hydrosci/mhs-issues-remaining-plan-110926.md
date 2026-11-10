@@ -59,10 +59,10 @@ Recheck cadence: after each school's next class day for FC-1 to FC-3, then weekl
 
 ### Small follow-ups (S each)
 
-- **S-1** The play gate's heading still says "Loading Unit N…" above "The game cannot start on this device yet": change the heading while gated.
+- **S-1** ~~The play gate's heading still says "Loading Unit N…"~~ **Done 2026-11-09 (48d5ca0):** while gated it says "<unit> cannot start yet".
 - **S-2** The service worker's `sw-cache.js` comment still names `_verifyLargestFile` (now `_fileDamage`); fix with the next service worker change (a comment-only edit would reinstall the worker on every device).
-- **S-3** Units page: when the last launch on this device was gated, say so on the units page too (before the student presses Launch), from the same server view.
-- **S-4** Backlog item ACT-4 (`download-held` outcome) in [`mhs-remaining-work-plan.md`](mhs-remaining-work-plan.md): re-scope now that B.3 logs every hold wait and restart; DL-4 (heartbeat re-arm on `pageshow`) matters more with discards (B.4).
+- **S-3** ~~Units page warning~~ **Done 2026-11-09 (48d5ca0):** the play page remembers a gated launch on the device (cleared when the services answer) and the units page shows an amber line naming the hosts before the next Launch. Verified on dev with the simulated block.
+- **S-4** ~~Re-scope ACT-4 and DL-4~~ **Done 2026-11-09:** both notes are in [`mhs-remaining-work-plan.md`](mhs-remaining-work-plan.md) (ACT-4 down to P3; DL-4 stays P2 and is the next small code item there).
 
 ---
 
@@ -118,6 +118,6 @@ Check: their build passes the hand-off's build checks on the dev site before it 
 2. ~~B.5~~ done 2026-11-09.
 3. The game team package (G-1 to G-5), together with the save fix hand-off.
 4. Per-school summaries for the people who deal with the schools, as problems come up (D-5, D-6). D-2 and D-3 are done; D-7 is closed (unknown).
-5. ~~B.6~~ done 2026-11-09; S-1 to S-3.
+5. ~~B.6, S-1, S-3, S-4~~ done 2026-11-09; S-2 with the next service worker change.
 6. FC-3 to FC-5 in the weekly review; then decide B.7.
 7. I-1 to I-3 as devices and time allow.

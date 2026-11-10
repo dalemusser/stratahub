@@ -50,7 +50,7 @@ the code has shifted since (line numbers especially).
 | DL-1 | SW download-creation race → BG fetch + fallback both run for one unit | P2 | M | OPEN |
 | DL-2 | Play overlay `autoCleanup([nextUnit])` wipes manual pre-downloads | P2 | S | OPEN |
 | DL-3 | Post-login early-download hook is a 4th, unmanaged download driver | P2 | M | OPEN |
-| DL-4 | Play heartbeat stopped on `pagehide`, no `pageshow`/`persisted` re-arm | P2 | S | OPEN |
+| DL-4 | Play heartbeat stopped on `pagehide`, no `pageshow`/`persisted` re-arm | P2 | S | OPEN — more relevant since B.4 (2026-11-09): a game window restored from the back/forward cache after a discard-like pause stops beating and reads as "page stopped responding" |
 | DL-5 | `authThrottle` idle-reset uses `nextAllowed` (future) not last-attempt | P3 | S | OPEN |
 | DL-6 | Two throttle-key derivations that are supposed to be one budget | P3 | S | OPEN |
 | DL-7 | `groupappstore` correlated `$lookup` — DocumentDB risk, error swallowed | P2 | M | OPEN |
@@ -60,7 +60,7 @@ the code has shifted since (line numbers especially).
 | ACT-1 | MHS Activity: student-day timeline (one student's merged, de-duplicated step log for one day across devices) | P2 | M | OPEN (plan phase 4, `docs/mhs-activity/plan.md`) |
 | ACT-2 | Device Tests viewer: let coordinators follow MHS Activity's record links (add `coordinator` to its roles; `viewscope` already restricts rows) | P3 | S | OPEN |
 | ACT-3 | MHS Activity: an organization-level rollup for windows longer than 31 days (today's cap; student-day documents are summed per request) | P3 | M | OPEN |
-| ACT-4 | A `download-held` outcome posted by the units page after some minutes in the tail, so a hold is a record of its own instead of being read from a later record | P2 | S | OPEN |
+| ACT-4 | A `download-held` outcome posted by the units page after some minutes in the tail, so a hold is a record of its own instead of being read from a later record | P3 | S | OPEN — re-scoped 2026-11-09: since B.3 (`mhs-issues-remaining-plan-110926.md`) the step log records each tail wait once and every whole-file restart, and MHS Activity shows "held at the tail since"; a record of its own only helps if a hold is never followed by any record from that tab |
 | UX-1 | `aria-live` announces every download percent (~1/s) — SR spam | P2 | M | OPEN |
 | UX-2 | Contrast fix (MHS-A4) nullified at runtime by JS class strings | P3 | S | OPEN |
 | UX-3 | 429 backoff is a dead-end alert; no `Retry-After` / client handling | P3 | M | OPEN |

@@ -1055,7 +1055,7 @@
     try { rec = JSON.parse(localStorage.getItem('mhs-services-blocked') || 'null'); } catch (e) { rec = null; }
     if (!rec || !rec.hosts) return;
     el.textContent = 'The last time, the game could not start on this device: the school\'s web filter is blocking ' + rec.hosts +
-      ', so progress cannot be saved. Please tell your teacher. The game starts by itself once IT allows them.';
+      ', so progress cannot be saved. Please tell your teacher. Once IT allows them, Launch works again.';
     el.classList.remove('hidden');
   })();
   function playWindowNote(text) {
