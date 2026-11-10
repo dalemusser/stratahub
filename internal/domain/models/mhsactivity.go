@@ -15,7 +15,9 @@ import (
 //	2 (2026-10-13): a day with fewer than MHSActivityMinPlayedEvents game
 //	   events is "stray events" (a tab opened on an earlier day), not played
 //	3 (2026-10-26): runs that froze (Launch.Froze) and the freeze loop flag
-const MHSActivityVersion = 3
+//	4 (2026-11-09): Flags.ServicesBlocked, the play page's probe finding the
+//	   game's requests to the log or save service blocked
+const MHSActivityVersion = 4
 
 // MHSActivityMinPlayedEvents is how many game log events a day needs to count
 // as played. A game tab left open from an earlier day sends a handful when
@@ -179,9 +181,17 @@ type MHSActivityFlags struct {
 	BgfetchRefused      bool `bson:"bgfetch_refused,omitempty" json:"bgfetch_refused,omitempty"`
 	StorageNotPersisted bool `bson:"storage_not_persisted,omitempty" json:"storage_not_persisted,omitempty"`
 	NewDevice           bool `bson:"new_device,omitempty" json:"new_device,omitempty"`
-	LoggingProblem      bool `bson:"logging_problem,omitempty" json:"logging_problem,omitempty"` // launched and heartbeating but no log events
-	StrayEvents         bool `bson:"stray_events,omitempty" json:"stray_events,omitempty"`       // a few game events and nothing else: a tab opened on an earlier day
-	FreezeLoop          bool `bson:"freeze_loop,omitempty" json:"freeze_loop,omitempty"`         // MHSFreezeLoopRuns or more runs froze that day: the student is stuck relaunching
+	LoggingProblem      bool `bson:"logging_problem,omitempty" json:"logging_problem,omitempty"`   // launched and heartbeating but no log events
+	StrayEvents         bool `bson:"stray_events,omitempty" json:"stray_events,omitempty"`         // a few game events and nothing else: a tab opened on an earlier day
+	FreezeLoop          bool `bson:"freeze_loop,omitempty" json:"freeze_loop,omitempty"`           // MHSFreezeLoopRuns or more runs froze that day: the student is stuck relaunching
+	ServicesBlocked     bool `bson:"services_blocked,omitempty" json:"services_blocked,omitempty"` // a launch's page found the game's requests to the log or save service blocked (MHSDeviceTest.ServicesBlocked)
+}
+
+// NoActivityArrived reports whether the game ran that day and none of its
+// activity reached the log service: launched, not played, with the log
+// service readable (a day computed without it cannot tell).
+func (d MHSActivityDay) NoActivityArrived() bool {
+	return d.Launched && !d.Played && d.Log.Available
 }
 
 // HasProblem reports whether the day shows something staff would act on.

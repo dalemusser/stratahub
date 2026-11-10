@@ -182,3 +182,32 @@ func TestUnitsPageScriptsParse(t *testing.T) {
 		}
 	}
 }
+
+// The play page carries the game-service probes (with their POST routes) and
+// the blocked form of the logging bar: the student's line, the teacher's
+// steps for IT, and the heartbeat field that tells the server.
+func TestPlayPageProbesGameServices(t *testing.T) {
+	data := memberPlayData()
+	data.ServiceProbes = ProbesFromServices(GameServices{LogSubmitURL: data.LogSubmitURL, StateSaveURL: data.StateSaveURL})
+	body := renderPlayPage(t, data)
+	for _, want := range []string{
+		`"post":"https://log.example.com/api/log/probe"`,
+		`"post":"https://save.example.com/api/state/probe"`,
+		`id="mhs-ln-how-blocked"`,
+		`class="mhs-ln-hosts"`,
+		`including <code>OPTIONS</code> and <code>POST</code>`,
+		`services_blocked:`,
+		`showLoggingNotice('blocked')`,
+		`MHSDeliveryManager.probeServices(probes, auth)`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("play page lacks %q", want)
+		}
+	}
+
+	// Without configured services the page has no probes and runs none.
+	body = renderPlayPage(t, memberPlayData())
+	if !strings.Contains(body, "var probes =  null  || [];") {
+		t.Errorf("play page without probes: %q", body[strings.Index(body, "var probes"):strings.Index(body, "var probes")+60])
+	}
+}

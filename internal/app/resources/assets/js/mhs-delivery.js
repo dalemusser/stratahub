@@ -697,6 +697,71 @@
     try { return new URL(url, window.location.href).host; } catch (e) { return url; }
   }
 
+  // One request in the game's own form to a service's /probe route: POST, a
+  // JSON body, an Authorization header (so the browser sends its OPTIONS
+  // preflight first). A school's filter can let a plain GET through and stop
+  // these, which is how the game's logs and saves go missing while the page
+  // works (docs/mission-hydrosci/mhs-issues-102826.md, Issue 3). Resolves
+  // {state, ms, status, error}; never rejects. States:
+  //   'ok'      the service answered {"ok":true}: the game's requests get through
+  //   'blocked' no answer the page may read (refused, preflight failed, a
+  //             filter's own reply, or nothing within the time limit)
+  //   'odd'     a readable answer that is not the service's (an older service
+  //             without the route, a server error): not evidence of a block
+  function probePost(url, auth) {
+    var started = Date.now();
+    var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
+    var timer = controller ? setTimeout(function() { controller.abort(); }, PREFLIGHT_TIMEOUT_MS) : null;
+    var opts = {
+      method: 'POST', mode: 'cors', cache: 'no-store', credentials: 'omit',
+      headers: { 'Content-Type': 'application/json', 'Authorization': auth || 'Bearer probe' },
+      body: '{"probe":true}'
+    };
+    if (controller) opts.signal = controller.signal;
+    return fetch(url, opts).then(function(resp) {
+      var status = resp.status || 0;
+      return resp.text().then(function(text) {
+        if (timer) clearTimeout(timer);
+        var body = null;
+        try { body = JSON.parse(text); } catch (e) { /* not JSON */ }
+        if (resp.ok && body && body.ok === true) return { state: 'ok', ms: Date.now() - started, status: status, error: '' };
+        return { state: 'odd', ms: Date.now() - started, status: status, error: 'answered HTTP ' + status + ' but not as the game service' };
+      });
+    }).catch(function(err) {
+      if (timer) clearTimeout(timer);
+      var aborted = err && err.name === 'AbortError';
+      return { state: 'blocked', ms: Date.now() - started, status: 0,
+        error: aborted ? ('no answer within ' + Math.round(PREFLIGHT_TIMEOUT_MS / 1000) + ' s')
+                       : 'the request was stopped before an answer (' + String((err && err.message) || err) + ')' };
+    });
+  }
+
+  /**
+   * Probes the game services as the game uses them. `probes` is the
+   * manifest's list ({name, url, post}); `auth` maps a service name to the
+   * Authorization value the game sends (the play page has them; other pages
+   * send a placeholder, which the probe route ignores). For each service it
+   * sends the POST probe and, alongside, the plain GET to /health, so a
+   * blocked result can say whether the host itself answers. Services without
+   * a `post` URL are left out. Resolves to
+   * [{name, host, state, ms, error, hostAnswers}]; never rejects.
+   */
+  MHSDeliveryManager.probeServices = function(probes, auth) {
+    auth = auth || {};
+    var checks = [];
+    (probes || []).forEach(function(probe) {
+      if (!probe || !probe.post) return;
+      checks.push(Promise.all([
+        probePost(probe.post, auth[probe.name]),
+        probe.url ? probeURL(probe.url, 'no-cors') : Promise.resolve({ ok: false })
+      ]).then(function(r) {
+        return { name: probe.name, host: hostOf(probe.post), state: r[0].state, ms: r[0].ms,
+          status: r[0].status, error: r[0].error, hostAnswers: !!r[1].ok };
+      }));
+    });
+    return Promise.all(checks);
+  };
+
   // The message shown when the content server cannot be reached.
   function cdnUnreachableMessage(host, error) {
     return 'Cannot reach the game content server (' + host + '). A school firewall or ' +
@@ -735,15 +800,32 @@
     }
     var probes = (this.manifest && this.manifest.probes) || [];
     var checks = [];
+    var posted = probes.filter(function(pr) { return pr && pr.post; });
+    if (posted.length) {
+      // The game's own form of request (see probePost): a GET can pass a
+      // filter that stops the game's requests.
+      checks.push(MHSDeliveryManager.probeServices(posted).then(function(list) {
+        return list.map(function(r) {
+          return { name: r.name, host: r.host, ok: r.state !== 'blocked', ms: r.ms, state: r.state,
+            error: r.state === 'blocked'
+              ? 'the game\'s requests are blocked (' + r.error + (r.hostAnswers ? '; the host itself answers, so a web filter is stopping them' : '') + ')'
+              : r.error };
+        });
+      }));
+    }
     for (var p = 0; p < probes.length; p++) {
+      if (probes[p].post) continue;
       (function(probe) {
         checks.push(probeURL(probe.url, 'no-cors').then(function(r) {
-          return { name: probe.name, host: hostOf(probe.url), ok: r.ok, ms: r.ms, error: r.error };
+          return [{ name: probe.name, host: hostOf(probe.url), ok: r.ok, ms: r.ms, error: r.error }];
         }));
       })(probes[p]);
     }
     if (checks.length) {
-      try { result.services = await Promise.all(checks); } catch (e) { /* individual probes never reject */ }
+      try {
+        var lists = await Promise.all(checks);
+        result.services = [].concat.apply([], lists);
+      } catch (e) { /* individual probes never reject */ }
     }
     // One row entry for all services: the panel shows a step's latest entry,
     // so per-service entries would let a green save line hide a failed log
@@ -751,7 +833,7 @@
     var okList = [], badList = [];
     for (var s = 0; s < result.services.length; s++) {
       var sv = result.services[s];
-      if (sv.ok) { okList.push(sv.name + ' (' + sv.host + ') ' + sv.ms + ' ms'); continue; }
+      if (sv.ok) { okList.push(sv.name + ' (' + sv.host + ') ' + sv.ms + ' ms' + (sv.state === 'odd' ? ' [' + sv.error + ']' : '')); continue; }
       console.warn('MHS preflight: game service "' + sv.name + '" (' + sv.host + ') unreachable: ' + sv.error);
       badList.push(sv.name + ' (' + sv.host + ') unreachable: ' + sv.error);
     }
@@ -762,7 +844,7 @@
       // save. Say so here, since this line is the only warning anyone sees.
       this._step('services', badList.length ? 'warn' : 'ok', badList.length
         ? 'Game service' + (badList.length > 1 ? 's' : '') + ' ' + badList.join('; ') +
-          ' — the game will play but will not show an error: gameplay logs and/or progress will not be recorded from this device until the network allows these hosts' +
+          ' — the game will play but will not show an error: gameplay logs and/or progress will not be recorded from this device until the school\'s network or web filter allows these hosts for all requests, including OPTIONS and POST' +
           (okList.length ? ' · reachable: ' + okList.join(', ') : '')
         : 'Game services reachable: ' + okList.join(', '));
     }

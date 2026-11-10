@@ -49,11 +49,34 @@ type Counts struct {
 	DevicesNew  int // device rows created in the window (fresh browser profiles)
 
 	BgfetchRefused int // students whose browser refused the background download
+
+	// The game's activity not reaching the servers (Issue 3 of
+	// docs/mission-hydrosci/mhs-issues-102826.md): Launched is students whose
+	// game ran; NoActivity those of them from whom no game activity arrived
+	// in the window (MHSActivityDay.NoActivityArrived on every day they
+	// launched); ServicesBlocked students whose play page found the game's
+	// requests to the log or save service blocked.
+	Launched        int
+	NoActivity      int
+	ServicesBlocked int
 }
 
 // Problem reports whether the counts show something to act on.
 func (c Counts) Problem() bool {
-	return c.Blocked > 0 || c.DlHeld > 0 || c.DlFailed > 0 || c.LaunchFailed > 0 || c.FreezeLoop > 0
+	return c.Blocked > 0 || c.DlHeld > 0 || c.DlFailed > 0 || c.LaunchFailed > 0 || c.FreezeLoop > 0 || c.ActivityNotArriving()
+}
+
+// noActivityMin is the fewest students without arriving activity that make a
+// school-level problem (with at least half of those whose game ran): one or
+// two can be a student who closed the game at once; at the two schools of
+// Issue 3 it was 11 of 13 and 4 of 4 on a class day.
+const noActivityMin = 3
+
+// ActivityNotArriving reports the school-level signal: a play page found the
+// game's requests blocked, or the game ran for several students and none of
+// their activity arrived.
+func (c Counts) ActivityNotArriving() bool {
+	return c.ServicesBlocked > 0 || (c.NoActivity >= noActivityMin && 2*c.NoActivity >= c.Launched)
 }
 
 // Downloads is the number of download episodes that moved data.
@@ -119,6 +142,8 @@ type StudentRow struct {
 	CrashReal       int
 	CrashNotice     int
 	FreezeLoop      bool // some day of the window: the game froze MHSFreezeLoopRuns+ times
+	NoActivity      bool // the game ran and none of its activity arrived in the window (Counts.NoActivity)
+	ServicesBlocked bool // a play page found the game's requests blocked (Counts.ServicesBlocked)
 	Devices         int
 	NewDevices      int
 	Platforms       string
@@ -329,14 +354,21 @@ func hasGroup(d models.MHSActivityDay, g primitive.ObjectID) bool {
 // users; downloads, launches and crashes add up; devices are distinct ids.
 func aggregate(ds []models.MHSActivityDay) Counts {
 	var c Counts
-	users := map[primitive.ObjectID]*struct{ opened, played, blocked, bgfetch, freezeLoop bool }{}
+	type userAcc struct {
+		opened, played, blocked, bgfetch, freezeLoop bool
+		launched, unknown, servicesBlocked           bool
+	}
+	users := map[primitive.ObjectID]*userAcc{}
 	devices := map[string]bool{}
 	for _, d := range ds {
 		u := users[d.UserID]
 		if u == nil {
-			u = &struct{ opened, played, blocked, bgfetch, freezeLoop bool }{}
+			u = &userAcc{}
 			users[d.UserID] = u
 		}
+		u.launched = u.launched || d.Launched
+		u.unknown = u.unknown || (d.Launched && !d.Log.Available)
+		u.servicesBlocked = u.servicesBlocked || d.Flags.ServicesBlocked
 		u.opened = u.opened || d.Opened
 		u.played = u.played || d.Played
 		u.blocked = u.blocked || d.Blocked
@@ -393,6 +425,15 @@ func aggregate(ds []models.MHSActivityDay) Counts {
 		}
 		if u.freezeLoop {
 			c.FreezeLoop++
+		}
+		if u.launched {
+			c.Launched++
+			if !u.played && !u.unknown {
+				c.NoActivity++
+			}
+		}
+		if u.servicesBlocked {
+			c.ServicesBlocked++
 		}
 	}
 	c.DevicesSeen = len(devices)
@@ -458,6 +499,12 @@ func studentRows(ds []models.MHSActivityDay, lk Lookups, loc *time.Location, sta
 			row.Stray = row.Stray || d.Flags.StrayEvents
 		}
 		row.Blocked = row.Blocked && !row.Played // see aggregate: never got in during the window
+		if c := aggregate(uds); c.NoActivity > 0 {
+			row.NoActivity = true
+		}
+		for _, d := range uds {
+			row.ServicesBlocked = row.ServicesBlocked || d.Flags.ServicesBlocked
+		}
 		row.Stray = row.Stray && !row.Opened && !row.Played
 		row.TimelineHref = "/mhsactivity/student/" + id.Hex() + "/day/" + uds[len(uds)-1].Day
 		row.Devices = len(devices)
@@ -585,8 +632,28 @@ func unitLabel(unit string) string {
 // freezeLoopTitle explains the freeze-loop pills.
 const freezeLoopTitle = "The game froze after loading and the run ended within minutes, three or more times in a day. A run that ends before the game's first save starts the unit over. Try another device; restarting this one may help."
 
+// activityTitle and blockedTitle explain the activity-not-arriving pills.
+const (
+	activityTitle = "The game ran but none of its activity (gameplay records, saves) reached the servers in this window. When this is most of a school's students, the school's web filter is usually blocking the game's requests to the log and save services: progress is not saved between sessions, and the current game may wait at START."
+	blockedTitle  = "The play page sent a request the way the game does and the school's web filter stopped it. The school's IT needs to allow the game's log and save hosts for all requests, including OPTIONS and POST; the play page's notice names them."
+)
+
 func schoolPills(c Counts, churn bool) []Pill {
 	var p []Pill
+	if c.ActivityNotArriving() {
+		t := "no game activity reaching the server from " + plural(c.NoActivity, "student", "students")
+		title := activityTitle
+		if c.ServicesBlocked > 0 {
+			t = "filter blocking the game for " + plural(c.ServicesBlocked, "student", "students")
+			if c.NoActivity > 0 {
+				t += fmt.Sprintf(" (%d with no activity arriving)", c.NoActivity)
+			}
+			title = blockedTitle + " " + activityTitle
+		}
+		p = append(p, Pill{Text: t, Class: viewers.PillAmber, Title: title})
+	} else if c.NoActivity > 0 {
+		p = append(p, Pill{Text: plural(c.NoActivity, "student", "students") + " launched, no activity arrived", Class: viewers.PillGray, Title: activityTitle})
+	}
 	if c.Blocked > 0 {
 		p = append(p, Pill{Text: plural(c.Blocked, "student", "students") + " blocked", Class: viewers.PillAmber, Title: "Opened the page, never played, and had a download or launch problem"})
 	}
@@ -624,6 +691,12 @@ func studentPills(r StudentRow) []Pill {
 	var p []Pill
 	if r.Blocked {
 		p = append(p, Pill{Text: "blocked", Class: viewers.PillAmber})
+	}
+	if r.ServicesBlocked {
+		p = append(p, Pill{Text: "filter blocking the game", Class: viewers.PillAmber, Title: blockedTitle})
+	}
+	if r.NoActivity {
+		p = append(p, Pill{Text: "no activity arrived", Class: viewers.PillGray, Title: activityTitle})
 	}
 	if r.Launch.Failed > 0 {
 		p = append(p, Pill{Text: plural(r.Launch.Failed, "launch failed", "launches failed"), Class: viewers.PillAmber})

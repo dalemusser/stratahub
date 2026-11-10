@@ -145,6 +145,7 @@ func (h *Handler) renderPlay(w http.ResponseWriter, r *http.Request, p playRende
 		SettingsSaveURL: h.Services.SettingsSaveURL,
 		SettingsLoadURL: h.Services.SettingsLoadURL,
 		SaveAuth:        h.Services.SaveAuth,
+		ServiceProbes:   h.Probes,
 		PlayBackURL:     p.BackURL,
 	}
 	data.SignInURL = "/login?return=" + url.QueryEscape(SignedInPath)

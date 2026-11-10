@@ -185,6 +185,9 @@ func (s *Store) Heartbeat(ctx context.Context, workspaceID, id primitive.ObjectI
 	if beat.OfflineMs > 0 {
 		set["offline_ms"] = beat.OfflineMs
 	}
+	if beat.ServicesBlocked != "" {
+		set["services_blocked"] = beat.ServicesBlocked
+	}
 	update := bson.M{
 		"$push": bson.M{"heartbeats": bson.M{"$each": []models.MHSDeviceTestHeartbeat{beat}, "$slice": -models.MHSDeviceTestMaxHeartbeats}},
 		"$set":  set,
@@ -205,6 +208,14 @@ func (s *Store) Heartbeat(ctx context.Context, workspaceID, id primitive.ObjectI
 		// since launch" (one extra write per launch, then a no-op filter).
 		baseline := bson.M{"_id": id, "workspace_id": workspaceID, "playerprefs_bytes_at_launch": bson.M{"$exists": false}}
 		if _, err := s.c.UpdateOne(ctx, baseline, bson.M{"$set": bson.M{"playerprefs_bytes_at_launch": beat.PlayerPrefsBytes}}); err != nil {
+			return err
+		}
+	}
+	if beat.ServicesBlocked != "" {
+		// When the page first reported the game services blocked (one extra
+		// write per blocked run, then a no-op filter).
+		first := bson.M{"_id": id, "workspace_id": workspaceID, "services_blocked_at": bson.M{"$exists": false}}
+		if _, err := s.c.UpdateOne(ctx, first, bson.M{"$set": bson.M{"services_blocked_at": beat.At}}); err != nil {
 			return err
 		}
 	}

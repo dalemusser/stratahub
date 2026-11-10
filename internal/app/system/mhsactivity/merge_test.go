@@ -266,3 +266,15 @@ func TestMergeFreezeLoop(t *testing.T) {
 		}
 	}
 }
+
+// A launch whose page found the game services blocked marks the day.
+func TestMergeServicesBlocked(t *testing.T) {
+	b, student, _ := testBuilder(t)
+	r := rec(student, "dev-a", "unit2", "launch-ok", ct(9, 15, 0))
+	r.ServicesBlocked = "log,save"
+	b.addRecord(r, &models.MHSMemberSummary{V: models.MHSMemberSummaryVersion})
+	docs := b.finish(time.Now())
+	if len(docs) != 1 || !docs[0].Flags.ServicesBlocked {
+		t.Fatalf("want the day flagged: %+v", docs)
+	}
+}

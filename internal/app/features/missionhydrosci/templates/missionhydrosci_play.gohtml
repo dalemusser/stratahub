@@ -245,6 +245,7 @@
           <button type="button" class="mhs-ln-btn mhs-ln-dismiss" id="mhs-ln-dismiss" aria-label="Hide this notice" title="Hide this notice">&times;</button>
         </div>
         <div class="mhs-ln-how" id="mhs-ln-how" hidden>
+          <div id="mhs-ln-how-default">
           <strong>For the teacher.</strong> The game is playing normally, but the record of this student's play is not reaching the research log. <span id="mhs-ln-reason"></span>
           <ol>
             <li>Let the student keep playing. Progress and settings are saved on the server and are not affected.</li>
@@ -252,6 +253,18 @@
             <li>If this notice comes back in the next session on this device, the school network may be blocking the game's log service. Tell your program contact and name this device.</li>
           </ol>
           Details are in the Teacher Guide under "Game activity not recorded".
+          </div>
+          <!-- The school's filter stops the game's own requests (docs/mission-hydrosci/mhs-issues-102826.md
+               Issue 3). The fix is the school's to make; this text is what to hand to IT. -->
+          <div id="mhs-ln-how-blocked" hidden>
+          <strong>For the teacher.</strong> This device opens the game, but the school's web filter is stopping the game's own requests to <span class="mhs-ln-hosts"></span>. Nothing is wrong with the student's account or the device.
+          <ol>
+            <li>Until the filter allows these addresses, this student's play is not recorded and progress is not saved between sessions. With the current game, <em>START</em> may do nothing.</li>
+            <li>Ask your school or district IT to allow <span class="mhs-ln-hosts"></span> for all kinds of requests, including <code>OPTIONS</code> and <code>POST</code>, without inspecting the request body, the same way the game's content address is allowed.</li>
+            <li>Afterwards, open the public Device Test on one of these devices: its result says whether the game's activity now arrives. Nothing needs redoing.</li>
+          </ol>
+          <span id="mhs-ln-blocked-detail"></span>
+          </div>
         </div>
       </div>
 
@@ -1024,7 +1037,9 @@
           cpu_pressure: devState.cpu,
           stalls: devState.stalls,
           max_stall_ms: devState.maxStallMs,
-          gl_context_lost: devState.glLost
+          gl_context_lost: devState.glLost,
+          // Game services this page's probe finds blocked now (see svcHealth).
+          services_blocked: (typeof svcHealth !== 'undefined' && svcHealth.blocked) || ''
         };
         hbFrames = 0; hbLastAt = now;
         devState.stalls = 0; devState.maxStallMs = 0;
@@ -1217,12 +1232,14 @@
       var lnReasons = {
         none: 'StrataHub has been watching this session and no gameplay logs have arrived from it.',
         cache: 'The game reported that it can no longer save its log cache on this device: its store is full, or the browser refuses to keep site data (a private window does this). Activity from here on in this session is not kept; what was saved before is sent next time.',
-        full: 'The game’s local log store on this device is nearly full, which means logs have been piling up unsent for a long time.'
+        full: 'The game’s local log store on this device is nearly full, which means logs have been piling up unsent for a long time.',
+        blocked: ''
       };
       var lnTexts = {
         none: 'Your game activity is not reaching the server right now. It is being saved on this device and will be sent the next time the game is opened. You can keep playing.',
         cache: 'This device cannot save your game activity. You can keep playing. Please tell your teacher.',
-        full: 'Your game activity has not been reaching the server, and the space this device keeps it in is nearly full. It will be sent the next time the game is opened. You can keep playing.'
+        full: 'Your game activity has not been reaching the server, and the space this device keeps it in is nearly full. It will be sent the next time the game is opened. You can keep playing.',
+        blocked: 'The school’s web filter is blocking the game’s activity on this device, so your progress is not being saved. Please tell your teacher.'
       };
       var lnText = document.getElementById('mhs-ln-text');
       if (lnHowBtn) lnHowBtn.addEventListener('click', function() {
@@ -1266,11 +1283,17 @@
       function showLoggingNotice(reason) {
         if (!lnEl || loggingHealth.dismissed[reason]) return;
         if (loggingHealth.shown === reason) return;
+        // A blocked service explains every other logging signal (and makes
+        // their "will be sent later" untrue), even after its bar is hidden.
+        if (reason !== 'blocked' && (loggingHealth.shown === 'blocked' || (typeof svcHealth !== 'undefined' && svcHealth.blocked))) return;
         // The signed-out bar is showing: keep this one for when it clears.
         if (signIn && signIn.state !== 'ok') { signIn.loggingWasShown = reason; return; }
         loggingHealth.shown = reason;
         if (lnReason) lnReason.textContent = lnReasons[reason] || '';
         if (lnText && lnTexts[reason]) lnText.textContent = lnTexts[reason];
+        var howDefault = document.getElementById('mhs-ln-how-default'), howBlocked = document.getElementById('mhs-ln-how-blocked');
+        if (howDefault) howDefault.hidden = (reason === 'blocked');
+        if (howBlocked) howBlocked.hidden = (reason !== 'blocked');
         barShow(lnEl);
       }
       function hideLoggingNotice() {
@@ -1453,6 +1476,82 @@
       // cached files with the network down): no transition event will come,
       // so say so now rather than after the first failures.
       if (navigator.onLine === false) showOffline();
+
+      // ---- Game services ----------------------------------------------------
+      // A school's web filter can let this page, its downloads and a plain GET
+      // to the log and save hosts through while it stops the game's own
+      // requests (POST with a JSON body and a key, preceded by the browser's
+      // OPTIONS preflight). The game says nothing: its activity is never
+      // recorded, progress is not saved, and a build that reads the save
+      // before it starts waits at START (docs/mission-hydrosci/mhs-issues-102826.md,
+      // Issue 3). So the page sends one request in the game's own form to each
+      // service's /probe route at launch. "Blocked" (no answer the page may
+      // read) while the device is online is checked once more after a short
+      // wait, then shown on the logging bar with the hosts to give to IT, as
+      // a services/fail step, and on every heartbeat; it is checked again
+      // every few minutes and cleared when the hosts answer. The page only
+      // reports the block: allowing the hosts is the school's decision.
+      var svcHealth = { blocked: '', hosts: '', confirmTimer: null, okLogged: false, oddLogged: false };
+      (function watchGameServices() {
+        var probes = {{ .ServiceProbes }} || [];
+        if (!probes.length || typeof MHSDeliveryManager === 'undefined' || !MHSDeliveryManager.probeServices) return;
+        var svc = (window.__mhsBridgeConfig && window.__mhsBridgeConfig.services) || {};
+        var auth = {
+          log: svc.log_submit && svc.log_submit.auth,
+          save: svc.state_save && svc.state_save.auth
+        };
+        var RECHECK_MS = 300000, CONFIRM_MS = 20000;
+        function online() { return navigator.onLine !== false && !netHealth.shown; }
+        function describe(list) {
+          return list.map(function(r) {
+            return r.name + ' (' + r.host + '): ' + r.error + (r.hostAnswers ? '; the host answers a plain request, so a filter is stopping the game\'s requests' : '');
+          }).join('; ');
+        }
+        function check(confirming) {
+          MHSDeliveryManager.probeServices(probes, auth).then(function(results) {
+            var blocked = results.filter(function(r) { return r.state === 'blocked'; });
+            var odd = results.filter(function(r) { return r.state === 'odd'; });
+            if (odd.length && !svcHealth.oddLogged) {
+              svcHealth.oddLogged = true;
+              stepLog.record('services', 'warn', 'Game service probe answered unexpectedly: ' + odd.map(function(r) { return r.name + ' (' + r.host + ') ' + r.error; }).join('; '));
+            }
+            if (blocked.length && online()) {
+              if (!confirming && !svcHealth.blocked) {
+                // Once more before telling anyone: a single miss can be a blip.
+                svcHealth.confirmTimer = setTimeout(function() { check(true); }, CONFIRM_MS);
+                return;
+              }
+              var names = blocked.map(function(r) { return r.name; }).join(',');
+              var hosts = blocked.map(function(r) { return r.host; }).join(' and ');
+              if (svcHealth.blocked !== names) {
+                svcHealth.blocked = names;
+                svcHealth.hosts = hosts;
+                stepLog.record('services', 'fail', 'The school\'s web filter is blocking the game\'s requests to ' + hosts +
+                  ': nothing from this session is logged or saved until IT allows ' + hosts + ' for all requests, including OPTIONS and POST — ' + describe(blocked),
+                  { services_blocked: names, hosts: hosts });
+                var hostEls = document.querySelectorAll('.mhs-ln-hosts');
+                for (var i = 0; i < hostEls.length; i++) hostEls[i].textContent = hosts;
+                var detail = document.getElementById('mhs-ln-blocked-detail');
+                if (detail) detail.textContent = 'Checked at ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + ': ' + describe(blocked) + '.';
+                showLoggingNotice('blocked');
+                if (hbTimer) sendHeartbeat(false); // the record learns it now, not at the next beat
+              }
+            } else if (!blocked.length) {
+              if (svcHealth.blocked) {
+                stepLog.record('services', 'ok', 'The game\'s requests reach ' + svcHealth.hosts + ' again');
+                svcHealth.blocked = ''; svcHealth.hosts = '';
+                if (loggingHealth.shown === 'blocked') hideLoggingNotice();
+                if (hbTimer) sendHeartbeat(false);
+              } else if (!svcHealth.okLogged && results.length && !odd.length) {
+                svcHealth.okLogged = true;
+                stepLog.record('services', 'ok', 'The game\'s requests get through: ' + results.map(function(r) { return r.name + ' (' + r.host + ') ' + r.ms + ' ms'; }).join(', '));
+              }
+            }
+          });
+        }
+        check(false);
+        setInterval(function() { if (online()) check(!!svcHealth.blocked); }, RECHECK_MS);
+      })();
 
       // ---- Signed out -------------------------------------------------------
       // StrataHub answers this page's own posts with 401 once the sign-in has

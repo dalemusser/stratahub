@@ -175,3 +175,65 @@ func pillTexts(ps []Pill) string {
 	}
 	return b.String()
 }
+
+// Issue 3's signature: the game ran for most of a school's students and none
+// of their activity arrived (amber at the school, gray per student); one
+// such student is a gray note; a page that found the services blocked makes
+// the school amber by itself; a day computed without the log service counts
+// for neither.
+func TestReportActivityNotArriving(t *testing.T) {
+	orgJ, orgK, orgL := primitive.NewObjectID(), primitive.NewObjectID(), primitive.NewObjectID()
+	lk := Lookups{Orgs: map[primitive.ObjectID]OrgInfo{orgJ: {Name: "School J", Loc: time.UTC}, orgK: {Name: "School K", Loc: time.UTC}, orgL: {Name: "School L", Loc: time.UTC}}}
+	day := func(org primitive.ObjectID, played, available, blocked bool) models.MHSActivityDay {
+		return models.MHSActivityDay{UserID: primitive.NewObjectID(), OrganizationID: org, Role: "member", Day: "2026-11-05",
+			Opened: true, Launched: true, Played: played, Launch: models.MHSActivityLaunch{OK: 1},
+			Log: models.MHSActivityLog{Available: available}, Flags: models.MHSActivityFlags{ServicesBlocked: blocked}}
+	}
+	var docs []models.MHSActivityDay
+	for i := 0; i < 11; i++ { // J: 11 of 13 launched with nothing arriving
+		docs = append(docs, day(orgJ, false, true, false))
+	}
+	docs = append(docs, day(orgJ, true, true, false), day(orgJ, true, true, false))
+	for i := 0; i < 5; i++ { // K: one of six, and one day without the log service
+		docs = append(docs, day(orgK, true, true, false))
+	}
+	docs = append(docs, day(orgK, false, true, false), day(orgK, false, false, false))
+	docs = append(docs, day(orgL, false, true, true)) // L: one page found the services blocked
+
+	rep := BuildReport(docs, lk, Options{SelectedOrg: orgJ})
+	by := map[string]SchoolRow{}
+	for _, s := range rep.Schools {
+		by[s.Name] = s
+	}
+	j, k, l := by["School J"], by["School K"], by["School L"]
+	if j.Launched != 13 || j.NoActivity != 11 || !j.ActivityNotArriving() || !j.Problem() {
+		t.Errorf("School J %+v", j.Counts)
+	}
+	if p := pillTexts(j.Pills); !strings.Contains(p, "no game activity reaching the server from 11 students") || !strings.Contains(p, "amber") {
+		t.Errorf("School J pills %q", p)
+	}
+	if k.NoActivity != 1 || k.ActivityNotArriving() || k.Problem() {
+		t.Errorf("School K %+v", k.Counts)
+	}
+	if p := pillTexts(k.Pills); !strings.Contains(p, "1 student launched, no activity arrived") || strings.Contains(p, "amber") {
+		t.Errorf("School K pills %q", p)
+	}
+	if l.ServicesBlocked != 1 || !l.ActivityNotArriving() {
+		t.Errorf("School L %+v", l.Counts)
+	}
+	if p := pillTexts(l.Pills); !strings.Contains(p, "filter blocking the game for 1 student (1 with no activity arriving)") {
+		t.Errorf("School L pills %q", p)
+	}
+	n := 0
+	for _, st := range rep.School.Students {
+		if st.NoActivity {
+			n++
+			if p := pillTexts(st.Pills); !strings.Contains(p, "no activity arrived") {
+				t.Errorf("student pills %q", p)
+			}
+		}
+	}
+	if n != 11 {
+		t.Errorf("students with no activity arrived: %d, want 11", n)
+	}
+}

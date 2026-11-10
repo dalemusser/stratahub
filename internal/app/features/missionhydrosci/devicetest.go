@@ -892,6 +892,8 @@ type deviceTestHeartbeatRequest struct {
 	Stalls        int    `json:"stalls"`
 	MaxStallMs    int64  `json:"max_stall_ms"`
 	GLContextLost int    `json:"gl_context_lost"`
+	// Game services the page's probe found blocked (optional).
+	ServicesBlocked string `json:"services_blocked"`
 }
 
 func (r deviceTestHeartbeatRequest) beat() models.MHSDeviceTestHeartbeat {
@@ -912,6 +914,7 @@ func (r deviceTestHeartbeatRequest) beat() models.MHSDeviceTestHeartbeat {
 		Stalls:           r.Stalls,
 		MaxStallMs:       r.MaxStallMs,
 		GLContextLost:    r.GLContextLost,
+		ServicesBlocked:  models.ClipRunes(r.ServicesBlocked, 32),
 	}
 }
 

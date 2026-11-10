@@ -88,10 +88,12 @@ func (h *Handler) SetDeviceTestStartLimit(limit int, window time.Duration) {
 	h.startWindow = window
 }
 
-// ProbesFromServices derives reachability probes (the services' /health
-// routes) from the configured game-service endpoints, so a client can tell a
-// blocked log or save host from a working one before a download or launch.
-// Endpoints that are unset or malformed produce no probe.
+// ProbesFromServices derives reachability probes from the configured
+// game-service endpoints, so a client can tell a blocked log or save host
+// from a working one: the services' /health routes (URL) and the /probe
+// route beside the endpoint the game posts to (Post: ".../api/log/submit"
+// gives ".../api/log/probe"). Endpoints that are unset or malformed produce
+// no probe; an endpoint without a path gets no Post.
 func ProbesFromServices(s GameServices) []ManifestProbe {
 	var probes []ManifestProbe
 	add := func(name, endpoint string) {
@@ -99,7 +101,13 @@ func ProbesFromServices(s GameServices) []ManifestProbe {
 		if err != nil || u.Scheme == "" || u.Host == "" {
 			return
 		}
-		probes = append(probes, ManifestProbe{Name: name, URL: u.Scheme + "://" + u.Host + "/health"})
+		p := ManifestProbe{Name: name, URL: u.Scheme + "://" + u.Host + "/health"}
+		// "/api/log/submit" -> "/api/log/probe"; a one-segment path such as
+		// the legacy "/logs" has no sibling route, so no Post.
+		if p2 := strings.TrimSuffix(u.Path, "/"); strings.LastIndex(p2, "/") > 0 {
+			p.Post = u.Scheme + "://" + u.Host + p2[:strings.LastIndex(p2, "/")] + "/probe"
+		}
+		probes = append(probes, p)
 	}
 	add("log", s.LogSubmitURL)
 	add("save", s.StateSaveURL)

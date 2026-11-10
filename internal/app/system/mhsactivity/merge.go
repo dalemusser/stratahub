@@ -191,6 +191,9 @@ func (b *builder) addRecord(rec models.MHSDeviceTest, sum *models.MHSMemberSumma
 	if inDay && outcomeOf(rec) == "launch-ok" && rec.LoggingProblem() {
 		a.doc.Flags.LoggingProblem = true
 	}
+	if inDay && rec.ServicesBlocked != "" {
+		a.doc.Flags.ServicesBlocked = true
+	}
 	if sum == nil {
 		return
 	}

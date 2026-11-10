@@ -60,6 +60,11 @@ type PlayData struct {
 	SettingsLoadURL string
 	SaveAuth        string
 
+	// ServiceProbes are the game services' reachability probes (the
+	// manifest's): the page sends each Post the way the game sends its own
+	// requests and tells the student and teacher when a filter blocks them.
+	ServiceProbes []ManifestProbe
+
 	// Device test (docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md):
 	// the page runs one unit for an anonymous tester. DeviceTest switches the
 	// template's completion, back-button and reporting branches.
@@ -139,12 +144,20 @@ type ManifestTuning struct {
 	KeepaliveMs     int `json:"keepaliveMs,omitempty"`     // how often pages nudge the SW to keep progress alive
 }
 
-// ManifestProbe is a reachability probe the client runs before its first
-// download (no-cors GET; any response counts as reachable). Used to tell a
-// blocked game-service host from a working one.
+// ManifestProbe is a game service's reachability probes. URL is the
+// service's /health, fetched as a no-cors GET (any response counts as
+// reachable): it only shows that the host answers. Post is the service's
+// /probe beside the endpoint the game uses (stratalog /api/log/probe,
+// stratasave /api/state/probe), sent the way the game sends its requests
+// (POST, a JSON body, an Authorization header, so the browser sends an
+// OPTIONS preflight first). A web filter can let the GET through and block
+// the game's requests (docs/mission-hydrosci/mhs-issues-102826.md Issue 3);
+// only a readable {"ok":true} from Post shows that the game's requests get
+// through.
 type ManifestProbe struct {
 	Name string `json:"name"`
 	URL  string `json:"url"`
+	Post string `json:"post,omitempty"`
 }
 
 // ContentManifestCeremony is the end-of-game ceremony in the content

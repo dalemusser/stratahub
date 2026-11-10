@@ -149,6 +149,11 @@ type MHSDeviceTestHeartbeat struct {
 	Stalls        int    `bson:"stalls,omitempty" json:"stalls,omitempty"`
 	MaxStallMs    int64  `bson:"max_stall_ms,omitempty" json:"max_stall_ms,omitempty"`
 	GLContextLost int    `bson:"gl_context_lost,omitempty" json:"gl_context_lost,omitempty"`
+	// The game services the page found blocked at this beat ("log", "save"
+	// or "log,save"): its probe, sent the way the game sends its requests,
+	// never reached them while the device was online. Empty when they answer
+	// or before the probe has a result. See MHSDeviceTest.ServicesBlocked.
+	ServicesBlocked string `bson:"services_blocked,omitempty" json:"services_blocked,omitempty"`
 }
 
 // Logging-health states of a launch (MHSDeviceTest.LogsState): whether the
@@ -306,6 +311,13 @@ type MHSDeviceTest struct {
 	PlayerPrefsBytesAtLaunch int64 `bson:"playerprefs_bytes_at_launch,omitempty" json:"playerprefs_bytes_at_launch,omitempty"`
 	// Cumulative time the page saw the device offline this session.
 	OfflineMs int64 `bson:"offline_ms,omitempty" json:"offline_ms,omitempty"`
+	// The game services this launch's page found blocked ("log", "save" or
+	// "log,save") and when it first reported it: a web filter that lets the
+	// page load but stops the game's own requests, so nothing from this run
+	// is logged or saved (docs/mission-hydrosci/mhs-issues-102826.md Issue 3).
+	// Kept once set: a run that was blocked stays marked when it clears.
+	ServicesBlocked   string     `bson:"services_blocked,omitempty" json:"services_blocked,omitempty"`
+	ServicesBlockedAt *time.Time `bson:"services_blocked_at,omitempty" json:"services_blocked_at,omitempty"`
 
 	// Summary is what the step log says, read once when a member record is
 	// stored (internal/app/system/mhssteplog): per-unit download facts,
