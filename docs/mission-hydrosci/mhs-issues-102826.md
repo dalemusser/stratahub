@@ -348,7 +348,7 @@ Ordered by what unblocks students soonest. Each item names its issue and its che
 1. School J and School L districts: allow the log and save hosts for all methods (OPTIONS, POST), no body inspection; verify with the public Device Test on a managed Chromebook. (Issue 3) Check: the next class day shows events and saves on the dashboard. **Sent** (reported 2026-11-09); whether the districts act is open; `filtercheck.js` in the local folder is the check.
 2. The School J teacher and coordinator: what the START symptom is, why Unit 1 restarted every day, nothing to redo once the hosts are allowed. (Issue 3) **Sent** (reported 2026-11-09).
 3. School D: the two students with the poisoned Unit 2 loader clear the site's data (or get a fresh profile) and download again; the code fix follows in B.2. (Issue 4)
-4. The 4 GB Chromebook advice and the Admin console setting to Schools B, F, C, K (already written). (Issue 1)
+4. The 4 GB Chromebook advice and the Admin console setting to Schools B, F, C, K (already written). (Issue 1) **Done:** provided to the schools (reported 2026-11-09). Some schools have no devices other than their 4 GB Chromebooks, so for them the remaining help is ours and the game team's (B.4, and the game team's save-on-hide and memory items).
 
 **B. StrataHub, in this order**
 
@@ -369,7 +369,7 @@ Ordered by what unblocks students soonest. Each item names its issue and its che
 
 **D. Districts**
 
-- One page for IT before day one: the three hosts (content, log, save), all methods, no body inspection, no tail scanning; the tab-discarding exception; keep site data for the host; 8 GB or Intel devices where possible. (Issues 1, 2, 3)
+- One page for IT before day one: the three hosts (content, log, save), all methods, no body inspection, no tail scanning; the tab-discarding exception; keep site data for the host; 8 GB or Intel devices where possible. (Issues 1, 2, 3) **Done:** made available to the schools (reported 2026-11-09; it names the real hosts, so it is kept outside this repository).
 
 **Decided 2026-11-09:** B.1, then B.2, then B.3. B.4 ships the one-window change on its own first; the discard notice and the Activity discard flags follow a few days later, since they only observe and carry a version bump with a rebuild of stored days, and second windows can be counted from the load records meanwhile. (Who sends A.1 is settled: the messages went out, reported 2026-11-09.)
 

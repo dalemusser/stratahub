@@ -69,8 +69,8 @@ Written as a `03-for-the-game-dev` page in the hand-off structure (Part 1 what t
 | ID | Change | Why |
 |---|---|---|
 | G-1 | START does not continue without the save service: after a timeout it says plainly that the game cannot start because progress cannot be saved, and asks the student to tell the teacher. No "continue anyway". | Issue 3; the play gate rule. The page's gate covers StrataHub; this covers the game anywhere (standalone, other hosts) |
-| G-2 | Save when the page becomes hidden (`visibilitychange`), since nothing runs at a discard | Issue 1: a discard loses everything since the last save |
-| G-3 | Memory: initial WebGL memory, one player voice, occlusion data, Unit 3 as well as Unit 2; the resume that re-activates the quest | Issue 1; the Unit 2 review (dialogue, occlusion, heap growth) |
+| G-2 | Save when the page becomes hidden (`visibilitychange`), since nothing runs at a discard | Issue 1: a discard loses everything since the last save. Some schools can only use 4 GB Chromebooks (2026-11-09), so this and G-3 are the remaining levers for them |
+| G-3 | Memory: initial WebGL memory, one player voice, occlusion data, Unit 3 as well as Unit 2; the resume that re-activates the quest | Issue 1; the Unit 2 review (dialogue, occlusion, heap growth). Highest-value item for schools that only have 4 GB Chromebooks |
 | G-4 | Optional flag from the page after a discard reload: skip the main menu and resume | Issue 1 (the record lists it as a game-side option; required only if Dale decides so) |
 | G-5 | Confirm what the 2026-11-02 release contains: the garden-box fix in Unit 4, logger 1.3, the save fix | Issue 4 |
 
@@ -83,8 +83,8 @@ Check: their build passes the hand-off's build checks on the dev site before it 
 | ID | What | Status | Next step |
 |---|---|---|---|
 | D-1 | School J and School L: allow the log and save hosts (all methods, no body inspection), then the public Device Test | Sent 2026-11-09; not acted on as of the 11-04/05 class days | Recheck with `filtercheck.js` after each class day (FC-1); follow up if the next class day is still blocked |
-| D-2 | One page for IT before a school's first day (content, log and save hosts; no tail scanning; keep site data; tab-discarding exception; 8 GB or Intel devices where possible) | Drafted locally (real hosts, so not in this repository) | Dale: send it to every school before day one, and to the schools with open problems now |
-| D-3 | The 4 GB Chromebook advice and the Admin console tab-discarding setting to Schools B, F, C, K (record A.4) | Written; not marked sent | Dale: confirm sent or send |
+| D-2 | One page for IT before a school's first day (content, log and save hosts; no tail scanning; keep site data; tab-discarding exception; 8 GB or Intel devices where possible) | **Done:** made available to the schools (reported by Dale 2026-11-09; real hosts, so the page lives outside this repository) | Point new schools to it before their first day |
+| D-3 | The 4 GB Chromebook advice and the Admin console tab-discarding setting to Schools B, F, C, K (record A.4) | **Done:** provided to the schools (reported by Dale 2026-11-09). Some schools have no devices other than their 4 GB Chromebooks | None for the schools; what helps those classes now is on our side and the game team's: B.4 (one window, discard notice) shipped, G-2 (save on hide) and G-3 (memory) in §3 |
 | D-4 | School D's damaged loader (record A.3) | Handled by B.2 (repaired on the next launch) | Close after FC-3 |
 | D-5 | Contacts at Schools C, D and E (tail hold since late October; School E never answered) | Open | Dale: find a contact; send D-2 |
 | D-6 | School B: why its browsers keep no site data between sessions (ephemeral or guest profiles?) | Asked in the Issue 1 fleet section; no answer | Ask the school's IT with D-2 |
@@ -113,7 +113,7 @@ Check: their build passes the hand-off's build checks on the dev site before it 
 1. FC-1 and FC-2 after the next class day at any school (the gate is the riskiest change: a false positive stops a class).
 2. B.5 (small, stops lost crash reports).
 3. The game team package (G-1 to G-5), together with the save fix hand-off.
-4. D-2, D-3, D-5 (messages; Dale).
+4. D-5, D-6, D-7 (messages; Dale). D-2 and D-3 are done.
 5. B.6, S-1 to S-3.
 6. FC-3 to FC-5 in the weekly review; then decide B.7.
 7. I-1 to I-3 as devices and time allow.
