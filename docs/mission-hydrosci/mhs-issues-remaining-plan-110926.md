@@ -70,11 +70,11 @@ Written as a `03-for-the-game-dev` page in the hand-off structure (Part 1 what t
 
 | ID | Change | Why |
 |---|---|---|
-| G-1 | START does not continue without the save service: after a timeout it says plainly that the game cannot start because progress cannot be saved, and asks the student to tell the teacher. No "continue anyway". | Issue 3; the play gate rule. The page's gate covers StrataHub; this covers the game anywhere (standalone, other hosts) |
+| G-1 | START does not continue without the save service: after a timeout it says plainly that the game cannot start because progress cannot be saved, and asks the student to tell the teacher. No "continue anyway". | Issue 3; the play gate rule. **Already in the game (2026-11-09):** the save fix v1.3 makes START wait with "Can't load your progress yet: no connection to the save service. Retrying in N s" and resume when the service answers; the unit never starts over. The one exception, a device resuming from its own last save while it keeps asking, is the same as being offline, which the rule allows; inside StrataHub the play gate stops a filtered device before the game loads. No change needed |
 | G-2 | Save when the page becomes hidden (`visibilitychange`), since nothing runs at a discard | Issue 1: a discard loses everything since the last save. Some schools can only use 4 GB Chromebooks (2026-11-09), so this and G-3 are the remaining levers for them |
 | G-3 | Memory: initial WebGL memory, one player voice, occlusion data, Unit 3 as well as Unit 2; the resume that re-activates the quest | Issue 1; the Unit 2 review (dialogue, occlusion, heap growth). Highest-value item for schools that only have 4 GB Chromebooks |
 | G-4 | Optional flag from the page after a discard reload: skip the main menu and resume | Issue 1 (the record lists it as a game-side option; required only if Dale decides so) |
-| G-5 | Confirm what the 2026-11-02 release contains: the garden-box fix in Unit 4, logger 1.3, the save fix | Issue 4 |
+| G-5 | Confirm what the 2026-11-02 release contains: the garden-box fix in Unit 4, logger 1.3, the save fix | Issue 4. **Answered from the team's code snapshot of 2026-10-29 (changelist 12527, the release is 12543):** the save fix v1.3 files are there unchanged (with its `GameLogger`, which includes logger 1.3 and the transition-gate fix) and so is the garden-box fix. Only a check of the release build itself remains (the hand-off checks of each package on the dev site) |
 
 Check: their build passes the hand-off's build checks on the dev site before it is activated for schools.
 
