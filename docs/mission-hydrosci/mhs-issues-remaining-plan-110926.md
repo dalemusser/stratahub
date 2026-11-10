@@ -36,10 +36,12 @@ Recheck cadence: after each school's next class day for FC-1 to FC-3, then weekl
 
 ## 2. StrataHub code
 
-### B.5 Crash reporter (Issue 5) — S, next
+### B.5 Crash reporter (Issue 5) — S — **done, deployed 2026-11-09 (0efd457)**
 
 - **What.** An unattributable `Script error.` (the browser masks errors from scripts of another origin; on School O's managed Windows laptops most likely a filter or monitoring extension) is reported as a crash and latches `crashReported`, which suppresses every real crash report for that page. Record it as a notice instead, never latch on it, keep crash reporting live; load the Unity scripts with `crossorigin="anonymous"` where they are served cross-origin so real messages arrive.
 - **Check.** A test page that throws a cross-origin error, then a real one: the first is a notice, the second a crash record. In the field: School O's "Script error." records turn into notices and real crashes still arrive.
+- **As built.** The play page logs a masked "Script error." (no detail) as a browser notice and never latches the crash reporter; the loader and its content-server retry load with `crossOrigin = 'anonymous'` (the content server sends CORS headers for every workspace origin; every cached copy was stored from a CORS request). `mhssteplog.IsCrashNotice` has the same rule and the Activity merge applies it to stored summaries (Activity version 7), so School O's older records become notices when their days are recomputed.
+- **Verified on dev after the deploy:** launches from the downloaded files and with the unit's cache deleted both rendered with the CORS-mode loader; two masked errors became one browser notice and a real error after them was still reported as a crash (test data: one crash record and one crash event for the test member). Field check: School O's next days.
 
 ### B.6 Logging-health count (Issue 6) — S
 
@@ -103,7 +105,7 @@ Check: their build passes the hand-off's build checks on the dev site before it 
 ## 6. Housekeeping
 
 - **H-1** Run the database-backed tests for B.4 step 2 and the play gate (`mhsactivity` handler and CSV tests, `missionhydrosci` handler tests) once the local database answers normally again (it took ~30 s per index on 2026-11-09).
-- **H-2** Dev test data from 2026-11-09 on the test member (gated launches, simulated discards, "Chrome closed the game 2 times" on the dev Activity day): leave or delete, but do not read it as field data.
+- **H-2** Dev test data from 2026-11-09 on the test member (gated launches, simulated discards, "Chrome closed the game 2 times" on the dev Activity day, one test crash record and crash event from the B.5 check): leave or delete, but do not read it as field data.
 - **H-3** Related work elsewhere that touches the same code paths: the restricted-key enforcement flip in the log and save services (waits on the game team's build with the new keys), and the save fix hand-off (G-package coordination).
 
 ---
@@ -111,7 +113,7 @@ Check: their build passes the hand-off's build checks on the dev site before it 
 ## Suggested order
 
 1. FC-1 and FC-2 after the next class day at any school (the gate is the riskiest change: a false positive stops a class).
-2. B.5 (small, stops lost crash reports).
+2. ~~B.5~~ done 2026-11-09.
 3. The game team package (G-1 to G-5), together with the save fix hand-off.
 4. Per-school summaries for the people who deal with the schools, as problems come up (D-5, D-6). D-2 and D-3 are done; D-7 is closed (unknown).
 5. B.6, S-1 to S-3.
