@@ -1683,6 +1683,7 @@
           loadingBar.style.width = '100%';
           loadingBar.style.background = '#f59e0b';
           if (retryBtn) retryBtn.hidden = false;
+          if (loadingStepEl) loadingStepEl.style.display = 'none'; // the step's technical text is in Status details
           memberReport('services-blocked');
         }
         function gateHint() {
@@ -1709,6 +1710,7 @@
             loadingBar.style.width = '0%';
             if (loadingHint) loadingHint.textContent = '';
             if (retryBtn) retryBtn.hidden = true;
+            if (loadingStepEl) loadingStepEl.style.display = '';
           }
           release();
         }
