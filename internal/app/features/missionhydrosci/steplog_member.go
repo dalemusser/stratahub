@@ -115,13 +115,21 @@ func (h *Handler) HandleMemberStepLog(w http.ResponseWriter, r *http.Request) {
 	}
 	// The play page's probe found the game services blocked (the play gate,
 	// or the bar during play): kept on the record like a heartbeat's report.
+	// The latest services step decides: a block that has since cleared (the
+	// hosts answered, the game started) does not mark this record.
 	for _, st := range steps {
-		if st.Step == "services" && st.State == "fail" && st.Detail["services_blocked"] != "" {
-			rec.ServicesBlocked = st.Detail["services_blocked"]
-			at := st.At
-			if rec.ServicesBlockedAt == nil {
+		if st.Step != "services" {
+			continue
+		}
+		switch {
+		case st.State == "fail" && st.Detail["services_blocked"] != "":
+			if rec.ServicesBlocked == "" {
+				at := st.At
 				rec.ServicesBlockedAt = &at
 			}
+			rec.ServicesBlocked = st.Detail["services_blocked"]
+		case st.State == "ok":
+			rec.ServicesBlocked, rec.ServicesBlockedAt = "", nil
 		}
 	}
 	// The log read as facts, so reports never need the steps of this record.
