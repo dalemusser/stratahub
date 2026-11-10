@@ -288,3 +288,23 @@ func TestUnitsPagePlaysInOneGameWindow(t *testing.T) {
 		t.Error("units page must ask with 'who', not 'hello'")
 	}
 }
+
+// The discard notice (plan B.4): shown when the page was reloaded after a
+// discard, with the student's line and the teacher's steps; it gives way to
+// the other bars and hides itself after the game renders.
+func TestPlayPageDiscardNotice(t *testing.T) {
+	body := renderPlayPage(t, memberPlayData())
+	for _, want := range []string{
+		`id="mhs-discard-notice"`,
+		`Chrome closed the game to free up memory while another window or tab was in front.`,
+		`Press START to continue from your last save point.`,
+		`Exceptions to tab discarding`,
+		`setTimeout(showDiscardNotice, 0);`,
+		`if (dcEl && el !== dcEl && !dcEl.hidden) barHide(dcEl);`,
+		`hideDiscardNoticeSoon();`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("play page lacks %q", want)
+		}
+	}
+}

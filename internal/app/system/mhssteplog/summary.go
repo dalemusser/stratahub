@@ -22,6 +22,7 @@ const holdMinSeconds = 10
 const (
 	maxSummaryLaunch  = 24
 	maxSummaryCrashes = 12
+	maxSummaryDevice  = 24
 )
 
 // Context is what the page's log context adds to a summary.
@@ -107,6 +108,20 @@ func Summarize(steps []models.MHSDeviceTestStep, outcome string, ctx Context) mo
 			}
 			le := models.MHSStepLaunchEvent{At: ev.At, Kind: string(ev.Kind), Unit: launchUnit(ev), Seconds: ev.Seconds, Source: ev.Source, Phase: ev.Phase, Reason: models.ClipRunes(ev.Reason, 200)}
 			s.Launch = append(s.Launch, le)
+		case KindDiscarded, KindOtherWindow, KindPageFrozen:
+			if len(s.Device) >= maxSummaryDevice {
+				continue
+			}
+			de := models.MHSStepDeviceEvent{At: ev.At, Unit: launchUnit(ev)}
+			switch ev.Kind {
+			case KindDiscarded:
+				de.Kind = models.MHSDeviceEventDiscarded
+			case KindOtherWindow:
+				de.Kind, de.N = models.MHSDeviceEventOtherWindows, ev.Count
+			case KindPageFrozen:
+				de.Kind, de.N = models.MHSDeviceEventPageFrozen, int(ev.Seconds)
+			}
+			s.Device = append(s.Device, de)
 		case KindCrash:
 			if len(s.Crashes) >= maxSummaryCrashes {
 				continue

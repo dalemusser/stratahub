@@ -62,6 +62,11 @@ func TestPagesStillWriteTheSentencesWeParse(t *testing.T) {
 		"'Unity failed to start: ' + err.message",
 		"'The game loader failed to load",
 		"'Game is rendering'",
+		"'The browser had discarded this page earlier (usually when the device is short of memory) and reloaded it'",
+		"'Another game window is open on this device (' + n + ' besides this one)'",
+		"'The page was frozen for ' + Math.round(gap / 1000) + ' s'",
+		"{ unit: unitId, other_windows: n }",
+		"{ unit: unitId, stall_s: Math.round(gap / 1000) }",
 		// structured detail
 		"{ type: type || 'unknown', phase: phase || crashPhase, unit: unitId }",
 		"{ unity_s: ((Date.now() - launchStartedAt) / 1000).toFixed(1), unit: unitId }",

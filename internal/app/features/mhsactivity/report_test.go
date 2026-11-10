@@ -283,3 +283,41 @@ func TestReportStuckAtTheTail(t *testing.T) {
 		}
 	}
 }
+
+// Issue 1 on the page: two discards in a day are amber for the student and
+// the school; one is gray; a second game window is amber.
+func TestReportDiscardsAndSecondWindow(t *testing.T) {
+	org := primitive.NewObjectID()
+	lk := Lookups{Orgs: map[primitive.ObjectID]OrgInfo{org: {Name: "School F", Loc: time.UTC}}}
+	twice, once := primitive.NewObjectID(), primitive.NewObjectID()
+	docs := []models.MHSActivityDay{
+		{UserID: twice, OrganizationID: org, Role: "member", Day: "2026-10-27", Opened: true, Launched: true,
+			Launch: models.MHSActivityLaunch{OK: 8, Discarded: 6, PageFrozen: 3}, Flags: models.MHSActivityFlags{ChromeClosed: true, SecondGameWindow: true}},
+		{UserID: once, OrganizationID: org, Role: "member", Day: "2026-10-27", Opened: true, Launched: true,
+			Launch: models.MHSActivityLaunch{OK: 2, Discarded: 1}},
+	}
+	rep := BuildReport(docs, lk, Options{SelectedOrg: org})
+	s := rep.Schools[0]
+	if s.LaunchDiscarded != 7 || s.Discarded != 2 || s.ChromeClosed != 1 || s.SecondWindow != 1 || !s.Problem() {
+		t.Errorf("school %+v", s.Counts)
+	}
+	p := pillTexts(s.Pills)
+	for _, want := range []string{"1 student had the game closed by Chrome", "1 student with 2 game windows open"} {
+		if !strings.Contains(p, want) {
+			t.Errorf("school pills %q lack %q", p, want)
+		}
+	}
+	for _, st := range rep.School.Students {
+		p := pillTexts(st.Pills)
+		switch st.UserID {
+		case twice.Hex():
+			if !strings.Contains(p, "Chrome closed the game 6 times") || !strings.Contains(p, "2 game windows open") {
+				t.Errorf("twice: %q", p)
+			}
+		case once.Hex():
+			if !strings.Contains(p, "Chrome closed the game 1 time") {
+				t.Errorf("once: %q", p)
+			}
+		}
+	}
+}

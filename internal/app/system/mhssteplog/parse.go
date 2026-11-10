@@ -46,6 +46,9 @@ const (
 	KindWatchdogFail   Kind = "watchdog_fail"   // launch/fail "Still no progress after N s — stuck <phase>…"
 	KindRendering      Kind = "rendering"       // game/ok "Game is rendering"
 	KindCrash          Kind = "crash"           // game/fail "Crash (<type>, <phase>): <message>", or game/warn "Browser notice (<type>, <phase>): <message>" (a notice)
+	KindDiscarded      Kind = "discarded"       // page/warn "The browser had discarded this page earlier … and reloaded it"
+	KindOtherWindow    Kind = "other_window"    // game/warn "Another game window is open on this device (N besides this one)"
+	KindPageFrozen     Kind = "page_frozen"     // game/warn "The page was frozen for N s"
 )
 
 // Event is one parsed entry. Fields not meaningful for the Kind are zero.
@@ -81,6 +84,8 @@ type Event struct {
 	QuotaMB   int   // storage
 	Persisted *bool // storage; nil when unknown
 	Fallback  bool  // watchdog_fail: the content-server retry had already been tried
+
+	Count int // other_window: game windows open besides this one
 }
 
 var (
@@ -103,6 +108,8 @@ var (
 	crashRe      = regexp.MustCompile(`^Crash \(([^,]+), ([^)]+)\): (.*)$`)
 	noticeRe     = regexp.MustCompile(`^Browser notice \(([^,]+), ([^)]+)\): (.*)$`)
 	pageRe       = regexp.MustCompile(`^Opened the (\S+) page(?: for (\S+)(?: v(\S+))?)?`)
+	otherWinRe   = regexp.MustCompile(`^Another game window is open on this device \((\d+) besides this one\)`)
+	pageFrozenRe = regexp.MustCompile(`^The page was frozen for (\d+) s`)
 )
 
 // Sentence prefixes the parser keys on; templates_pin_test.go checks that
@@ -138,6 +145,9 @@ const (
 	phraseCrash          = "Crash ("
 	phraseOpenedPage     = "Opened the "
 	phraseProgressOf     = " of "
+	phraseDiscarded      = "The browser had discarded this page earlier"
+	phraseOtherWindow    = "Another game window is open on this device ("
+	phrasePageFrozen     = "The page was frozen for "
 	phraseProgressMB     = " MB"
 	phraseProgressMBps   = " MB/s"
 	phraseProgressPct    = "% · "
@@ -153,6 +163,11 @@ func Parse(st models.MHSDeviceTestStep) (ev Event, ok bool) {
 	msg := st.Msg
 	switch st.Step {
 	case "page":
+		if st.State == "warn" && strings.HasPrefix(msg, phraseDiscarded) {
+			ev.Kind = KindDiscarded
+			ev.Unit = unitID(d["unit"])
+			return ev, true
+		}
 		m := pageRe.FindStringSubmatch(msg)
 		if m == nil {
 			return ev, false
@@ -226,6 +241,16 @@ func Parse(st models.MHSDeviceTestStep) (ev Event, ok bool) {
 			}
 		}
 		if st.State == "warn" {
+			if m := otherWinRe.FindStringSubmatch(msg); m != nil {
+				ev.Kind = KindOtherWindow
+				ev.Count = intPick(d, "other_windows", int(num(m[1])))
+				return ev, true
+			}
+			if m := pageFrozenRe.FindStringSubmatch(msg); m != nil {
+				ev.Kind = KindPageFrozen
+				ev.Seconds = numPick(d, "stall_s", num(m[1]))
+				return ev, true
+			}
 			// A browser notice the page told apart itself: counted with the
 			// crash entries, as a notice.
 			if m := noticeRe.FindStringSubmatch(msg); m != nil {

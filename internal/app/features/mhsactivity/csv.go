@@ -26,7 +26,8 @@ func (h *Handler) ServeSchoolsCSV(w http.ResponseWriter, r *http.Request) {
 		"downloads_complete", "downloads_held_then_done", "downloads_held", "downloads_failed", "downloads_cached", "downloads_unfinished",
 		"launches_ok", "launches_slow", "launches_slow_recovered", "launches_failed", "crashes_real", "crash_notices",
 		"devices_seen", "devices_new", "new_profile_every_day", "bgfetch_refused_students", "platforms", "last_activity",
-		"launches_froze", "students_freeze_loop"}); err != nil {
+		"launches_froze", "students_freeze_loop",
+		"launches_discarded", "students_discarded", "students_chrome_closed", "students_second_game_window"}); err != nil {
 		return
 	}
 	for _, s := range vm.Report.Schools {
@@ -34,7 +35,8 @@ func (h *Handler) ServeSchoolsCSV(w http.ResponseWriter, r *http.Request) {
 			n(s.DlComplete), n(s.DlHeldDone), n(s.DlHeld), n(s.DlFailed), n(s.DlCached), n(s.DlInProgress),
 			n(s.LaunchOK), n(s.LaunchStalled), n(s.LaunchRecovered), n(s.LaunchFailed), n(s.CrashReal), n(s.CrashNotice),
 			n(s.DevicesSeen), n(s.DevicesNew), yesNo(s.Churn), n(s.BgfetchRefused), s.Platforms, s.LastActivity,
-			n(s.LaunchFroze), n(s.FreezeLoop)})); err != nil {
+			n(s.LaunchFroze), n(s.FreezeLoop),
+			n(s.LaunchDiscarded), n(s.Discarded), n(s.ChromeClosed), n(s.SecondWindow)})); err != nil {
 			h.Log.Warn("mhs activity csv", zap.Error(err))
 			return
 		}
@@ -55,7 +57,8 @@ func (h *Handler) ServeStudentsCSV(w http.ResponseWriter, r *http.Request) {
 		"unit", "unit_state", "device_id", "total_mb", "max_mb", "drops", "stalls", "retries", "fails", "last_error_class", "complete_mb", "complete_seconds", "held_at_mb", "hold_seconds", "bgfetch_refused",
 		"launches_ok", "launches_slow", "launches_slow_recovered", "launches_failed", "crashes_real", "crash_notices",
 		"devices", "new_devices", "platforms", "current_unit", "first_at_utc", "last_at_utc", "page_views", "load_records", "partial",
-		"launches_froze", "freeze_loop"}); err != nil {
+		"launches_froze", "freeze_loop",
+		"discarded", "page_frozen", "chrome_closed", "second_game_window"}); err != nil {
 		return
 	}
 	for _, d := range vm.docs {
@@ -113,7 +116,8 @@ func (h *Handler) studentDayRow(vm *pageVM, d models.MHSActivityDay) csvRowParts
 		head: []string{d.Day, d.TZ, vm.lk.OrgName(d.OrganizationID), strings.Join(groups, "; "), d.UserID.Hex(), vm.lk.UserName(d.UserID), d.Role, yesNo(d.Opened), yesNo(d.Played), yesNo(d.Blocked)},
 		tail: []string{n(d.Launch.OK), n(d.Launch.Stalled), n(d.Launch.StalledRecovered), n(d.Launch.Failed), n(d.Crashes.Real), n(d.Crashes.Notice),
 			n(len(d.Devices)), n(newDevices), strings.Join(plats, "; "), d.CurrentUnit, first, last, n(d.PageViews), n(d.Records), yesNo(d.Partial),
-			n(d.Launch.Froze), yesNo(d.Flags.FreezeLoop)},
+			n(d.Launch.Froze), yesNo(d.Flags.FreezeLoop),
+			n(d.Launch.Discarded), n(d.Launch.PageFrozen), yesNo(d.Flags.ChromeClosed), yesNo(d.Flags.SecondGameWindow)},
 	}
 }
 

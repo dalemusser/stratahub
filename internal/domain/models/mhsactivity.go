@@ -17,7 +17,14 @@ import (
 //	3 (2026-10-26): runs that froze (Launch.Froze) and the freeze loop flag
 //	4 (2026-11-09): Flags.ServicesBlocked, the play page's probe finding the
 //	   game's requests to the log or save service blocked
-const MHSActivityVersion = 4
+//	5 (2026-11-09): Launch.Discarded and Launch.PageFrozen, Flags.ChromeClosed
+//	   (MHSChromeClosedDiscards or more discards) and Flags.SecondGameWindow
+const MHSActivityVersion = 5
+
+// MHSChromeClosedDiscards is how many discards in a day make a problem. One
+// is ordinary (Chrome's memory saver unloads a tab left in the background
+// over lunch); two or more is a device that cannot keep the game in memory.
+const MHSChromeClosedDiscards = 2
 
 // MHSActivityMinPlayedEvents is how many game log events a day needs to count
 // as played. A game tab left open from an earlier day sends a handful when
@@ -152,6 +159,12 @@ type MHSActivityLaunch struct {
 	// the student relaunches, and a run that ends before the first save
 	// starts the unit over each time.
 	Froze int `bson:"froze,omitempty" json:"froze,omitempty"`
+	// Discarded counts the times Chrome had unloaded the game window for
+	// memory and it was reloaded (document.wasDiscarded); PageFrozen the
+	// times the page's main thread stopped for 10 s or more while visible.
+	// Recorded from 2026-10-27; earlier days have none.
+	Discarded  int `bson:"discarded,omitempty" json:"discarded,omitempty"`
+	PageFrozen int `bson:"page_frozen,omitempty" json:"page_frozen,omitempty"`
 }
 
 // MHSActivityCrashes splits the day's "Crash (…)" entries into browser
@@ -181,10 +194,12 @@ type MHSActivityFlags struct {
 	BgfetchRefused      bool `bson:"bgfetch_refused,omitempty" json:"bgfetch_refused,omitempty"`
 	StorageNotPersisted bool `bson:"storage_not_persisted,omitempty" json:"storage_not_persisted,omitempty"`
 	NewDevice           bool `bson:"new_device,omitempty" json:"new_device,omitempty"`
-	LoggingProblem      bool `bson:"logging_problem,omitempty" json:"logging_problem,omitempty"`   // launched and heartbeating but no log events
-	StrayEvents         bool `bson:"stray_events,omitempty" json:"stray_events,omitempty"`         // a few game events and nothing else: a tab opened on an earlier day
-	FreezeLoop          bool `bson:"freeze_loop,omitempty" json:"freeze_loop,omitempty"`           // MHSFreezeLoopRuns or more runs froze that day: the student is stuck relaunching
-	ServicesBlocked     bool `bson:"services_blocked,omitempty" json:"services_blocked,omitempty"` // a launch's page found the game's requests to the log or save service blocked (MHSDeviceTest.ServicesBlocked)
+	LoggingProblem      bool `bson:"logging_problem,omitempty" json:"logging_problem,omitempty"`       // launched and heartbeating but no log events
+	StrayEvents         bool `bson:"stray_events,omitempty" json:"stray_events,omitempty"`             // a few game events and nothing else: a tab opened on an earlier day
+	FreezeLoop          bool `bson:"freeze_loop,omitempty" json:"freeze_loop,omitempty"`               // MHSFreezeLoopRuns or more runs froze that day: the student is stuck relaunching
+	ServicesBlocked     bool `bson:"services_blocked,omitempty" json:"services_blocked,omitempty"`     // a launch's page found the game's requests to the log or save service blocked (MHSDeviceTest.ServicesBlocked)
+	ChromeClosed        bool `bson:"chrome_closed,omitempty" json:"chrome_closed,omitempty"`           // MHSChromeClosedDiscards or more discards that day
+	SecondGameWindow    bool `bson:"second_game_window,omitempty" json:"second_game_window,omitempty"` // a play page saw another game window open on the device
 }
 
 // NoActivityArrived reports whether the game ran that day and none of its
@@ -196,7 +211,7 @@ func (d MHSActivityDay) NoActivityArrived() bool {
 
 // HasProblem reports whether the day shows something staff would act on.
 func (d MHSActivityDay) HasProblem() bool {
-	return d.Blocked || d.Flags.DownloadFailed || d.Flags.Held || d.Flags.LaunchFailed || d.Crashes.Real > 0 || d.Flags.FreezeLoop
+	return d.Blocked || d.Flags.DownloadFailed || d.Flags.Held || d.Flags.LaunchFailed || d.Crashes.Real > 0 || d.Flags.FreezeLoop || d.Flags.ChromeClosed
 }
 
 // MHSActivityMark records that an organization's day has been rolled up

@@ -278,3 +278,33 @@ func TestMergeServicesBlocked(t *testing.T) {
 		t.Fatalf("want the day flagged: %+v", docs)
 	}
 }
+
+// Discards, other game windows and page freezes land on the day; a line two
+// records of one tab both carry counts once; two discards make the day a
+// problem, one does not.
+func TestMergeDeviceState(t *testing.T) {
+	b, student, teacher := testBuilder(t)
+	sum := &models.MHSMemberSummary{V: models.MHSMemberSummaryVersion, Device: []models.MHSStepDeviceEvent{
+		{At: ct(10, 0, 0), Kind: models.MHSDeviceEventDiscarded, Unit: "unit3"},
+		{At: ct(10, 20, 0), Kind: models.MHSDeviceEventDiscarded, Unit: "unit3"},
+		{At: ct(10, 21, 0), Kind: models.MHSDeviceEventOtherWindows, Unit: "unit3", N: 1},
+		{At: ct(10, 22, 0), Kind: models.MHSDeviceEventPageFrozen, Unit: "unit3", N: 18},
+	}}
+	b.addRecord(rec(student, "dev-a", "unit3", "launch-ok", ct(10, 0, 0)), sum)
+	b.addRecord(rec(student, "dev-a", "unit3", "launch-ok", ct(10, 30, 0)), sum) // the same tab's later record
+	b.addRecord(rec(teacher, "dev-t", "unit3", "launch-ok", ct(11, 0, 0)), &models.MHSMemberSummary{V: models.MHSMemberSummaryVersion, Device: []models.MHSStepDeviceEvent{
+		{At: ct(11, 5, 0), Kind: models.MHSDeviceEventDiscarded, Unit: "unit3"},
+	}})
+	for _, d := range b.finish(time.Now()) {
+		switch d.UserID {
+		case student.ID:
+			if d.Launch.Discarded != 2 || d.Launch.PageFrozen != 1 || !d.Flags.SecondGameWindow || !d.Flags.ChromeClosed || !d.HasProblem() {
+				t.Errorf("student: %+v %+v", d.Launch, d.Flags)
+			}
+		case teacher.ID:
+			if d.Launch.Discarded != 1 || d.Flags.ChromeClosed {
+				t.Errorf("one discard is not a problem: %+v %+v", d.Launch, d.Flags)
+			}
+		}
+	}
+}

@@ -64,11 +64,20 @@ type Counts struct {
 	// on two or more of their download days in the window, with no
 	// completion since (StudentRow.StuckTailSince).
 	StuckTail int
+
+	// Chrome discarding the game window and second game windows (Issue 1):
+	// LaunchDiscarded is the discards; Discarded students with any;
+	// ChromeClosed students with a day of MHSChromeClosedDiscards or more;
+	// SecondWindow students whose play page saw another game window.
+	LaunchDiscarded int
+	Discarded       int
+	ChromeClosed    int
+	SecondWindow    int
 }
 
 // Problem reports whether the counts show something to act on.
 func (c Counts) Problem() bool {
-	return c.Blocked > 0 || c.DlHeld > 0 || c.DlFailed > 0 || c.LaunchFailed > 0 || c.FreezeLoop > 0 || c.ActivityNotArriving() || c.StuckTail > 0
+	return c.Blocked > 0 || c.DlHeld > 0 || c.DlFailed > 0 || c.LaunchFailed > 0 || c.FreezeLoop > 0 || c.ActivityNotArriving() || c.StuckTail > 0 || c.ChromeClosed > 0
 }
 
 // noActivityMin is the fewest students without arriving activity that make a
@@ -150,6 +159,8 @@ type StudentRow struct {
 	NoActivity      bool   // the game ran and none of its activity arrived in the window (Counts.NoActivity)
 	StuckTailSince  string // "2026-10-22": first day of a run of held days for one unit, 2+ days, no completion since
 	StuckTailUnit   string // that unit, "U3"
+	ChromeClosed    bool   // a day with MHSChromeClosedDiscards or more discards (Launch.Discarded counts them all)
+	SecondWindow    bool   // a play page saw another game window open
 	ServicesBlocked bool   // a play page found the game's requests blocked (Counts.ServicesBlocked)
 	Devices         int
 	NewDevices      int
@@ -364,6 +375,7 @@ func aggregate(ds []models.MHSActivityDay) Counts {
 	type userAcc struct {
 		opened, played, blocked, bgfetch, freezeLoop bool
 		launched, unknown, servicesBlocked           bool
+		discarded, chromeClosed, secondWindow        bool
 		days                                         []models.MHSActivityDay
 	}
 	users := map[primitive.ObjectID]*userAcc{}
@@ -378,6 +390,10 @@ func aggregate(ds []models.MHSActivityDay) Counts {
 		u.launched = u.launched || d.Launched
 		u.unknown = u.unknown || (d.Launched && !d.Log.Available)
 		u.servicesBlocked = u.servicesBlocked || d.Flags.ServicesBlocked
+		u.discarded = u.discarded || d.Launch.Discarded > 0
+		u.chromeClosed = u.chromeClosed || d.Flags.ChromeClosed
+		u.secondWindow = u.secondWindow || d.Flags.SecondGameWindow
+		c.LaunchDiscarded += d.Launch.Discarded
 		u.opened = u.opened || d.Opened
 		u.played = u.played || d.Played
 		u.blocked = u.blocked || d.Blocked
@@ -447,6 +463,15 @@ func aggregate(ds []models.MHSActivityDay) Counts {
 		if since, _ := stuckTailSince(u.days); since != "" {
 			c.StuckTail++
 		}
+		if u.discarded {
+			c.Discarded++
+		}
+		if u.chromeClosed {
+			c.ChromeClosed++
+		}
+		if u.secondWindow {
+			c.SecondWindow++
+		}
 	}
 	c.DevicesSeen = len(devices)
 	return c
@@ -475,6 +500,10 @@ func studentRows(ds []models.MHSActivityDay, lk Lookups, loc *time.Location, sta
 			row.Launch.StalledRecovered += d.Launch.StalledRecovered
 			row.Launch.Failed += d.Launch.Failed
 			row.Launch.Froze += d.Launch.Froze
+			row.Launch.Discarded += d.Launch.Discarded
+			row.Launch.PageFrozen += d.Launch.PageFrozen
+			row.ChromeClosed = row.ChromeClosed || d.Flags.ChromeClosed
+			row.SecondWindow = row.SecondWindow || d.Flags.SecondGameWindow
 			row.FreezeLoop = row.FreezeLoop || d.Flags.FreezeLoop
 			row.Launch.LoaderCache += d.Launch.LoaderCache
 			row.Launch.LoaderNetwork += d.Launch.LoaderNetwork
@@ -714,6 +743,12 @@ func shortDay(day string) string {
 // stuckTailTitle explains the held-since pills.
 const stuckTailTitle = "The download of this unit stopped a few MB before the end (a web filter holding the file) on two or more days, with no completion since. The download page now fetches such a file whole again; if it keeps happening, the school's IT needs to exempt the content host from scanning."
 
+// discardTitle and secondWindowTitle explain the Issue 1 pills.
+const (
+	discardTitle      = "Chrome unloaded the game window to free memory while another window or tab was in front, and reloaded it when the student came back: the game starts again at its menu and continues from the last save point. Two or more times in a day is a device that cannot keep the game in memory (usually a 4 GB Chromebook): close other tabs and windows, keep one copy of the game open, or use a device with more memory. Recorded since Oct 27, 2026."
+	secondWindowTitle = "Two copies of the game were open on this device at once, which doubles the memory needed and makes Chrome close the game far more often. Close the extra window. Recorded since Oct 27, 2026."
+)
+
 // activityTitle and blockedTitle explain the activity-not-arriving pills.
 const (
 	activityTitle = "The game ran but none of its activity (gameplay records, saves) reached the servers in this window. When this is most of a school's students, the school's web filter is usually blocking the game's requests to the log and save services: progress is not saved between sessions, and the current game may wait at START."
@@ -744,6 +779,14 @@ func schoolPills(c Counts, churn bool) []Pill {
 	}
 	if c.StuckTail > 0 {
 		p = append(p, Pill{Text: plural(c.StuckTail, "student", "students") + " held on 2+ days", Class: viewers.PillAmber, Title: stuckTailTitle})
+	}
+	if c.ChromeClosed > 0 {
+		p = append(p, Pill{Text: plural(c.ChromeClosed, "student", "students") + " had the game closed by Chrome", Class: viewers.PillAmber, Title: discardTitle})
+	} else if c.Discarded > 0 {
+		p = append(p, Pill{Text: plural(c.Discarded, "student", "students") + " had the game closed by Chrome once", Class: viewers.PillGray, Title: discardTitle})
+	}
+	if c.SecondWindow > 0 {
+		p = append(p, Pill{Text: plural(c.SecondWindow, "student", "students") + " with 2 game windows open", Class: viewers.PillAmber, Title: secondWindowTitle})
 	}
 	if c.DlFailed > 0 {
 		p = append(p, Pill{Text: plural(c.DlFailed, "download failed", "downloads failed"), Class: viewers.PillAmber})
@@ -779,6 +822,16 @@ func studentPills(r StudentRow) []Pill {
 	}
 	if r.ServicesBlocked {
 		p = append(p, Pill{Text: "filter blocking the game", Class: viewers.PillAmber, Title: blockedTitle})
+	}
+	if r.Launch.Discarded > 0 {
+		cls := viewers.PillGray
+		if r.ChromeClosed {
+			cls = viewers.PillAmber
+		}
+		p = append(p, Pill{Text: "Chrome closed the game " + plural(r.Launch.Discarded, "time", "times"), Class: cls, Title: discardTitle})
+	}
+	if r.SecondWindow {
+		p = append(p, Pill{Text: "2 game windows open", Class: viewers.PillAmber, Title: secondWindowTitle})
 	}
 	if r.StuckTailSince != "" {
 		p = append(p, Pill{Text: r.StuckTailUnit + " held at the tail since " + shortDay(r.StuckTailSince), Class: viewers.PillAmber, Title: stuckTailTitle})

@@ -263,6 +263,24 @@ func (b *builder) addRecord(rec models.MHSDeviceTest, sum *models.MHSMemberSumma
 			a.doc.Crashes.Last = &t
 		}
 	}
+	for _, e := range sum.Device {
+		if e.At.IsZero() || LocalDay(e.At, loc) != b.day {
+			continue
+		}
+		// Records from one tab repeat each other's entries: count each line once.
+		if a.seen(dev, "device:"+e.Kind, e.At, false) {
+			continue
+		}
+		a.touch(e.At)
+		switch e.Kind {
+		case models.MHSDeviceEventDiscarded:
+			a.doc.Launch.Discarded++
+		case models.MHSDeviceEventPageFrozen:
+			a.doc.Launch.PageFrozen++
+		case models.MHSDeviceEventOtherWindows:
+			a.doc.Flags.SecondGameWindow = true
+		}
+	}
 	if sum.Storage != nil && sum.Storage.Persisted != nil && !*sum.Storage.Persisted && b.inDay(sum.Storage.At) {
 		a.doc.Flags.StorageNotPersisted = true
 	}
@@ -513,6 +531,7 @@ func (b *builder) finish(now time.Time) []models.MHSActivityDay {
 			problem = true
 		}
 		d.Flags.FreezeLoop = d.Launch.Froze >= models.MHSFreezeLoopRuns
+		d.Flags.ChromeClosed = d.Launch.Discarded >= models.MHSChromeClosedDiscards
 		for t := range a.types {
 			d.Crashes.Types = append(d.Crashes.Types, t)
 		}

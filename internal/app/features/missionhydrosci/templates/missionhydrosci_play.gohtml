@@ -289,6 +289,31 @@
         </div>
       </div>
 
+      <!-- Discard notice (plan B.4, Issue 1 of docs/mission-hydrosci/mhs-issues-102826.md).
+           Chrome unloaded this game window for memory while another window or
+           tab was in front and reloaded it when the student came back
+           (document.wasDiscarded). Without this the reload looks like the game
+           throwing the student back to the start. Shown during the reload,
+           hidden a minute after the game renders, and it gives way to any
+           other bar (only one bar shows at a time). It says "last save
+           point": the page cannot know what reached the save service. -->
+      <div id="mhs-discard-notice" class="mhs-notice-bar" role="status" aria-live="polite" hidden>
+        <div class="mhs-ln-row">
+          <span class="mhs-ln-icon" aria-hidden="true">!</span>
+          <span class="mhs-ln-text">Chrome closed the game to free up memory while another window or tab was in front. The game is loading again. Press START to continue from your last save point.</span>
+          <button type="button" class="mhs-ln-btn" id="mhs-dc-how-btn" aria-expanded="false" aria-controls="mhs-dc-how">What to do</button>
+          <button type="button" class="mhs-ln-btn mhs-ln-dismiss" id="mhs-dc-dismiss" aria-label="Hide this notice" title="Hide this notice">&times;</button>
+        </div>
+        <div class="mhs-ln-how" id="mhs-dc-how" hidden>
+          <strong>For the teacher.</strong> When a device runs short of memory, Chrome unloads a game window that is in the background and reloads it when the student comes back. The game then starts at its menu and continues from its last save point. <span id="mhs-dc-detail"></span>
+          <ol>
+            <li>Close the other tabs and windows on this device, and keep only one copy of the game open.</li>
+            <li>When the game seems to freeze, wait about 30 seconds instead of switching to another window or tab.</li>
+            <li>If it keeps happening, use a device with more memory if one is available. The school's IT can also add the game's address to "Exceptions to tab discarding" in the Google Admin console.</li>
+          </ol>
+        </div>
+      </div>
+
       {{ if not .DeviceTest }}
       <!-- Signed-out notice. StrataHub answers this page's own posts with 401:
            the sign-in has ended (it lasts 30 days, and an administrator can
@@ -1045,7 +1070,10 @@
         }
       } catch (e) { /* not available */ }
       try {
-        if (document.wasDiscarded) stepLog.record('page', 'warn', 'The browser had discarded this page earlier (usually when the device is short of memory) and reloaded it', { unit: unitId });
+        if (document.wasDiscarded) {
+          stepLog.record('page', 'warn', 'The browser had discarded this page earlier (usually when the device is short of memory) and reloaded it', { unit: unitId });
+          setTimeout(showDiscardNotice, 0); // after the bars' helpers below are set up
+        }
       } catch (e) { /* not available */ }
 
       var hbFrames = 0, hbLastAt = Date.now(), hbTimer = null;
@@ -1293,6 +1321,9 @@
       // it stays above a fullscreen canvas; plain visibility otherwise.
       function barShow(el) {
         if (!el) return;
+        // Only one bar at a time: the discard notice gives way to the others.
+        var dcEl = document.getElementById('mhs-discard-notice');
+        if (dcEl && el !== dcEl && !dcEl.hidden) barHide(dcEl);
         el.hidden = false;
         if (typeof el.showPopover !== 'function') return;
         try {
@@ -1309,7 +1340,7 @@
       // fullscreen changes, re-raise any bar that is showing.
       ['fullscreenchange', 'webkitfullscreenchange'].forEach(function(ev) {
         document.addEventListener(ev, function() {
-          [document.getElementById('mhs-logging-notice'), document.getElementById('mhs-offline-notice'), document.getElementById('mhs-signedout-notice')].forEach(function(el) {
+          [document.getElementById('mhs-logging-notice'), document.getElementById('mhs-offline-notice'), document.getElementById('mhs-signedout-notice'), document.getElementById('mhs-discard-notice')].forEach(function(el) {
             if (el && !el.hidden && typeof el.showPopover === 'function') {
               try { if (el.matches(':popover-open')) el.hidePopover(); el.showPopover(); } catch (e) {}
             }
@@ -1339,6 +1370,50 @@
         if (lnHowBtn) { lnHowBtn.setAttribute('aria-expanded', 'false'); lnHowBtn.textContent = 'What to do'; }
         loggingHealth.shown = '';
       }
+      // ---- Discard notice (see its markup) ---------------------------------
+      var dcHideTimer = null;
+      function showDiscardNotice() {
+        var el = document.getElementById('mhs-discard-notice');
+        if (!el) return;
+        // Another bar is already up: it matters more.
+        var others = ['mhs-logging-notice', 'mhs-offline-notice', 'mhs-signedout-notice'];
+        for (var i = 0; i < others.length; i++) {
+          var o = document.getElementById(others[i]);
+          if (o && !o.hidden) return;
+        }
+        fillDiscardDetail();
+        barShow(el);
+      }
+      // The device facts for the teacher; refreshed when "What to do" opens,
+      // since other game windows answer on the channel after the page loads.
+      function fillDiscardDetail() {
+        var detail = document.getElementById('mhs-dc-detail');
+        if (!detail) return;
+        var facts = [];
+        if (navigator.deviceMemory) facts.push('This device reports ' + navigator.deviceMemory + ' GB of memory; the game needs about 750 MB in its window.');
+        var n = (typeof otherGameWindows === 'function') ? otherGameWindows() : 0;
+        if (n > 0) facts.push(n === 1 ? 'Another game window is open on this device right now.' : n + ' other game windows are open on this device right now.');
+        detail.textContent = facts.join(' ');
+      }
+      function hideDiscardNoticeSoon() {
+        var el = document.getElementById('mhs-discard-notice');
+        if (!el || el.hidden || dcHideTimer) return;
+        dcHideTimer = setTimeout(function() { barHide(el); }, 60000);
+      }
+      (function wireDiscardNotice() {
+        var btn = document.getElementById('mhs-dc-how-btn'), how = document.getElementById('mhs-dc-how');
+        if (btn && how) btn.addEventListener('click', function() {
+          var open = how.hidden;
+          if (open) fillDiscardDetail();
+          how.hidden = !open;
+          btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+          btn.textContent = open ? 'Hide' : 'What to do';
+          if (open && dcHideTimer) { clearTimeout(dcHideTimer); dcHideTimer = null; } // being read: keep it
+        });
+        var x = document.getElementById('mhs-dc-dismiss');
+        if (x) x.addEventListener('click', function() { barHide(document.getElementById('mhs-discard-notice')); });
+      })();
+
       // 1. The server's verdict, from the heartbeat reply.
       var lnStateLogged = {};
       function onLogsState(state) {
@@ -1939,6 +2014,7 @@
           requestAnimationFrame(function() {
             requestAnimationFrame(function() {
               stepLog.record('game', 'ok', 'Game is rendering', { unit: unitId });
+              hideDiscardNoticeSoon();
               memberReport('launch-ok');
               {{ if .DeviceTest }}
               deviceTestSummary({

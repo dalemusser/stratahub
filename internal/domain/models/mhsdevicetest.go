@@ -379,7 +379,9 @@ func (t *MHSDeviceTest) StoppedResponding(now time.Time) bool {
 
 // MHSMemberSummaryVersion is bumped when Summarize's reading of the step log
 // changes in a way that should make a backfill re-stamp stored records.
-const MHSMemberSummaryVersion = 1
+//
+//	2 (2026-11-09): Device (discards, other game windows, page freezes)
+const MHSMemberSummaryVersion = 2
 
 // MHSMemberSummary is a member record's step log read as facts (see
 // MHSDeviceTest.Summary). Times are the entries' own wall clock, so a
@@ -396,6 +398,7 @@ type MHSMemberSummary struct {
 	Launch  []MHSStepLaunchEvent `bson:"launch,omitempty" json:"launch,omitempty"`
 	Crashes []MHSStepCrash       `bson:"crashes,omitempty" json:"crashes,omitempty"`
 	Storage *MHSStepStorage      `bson:"storage,omitempty" json:"storage,omitempty"`
+	Device  []MHSStepDeviceEvent `bson:"device,omitempty" json:"device,omitempty"`
 
 	// From the page's log context.
 	DeviceID        string `bson:"device_id,omitempty" json:"device_id,omitempty"`
@@ -456,6 +459,22 @@ const (
 	MHSLaunchEventWatchdogFail = "watchdog_fail" // still none at 90 s
 	MHSLaunchEventRendering    = "rendering"     // the game's first frame
 )
+
+// MHSStepDeviceEvent kinds: the device-state lines the play page writes
+// (Issue 1 of docs/mission-hydrosci/mhs-issues-102826.md).
+const (
+	MHSDeviceEventDiscarded    = "discarded"     // Chrome had discarded the game window for memory and it reloaded
+	MHSDeviceEventOtherWindows = "other_windows" // another game window was open on the device (N = how many besides this one)
+	MHSDeviceEventPageFrozen   = "page_frozen"   // the page's main thread stopped for 10 s or more (N = seconds)
+)
+
+// MHSStepDeviceEvent is one device-state line from the play page.
+type MHSStepDeviceEvent struct {
+	At   time.Time `bson:"at" json:"at"`
+	Kind string    `bson:"kind" json:"kind"`
+	Unit string    `bson:"unit,omitempty" json:"unit,omitempty"`
+	N    int       `bson:"n,omitempty" json:"n,omitempty"`
+}
 
 // MHSStepLaunchEvent is one launch milestone or problem from the play page.
 type MHSStepLaunchEvent struct {
