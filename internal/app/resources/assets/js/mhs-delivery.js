@@ -679,6 +679,13 @@
   // manifest's `tuning` block (see _tune) without a JS deploy.
   var BG_STALL_MS = 150000;       // Background Fetch quiet this long => 'stalled' (the frozen-switch fires first)
   var FALLBACK_STALL_MS = 45000;  // SW fallback loop quiet this long => restarted automatically (every time)
+  // In a large file's last 16 MB (the SW marks those broadcasts `tail`), a
+  // school's web filter may be scanning the file before it releases the end:
+  // restarting after 45 s turns that into a tail-only request the filter
+  // holds again (Issue 2 of docs/mission-hydrosci/mhs-issues-102826.md), so
+  // the transfer is given this long first. The SW fetches the file whole
+  // again after repeated tail holds (sw-background-fetch.js, tailDecision).
+  var TAIL_STALL_MS = 300000;
   var SUCCESS_BROADCAST_GRACE_MS = 45000; // BG fetch success but no 'cached' broadcast => reconcile
   var FROZEN_SWITCH_MS = 25000;   // BG fetch frozen this long => switch to fallback (must exceed the keepalive)
   var PREFLIGHT_TIMEOUT_MS = 8000; // reachability probe budget per URL
@@ -1265,6 +1272,26 @@
               (drops > 1 ? ' (' + drops + ' drops so far)' : ''), { unit: unitId, resumed_mb: fmtMB(detail.resumedFrom), drops: drops || 1 });
           }
         }
+        if (detail.restartedFromZero) {
+          var rz = detail.restartedFromZero;
+          this._step('download', 'warn', title + ': fetching ' + rz.file + ' whole again — ' +
+            (rz.reason === 'stale' ? 'its last part had been held since an earlier day' : 'its last part was held twice') +
+            ' at ' + fmtMB(rz.heldAt) + ' of ' + fmtMB(rz.size) + ' MB (a web filter scanning the file); restart ' + rz.restarts + ' today',
+            { unit: unitId, restart_zero: rz.reason, held_mb: fmtMB(rz.heldAt), total_mb: fmtMB(rz.size), restarts: String(rz.restarts) });
+          return;
+        }
+        if (detail.tailWait) {
+          // Once per hold, not on every 5 s tick.
+          var tk = unitId + '|' + detail.downloaded;
+          if (!this._tailNoted) this._tailNoted = {};
+          if (!this._tailNoted[tk]) {
+            this._tailNoted[tk] = true;
+            this._step('download', 'warn', title + ': the last part is being held at ' + fmtMB(detail.downloaded) + ' MB — waiting up to ' +
+              Math.round(this._tune('tailStallMs', TAIL_STALL_MS) / 60000) + ' min for the school\'s filter to finish checking the file',
+              { unit: unitId, tail_wait: '1', at_mb: fmtMB(detail.downloaded) });
+          }
+          return;
+        }
         if (detail.note) { this._step('download', 'warn', detail.note, { unit: unitId, note: '1' }); return; }
         if (detail.waitingMs >= 5000) {
           var wmsg = 'No data for ' + Math.round(detail.waitingMs / 1000) + ' s';
@@ -1477,11 +1504,18 @@
    * restarting it on the sequential fallback path converts slow-network
    * successes into failures.
    */
+  // How long a direct (SW) download may stay quiet before it is restarted.
+  MHSDeliveryManager.prototype._fallbackThreshold = function(state) {
+    return (state && state.tail)
+      ? this._tune('tailStallMs', TAIL_STALL_MS)
+      : this._tune('fallbackStallMs', FALLBACK_STALL_MS);
+  };
+
   MHSDeliveryManager.prototype._maybeFireStalled = function(unitId, unit) {
     var state = this._stallState[unitId];
     if (!state || state.stalled) return;
     var threshold = state.fallback
-      ? this._tune('fallbackStallMs', FALLBACK_STALL_MS)
+      ? this._fallbackThreshold(state)
       : this._tune('bgStallMs', BG_STALL_MS);
     var quietMs = Date.now() - state.lastProgressAt;
     if (quietMs < threshold) return;
@@ -1776,7 +1810,7 @@
       // Surface the wait (and what happens next) while the loop is quiet.
       var quietMs = Date.now() - state.lastProgressAt;
       if (!state.stalled && quietMs >= PROGRESS_POLL_MS) {
-        var threshold = self._tune('fallbackStallMs', FALLBACK_STALL_MS);
+        var threshold = self._fallbackThreshold(state);
         var total = unit.totalSize || unit.files.reduce(function(sum, f) { return sum + f.size; }, 0);
         var detail = {
           downloaded: state.maxDownloaded,
@@ -1786,6 +1820,14 @@
           waitingMs: quietMs
         };
         detail.resumeInMs = Math.max(0, threshold - quietMs);
+        if (state.tail) {
+          // Say what is happening and that it finishes by itself; the
+          // student should not reload or start over.
+          var left = Math.round(detail.resumeInMs / 1000);
+          detail.tailWait = true;
+          detail.note = 'Checking the file: the school\'s web filter is scanning it before the last part arrives. ' +
+            'This usually finishes by itself; keep this page open (' + Math.floor(left / 60) + ':' + ('0' + (left % 60)).slice(-2) + ').';
+        }
         self._fireStatus(unitId, 'downloading', detail);
       }
       self._maybeFireStalled(unitId, unit);
@@ -2544,6 +2586,7 @@
     if (status === 'downloading' && !(detail && detail.local)) {
       var dlState = this._stallState[unitId];
       if (dlState) {
+        if (detail && typeof detail.downloaded === 'number') dlState.tail = !!detail.tail;
         var newBytes = detail && typeof detail.downloaded === 'number' &&
           detail.downloaded > dlState.maxDownloaded;
         if (newBytes) {

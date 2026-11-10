@@ -229,6 +229,70 @@ var RESUME_PART_BYTES = 8 * 1024 * 1024;
 function partKey(cacheKey, i) { return cacheKey + '?part=' + i; }
 function partsMetaKey(cacheKey) { return cacheKey + '?parts'; }
 
+// The held tail (docs/mission-hydrosci/mhs-issues-102826.md, Issue 2; plan
+// B.3). A web filter on managed Chromebooks scans a large file before it
+// releases the last ~12 MB. Resuming such a file asks for the tail by itself
+// (Range: bytes=<saved>-), which the filter holds again, and on a device that
+// keeps its browser data the stuck partial re-creates the hold every day.
+// So, for a large file whose saved part is within TAIL_ZONE_BYTES of its end:
+// after TAIL_TRIES_BEFORE_RESTART tail-only attempts that saved nothing (a
+// hold; a connection that is merely cut keeps saving bytes and is resumed as
+// before), or when the partial was started on an earlier day, the parts are
+// dropped and the file is fetched whole again, so the filter scans the whole
+// object. At most
+// ZERO_RESTARTS_PER_DAY such restarts per file and day (each costs the whole
+// file); after that the tail resumes go on as before (never give up). The
+// counts live under '<key>?tail', which dropParts leaves alone. Nothing here
+// hides a file from the filter: the request is the plain whole file.
+var TAIL_ZONE_BYTES = 16 * 1024 * 1024;
+var TAIL_MIN_FILE_BYTES = 32 * 1024 * 1024;
+var TAIL_TRIES_BEFORE_RESTART = 2;
+var ZERO_RESTARTS_PER_DAY = 2;
+
+function tailStateKey(cacheKey) { return cacheKey + '?tail'; }
+function localDay(t) {
+  var d = new Date(t);
+  return d.getFullYear() + '-' + (d.getMonth() + 1) + '-' + d.getDate();
+}
+async function readTailState(cache, cacheKey) {
+  try {
+    var r = await cache.match(tailStateKey(cacheKey));
+    if (r) return await r.json();
+  } catch (e) { /* none */ }
+  return null;
+}
+async function writeTailState(cache, cacheKey, st) {
+  try {
+    await cache.put(tailStateKey(cacheKey), new Response(JSON.stringify(st), { headers: { 'content-type': 'application/json' } }));
+  } catch (e) { /* best effort: without it the file only resumes as before */ }
+}
+function inTail(expectedSize, bytes) {
+  return expectedSize >= TAIL_MIN_FILE_BYTES && bytes < expectedSize && expectedSize - bytes <= TAIL_ZONE_BYTES;
+}
+
+// Decides, before a resume, whether a partial stuck at its tail is fetched
+// whole instead. Returns null (resume as usual) or {reason, heldAt, restarts}.
+async function tailDecision(cache, cacheKey, expectedSize, meta, now) {
+  if (!meta || !inTail(expectedSize, meta.bytes)) return null;
+  var today = localDay(now);
+  var st = await readTailState(cache, cacheKey);
+  if (!st || st.day !== today) st = { day: today, tries: 0, restarts: 0, bytes: 0 };
+  // Bytes saved since the last tail attempt: the connection was cut, not
+  // held. Only attempts that saved nothing count toward a restart.
+  if (meta.bytes > (st.bytes || 0)) st.tries = 0;
+  st.bytes = meta.bytes;
+  var stale = !!(meta.started && localDay(meta.started) !== today);
+  if ((stale || st.tries >= TAIL_TRIES_BEFORE_RESTART) && st.restarts < ZERO_RESTARTS_PER_DAY) {
+    st.restarts++;
+    st.tries = 0;
+    await writeTailState(cache, cacheKey, st);
+    return { reason: stale ? 'stale' : 'held', heldAt: meta.bytes, restarts: st.restarts, tries: TAIL_TRIES_BEFORE_RESTART };
+  }
+  st.tries++;
+  await writeTailState(cache, cacheKey, st);
+  return null;
+}
+
 async function readPartsMeta(cache, cacheKey, expectedSize) {
   try {
     var r = await cache.match(partsMetaKey(cacheKey));
@@ -290,7 +354,7 @@ function concatStreams(a, b) {
 // every connection after a few MB (less than a part) still moves the resume
 // point forward each time. Parts are read back in index order, so their
 // sizes may differ. Resolves when the stream ends; rejects on error.
-async function writeParts(cache, cacheKey, stream, startIndex, startBytes, etag, expectedSize, contentType) {
+async function writeParts(cache, cacheKey, stream, startIndex, startBytes, etag, expectedSize, contentType, started) {
   var reader = stream.getReader();
   var index = startIndex, bytes = startBytes;
   var chunks = [], buffered = 0;
@@ -301,7 +365,7 @@ async function writeParts(cache, cacheKey, stream, startIndex, startBytes, etag,
     chunks = []; buffered = 0;
     await cache.put(partKey(cacheKey, index), new Response(buf));
     index++; bytes += buf.byteLength;
-    await writePartsMeta(cache, cacheKey, { size: expectedSize, etag: etag, count: index, bytes: bytes, type: contentType || '' });
+    await writePartsMeta(cache, cacheKey, { size: expectedSize, etag: etag, count: index, bytes: bytes, type: contentType || '', started: started || Date.now() });
   }
   try {
     for (;;) {
@@ -326,8 +390,14 @@ async function writeParts(cache, cacheKey, stream, startIndex, startBytes, etag,
  * earlier attempt broke mid-stream (see the notes above); onResume(offset)
  * is called when that happens.
  */
-async function fetchAndCacheFile(cache, cacheKey, url, expectedSize, onBytes, signal, onResume) {
+async function fetchAndCacheFile(cache, cacheKey, url, expectedSize, onBytes, signal, onResume, onRestart) {
   var meta = expectedSize ? await readPartsMeta(cache, cacheKey, expectedSize) : null;
+  var restart = await tailDecision(cache, cacheKey, expectedSize, meta, Date.now());
+  if (restart) {
+    await dropParts(cache, cacheKey);
+    meta = null;
+    if (onRestart) { try { onRestart(restart); } catch (e) { /* ignore */ } }
+  }
   if (meta && meta.bytes >= expectedSize) {
     // Every part arrived but the final write failed (a quota blip, a
     // terminated worker): assemble from the parts, no request needed. A
@@ -397,7 +467,7 @@ async function fetchAndCacheFile(cache, cacheKey, url, expectedSize, onBytes, si
   var headers = new Headers();
   headers.set('content-type', response.headers.get('content-type') || 'application/octet-stream');
   headers.set('content-length', String(expectedSize));
-  var partWriter = writeParts(cache, cacheKey, branches[1], startIndex, offset, etag, expectedSize, headers.get('content-type'));
+  var partWriter = writeParts(cache, cacheKey, branches[1], startIndex, offset, etag, expectedSize, headers.get('content-type'), (meta && meta.started) || Date.now());
   // Either promise rejecting (a broken stream) rejects the whole attempt; the
   // parts written so far stay for the next one. Both are waited for to the
   // end — not just the first rejection — so the part writer's last flush has
@@ -411,6 +481,7 @@ async function fetchAndCacheFile(cache, cacheKey, url, expectedSize, onBytes, si
     if (results[ri].status === 'rejected') throw results[ri].reason;
   }
   await dropParts(cache, cacheKey);
+  try { await cache.delete(tailStateKey(cacheKey)); } catch (e) { /* best effort */ }
 }
 
 // Retries a broken transfer for as long as it keeps making progress. Every
@@ -434,17 +505,24 @@ async function savedBytes(cache, cacheKey, expectedSize) {
   return meta ? meta.bytes : 0;
 }
 
-async function fetchAndCacheFileWithRetry(cache, cacheKey, url, expectedSize, onBytes, signal, onResume, onDrop) {
+async function fetchAndCacheFileWithRetry(cache, cacheKey, url, expectedSize, onBytes, signal, onResume, onDrop, onRestart) {
   var futile = 0; // consecutive attempts that saved nothing new
   for (var attempt = 1; ; attempt++) {
     var before = await savedBytes(cache, cacheKey, expectedSize);
+    var restarted = false;
     try {
-      await fetchAndCacheFile(cache, cacheKey, url, expectedSize, onBytes, signal, onResume);
+      await fetchAndCacheFile(cache, cacheKey, url, expectedSize, onBytes, signal, onResume, function(info) {
+        restarted = true;
+        if (onRestart) onRestart(info);
+      });
       return;
     } catch (err) {
       if (signal && signal.aborted) throw err;
       var after = await savedBytes(cache, cacheKey, expectedSize);
-      futile = after > before ? 0 : futile + 1;
+      // A whole-file restart that got back to the tail moved the transfer
+      // (the filter saw the whole object), even though the saved count is
+      // where it was: not a futile attempt.
+      futile = (after > before || restarted) ? 0 : futile + 1;
       if (futile >= MAX_FUTILE_ATTEMPTS) throw err;
       if (onDrop) {
         try { onDrop({ attempt: attempt, savedBytes: after, futile: futile, error: err }); } catch (e) { /* ignore */ }
@@ -546,7 +624,11 @@ async function runFallbackFetch(fallbackKey, unitId, version, files, cdnBaseUrl,
         var now = Date.now();
         if (now - lastBroadcast < 1000) return;
         lastBroadcast = now;
-        broadcastProgress(downloaded + fileReceived);
+        var detail = progressDetail(downloaded + fileReceived);
+        // In a large file's last few MB: the pages wait longer before
+        // restarting a quiet transfer there (a filter scanning the file).
+        if (inTail(file.size, fileReceived)) detail.tail = true;
+        broadcastStatus(unitId, 'downloading', detail);
       }, aborter.signal, function(offset) {
         // A file picked up where a broken attempt left it: tell the pages.
         var detail = progressDetail(downloaded + offset);
@@ -555,6 +637,12 @@ async function runFallbackFetch(fallbackKey, unitId, version, files, cdnBaseUrl,
       }, function(info) {
         drops++;
         lastDropError = info.error;
+      }, function(info) {
+        var detail = progressDetail(downloaded);
+        detail.restartedFromZero = {
+          file: file.path.split('/').pop(), reason: info.reason, heldAt: info.heldAt, size: file.size, restarts: info.restarts
+        };
+        broadcastStatus(unitId, 'downloading', detail);
       });
 
       downloaded += file.size;

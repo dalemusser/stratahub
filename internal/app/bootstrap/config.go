@@ -85,6 +85,7 @@ var appConfigKeys = []config.AppKey{
 	{Name: "mhs_cdn_base_url", Default: "", Desc: "CDN base URL for MHS game builds (e.g., https://cdn.adroit.games/mhs)"},
 	{Name: "mhs_frozen_switch_ms", Default: 25000, Desc: "Background Fetch quiet this long (ms, visible tab) before switching to the direct download"},
 	{Name: "mhs_fallback_stall_ms", Default: 45000, Desc: "Direct (SW) download quiet this long (ms, visible tab) before one auto-resume, then Stalled"},
+	{Name: "mhs_tail_stall_ms", Default: 300000, Desc: "Direct (SW) download quiet this long (ms) in a large file's last 16 MB (a web filter scanning it) before it is restarted"},
 	{Name: "mhs_keepalive_ms", Default: 10000, Desc: "How often (ms) pages nudge the service worker to keep download progress alive"},
 	{Name: "mhs_device_test_start_limit", Default: 10, Desc: "Unit 2 device test: new runs one client IP may start per window (a school behind one address shares it)"},
 	{Name: "mhs_device_test_start_window", Default: "10m", Desc: "Unit 2 device test: the window for mhs_device_test_start_limit (e.g. 10m, 1h)"},
@@ -218,6 +219,7 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 
 		MHSFrozenSwitchMs:  appValues.Int("mhs_frozen_switch_ms"),
 		MHSFallbackStallMs: appValues.Int("mhs_fallback_stall_ms"),
+		MHSTailStallMs:     appValues.Int("mhs_tail_stall_ms"),
 		MHSKeepaliveMs:     appValues.Int("mhs_keepalive_ms"),
 
 		MHSDeviceTestStartLimit:  appValues.Int("mhs_device_test_start_limit"),

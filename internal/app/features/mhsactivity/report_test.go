@@ -237,3 +237,49 @@ func TestReportActivityNotArriving(t *testing.T) {
 		t.Errorf("students with no activity arrived: %d, want 11", n)
 	}
 }
+
+// School C's pattern (Issue 2): the same unit held at the tail on several of
+// a student's download days with no completion since is "held at the tail
+// since" its first day; a completion in between restarts the count; one held
+// day is not enough; another student's held day does not join it.
+func TestReportStuckAtTheTail(t *testing.T) {
+	org := primitive.NewObjectID()
+	lk := Lookups{Orgs: map[primitive.ObjectID]OrgInfo{org: {Name: "School C", Loc: time.UTC}}}
+	held := func(unit string) models.MHSActivityUnit {
+		return models.MHSActivityUnit{Unit: unit, Version: "2.8.9", State: models.MHSActivityUnitHeld, TotalMB: 156, HeldAtMB: 144}
+	}
+	done := func(unit string) models.MHSActivityUnit {
+		return models.MHSActivityUnit{Unit: unit, Version: "2.8.9", State: models.MHSActivityUnitComplete}
+	}
+	stuck, recovered, once := primitive.NewObjectID(), primitive.NewObjectID(), primitive.NewObjectID()
+	day := func(u primitive.ObjectID, d string, units ...models.MHSActivityUnit) models.MHSActivityDay {
+		return models.MHSActivityDay{UserID: u, OrganizationID: org, Role: "member", Day: d, Opened: true, Units: units}
+	}
+	docs := []models.MHSActivityDay{
+		day(stuck, "2026-10-22", held("unit3")), day(stuck, "2026-10-23"), day(stuck, "2026-10-26", held("unit3")), day(stuck, "2026-10-27", held("unit3")),
+		day(recovered, "2026-10-20", held("unit1")), day(recovered, "2026-10-21", done("unit1")), day(recovered, "2026-10-22", held("unit1")),
+		day(once, "2026-10-27", held("unit3")),
+	}
+	rep := BuildReport(docs, lk, Options{SelectedOrg: org})
+	if got := rep.Schools[0].StuckTail; got != 1 {
+		t.Errorf("StuckTail = %d, want 1", got)
+	}
+	if p := pillTexts(rep.Schools[0].Pills); !strings.Contains(p, "1 student held on 2+ days") {
+		t.Errorf("school pills %q", p)
+	}
+	for _, st := range rep.School.Students {
+		switch st.UserID {
+		case stuck.Hex():
+			if st.StuckTailSince != "2026-10-22" || st.StuckTailUnit != "U3" {
+				t.Errorf("stuck: since %q unit %q", st.StuckTailSince, st.StuckTailUnit)
+			}
+			if p := pillTexts(st.Pills); !strings.Contains(p, "U3 held at the tail since Oct 22") {
+				t.Errorf("stuck pills %q", p)
+			}
+		case recovered.Hex(), once.Hex():
+			if st.StuckTailSince != "" {
+				t.Errorf("%s: since %q, want none", st.Name, st.StuckTailSince)
+			}
+		}
+	}
+}

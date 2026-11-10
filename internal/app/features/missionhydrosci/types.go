@@ -140,6 +140,7 @@ type ContentManifestUnit struct {
 type ManifestTuning struct {
 	FrozenSwitchMs  int `json:"frozenSwitchMs,omitempty"`  // Background Fetch quiet this long (visible tab) => switch to the direct download
 	FallbackStallMs int `json:"fallbackStallMs,omitempty"` // direct (SW) download quiet this long => auto-resume once, then Stalled
+	TailStallMs     int `json:"tailStallMs,omitempty"`     // the same in a large file's last 16 MB, where a web filter may be scanning the file
 	BgStallMs       int `json:"bgStallMs,omitempty"`       // Background Fetch quiet this long => Stalled (normally never reached)
 	KeepaliveMs     int `json:"keepaliveMs,omitempty"`     // how often pages nudge the SW to keep progress alive
 }

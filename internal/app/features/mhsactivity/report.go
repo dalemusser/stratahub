@@ -59,11 +59,16 @@ type Counts struct {
 	Launched        int
 	NoActivity      int
 	ServicesBlocked int
+
+	// StuckTail is students whose download of one unit was held at the tail
+	// on two or more of their download days in the window, with no
+	// completion since (StudentRow.StuckTailSince).
+	StuckTail int
 }
 
 // Problem reports whether the counts show something to act on.
 func (c Counts) Problem() bool {
-	return c.Blocked > 0 || c.DlHeld > 0 || c.DlFailed > 0 || c.LaunchFailed > 0 || c.FreezeLoop > 0 || c.ActivityNotArriving()
+	return c.Blocked > 0 || c.DlHeld > 0 || c.DlFailed > 0 || c.LaunchFailed > 0 || c.FreezeLoop > 0 || c.ActivityNotArriving() || c.StuckTail > 0
 }
 
 // noActivityMin is the fewest students without arriving activity that make a
@@ -141,9 +146,11 @@ type StudentRow struct {
 	Launch          models.MHSActivityLaunch
 	CrashReal       int
 	CrashNotice     int
-	FreezeLoop      bool // some day of the window: the game froze MHSFreezeLoopRuns+ times
-	NoActivity      bool // the game ran and none of its activity arrived in the window (Counts.NoActivity)
-	ServicesBlocked bool // a play page found the game's requests blocked (Counts.ServicesBlocked)
+	FreezeLoop      bool   // some day of the window: the game froze MHSFreezeLoopRuns+ times
+	NoActivity      bool   // the game ran and none of its activity arrived in the window (Counts.NoActivity)
+	StuckTailSince  string // "2026-10-22": first day of a run of held days for one unit, 2+ days, no completion since
+	StuckTailUnit   string // that unit, "U3"
+	ServicesBlocked bool   // a play page found the game's requests blocked (Counts.ServicesBlocked)
 	Devices         int
 	NewDevices      int
 	Platforms       string
@@ -357,6 +364,7 @@ func aggregate(ds []models.MHSActivityDay) Counts {
 	type userAcc struct {
 		opened, played, blocked, bgfetch, freezeLoop bool
 		launched, unknown, servicesBlocked           bool
+		days                                         []models.MHSActivityDay
 	}
 	users := map[primitive.ObjectID]*userAcc{}
 	devices := map[string]bool{}
@@ -366,6 +374,7 @@ func aggregate(ds []models.MHSActivityDay) Counts {
 			u = &userAcc{}
 			users[d.UserID] = u
 		}
+		u.days = append(u.days, d)
 		u.launched = u.launched || d.Launched
 		u.unknown = u.unknown || (d.Launched && !d.Log.Available)
 		u.servicesBlocked = u.servicesBlocked || d.Flags.ServicesBlocked
@@ -434,6 +443,9 @@ func aggregate(ds []models.MHSActivityDay) Counts {
 		}
 		if u.servicesBlocked {
 			c.ServicesBlocked++
+		}
+		if since, _ := stuckTailSince(u.days); since != "" {
+			c.StuckTail++
 		}
 	}
 	c.DevicesSeen = len(devices)
@@ -504,6 +516,9 @@ func studentRows(ds []models.MHSActivityDay, lk Lookups, loc *time.Location, sta
 		}
 		for _, d := range uds {
 			row.ServicesBlocked = row.ServicesBlocked || d.Flags.ServicesBlocked
+		}
+		if since, unit := stuckTailSince(uds); since != "" {
+			row.StuckTailSince, row.StuckTailUnit = since, unitLabel(unit)
 		}
 		row.Stray = row.Stray && !row.Opened && !row.Played
 		row.TimelineHref = "/mhsactivity/student/" + id.Hex() + "/day/" + uds[len(uds)-1].Day
@@ -632,6 +647,73 @@ func unitLabel(unit string) string {
 // freezeLoopTitle explains the freeze-loop pills.
 const freezeLoopTitle = "The game froze after loading and the run ended within minutes, three or more times in a day. A run that ends before the game's first save starts the unit over. Try another device; restarting this one may help."
 
+// stuckTailSince finds a unit (and version) whose download was held at the
+// tail on two or more of the student's download days for it, with no day of
+// completing it since: the persisted browser profile that re-creates the hold
+// every day (Issue 2 of docs/mission-hydrosci/mhs-issues-102826.md). Days
+// without an episode of that unit do not break the run (the student did not
+// try). Returns the first day of the earliest such run and the unit, or "".
+func stuckTailSince(ds []models.MHSActivityDay) (string, string) {
+	type dayState struct{ held, done bool }
+	byUnit := map[string]map[string]*dayState{} // unit|version -> day -> state
+	for _, d := range ds {
+		for _, u := range d.Units {
+			k := u.Unit + "|" + u.Version
+			if byUnit[k] == nil {
+				byUnit[k] = map[string]*dayState{}
+			}
+			st := byUnit[k][d.Day]
+			if st == nil {
+				st = &dayState{}
+				byUnit[k][d.Day] = st
+			}
+			switch u.State {
+			case models.MHSActivityUnitHeld:
+				st.held = true
+			case models.MHSActivityUnitComplete, models.MHSActivityUnitHeldDone, models.MHSActivityUnitCached:
+				st.done = true
+			}
+		}
+	}
+	bestDay, bestUnit := "", ""
+	for k, days := range byUnit {
+		keys := make([]string, 0, len(days))
+		for day := range days {
+			keys = append(keys, day)
+		}
+		sort.Strings(keys)
+		start, n := "", 0
+		for _, day := range keys {
+			st := days[day]
+			switch {
+			case st.done:
+				start, n = "", 0
+			case st.held:
+				if start == "" {
+					start = day
+				}
+				n++
+			}
+		}
+		if n >= 2 && (bestDay == "" || start < bestDay) {
+			bestDay, bestUnit = start, strings.SplitN(k, "|", 2)[0]
+		}
+	}
+	return bestDay, bestUnit
+}
+
+// shortDay renders "2026-10-22" as "Oct 22".
+func shortDay(day string) string {
+	t, err := time.Parse("2006-01-02", day)
+	if err != nil {
+		return day
+	}
+	return t.Format("Jan 2")
+}
+
+// stuckTailTitle explains the held-since pills.
+const stuckTailTitle = "The download of this unit stopped a few MB before the end (a web filter holding the file) on two or more days, with no completion since. The download page now fetches such a file whole again; if it keeps happening, the school's IT needs to exempt the content host from scanning."
+
 // activityTitle and blockedTitle explain the activity-not-arriving pills.
 const (
 	activityTitle = "The game ran but none of its activity (gameplay records, saves) reached the servers in this window. When this is most of a school's students, the school's web filter is usually blocking the game's requests to the log and save services: progress is not saved between sessions, and the current game may wait at START."
@@ -659,6 +741,9 @@ func schoolPills(c Counts, churn bool) []Pill {
 	}
 	if c.DlHeld > 0 {
 		p = append(p, Pill{Text: plural(c.DlHeld, "download held", "downloads held"), Class: viewers.PillAmber, Title: "Stopped a few MB before the end and never finished (a scanning web filter holding the file)"})
+	}
+	if c.StuckTail > 0 {
+		p = append(p, Pill{Text: plural(c.StuckTail, "student", "students") + " held on 2+ days", Class: viewers.PillAmber, Title: stuckTailTitle})
 	}
 	if c.DlFailed > 0 {
 		p = append(p, Pill{Text: plural(c.DlFailed, "download failed", "downloads failed"), Class: viewers.PillAmber})
@@ -694,6 +779,9 @@ func studentPills(r StudentRow) []Pill {
 	}
 	if r.ServicesBlocked {
 		p = append(p, Pill{Text: "filter blocking the game", Class: viewers.PillAmber, Title: blockedTitle})
+	}
+	if r.StuckTailSince != "" {
+		p = append(p, Pill{Text: r.StuckTailUnit + " held at the tail since " + shortDay(r.StuckTailSince), Class: viewers.PillAmber, Title: stuckTailTitle})
 	}
 	if r.NoActivity {
 		p = append(p, Pill{Text: "no activity arrived", Class: viewers.PillGray, Title: activityTitle})

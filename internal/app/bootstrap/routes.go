@@ -350,6 +350,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	missionHydroSciHandler.Tuning = missionhydroscifeature.ManifestTuning{
 		FrozenSwitchMs:  appCfg.MHSFrozenSwitchMs,
 		FallbackStallMs: appCfg.MHSFallbackStallMs,
+		TailStallMs:     appCfg.MHSTailStallMs,
 		KeepaliveMs:     appCfg.MHSKeepaliveMs,
 	}
 	missionHydroSciHandler.Probes = missionhydroscifeature.ProbesFromServices(missionHydroSciHandler.Services)

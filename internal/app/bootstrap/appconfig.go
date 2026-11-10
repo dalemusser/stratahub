@@ -109,6 +109,7 @@ type AppConfig struct {
 	// edit and restart instead of a JS deploy. Zero means "client default".
 	MHSFrozenSwitchMs  int // Background Fetch quiet this long (visible tab) before switching to the direct download
 	MHSFallbackStallMs int // direct (SW) download quiet this long before one auto-resume, then Stalled
+	MHSTailStallMs     int // the same in a large file's last 16 MB (a web filter scanning the file)
 	MHSKeepaliveMs     int // how often pages nudge the service worker to keep progress reporting alive
 
 	// Unit 2 device test: how many new runs one client IP may start per

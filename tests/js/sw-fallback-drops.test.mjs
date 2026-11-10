@@ -204,3 +204,75 @@ test('a refused Background Fetch is announced before the direct download takes o
   assert.equal(broadcasts[0].detail.version, '1.0.0');
   assert.equal(broadcasts[broadcasts.length - 1].status, 'cached');
 });
+
+// ---- The held tail (Issue 2 of docs/mission-hydrosci/mhs-issues-102826.md, plan B.3)
+// A filter that scans large files: a request for the whole file is cut at
+// size - 12 MB until the filter has scanned it `scansNeeded` times, then
+// passes; a request for the tail alone is always cut before any byte.
+function makeFilter(fileBytes, scansNeeded) {
+  let wholeRequests = 0;
+  const server = makeServer(fileBytes, (n) => {
+    const req = server.requests[n];
+    if (req.offset === 0) {
+      wholeRequests++;
+      return wholeRequests > scansNeeded ? Infinity : fileBytes - 12 * MB;
+    }
+    return 0; // tail-only: held, then the connection closes
+  });
+  return server;
+}
+
+test('a held tail is fetched whole after two held tail attempts, and completes', async () => {
+  const server = makeFilter(132 * MB, 1);
+  const { sandbox, cache } = load(server);
+  const restarts = [];
+  await sandbox.fetchAndCacheFileWithRetry(cache, KEY, URL_, 132 * MB, () => {}, undefined, () => {}, () => {}, (r) => restarts.push(r));
+  const saved = await cache.match(KEY);
+  assert.deepEqual(new Uint8Array(await saved.arrayBuffer()), server.file, 'byte-identical');
+  assert.deepEqual(server.requests.map((r) => (r.offset === 0 ? 'whole' : 'tail')), ['whole', 'tail', 'tail', 'whole']);
+  assert.equal(restarts.length, 1);
+  assert.equal(restarts[0].reason, 'held');
+  assert.ok(Math.abs(restarts[0].heldAt - 120 * MB) <= MB, 'held about 12 MB before the end: ' + restarts[0].heldAt);
+  assert.equal(await cache.match(KEY + '?tail'), undefined, 'the tail state is dropped after success');
+});
+
+test('a partial stuck at the tail since an earlier day is fetched whole at once', async () => {
+  const server = makeFilter(132 * MB, 0);
+  const { sandbox, cache } = load(server);
+  // Yesterday's run left 120 MB of parts.
+  const yesterday = Date.now() - 36 * 3600 * 1000;
+  await cache.put(KEY + '?part=0', new Response(server.file.slice(0, 120 * MB)));
+  await cache.put(KEY + '?parts', new Response(JSON.stringify({ size: 132 * MB, etag: '"abc"', count: 1, bytes: 120 * MB, type: '', started: yesterday })));
+  const restarts = [];
+  await sandbox.fetchAndCacheFileWithRetry(cache, KEY, URL_, 132 * MB, () => {}, undefined, () => {}, () => {}, (r) => restarts.push(r));
+  assert.deepEqual(server.requests.map((r) => r.offset), [0], 'one whole request, no tail-only one');
+  assert.equal(restarts[0].reason, 'stale');
+  const saved = await cache.match(KEY);
+  assert.deepEqual(new Uint8Array(await saved.arrayBuffer()), server.file);
+});
+
+test('at most two whole restarts per file and day; then tail resumes until the futile limit', async () => {
+  const server = makeFilter(132 * MB, Infinity); // the filter never releases
+  const { sandbox, cache } = load(server);
+  const restarts = [];
+  await assert.rejects(sandbox.fetchAndCacheFileWithRetry(cache, KEY, URL_, 132 * MB, () => {}, undefined, () => {}, () => {}, (r) => restarts.push(r)));
+  assert.equal(restarts.length, 2, 'two restarts');
+  assert.equal(server.requests.filter((r) => r.offset === 0).length, 3, 'the first whole request and two restarts');
+});
+
+test('a connection cut every few MB in the tail is resumed, never restarted from zero', async () => {
+  const server = makeServer(40 * MB, () => 3 * MB);
+  const { sandbox, cache } = load(server);
+  const restarts = [];
+  await sandbox.fetchAndCacheFileWithRetry(cache, KEY, URL_, 40 * MB, () => {}, undefined, () => {}, () => {}, (r) => restarts.push(r));
+  assert.equal(restarts.length, 0);
+  assert.equal(server.requests.filter((r) => r.offset === 0).length, 1);
+});
+
+test('a small file is never restarted from zero', async () => {
+  const server = makeFilter(20 * MB, Infinity);
+  const { sandbox, cache } = load(server);
+  const restarts = [];
+  await assert.rejects(sandbox.fetchAndCacheFileWithRetry(cache, KEY, URL_, 20 * MB, () => {}, undefined, () => {}, () => {}, (r) => restarts.push(r)));
+  assert.equal(restarts.length, 0);
+});
