@@ -129,6 +129,7 @@
       >
         Launch
       </a>
+      <p id="play-window-note" class="hidden text-xs text-center text-gray-600 dark:text-gray-300" aria-live="polite"></p>
     </div>
 
     <!-- Next unit status (hidden when no next unit) -->
@@ -1031,15 +1032,96 @@
     document.getElementById('ios-install-banner').classList.remove('hidden');
   }
 
+  // One game window per device (plan B.4, docs/mission-hydrosci/mhs-issues-102826.md
+  // Issue 1): a second game window doubles the memory a 4 GB Chromebook has to
+  // find and triples the chance that Chrome discards the game. Play therefore
+  // reuses the game window: a window named 'mhs-game' is taken at the click
+  // itself (window.open('', name) returns it unchanged, or a new blank one;
+  // a popup blocker allows only that), then the game windows are asked on
+  // their channel which unit they show and the window is focused, switched or
+  // filled. A game window that is running the same unit is focused, not
+  // reloaded; one that does not answer (frozen, discarded) is loaded again.
+  // Switching drops what happened since that unit's last save point, as
+  // closing it would; the note below the button says what happened.
+  var GAME_WINDOW = 'mhs-game';
+  function playWindowNote(text) {
+    var el = document.getElementById('play-window-note');
+    if (!el) return;
+    el.textContent = text || '';
+    el.classList.toggle('hidden', !text);
+  }
+  function unitName(id) { return (typeof unitTitles !== 'undefined' && unitTitles[id]) || id; }
   window.mhsPlay = function(link) {
     // Check standalone at click time — the page-load check can become stale
     // after navigating away and back within the PWA.
     var standalone = window.matchMedia('(display-mode: standalone)').matches || navigator.standalone;
     if (standalone) {
       window.location.href = link.href;
-    } else {
-      window.open(link.href, '_blank');
+      return false;
     }
+    var target = link.href;
+    var targetPath = new URL(target, location.href).pathname;
+    var unit = targetPath.split('/').pop();
+    playWindowNote('');
+
+    var win = null;
+    try { win = window.open('', GAME_WINDOW); } catch (e) { win = null; }
+    if (!win) {
+      // Pop-ups blocked: play in this tab.
+      window.location.href = target;
+      return false;
+    }
+    var shown = '';
+    try { shown = win.location.href === 'about:blank' ? '' : win.location.pathname; } catch (e) { shown = '?'; }
+
+    var answers = {};
+    var ch = null;
+    try {
+      ch = new BroadcastChannel('mhs-play-windows');
+      ch.onmessage = function(ev) {
+        var m = ev.data || {};
+        if (m.kind === 'here' && m.id) answers[m.id] = m;
+      };
+      ch.postMessage({ kind: 'who', id: 'units-' + Date.now().toString(36) });
+    } catch (e) { ch = null; }
+
+    setTimeout(function() {
+      var list = Object.keys(answers).map(function(k) { return answers[k]; });
+      try { if (ch) ch.close(); } catch (e) { /* ignore */ }
+      var playMatch = /^\/missionhydrosci\/play\/([^/?#]+)/.exec(shown);
+      if (shown) {
+        // The game window exists (shown is its path, or '?' when it shows a
+        // page this one cannot read, which is simply replaced).
+        var alive = list.some(function(a) { return a.named && a.unit === unit; });
+        if (playMatch && playMatch[1] === unit && alive) {
+          try { win.focus(); } catch (e) { /* ignore */ }
+          playWindowNote(unitName(unit) + ' is already open in your game window.');
+          return;
+        }
+        win.location.href = target;
+        try { win.focus(); } catch (e) { /* ignore */ }
+        if (playMatch && playMatch[1] !== unit) {
+          playWindowNote('Your game window switched from ' + unitName(playMatch[1]) + ' to ' + unitName(unit) + '.');
+        }
+        return;
+      }
+      // A new blank window. A game window this page cannot reach by name
+      // (opened another way, or the installed app's window): use it instead.
+      var other = list[0];
+      if (other) {
+        try { win.close(); } catch (e) { /* ignore */ }
+        try {
+          var sw = new BroadcastChannel('mhs-play-windows');
+          sw.postMessage({ kind: 'switch', id: 'units-' + Date.now().toString(36), to: other.id, unit: unit, target: target });
+          setTimeout(function() { try { sw.close(); } catch (e) {} }, 1000);
+        } catch (e) { /* ignore */ }
+        playWindowNote(other.unit === unit
+          ? unitName(unit) + ' is already open in another window. Switch to that window to play.'
+          : 'Your game is open in another window; it now shows ' + unitName(unit) + '. Switch to that window to play.');
+        return;
+      }
+      win.location.href = target;
+    }, 300);
     return false;
   };
 

@@ -235,3 +235,56 @@ func TestPlayPageDamagedLoaderAndFailedNextUnit(t *testing.T) {
 		t.Error("a failed next-unit download still opens the next unit's play page")
 	}
 }
+
+// One game window per device (plan B.4): a student's play page names its
+// window and answers the units page's 'who' and 'switch'; a device-test
+// play page keeps out of it.
+func TestPlayPageOneGameWindow(t *testing.T) {
+	body := renderPlayPage(t, memberPlayData())
+	for _, want := range []string{
+		`var memberWindow = true;`,
+		`window.name = 'mhs-game'`,
+		`if (m.kind === 'who') {`,
+		`if (m.kind === 'switch') {`,
+		`m.to !== devState.pageId`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("play page lacks %q", want)
+		}
+	}
+	data := memberPlayData()
+	data.DeviceTest = true
+	data.DeviceTestID = "ffffffff0123456789abcdef"
+	data.DeviceTestBase = "/missionhydrosci/devicetest/run/ffffffff0123456789abcdef"
+	if body := renderPlayPage(t, data); !strings.Contains(body, `var memberWindow = false;`) {
+		t.Error("a device-test play page must not take part in the one-window switch")
+	}
+}
+
+// The units page opens Play in the named game window (taken at the click),
+// asks the game windows with 'who', never with 'hello' (which play pages
+// count as another game window), and never opens a '_blank' window.
+func TestUnitsPagePlaysInOneGameWindow(t *testing.T) {
+	bootCeremonyTemplates(t)
+	rec := httptest.NewRecorder()
+	templates.Render(rec, httptest.NewRequest("GET", "/missionhydrosci/units", nil), "missionhydrosci_units", UnitsData{
+		BaseVM: viewdata.BaseVM{Title: "Mission HydroSci"}, CurrentUnit: "unit1",
+	})
+	body := rec.Body.String()
+	for _, want := range []string{
+		`var GAME_WINDOW = 'mhs-game';`,
+		`win = window.open('', GAME_WINDOW);`,
+		`ch.postMessage({ kind: 'who'`,
+		`kind: 'switch'`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("units page lacks %q", want)
+		}
+	}
+	if strings.Contains(body, `window.open(link.href, '_blank')`) {
+		t.Error("units page still opens a new window per Play")
+	}
+	if strings.Contains(body, `kind: 'hello'`) {
+		t.Error("units page must ask with 'who', not 'hello'")
+	}
+}

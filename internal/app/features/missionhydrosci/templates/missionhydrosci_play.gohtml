@@ -965,13 +965,34 @@
         return n;
       }
       try {
+        // One game window per device (plan B.4, docs/mission-hydrosci/mhs-issues-102826.md
+        // Issue 1): a student's game window carries the name the units page
+        // opens it under, so a later Play finds it and switches it instead of
+        // opening a second copy; one opened another way (an older link, a
+        // typed address) takes the name here. The units page asks with 'who'
+        // (it is not a game window, so it is not counted below) and may ask a
+        // window it cannot reach by name to 'switch' to another unit. A
+        // device-test window keeps out of this: it is the tester's.
+        var memberWindow = {{ if .DeviceTest }}false{{ else }}true{{ end }};
+        if (memberWindow) { try { window.name = 'mhs-game'; } catch (e) { /* ignore */ } }
         var playChannel = new BroadcastChannel('mhs-play-windows');
         playChannel.onmessage = function(ev) {
           var m = ev.data || {};
           if (!m.id || m.id === devState.pageId) return;
+          if (m.kind === 'who') {
+            if (memberWindow) playChannel.postMessage({ kind: 'here', id: devState.pageId, unit: unitId, named: window.name === 'mhs-game' });
+            return;
+          }
+          if (m.kind === 'switch') {
+            if (!memberWindow || !m.target || m.to !== devState.pageId) return;
+            if (m.unit === unitId) { try { window.focus(); } catch (e) {} return; }
+            stepLog.record('page', 'info', 'Switched to ' + m.unit + ' from the units page (one game window per device)', { unit: unitId, to_unit: m.unit });
+            window.location.href = m.target;
+            return;
+          }
           if (m.kind === 'bye') { delete devState.others[m.id]; return; }
           devState.others[m.id] = Date.now();
-          if (m.kind === 'hello') playChannel.postMessage({ kind: 'here', id: devState.pageId, unit: unitId });
+          if (m.kind === 'hello') playChannel.postMessage({ kind: 'here', id: devState.pageId, unit: unitId, named: window.name === 'mhs-game' });
           var n = otherGameWindows();
           if (n > devState.othersLogged && devState.othersLogged < 3) {
             devState.othersLogged = n;
