@@ -308,3 +308,17 @@ func TestMergeDeviceState(t *testing.T) {
 		}
 	}
 }
+
+// A launch kept from starting by the play gate (outcome services-blocked,
+// no launch events) makes an opened, blocked day.
+func TestMergePlayGateBlockedDay(t *testing.T) {
+	b, student, _ := testBuilder(t)
+	b.logAvailable = true
+	r := rec(student, "dev-a", "unit2", "services-blocked", ct(9, 15, 0))
+	r.ServicesBlocked = "log,save"
+	b.addRecord(r, &models.MHSMemberSummary{V: models.MHSMemberSummaryVersion, Outcome: "services-blocked"})
+	docs := b.finish(time.Now())
+	if len(docs) != 1 || !docs[0].Opened || !docs[0].Blocked || docs[0].Played {
+		t.Fatalf("want an opened, blocked, unplayed day: %+v", docs)
+	}
+}

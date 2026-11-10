@@ -198,7 +198,12 @@ func TestPlayPageProbesGameServices(t *testing.T) {
 		`including <code>OPTIONS</code> and <code>POST</code>`,
 		`services_blocked:`,
 		`showLoggingNotice('blocked')`,
-		`MHSDeliveryManager.probeServices(probes, auth)`,
+		`MHSDeliveryManager.probeServices(svcProbes, svcAuth)`,
+		`fetch('/missionhydrosci/api/services-health'`,
+		`Promise.all([logQueueReady, servicesGate])`,
+		`memberReport('services-blocked');`,
+		`id="loading-gate-retry"`,
+		`if (r.hostAnswers || up[r.name] === 'ok') school.push(r); else down.push(r);`,
 	} {
 		if !strings.Contains(body, want) {
 			t.Errorf("play page lacks %q", want)
@@ -207,8 +212,8 @@ func TestPlayPageProbesGameServices(t *testing.T) {
 
 	// Without configured services the page has no probes and runs none.
 	body = renderPlayPage(t, memberPlayData())
-	if !strings.Contains(body, "var probes =  null  || [];") {
-		t.Errorf("play page without probes: %q", body[strings.Index(body, "var probes"):strings.Index(body, "var probes")+60])
+	if !strings.Contains(body, "var svcProbes =  null  || [];") {
+		t.Errorf("play page without probes: %q", body[strings.Index(body, "var svcProbes"):strings.Index(body, "var svcProbes")+60])
 	}
 }
 

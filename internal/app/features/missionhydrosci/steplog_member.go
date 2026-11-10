@@ -31,9 +31,10 @@ const (
 	memberStepLogLaunchStalled    = "launch-stalled" // no loader progress for 30 s (the play page's watchdog)
 	memberStepLogLaunchOK         = "launch-ok"
 	memberStepLogCrash            = "crash"
-	memberStepLogReport           = "report"          // the student pressed Send report (note attached)
-	memberStepLogCeremonyOK       = "ceremony-ok"     // the end-of-game ceremony reached its end screen (unit "end")
-	memberStepLogCeremonyFailed   = "ceremony-failed" // the ceremony could not start or play (WebGL, a bundle file, the player)
+	memberStepLogReport           = "report"           // the student pressed Send report (note attached)
+	memberStepLogCeremonyOK       = "ceremony-ok"      // the end-of-game ceremony reached its end screen (unit "end")
+	memberStepLogCeremonyFailed   = "ceremony-failed"  // the ceremony could not start or play (WebGL, a bundle file, the player)
+	memberStepLogServicesBlocked  = "services-blocked" // the play gate kept the game from starting: the school blocks the log or save service
 )
 
 // memberStepLogRequest is the page's body: the outcome, the unit, the log's
@@ -59,7 +60,7 @@ func (h *Handler) HandleMemberStepLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch req.Outcome {
-	case memberStepLogDownloadFailed, memberStepLogDownloadComplete, memberStepLogDownloadSwitched, memberStepLogLaunchFailed, memberStepLogLaunchStalled, memberStepLogLaunchOK, memberStepLogCrash, memberStepLogReport, memberStepLogCeremonyOK, memberStepLogCeremonyFailed:
+	case memberStepLogDownloadFailed, memberStepLogDownloadComplete, memberStepLogDownloadSwitched, memberStepLogLaunchFailed, memberStepLogLaunchStalled, memberStepLogLaunchOK, memberStepLogCrash, memberStepLogReport, memberStepLogCeremonyOK, memberStepLogCeremonyFailed, memberStepLogServicesBlocked:
 	default:
 		writeDeviceTestJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bad_outcome"})
 		return
@@ -111,6 +112,17 @@ func (h *Handler) HandleMemberStepLog(w http.ResponseWriter, r *http.Request) {
 	}
 	if derived.gameplayAt != nil {
 		rec.GameplayReachedAt = derived.gameplayAt
+	}
+	// The play page's probe found the game services blocked (the play gate,
+	// or the bar during play): kept on the record like a heartbeat's report.
+	for _, st := range steps {
+		if st.Step == "services" && st.State == "fail" && st.Detail["services_blocked"] != "" {
+			rec.ServicesBlocked = st.Detail["services_blocked"]
+			at := st.At
+			if rec.ServicesBlockedAt == nil {
+				rec.ServicesBlockedAt = &at
+			}
+		}
 	}
 	// The log read as facts, so reports never need the steps of this record.
 	sum := mhssteplog.Summarize(steps, req.Outcome, mhssteplog.Context{

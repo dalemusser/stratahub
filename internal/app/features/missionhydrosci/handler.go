@@ -72,6 +72,7 @@ type Handler struct {
 	authThrottle      *authThrottle      // per-member backoff on failed member-auth attempts
 	startLimiter      *ratelimit.Limiter // per-IP quota on starting device-test runs
 	startWindow       time.Duration      // the quota's window (for Retry-After)
+	svcHealth         servicesHealth     // the server's view of the game services (services_health.go)
 }
 
 // SetDeviceTestStartLimit replaces the per-IP quota on starting device-test

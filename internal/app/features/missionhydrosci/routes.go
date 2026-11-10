@@ -12,6 +12,10 @@ import (
 func Routes(h *Handler, sm *auth.SessionManager) chi.Router {
 	r := chi.NewRouter()
 
+	// The server's view of the game services, for the play gate (public: the
+	// device-test play page has no account; the reply names no person).
+	r.With(middleware.Timeout(timeouts.Long())).Get("/api/services-health", h.ServeServicesHealth)
+
 	r.Group(func(pr chi.Router) {
 		// Bound every handler's request context so a stalled DB primary (e.g.
 		// during a DocumentDB failover) can't pin request goroutines. This

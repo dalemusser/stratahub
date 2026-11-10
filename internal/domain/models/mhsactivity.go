@@ -19,7 +19,10 @@ import (
 //	   game's requests to the log or save service blocked
 //	5 (2026-11-09): Launch.Discarded and Launch.PageFrozen, Flags.ChromeClosed
 //	   (MHSChromeClosedDiscards or more discards) and Flags.SecondGameWindow
-const MHSActivityVersion = 5
+//	6 (2026-11-09): a day whose play page found the game services blocked and
+//	   that did not play is Blocked (the play gate keeps the game from
+//	   starting there)
+const MHSActivityVersion = 6
 
 // MHSChromeClosedDiscards is how many discards in a day make a problem. One
 // is ordinary (Chrome's memory saver unloads a tab left in the background

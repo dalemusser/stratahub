@@ -223,6 +223,7 @@
         <p id="loading-text" role="status" aria-live="polite" style="margin-top:8px; font-size:14px; opacity:0.7;">Initializing...</p>
         <p id="loading-step" style="margin-top:4px; font-size:12px; opacity:0.6;"></p>
         <p id="loading-hint" style="margin-top:8px; font-size:13px; opacity:0.85; max-width:min(560px, 92vw);"></p>
+        <button type="button" id="loading-gate-retry" hidden style="margin-top:10px; padding:6px 14px; font-size:13px; border-radius:6px; border:1px solid rgba(255,255,255,0.45); background:rgba(255,255,255,0.12); color:inherit; cursor:pointer;">Check again now</button>
         <!-- The per-load step log; hidden until a launch step fails, then
              shown so the user can read and copy where it stopped. -->
         <div id="loading-steplog" style="display:none; margin-top:12px; width:min(560px, 92vw); text-align:left;">
@@ -1588,81 +1589,175 @@
       // so say so now rather than after the first failures.
       if (navigator.onLine === false) showOffline();
 
-      // ---- Game services ----------------------------------------------------
+      // ---- Game services and the play gate ------------------------------------
       // A school's web filter can let this page, its downloads and a plain GET
       // to the log and save hosts through while it stops the game's own
       // requests (POST with a JSON body and a key, preceded by the browser's
       // OPTIONS preflight). The game says nothing: its activity is never
-      // recorded, progress is not saved, and a build that reads the save
-      // before it starts waits at START (docs/mission-hydrosci/mhs-issues-102826.md,
-      // Issue 3). So the page sends one request in the game's own form to each
-      // service's /probe route at launch. "Blocked" (no answer the page may
-      // read) while the device is online is checked once more after a short
-      // wait, then shown on the logging bar with the hosts to give to IT, as
-      // a services/fail step, and on every heartbeat; it is checked again
-      // every few minutes and cleared when the hosts answer. The page only
-      // reports the block: allowing the hosts is the school's decision.
-      var svcHealth = { blocked: '', hosts: '', confirmTimer: null, okLogged: false, oddLogged: false };
-      (function watchGameServices() {
-        var probes = {{ .ServiceProbes }} || [];
-        if (!probes.length || typeof MHSDeliveryManager === 'undefined' || !MHSDeliveryManager.probeServices) return;
+      // recorded and progress is not saved (docs/mission-hydrosci/mhs-issues-102826.md,
+      // Issue 3). Play that is not recorded is not part of the study, so the
+      // game does not start then (the play gate, decided 2026-11-09): before
+      // the loader runs, the page sends one request in the game's own form to
+      // each service's /probe route. A service counts as blocked by the school
+      // only when the device is online and there is evidence the service
+      // itself is up: the host answers a plain request, or StrataHub's server
+      // reaches the service (/api/services-health). A device without internet
+      // and an outage on our side do not stop the game (it keeps its activity
+      // and sends it later). A block is confirmed once after a short wait,
+      // then the loading screen says why, names the hosts for IT, and checks
+      // again every 30 s, starting the game by itself when they answer. Once
+      // the game runs, a block found later only shows the logging bar.
+      var svcHealth = { blocked: '', hosts: '', okLogged: false, oddLogged: false, downLogged: false };
+      var svcProbes = {{ .ServiceProbes }} || [];
+      var svcAuth = (function() {
         var svc = (window.__mhsBridgeConfig && window.__mhsBridgeConfig.services) || {};
-        var auth = {
-          log: svc.log_submit && svc.log_submit.auth,
-          save: svc.state_save && svc.state_save.auth
-        };
-        var RECHECK_MS = 300000, CONFIRM_MS = 20000;
-        function online() { return navigator.onLine !== false && !netHealth.shown; }
-        function describe(list) {
-          return list.map(function(r) {
-            return r.name + ' (' + r.host + '): ' + r.error + (r.hostAnswers ? '; the host answers a plain request, so a filter is stopping the game\'s requests' : '');
-          }).join('; ');
+        return { log: svc.log_submit && svc.log_submit.auth, save: svc.state_save && svc.state_save.auth };
+      })();
+      function svcOnline() { return navigator.onLine !== false && !netHealth.shown; }
+      function svcDescribe(list) {
+        return list.map(function(r) {
+          return r.name + ' (' + r.host + '): ' + r.error + (r.hostAnswers ? '; the host answers a plain request, so a filter is stopping the game\'s requests' : '; the game service is up');
+        }).join('; ');
+      }
+      // One look at the services: the probes plus the server's view.
+      // Resolves {results, school (blocked by the school), down (not
+      // answering, no evidence it is the school), odd}.
+      function assessServices() {
+        var health = fetch('/missionhydrosci/api/services-health', { cache: 'no-store', credentials: 'same-origin' })
+          .then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; });
+        return Promise.all([MHSDeliveryManager.probeServices(svcProbes, svcAuth), health]).then(function(v) {
+          var results = v[0] || [], up = (v[1] && v[1].services) || {};
+          var school = [], down = [];
+          results.forEach(function(r) {
+            if (r.state !== 'blocked') return;
+            if (r.hostAnswers || up[r.name] === 'ok') school.push(r); else down.push(r);
+          });
+          return { results: results, school: school, down: down, odd: results.filter(function(r) { return r.state === 'odd'; }) };
+        });
+      }
+      function noteServices(a) {
+        if (a.odd.length && !svcHealth.oddLogged) {
+          svcHealth.oddLogged = true;
+          stepLog.record('services', 'warn', 'Game service probe answered unexpectedly: ' + a.odd.map(function(r) { return r.name + ' (' + r.host + ') ' + r.error; }).join('; '));
+        }
+        if (a.down.length && !svcHealth.downLogged) {
+          svcHealth.downLogged = true;
+          stepLog.record('services', 'warn', 'Game service not answering, and the server cannot reach it either (likely an outage on our side, not the school): ' +
+            a.down.map(function(r) { return r.name + ' (' + r.host + ') ' + r.error; }).join('; ') + ' — the game plays and sends its activity later');
+        }
+      }
+      function markBlocked(school) {
+        var names = school.map(function(r) { return r.name; }).join(',');
+        var hosts = school.map(function(r) { return r.host; }).join(' and ');
+        if (svcHealth.blocked === names) return false;
+        svcHealth.blocked = names;
+        svcHealth.hosts = hosts;
+        stepLog.record('services', 'fail', 'The school\'s web filter is blocking the game\'s requests to ' + hosts +
+          ': nothing from this session can be logged or saved until IT allows ' + hosts + ' for all requests, including OPTIONS and POST — ' + svcDescribe(school),
+          { services_blocked: names, hosts: hosts });
+        var hostEls = document.querySelectorAll('.mhs-ln-hosts');
+        for (var i = 0; i < hostEls.length; i++) hostEls[i].textContent = hosts;
+        var detail = document.getElementById('mhs-ln-blocked-detail');
+        if (detail) detail.textContent = 'Checked at ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + ': ' + svcDescribe(school) + '.';
+        return true;
+      }
+      function markClear(results) {
+        if (svcHealth.blocked) {
+          stepLog.record('services', 'ok', 'The game\'s requests reach ' + svcHealth.hosts + ' again');
+          svcHealth.blocked = ''; svcHealth.hosts = '';
+        } else if (!svcHealth.okLogged && results.length) {
+          svcHealth.okLogged = true;
+          stepLog.record('services', 'ok', 'The game\'s requests get through: ' + results.map(function(r) { return r.name + ' (' + r.host + ') ' + r.ms + ' ms'; }).join(', '));
+        }
+      }
+
+      // The gate: resolves when the game may start.
+      var servicesGate = new Promise(function(release) {
+        if (!svcProbes.length || typeof MHSDeliveryManager === 'undefined' || !MHSDeliveryManager.probeServices) { release(); return; }
+        var GATE_RECHECK_S = 30, CONFIRM_MS = 3000;
+        var gated = false, nextAt = 0, tick = null, checking = false;
+        var retryBtn = document.getElementById('loading-gate-retry');
+        function showGate() {
+          gated = true;
+          loadingText.textContent = 'The game cannot start on this device yet';
+          loadingBar.style.width = '100%';
+          loadingBar.style.background = '#f59e0b';
+          if (retryBtn) retryBtn.hidden = false;
+          memberReport('services-blocked');
+        }
+        function gateHint() {
+          var left = Math.max(0, Math.round((nextAt - Date.now()) / 1000));
+          if (loadingHint) loadingHint.textContent = 'The school\'s web filter is blocking the game from saving your progress, so it cannot start here. Please tell your teacher. ' +
+            'For the teacher: ask the school or district IT to allow ' + svcHealth.hosts + ' for all kinds of requests, including OPTIONS and POST, without inspecting the request body. ' +
+            'The game starts here by itself once they are allowed. ' + (checking ? 'Checking now…' : 'Checking again in ' + left + ' s.');
+        }
+        function schedule() {
+          nextAt = Date.now() + GATE_RECHECK_S * 1000;
+          if (!tick) tick = setInterval(function() {
+            if (typeof launchProgress === 'function') launchProgress(); // the launch watchdog waits with the gate
+            if (!checking && Date.now() >= nextAt) check(true);
+            gateHint();
+          }, 1000);
+          gateHint();
+        }
+        function open() {
+          if (tick) { clearInterval(tick); tick = null; }
+          if (gated) {
+            gated = false;
+            loadingText.textContent = 'Starting…';
+            loadingBar.style.background = '';
+            loadingBar.style.width = '0%';
+            if (loadingHint) loadingHint.textContent = '';
+            if (retryBtn) retryBtn.hidden = true;
+          }
+          release();
         }
         function check(confirming) {
-          MHSDeliveryManager.probeServices(probes, auth).then(function(results) {
-            var blocked = results.filter(function(r) { return r.state === 'blocked'; });
-            var odd = results.filter(function(r) { return r.state === 'odd'; });
-            if (odd.length && !svcHealth.oddLogged) {
-              svcHealth.oddLogged = true;
-              stepLog.record('services', 'warn', 'Game service probe answered unexpectedly: ' + odd.map(function(r) { return r.name + ' (' + r.host + ') ' + r.error; }).join('; '));
-            }
-            if (blocked.length && online()) {
-              if (!confirming && !svcHealth.blocked) {
-                // Once more before telling anyone: a single miss can be a blip.
-                svcHealth.confirmTimer = setTimeout(function() { check(true); }, CONFIRM_MS);
+          checking = true;
+          if (gated) gateHint();
+          assessServices().then(function(a) {
+            checking = false;
+            noteServices(a);
+            if (a.school.length && svcOnline()) {
+              if (!confirming && !gated) {
+                // Once more before stopping anyone: a single miss can be a blip.
+                setTimeout(function() { check(true); }, CONFIRM_MS);
                 return;
               }
-              var names = blocked.map(function(r) { return r.name; }).join(',');
-              var hosts = blocked.map(function(r) { return r.host; }).join(' and ');
-              if (svcHealth.blocked !== names) {
-                svcHealth.blocked = names;
-                svcHealth.hosts = hosts;
-                stepLog.record('services', 'fail', 'The school\'s web filter is blocking the game\'s requests to ' + hosts +
-                  ': nothing from this session is logged or saved until IT allows ' + hosts + ' for all requests, including OPTIONS and POST — ' + describe(blocked),
-                  { services_blocked: names, hosts: hosts });
-                var hostEls = document.querySelectorAll('.mhs-ln-hosts');
-                for (var i = 0; i < hostEls.length; i++) hostEls[i].textContent = hosts;
-                var detail = document.getElementById('mhs-ln-blocked-detail');
-                if (detail) detail.textContent = 'Checked at ' + new Date().toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) + ': ' + describe(blocked) + '.';
+              markBlocked(a.school);
+              if (!gated) showGate();
+              schedule();
+              return;
+            }
+            markClear(a.results);
+            open();
+          }, function() { checking = false; open(); });
+        }
+        if (retryBtn) retryBtn.addEventListener('click', function() { if (!checking) { nextAt = Date.now(); check(true); } });
+        check(false);
+      });
+
+      // After the start: a block found later shows the logging bar (the game
+      // is not stopped; its own store keeps the activity meanwhile).
+      servicesGate.then(function() {
+        if (!svcProbes.length || typeof MHSDeliveryManager === 'undefined' || !MHSDeliveryManager.probeServices) return;
+        setInterval(function() {
+          if (!svcOnline()) return;
+          assessServices().then(function(a) {
+            noteServices(a);
+            if (a.school.length) {
+              if (markBlocked(a.school)) {
                 showLoggingNotice('blocked');
                 if (hbTimer) sendHeartbeat(false); // the record learns it now, not at the next beat
               }
-            } else if (!blocked.length) {
-              if (svcHealth.blocked) {
-                stepLog.record('services', 'ok', 'The game\'s requests reach ' + svcHealth.hosts + ' again');
-                svcHealth.blocked = ''; svcHealth.hosts = '';
-                if (loggingHealth.shown === 'blocked') hideLoggingNotice();
-                if (hbTimer) sendHeartbeat(false);
-              } else if (!svcHealth.okLogged && results.length && !odd.length) {
-                svcHealth.okLogged = true;
-                stepLog.record('services', 'ok', 'The game\'s requests get through: ' + results.map(function(r) { return r.name + ' (' + r.host + ') ' + r.ms + ' ms'; }).join(', '));
-              }
+            } else if (svcHealth.blocked && !a.down.length) {
+              markClear(a.results);
+              if (loggingHealth.shown === 'blocked') hideLoggingNotice();
+              if (hbTimer) sendHeartbeat(false);
             }
           });
-        }
-        check(false);
-        setInterval(function() { if (online()) check(!!svcHealth.blocked); }, RECHECK_MS);
-      })();
+        }, 300000);
+      });
 
       // ---- Signed out -------------------------------------------------------
       // StrataHub answers this page's own posts with 401 once the sign-in has
@@ -2050,7 +2145,8 @@
       };
       // The game reads its store when it starts, so it starts after the
       // repair (logQueueReady always resolves, within 3.5 seconds).
-      logQueueReady.then(function() { document.body.appendChild(script); });
+      // ... and after the play gate (game services) lets it start.
+      Promise.all([logQueueReady, servicesGate]).then(function() { document.body.appendChild(script); });
     })();
 
     // Focus the Unity canvas so it receives keyboard input.

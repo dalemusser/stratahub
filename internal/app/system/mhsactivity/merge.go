@@ -193,6 +193,7 @@ func (b *builder) addRecord(rec models.MHSDeviceTest, sum *models.MHSMemberSumma
 	}
 	if inDay && rec.ServicesBlocked != "" {
 		a.doc.Flags.ServicesBlocked = true
+		a.doc.Opened = true // the play page was opened (the gate may have kept the game from starting)
 	}
 	if sum == nil {
 		return
@@ -542,6 +543,9 @@ func (b *builder) finish(now time.Time) []models.MHSActivityDay {
 		}
 		if d.Opened || d.Records > 0 {
 			d.Flags.StrayEvents = false // something happened today; the events are its own
+		}
+		if d.Flags.ServicesBlocked {
+			problem = true // the play gate kept the game from starting (or nothing was recorded)
 		}
 		d.Blocked = d.Opened && !d.Played && problem
 		d.Final = false
