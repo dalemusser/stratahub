@@ -224,20 +224,25 @@ func (h *Handler) load(w http.ResponseWriter, r *http.Request, pathOrg primitive
 		if len(days) > 1 {
 			multiDay = true
 		}
+		// A closed day whose organizations are all rolled up comes from the
+		// store (read for the zone's whole window at once); anything else is
+		// computed live (and cached).
+		var closed []string
 		for _, day := range days {
-			// A closed day whose organizations are all rolled up comes from
-			// the store; anything else is computed live (and cached).
 			if h.Store != nil && activity.Closed(day, z.Loc, h.Compute.EffectiveCloseAfter(), now) {
-				stored, at, partial, outdated, err := h.loadStored(ctx, wsID, day, z)
-				if err != nil {
-					h.fail(w, r, "stored "+day, err)
-					return nil, false
-				}
-				if stored != nil {
-					docs = append(docs, stored...)
-					fresh.stored(day, at, partial, outdated)
-					continue
-				}
+				closed = append(closed, day)
+			}
+		}
+		storedDays, err := h.loadStored(ctx, wsID, closed, z)
+		if err != nil {
+			h.fail(w, r, "stored "+z.TZ, err)
+			return nil, false
+		}
+		for _, day := range days {
+			if sd, ok := storedDays[day]; ok {
+				docs = append(docs, sd.docs...)
+				fresh.stored(day, sd.at, sd.partial, sd.outdated)
+				continue
 			}
 			liveDays[day] = true
 			if len(liveDays) > h.Config.MaxLiveDays {
@@ -383,36 +388,81 @@ func SchoolHref(orgID string, windowQuery string) string {
 	return "/mhsactivity?" + v.Encode()
 }
 
-// loadStored returns the stored documents of a closed zone-day when every
-// organization of the zone has a final mark; nil otherwise (the caller
-// computes live). It also returns the oldest computed-at of those marks,
-// whether any is partial, and whether any was computed by an earlier
-// reading of the data (the job recomputes those a few per pass; until then
-// the stored day is served and said to be refreshing).
-func (h *Handler) loadStored(ctx context.Context, wsID primitive.ObjectID, day string, z activity.Zone) (docs []models.MHSActivityDay, at time.Time, partial, outdated bool, err error) {
-	marks, err := h.Store.GetMarks(ctx, wsID, day, day, z.OrgIDs)
-	if err != nil {
-		return nil, time.Time{}, false, false, err
+// storedDay is one closed zone-day served from the store: its documents,
+// the oldest computed-at of its marks, whether any mark is partial, and
+// whether any was computed by an earlier reading of the data (the job
+// recomputes those a few per pass; until then the stored day is served and
+// said to be refreshing).
+type storedDay struct {
+	docs              []models.MHSActivityDay
+	at                time.Time
+	partial, outdated bool
+}
+
+// loadStored returns the closed days of one zone that can be
+// served from the store: those where every organization of the zone has a
+// final mark. Missing days are computed live by the caller. It reads the
+// marks and the documents for the zone's whole span in two queries; one
+// pair per day made a 30-day digest run past the request timeout.
+func (h *Handler) loadStored(ctx context.Context, wsID primitive.ObjectID, days []string, z activity.Zone) (map[string]storedDay, error) {
+	out := map[string]storedDay{}
+	if len(days) == 0 || h.Store == nil {
+		return out, nil
 	}
-	for _, org := range z.OrgIDs {
-		m, ok := marks[mhsactivitydays.MarkKey(org, day)]
-		if !ok || !m.Final {
-			return nil, time.Time{}, false, false, nil
+	from, to := days[0], days[0]
+	for _, d := range days {
+		if d < from {
+			from = d
 		}
-		if at.IsZero() || m.ComputedAt.Before(at) {
-			at = m.ComputedAt
+		if d > to {
+			to = d
 		}
-		partial = partial || m.Partial
-		outdated = outdated || m.Version != models.MHSActivityVersion
 	}
-	docs, err = h.Store.ListDays(ctx, mhsactivitydays.DaysQuery{WorkspaceID: wsID, From: day, To: day, OrgIDs: z.OrgIDs})
+	marks, err := h.Store.GetMarks(ctx, wsID, from, to, z.OrgIDs)
 	if err != nil {
-		return nil, time.Time{}, false, false, err
+		return nil, err
 	}
-	if docs == nil {
-		docs = []models.MHSActivityDay{}
+	for _, day := range days {
+		_, dayEnd, _ := activity.DayBounds(day, z.Loc)
+		sd, ok := storedDay{docs: []models.MHSActivityDay{}}, true
+		for _, org := range z.OrgIDs {
+			m, found := marks[mhsactivitydays.MarkKey(org, day)]
+			if !found && !dayEnd.IsZero() && !org.Timestamp().Before(dayEnd) {
+				// The organization was created after this day ended, so it
+				// has nothing to roll up for it (the job never marks days
+				// before an organization existed). Without this, adding a
+				// school sent every earlier day of its zone to the live path
+				// and the 30-day digest past the live-day cap.
+				continue
+			}
+			if !found || !m.Final {
+				ok = false
+				break
+			}
+			if sd.at.IsZero() || m.ComputedAt.Before(sd.at) {
+				sd.at = m.ComputedAt
+			}
+			sd.partial = sd.partial || m.Partial
+			sd.outdated = sd.outdated || m.Version != models.MHSActivityVersion
+		}
+		if ok {
+			out[day] = sd
+		}
 	}
-	return docs, at, partial, outdated, nil
+	if len(out) == 0 {
+		return out, nil
+	}
+	docs, err := h.Store.ListDays(ctx, mhsactivitydays.DaysQuery{WorkspaceID: wsID, From: from, To: to, OrgIDs: z.OrgIDs})
+	if err != nil {
+		return nil, err
+	}
+	for _, d := range docs {
+		if sd, ok := out[d.Day]; ok {
+			sd.docs = append(sd.docs, d)
+			out[d.Day] = sd
+		}
+	}
+	return out, nil
 }
 
 // freshness collects where each zone-day came from and says it in a line or
@@ -431,6 +481,9 @@ func (f *freshness) stored(day string, at time.Time, partial, outdated bool) {
 		f.storedDays = map[string]bool{}
 	}
 	f.storedDays[day] = true
+	if at.IsZero() { // a zone-day whose organizations all came later: nothing was computed
+		return
+	}
 	if f.storedOldest.IsZero() || at.Before(f.storedOldest) {
 		f.storedOldest = at
 	}
@@ -460,7 +513,10 @@ func (f *freshness) lines() []string {
 		if len(days) > 1 {
 			span += " – " + prettyDay(days[len(days)-1])
 		}
-		line := fmt.Sprintf("Stored: %s (closed days, stored once; last stored %s UTC)", span, f.storedNewest.UTC().Format("Jan 2 15:04"))
+		line := fmt.Sprintf("Stored: %s (closed days, stored once)", span)
+		if !f.storedNewest.IsZero() {
+			line = fmt.Sprintf("Stored: %s (closed days, stored once; last stored %s UTC)", span, f.storedNewest.UTC().Format("Jan 2 15:04"))
+		}
 		if f.partial {
 			line += "; some of it was computed with a source unavailable"
 		}

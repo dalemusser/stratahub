@@ -235,8 +235,23 @@ func TestStoredDayReplacesLiveComputation(t *testing.T) {
 	if !strings.Contains(body, "School B</a>") || strings.Contains(body, "School A</a>") || !strings.Contains(body, "Stored: Oct 12, 2026 (closed days, stored once; last stored Oct 13 11:12 UTC)") {
 		t.Errorf("closed day did not come from the store: %s", body[strings.Index(body, "Data:"):min(len(body), strings.Index(body, "Data:")+300)])
 	}
-	// A window needing more live days than allowed is refused.
+	// A school added to the zone later has no mark for the 12th; the day
+	// still comes from the store (it cannot have had activity before it
+	// existed), so adding a school does not send old days to the live path.
+	ctx2, cancel2 := testutil.TestContext()
+	defer cancel2()
+	late := testutil.NewFixtures(t, fx.db).CreateOrganizationWithDetails(ctx2, "School C", "Tulsa", "OK", "America/Chicago")
+	if _, err := fx.db.Collection("organizations").UpdateByID(ctx2, late.ID, bson.M{"$set": bson.M{"workspace_id": fx.ws}}); err != nil {
+		t.Fatal(err)
+	}
 	fx.h.Config.MaxLiveDays = 1
+	rec = fx.get(t, "/mhsactivity?range=7d", testutil.AdminUser())
+	if rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "School B</a>") {
+		t.Errorf("a later school sent stored days live: status %d", rec.Code)
+	}
+	// A window needing more live days than allowed is refused (days after
+	// the fixture's schools were created, none of them stored).
+	fx.h.setNow(func() time.Time { return time.Now().AddDate(0, 0, 20) })
 	rec = fx.get(t, "/mhsactivity?range=7d", testutil.AdminUser())
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("live cap: status %d", rec.Code)
