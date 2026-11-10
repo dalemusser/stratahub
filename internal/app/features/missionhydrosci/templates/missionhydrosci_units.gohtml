@@ -130,6 +130,10 @@
         Launch
       </a>
       <p id="play-window-note" class="hidden text-xs text-center text-gray-600 dark:text-gray-300" aria-live="polite"></p>
+      <!-- The last launch on this device was stopped by the play gate: the
+           school's web filter blocks the game's log or save service (see the
+           play page's "Game services and the play gate"). -->
+      <p id="services-blocked-note" class="hidden text-xs text-center text-amber-800 dark:text-amber-300" role="status"></p>
     </div>
 
     <!-- Next unit status (hidden when no next unit) -->
@@ -1044,6 +1048,16 @@
   // Switching drops what happened since that unit's last save point, as
   // closing it would; the note below the button says what happened.
   var GAME_WINDOW = 'mhs-game';
+  (function servicesBlockedNote() {
+    var el = document.getElementById('services-blocked-note');
+    if (!el) return;
+    var rec = null;
+    try { rec = JSON.parse(localStorage.getItem('mhs-services-blocked') || 'null'); } catch (e) { rec = null; }
+    if (!rec || !rec.hosts) return;
+    el.textContent = 'The last time, the game could not start on this device: the school\'s web filter is blocking ' + rec.hosts +
+      ', so progress cannot be saved. Please tell your teacher. The game starts by itself once IT allows them.';
+    el.classList.remove('hidden');
+  })();
   function playWindowNote(text) {
     var el = document.getElementById('play-window-note');
     if (!el) return;

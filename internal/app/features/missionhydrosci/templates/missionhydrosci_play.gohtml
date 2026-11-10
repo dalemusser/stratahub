@@ -216,7 +216,7 @@
       <a id="back-btn" href="{{ if .PlayBackURL }}{{ .PlayBackURL }}{{ else }}/missionhydrosci/units{{ end }}" title="{{ if .DeviceTest }}Done testing — back to the test page to answer the questions{{ else }}Back to Mission HydroSci{{ end }}" aria-label="{{ if .DeviceTest }}Done testing — back to the test page{{ else }}Back to Mission HydroSci{{ end }}"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" style="vertical-align: middle;" aria-hidden="true"><path d="M13 4 L7 10 L13 16" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/></svg></a>
       <button id="fullscreen-btn" onclick="toggleFullscreen()" title="Fullscreen" aria-label="Toggle fullscreen">⛶</button>
       <div id="loading-overlay">
-        <h2>Loading {{ .UnitTitle }}...</h2>
+        <h2 id="loading-title">Loading {{ .UnitTitle }}...</h2>
         <div class="loading-bar-bg">
           <div id="loading-bar" class="loading-bar-fill" style="width: 0%"></div>
         </div>
@@ -1689,13 +1689,25 @@
         var GATE_RECHECK_S = 30, CONFIRM_MS = 3000;
         var gated = false, nextAt = 0, tick = null, checking = false;
         var retryBtn = document.getElementById('loading-gate-retry');
+        var titleEl = document.getElementById('loading-title');
+        var titleText = titleEl ? titleEl.textContent : '';
+        // The units page reads this to warn before the next Launch (cleared
+        // when the services answer).
+        function rememberGate(hosts) {
+          try {
+            if (hosts) localStorage.setItem('mhs-services-blocked', JSON.stringify({ hosts: hosts, at: new Date().toISOString() }));
+            else localStorage.removeItem('mhs-services-blocked');
+          } catch (e) { /* storage refused */ }
+        }
         function showGate() {
           gated = true;
+          if (titleEl) titleEl.textContent = '{{ .UnitTitle }} cannot start yet';
           loadingText.textContent = 'The game cannot start on this device yet';
           loadingBar.style.width = '100%';
           loadingBar.style.background = '#f59e0b';
           if (retryBtn) retryBtn.hidden = false;
           if (loadingStepEl) loadingStepEl.style.display = 'none'; // the step's technical text is in Status details
+          rememberGate(svcHealth.hosts);
           memberReport('services-blocked');
         }
         function gateHint() {
@@ -1723,7 +1735,9 @@
             if (loadingHint) loadingHint.textContent = '';
             if (retryBtn) retryBtn.hidden = true;
             if (loadingStepEl) loadingStepEl.style.display = '';
+            if (titleEl) titleEl.textContent = titleText;
           }
+          rememberGate('');
           release();
         }
         function check(confirming) {

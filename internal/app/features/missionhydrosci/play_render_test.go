@@ -335,3 +335,27 @@ func TestPlayPageMaskedScriptErrorIsANotice(t *testing.T) {
 		t.Error("the masked-error notice must return before crashReported is set")
 	}
 }
+
+// S-1 and S-3: while gated the heading says the unit cannot start, and the
+// gate is remembered on the device for the units page's warning.
+func TestPlayGateHeadingAndUnitsWarning(t *testing.T) {
+	body := renderPlayPage(t, memberPlayData())
+	for _, want := range []string{
+		`<h2 id="loading-title">Loading Unit 1...</h2>`,
+		`titleEl.textContent = 'Unit 1 cannot start yet';`,
+		`rememberGate(svcHealth.hosts);`,
+		`rememberGate('');`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("play page lacks %q", want)
+		}
+	}
+	bootCeremonyTemplates(t)
+	rec := httptest.NewRecorder()
+	templates.Render(rec, httptest.NewRequest("GET", "/missionhydrosci/units", nil), "missionhydrosci_units", UnitsData{
+		BaseVM: viewdata.BaseVM{Title: "Mission HydroSci"}, CurrentUnit: "unit1",
+	})
+	if !strings.Contains(rec.Body.String(), `localStorage.getItem('mhs-services-blocked')`) {
+		t.Error("units page does not read the remembered gate")
+	}
+}
