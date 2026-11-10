@@ -1,6 +1,6 @@
-# MHS issues under discussion, 2026-10-28 (updated 2026-11-04)
+# MHS issues under discussion, 2026-10-28 (updated 2026-11-09)
 
-A working record. Each issue is written down as it is discussed so the details are not lost; once all of them are on the page a plan follows (§ "Plan", to be written), then the work. School, teacher and student names stay out of this document (the repository is public); the local report folders named below hold them.
+A working record. Each issue is written down as it is discussed so the details are not lost; once all of them are on the page a plan follows (§ "Plan", proposed 2026-11-04), then the work. School, teacher and student names stay out of this document (the repository is public); the local report folders named below hold them.
 
 Status key: **documented** = written down, nothing changed · **planned** = in the plan below · **done** = fixed and deployed, with the commit.
 
@@ -245,7 +245,7 @@ Local folder `mhs-reports-102826-issues/` on Dale's desktop (outside the reposit
 
 ## Issue 3 — At two schools the game's activity and saves never reach the servers from the school's Chromebooks; with the 2026-11-02 build, START then does nothing
 
-**Status:** documented (2026-11-04). Urgent: a whole class cannot play, and a second school has had no recorded activity since its first day.
+**Status:** documented (2026-11-04); the request to allow the two hosts went to both schools (reported 2026-11-09), and whether the districts make the change is still open (see the update below). Urgent: a whole class cannot play, and a second school has had no recorded activity since its first day.
 
 ### The report
 
@@ -288,9 +288,16 @@ Ours (in the plan):
 - The Activity page: a school-level flag when launches run but no game events arrive from any device at a school for a whole day (School L sat unnoticed for a week), and the per-student "none arrived" state already exists.
 - Game team: START must not wait on the save service without a message and a way on; after a timeout, start with a local or new save and say so.
 
+### Update 2026-11-09: the request is with both schools; how we will know; why the work does not wait for them
+
+- **Sent.** A message to School J (coordinator and district IT) and a separate one to School L, both asking that the log and save hosts be allowed for all methods including OPTIONS and POST, with no body inspection, followed by a public Device Test run on a managed Chromebook. School L had reported nothing; its message was written from the data (107 students, 0 events and 0 saves since its first day, and the same tail holds on 11-02), because its next class on the 2026-11-02 build will meet the START symptom unless the hosts are allowed first. Both drafts are in the local review (names inside).
+- **Still open.** Whether either district makes the change. Districts have been slow or silent before: School A took five days and a hotspot test before its technician changed the filter; School E never answered; Schools C, D and F have had the tail hold since late October without a contact. This district did allow the content host within a day (10-27 to 10-28), so it may act quickly, but nothing in the plan may depend on it.
+- **How we will know, without asking.** On the next class day at either school: launch records whose `logs_state` is `seen`, game events in stratalog and saves in stratasave from students on the school's Chromebooks (not only the two laptops and the one Chromebook already getting through), and the game's unsent-log cache no longer growing through the period. The local folder has a rerunnable read-only query for exactly this (`queries/filtercheck.js`, one verdict line per school and class day). A Device Test run from a managed Chromebook shows the same thing on its record.
+- **Consequence for the plan.** B.1 (the API probe, the notice naming the blocked hosts, the school-level "no game activity is reaching the server" flag) and the game-team item "START must not block on the save service" go ahead whatever the districts do; they are the parts that need no district action, and the notice gives the teacher the exact text to hand to IT. A.1 and A.2 are done.
+
 ### Where the evidence is
 
-`mhs-reports-110426/` (local, names people): the school and class queries, `orphans.js`, `week.js`, raw output, and `mhs-review-110426.md`.
+`mhs-reports-110426/` (local, names people): the school and class queries, `orphans.js`, `week.js`, `filtercheck.js`, raw output, and `mhs-review-110426.md`.
 
 ---
 
@@ -336,8 +343,8 @@ Ordered by what unblocks students soonest. Each item names its issue and its che
 
 **A. Today, messages, no code**
 
-1. School J and School L districts: allow the log and save hosts for all methods (OPTIONS, POST), no body inspection; verify with the public Device Test on a managed Chromebook. (Issue 3) Check: the next class day shows events and saves on the dashboard.
-2. The School J teacher and coordinator: what the START symptom is, why Unit 1 restarted every day, nothing to redo once the hosts are allowed. (Issue 3)
+1. School J and School L districts: allow the log and save hosts for all methods (OPTIONS, POST), no body inspection; verify with the public Device Test on a managed Chromebook. (Issue 3) Check: the next class day shows events and saves on the dashboard. **Sent** (reported 2026-11-09); whether the districts act is open; `filtercheck.js` in the local folder is the check.
+2. The School J teacher and coordinator: what the START symptom is, why Unit 1 restarted every day, nothing to redo once the hosts are allowed. (Issue 3) **Sent** (reported 2026-11-09).
 3. School D: the two students with the poisoned Unit 2 loader clear the site's data (or get a fresh profile) and download again; the code fix follows in B.2. (Issue 4)
 4. The 4 GB Chromebook advice and the Admin console setting to Schools B, F, C, K (already written). (Issue 1)
 
@@ -362,5 +369,5 @@ Ordered by what unblocks students soonest. Each item names its issue and its che
 
 - One page for IT before day one: the three hosts (content, log, save), all methods, no body inspection, no tail scanning; the tab-discarding exception; keep site data for the host; 8 GB or Intel devices where possible. (Issues 1, 2, 3)
 
-**Open questions for Dale:** the order of B.1 to B.3 (B.1 is the smallest and unblocks two schools); whether B.4 ships as one piece or the one-window change first; who sends A.1 to the two districts.
+**Open questions for Dale:** the order of B.1 to B.3 (B.1 is the smallest and unblocks two schools); whether B.4 ships as one piece or the one-window change first. (Who sends A.1 is settled: the messages went out, reported 2026-11-09.)
 
