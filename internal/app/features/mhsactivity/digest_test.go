@@ -50,15 +50,15 @@ func TestDigestDayOf(t *testing.T) {
 func TestDigestSpanAndWindow(t *testing.T) {
 	h := &Handler{Config: Config{MaxDays: 31}}
 	h.now = func() time.Time { return time.Date(2026, 11, 9, 20, 0, 0, 0, time.UTC) }
-	if from, to := h.digestSpan(); from != "2026-10-11" || to != "2026-11-09" {
+	if from, to := h.digestSpan("2026-11-09"); from != "2026-10-11" || to != "2026-11-09" {
 		t.Errorf("span %s..%s", from, to)
 	}
 	h.Config.BackfillStart = "2026-10-13"
-	if from, _ := h.digestSpan(); from != "2026-10-13" {
+	if from, _ := h.digestSpan("2026-11-09"); from != "2026-10-13" {
 		t.Errorf("span starts %s, want the backfill start", from)
 	}
 	h.Config.MaxDays = 7
-	if from, _ := h.digestSpan(); from != "2026-11-03" {
+	if from, _ := h.digestSpan("2026-11-09"); from != "2026-11-03" {
 		t.Errorf("span starts %s with MaxDays 7", from)
 	}
 	r := withWindow(httptest.NewRequest("GET", "/mhsactivity/digest?org=x&group=y", nil), "2026-11-03", "2026-11-09")
@@ -85,7 +85,7 @@ func TestDigestPagesRender(t *testing.T) {
 	rec := httptest.NewRecorder()
 	templates.Render(rec, httptest.NewRequest("GET", "/mhsactivity/digest", nil), "mhsactivity_digest", list)
 	body := rec.Body.String()
-	for _, want := range []string{"MHS Daily Digest", "Look at this", "No problems", "No activity (weekend)", `href="/mhsactivity/digest/2026-11-05"`, "1 student blocked"} {
+	for _, want := range []string{"MHS Daily Digest", "Look at this", "No problems", "No activity (weekend)", `href="/mhsactivity/digest/2026-11-05"`, `data-href="/mhsactivity/digest/2026-11-05"`, "tr.mhs-digest-row", "1 student blocked"} {
 		if !strings.Contains(body, want) {
 			t.Errorf("list lacks %q", want)
 		}

@@ -11,6 +11,7 @@ import (
 	"github.com/dalemusser/stratahub/internal/app/features/viewers"
 	activity "github.com/dalemusser/stratahub/internal/app/system/mhsactivity"
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
+	"github.com/dalemusser/stratahub/internal/app/system/workspace"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"github.com/dalemusser/waffle/pantry/templates"
 	"github.com/go-chi/chi/v5"
@@ -74,11 +75,29 @@ func withWindow(r *http.Request, from, to string) *http.Request {
 	return r2
 }
 
-// digestSpan is the list's window: the last digestDays days (UTC days, the
-// page's custom windows are day strings), not before the stored history
-// starts and not longer than the page's longest window.
-func (h *Handler) digestSpan() (string, string) {
-	today := h.now().UTC().Format(activity.DayFormat)
+// digestToday is the newest day the list shows: the latest local today
+// among the workspace's school time zones (a UTC day would show tomorrow
+// in the American evening); UTC when the zones cannot be read.
+func (h *Handler) digestToday(r *http.Request) string {
+	now := h.now()
+	today := ""
+	if zones, err := activity.ZonesFor(r.Context(), h.DB, workspace.IDFromRequest(r), nil); err == nil {
+		for _, z := range zones {
+			if d := activity.LocalDay(now, z.Loc); d > today {
+				today = d
+			}
+		}
+	}
+	if today == "" {
+		today = now.UTC().Format(activity.DayFormat)
+	}
+	return today
+}
+
+// digestSpan is the list's window ending on today: the last digestDays
+// days, not before the stored history starts and not longer than the
+// page's longest window.
+func (h *Handler) digestSpan(today string) (string, string) {
 	n := digestDays
 	if h.Config.MaxDays > 0 && h.Config.MaxDays < n {
 		n = h.Config.MaxDays
@@ -92,7 +111,7 @@ func (h *Handler) digestSpan() (string, string) {
 
 // ServeDigest lists the recent days.
 func (h *Handler) ServeDigest(w http.ResponseWriter, r *http.Request) {
-	from, to := h.digestSpan()
+	from, to := h.digestSpan(h.digestToday(r))
 	vm, ok := h.load(w, withWindow(r, from, to), primitive.NilObjectID)
 	if !ok {
 		return

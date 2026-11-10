@@ -26,9 +26,10 @@
     </thead>
     <tbody>
       {{ range .Days }}
-      <tr class="border-b border-gray-100 dark:border-gray-700 align-top {{ if .Problem }}bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30{{ else }}hover:bg-gray-50 dark:hover:bg-gray-700/50{{ end }}">
+      {{/* The whole row opens the day; the date stays a real link for the keyboard and screen readers. */}}
+      <tr data-href="{{ .Href }}" class="mhs-digest-row cursor-pointer border-b border-gray-100 dark:border-gray-700 align-top {{ if .Problem }}bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30{{ else }}hover:bg-gray-50 dark:hover:bg-gray-700/50{{ end }}">
         <td class="px-3 py-2 whitespace-nowrap">
-          <a href="{{ .Href }}" class="font-medium {{ if .Active }}text-indigo-600 dark:text-indigo-400 hover:underline{{ else }}text-gray-400 dark:text-gray-500 hover:underline{{ end }}">{{ .Label }}</a>
+          <a href="{{ .Href }}" class="font-medium underline underline-offset-2 {{ if .Active }}text-indigo-600 dark:text-indigo-400{{ else }}text-gray-500 dark:text-gray-400{{ end }}">{{ .Label }}</a>
         </td>
         <td class="px-3 py-2 whitespace-nowrap">
           {{ if .Problem }}
@@ -48,4 +49,15 @@
   </table>
 </div>
 {{ range .Freshness }}<p class="text-xs text-gray-500 dark:text-gray-400">{{ . }}</p>{{ end }}
+<script>
+  // A click anywhere on a day's row opens that day (the date link is the
+  // keyboard path). Clicks on the link itself are left to the browser.
+  document.querySelectorAll('tr.mhs-digest-row').forEach(function(row) {
+    row.addEventListener('click', function(e) {
+      if (e.target.closest('a')) return;
+      if (window.getSelection && String(window.getSelection())) return; // selecting text, not opening
+      window.location.href = row.getAttribute('data-href');
+    });
+  });
+</script>
 {{ end }}
