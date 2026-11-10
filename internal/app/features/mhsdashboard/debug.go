@@ -80,6 +80,40 @@ func (h *Handler) ServeDebugStudents(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Every student's event count, read in aggregates of debugCountChunk
+	// students on the {game, user_id, _id} index, within a time budget that
+	// ends before the request's deadline. Counting student by student ran out
+	// of the request's time on a large group and logged one "failed to count
+	// events" line per remaining student (Issue 6 of
+	// docs/mission-hydrosci/mhs-issues-102826.md); an all-time count is
+	// slow for students with many events (200 busy students: ~27 s on
+	// DocumentDB, 2026-11-09). Students not reached show as unknown.
+	eventCounts := map[string]int64{}
+	counted := map[string]bool{}
+	if h.LogStore != nil {
+		budget := time.Now().Add(debugCountBudget)
+		if dl, ok := ctx.Deadline(); ok && dl.Add(-2*time.Second).Before(budget) {
+			budget = dl.Add(-2 * time.Second)
+		}
+		for start := 0; start < len(userIDHexes) && time.Now().Before(budget); start += debugCountChunk {
+			end := start + debugCountChunk
+			if end > len(userIDHexes) {
+				end = len(userIDHexes)
+			}
+			cctx, ccancel := context.WithDeadline(ctx, budget)
+			c, cerr := h.LogStore.ActivityByUsers(cctx, "mhs", userIDHexes[start:end], time.Unix(0, 0), time.Now().Add(time.Minute))
+			ccancel()
+			if cerr != nil {
+				h.Log.Warn("failed to count events for the group", zap.String("group", groupID), zap.Int("from", start), zap.Int("students", len(userIDHexes)), zap.Error(cerr))
+				break
+			}
+			for _, id := range userIDHexes[start:end] {
+				counted[id] = true
+				eventCounts[id] = int64(c[id].Events)
+			}
+		}
+	}
+
 	// Build student rows with anomaly counts.
 	// LoginID is kept on the row for leader-facing display; the grade lookup
 	// and log query are keyed by user_id hex.
@@ -101,15 +135,8 @@ func (h *Handler) ServeDebugStudents(w http.ResponseWriter, r *http.Request) {
 		}
 		row.TotalAnomalies = row.PencilCount + row.EmptyCount + row.DuplicateCount
 
-		// Get event count if log store is available
-		if h.LogStore != nil {
-			count, err := h.LogStore.CountForUser(ctx, "mhs", userIDHex)
-			if err != nil {
-				h.Log.Warn("failed to count events", zap.String("user_id", userIDHex), zap.Error(err))
-			} else {
-				row.TotalEvents = count
-			}
-		}
+		row.EventsKnown = counted[userIDHex]
+		row.TotalEvents = eventCounts[userIDHex]
 
 		rows = append(rows, row)
 	}
@@ -121,6 +148,12 @@ func (h *Handler) ServeDebugStudents(w http.ResponseWriter, r *http.Request) {
 
 	templates.Render(w, r, "mhsdashboard_debug_students", data)
 }
+
+// Bounds of the debug view's event counts (see ServeDebugStudents).
+const (
+	debugCountChunk  = 25
+	debugCountBudget = 20 * time.Second
+)
 
 // ServeDebugDetail serves the full debug detail view for a single student.
 func (h *Handler) ServeDebugDetail(w http.ResponseWriter, r *http.Request) {

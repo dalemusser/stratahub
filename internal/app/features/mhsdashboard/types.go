@@ -251,6 +251,7 @@ type DebugStudentRow struct {
 	DuplicateCount int // duplicate trigger events
 	TotalAnomalies int
 	TotalEvents    int64 // total log entries for this student
+	EventsKnown    bool  // false when the count could not be read (shown as unknown, not 0)
 }
 
 // DebugStudentsData is the view model for the debug student list.

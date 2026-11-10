@@ -43,11 +43,13 @@ Recheck cadence: after each school's next class day for FC-1 to FC-3, then weekl
 - **As built.** The play page logs a masked "Script error." (no detail) as a browser notice and never latches the crash reporter; the loader and its content-server retry load with `crossOrigin = 'anonymous'` (the content server sends CORS headers for every workspace origin; every cached copy was stored from a CORS request). `mhssteplog.IsCrashNotice` has the same rule and the Activity merge applies it to stored summaries (Activity version 7), so School O's older records become notices when their days are recomputed.
 - **Verified on dev after the deploy:** launches from the downloaded files and with the unit's cache deleted both rendered with the CORS-mode loader; two masked errors became one browser notice and a real error after them was still reported as a crash (test data: one crash record and one crash event for the test member). Field check: School O's next days.
 
-### B.6 Logging-health count (Issue 6) — S
+### B.6 Logging-health count (Issue 6) — S — **done, deployed 2026-11-09**
 
 - **Correct the record first.** The "failed to count events: context deadline exceeded" lines come from the dashboard's count (`mhsdashboard/debug.go`), not from the heartbeat's logging-health check (which already asks a bounded "any entry since" question). Re-read the journal to confirm which callers time out.
 - **What.** Replace that count with a bounded existence query (limit 1 on the `{game, user_id, _id}` index), or cap it; make sure the query it runs is covered by an index on DocumentDB.
 - **Check.** No more deadline lines in the journal for a week.
+- **Found (2026-11-09, journal 11-02 onward):** all 127 "failed to count events" lines came from one place, the dashboard's staff debug view (`mhsdashboard/debug.go`), on one day: it counted each student's events one by one inside one request, and once the request's time ran out every remaining student failed. The heartbeat's logging-health check logged no failure in that period. So Issue 6's conclusion that `logs_state` is partly noise was wrong; the empty and "quiet" states are real.
+- **As built.** The debug view reads the counts in aggregates of 25 students on the `{game, user_id, _id}` index, within a 20-second budget that ends before the request's deadline; students it did not reach show "?" instead of 0, and a failure logs one line for the group. An all-time count is heavy for busy students (200 students with 654,677 events took about 27 s on DocumentDB), which is why it is chunked and budgeted rather than one query. Not verified in a browser (the debug view needs an administrator's session); the field check is the journal.
 
 ### B.7 Smaller objects on the content server (Issue 2, solution 2) — L, after FC-4
 
@@ -116,6 +118,6 @@ Check: their build passes the hand-off's build checks on the dev site before it 
 2. ~~B.5~~ done 2026-11-09.
 3. The game team package (G-1 to G-5), together with the save fix hand-off.
 4. Per-school summaries for the people who deal with the schools, as problems come up (D-5, D-6). D-2 and D-3 are done; D-7 is closed (unknown).
-5. B.6, S-1 to S-3.
+5. ~~B.6~~ done 2026-11-09; S-1 to S-3.
 6. FC-3 to FC-5 in the weekly review; then decide B.7.
 7. I-1 to I-3 as devices and time allow.

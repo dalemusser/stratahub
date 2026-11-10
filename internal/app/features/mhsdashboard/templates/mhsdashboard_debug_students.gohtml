@@ -46,7 +46,7 @@
           <span class="text-green-400 font-medium">0</span>
           {{ end }}
         </td>
-        <td class="text-center px-3 py-2 text-[#7fb3d3]">{{ .TotalEvents }}</td>
+        <td class="text-center px-3 py-2 text-[#7fb3d3]">{{ if .EventsKnown }}{{ .TotalEvents }}{{ else }}<span title="The count could not be read">?</span>{{ end }}</td>
         <td class="text-center px-3 py-2">
           <button type="button"
                   class="text-[#5cb8e6] hover:text-[#8ed0f0] hover:underline font-medium"
