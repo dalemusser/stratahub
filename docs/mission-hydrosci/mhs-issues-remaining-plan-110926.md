@@ -105,7 +105,7 @@ Check: their build passes the hand-off's build checks on the dev site before it 
 ## 5. Open investigations
 
 - **I-1 Quota error at the tail (School O, School B).** "Quota exceeded" at 88–94 % with gigabytes of reported quota free. The final write briefly needs twice the file's size, which explains it only if those (not persisted, possibly in-memory) profiles have a real limit far below the reported one. Needs a device that reproduces it; then decide whether to drop parts while they stream (halves the peak, loses progress if that write fails).
-- **I-2 Nobody sees a problem day in time.** The Activity page surfaced Issue 1's student and Schools J/L days before anyone wrote, but nobody opens it during the school day. Design a daily digest of problem days (students with a problem flag, by school) to staff, or a fixed morning check.
+- **I-2 Nobody sees a problem day in time.** The Activity page surfaced Issue 1's student and Schools J/L days before anyone wrote, but nobody opens it during the school day. **Decided (Dale, 2026-11-09):** a daily digest as a StrataHub feature: a list of days with a visual mark on the days that have problems worth looking at; selecting a day shows that day's digest. Emails later, not now.
 - **I-3 Issue 1, real-device confirmation.** A real discard on a 4 GB Chromebook with the notice showing, and the one-window change on a Chromebook, a frozen window and the installed app (only desktop Chrome tested).
 
 ---
