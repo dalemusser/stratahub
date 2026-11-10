@@ -313,3 +313,25 @@ func TestPlayPageDiscardNotice(t *testing.T) {
 		}
 	}
 }
+
+// B.5: a masked "Script error." is a notice that never latches the crash
+// reporter, and the loader is requested in CORS mode so real errors carry
+// their message.
+func TestPlayPageMaskedScriptErrorIsANotice(t *testing.T) {
+	body := renderPlayPage(t, memberPlayData())
+	for _, want := range []string{
+		`return m === 'Script error.' || m === 'Script error';`,
+		`(type === 'runtime_error' && isMaskedScriptError(message))) {`,
+		`script.crossOrigin = 'anonymous';`,
+		`s2.crossOrigin = 'anonymous';`,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("play page lacks %q", want)
+		}
+	}
+	notice := strings.Index(body, `isMaskedScriptError(message))) {`)
+	latch := strings.Index(body, `crashReported = true;`)
+	if notice < 0 || latch < 0 || notice > latch {
+		t.Error("the masked-error notice must return before crashReported is set")
+	}
+}

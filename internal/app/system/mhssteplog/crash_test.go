@@ -30,6 +30,10 @@ func TestIsCrashNotice(t *testing.T) {
 		{"runtime_error", "RuntimeError: memory access out of bounds (pointer lock)", false},
 		{"load_error", "Failed to load Unity loader script", false},
 		{"load_stalled", "No launch progress after 90 s", false},
+		{"runtime_error", "Script error.", true},
+		{"runtime_error", " Script error ", true},
+		{"runtime_error", "Script error. in unit2.framework.js", false},
+		{"load_error", "Script error.", false},
 	}
 	for _, tc := range tests {
 		if got := IsCrashNotice(tc.typ, tc.msg); got != tc.want {

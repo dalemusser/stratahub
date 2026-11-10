@@ -22,7 +22,9 @@ import (
 //	6 (2026-11-09): a day whose play page found the game services blocked and
 //	   that did not play is Blocked (the play gate keeps the game from
 //	   starting there)
-const MHSActivityVersion = 6
+//	7 (2026-11-10): a masked "Script error." runtime error is a browser
+//	   notice, not a crash (mhssteplog.IsCrashNotice), also for older records
+const MHSActivityVersion = 7
 
 // MHSChromeClosedDiscards is how many discards in a day make a problem. One
 // is ordinary (Chrome's memory saver unloads a tab left in the background

@@ -322,3 +322,18 @@ func TestMergePlayGateBlockedDay(t *testing.T) {
 		t.Fatalf("want an opened, blocked, unplayed day: %+v", docs)
 	}
 }
+
+// A record summarized before the masked-error rule (Notice false on a
+// "Script error." runtime error) counts as a notice now; a real runtime
+// error is still a crash.
+func TestMergeMaskedScriptErrorIsANotice(t *testing.T) {
+	b, student, _ := testBuilder(t)
+	b.addRecord(rec(student, "dev-a", "unit2", "crash", ct(9, 0, 0)), &models.MHSMemberSummary{V: models.MHSMemberSummaryVersion, Crashes: []models.MHSStepCrash{
+		{At: ct(9, 0, 0), Type: "runtime_error", Phase: "running", Unit: "unit2", Message: "Script error."},
+		{At: ct(9, 30, 0), Type: "runtime_error", Phase: "running", Unit: "unit2", Message: "RuntimeError: memory access out of bounds"},
+	}})
+	d := b.finish(time.Now())[0]
+	if d.Crashes.Notice != 1 || d.Crashes.Real != 1 {
+		t.Errorf("crashes %+v", d.Crashes)
+	}
+}

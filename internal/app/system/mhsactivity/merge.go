@@ -8,6 +8,7 @@ import (
 
 	"github.com/dalemusser/stratahub/internal/app/store/activity"
 	"github.com/dalemusser/stratahub/internal/app/store/logdata"
+	"github.com/dalemusser/stratahub/internal/app/system/mhssteplog"
 	"github.com/dalemusser/stratahub/internal/domain/models"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo/options"
@@ -251,7 +252,10 @@ func (b *builder) addRecord(rec models.MHSDeviceTest, sum *models.MHSMemberSumma
 			continue
 		}
 		a.touch(c.At)
-		if c.Notice {
+		// The stored flag, or today's rule applied to the stored type and
+		// message (records summarized before a rule existed, e.g. the masked
+		// "Script error.").
+		if c.Notice || mhssteplog.IsCrashNotice(c.Type, c.Message) {
 			a.doc.Crashes.Notice++
 			continue
 		}

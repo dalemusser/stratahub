@@ -1192,8 +1192,20 @@
       // is still reported.
       var crashNoticeRe = /pointer lock|permissions check failed|too many pointer lock|fullscreen|audiocontext/i;
 
+      // A masked cross-origin error ("Script error.", no source, no line): a
+      // script from another origin threw (on managed laptops most likely a
+      // filter or monitoring extension) and the browser hides everything else.
+      // It is a notice like the ones above, never a crash, and it must not
+      // latch crashReported, which would silence every real crash after it
+      // (Nov 2026, School O; mhssteplog.IsMaskedScriptError is the same rule).
+      function isMaskedScriptError(message) {
+        var m = String(message || '').trim();
+        return m === 'Script error.' || m === 'Script error';
+      }
+
       function reportCrash(type, message, stack, phase) {
-        if (type === 'unhandled_rejection' && crashNoticeRe.test(String(message || ''))) {
+        if ((type === 'unhandled_rejection' && crashNoticeRe.test(String(message || ''))) ||
+            (type === 'runtime_error' && isMaskedScriptError(message))) {
           if (noticesLogged >= 5) return;
           noticesLogged++;
           stepLog.record('game', 'warn', 'Browser notice (' + type + ', ' + (phase || crashPhase) + '): ' +
@@ -1968,6 +1980,7 @@
         watchdogWarned = false;
         launchProgress('loader');
         var s2 = document.createElement('script');
+        s2.crossOrigin = 'anonymous';
         s2.src = loaderUrl;
         s2.onload = script.onload;
         s2.onerror = script.onerror;
@@ -2041,6 +2054,11 @@
       // Load the Unity loader script
       stepLog.record('launch', 'running', 'Loading the game loader (' + unitId + '.loader.js)…');
       var script = document.createElement('script');
+      // CORS mode, so an error the loader raises arrives with its message and
+      // line instead of the masked "Script error." (the content is served
+      // with CORS headers for every workspace origin, and every cached copy
+      // was stored from a CORS request).
+      script.crossOrigin = 'anonymous';
       script.src = loaderUrl;
       activeScript = script;
       script.onload = function() {
