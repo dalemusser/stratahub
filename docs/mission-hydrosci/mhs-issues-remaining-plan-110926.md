@@ -86,9 +86,9 @@ Check: their build passes the hand-off's build checks on the dev site before it 
 | D-2 | One page for IT before a school's first day (content, log and save hosts; no tail scanning; keep site data; tab-discarding exception; 8 GB or Intel devices where possible) | **Done:** made available to the schools (reported by Dale 2026-11-09; real hosts, so the page lives outside this repository) | Point new schools to it before their first day |
 | D-3 | The 4 GB Chromebook advice and the Admin console tab-discarding setting to Schools B, F, C, K (record A.4) | **Done:** provided to the schools (reported by Dale 2026-11-09). Some schools have no devices other than their 4 GB Chromebooks | None for the schools; what helps those classes now is on our side and the game team's: B.4 (one window, discard notice) shipped, G-2 (save on hide) and G-3 (memory) in §3 |
 | D-4 | School D's damaged loader (record A.3) | Handled by B.2 (repaired on the next launch) | Close after FC-3 |
-| D-5 | Contacts at Schools C, D and E (tail hold since late October; School E never answered) | Open | Dale: find a contact; send D-2 |
-| D-6 | School B: why its browsers keep no site data between sessions (ephemeral or guest profiles?) | Asked in the Issue 1 fleet section; no answer | Ask the school's IT with D-2 |
-| D-7 | Which districts changed their filters for the tail hold, and what they changed (vendor, setting), so D-2 can quote it | Open | Ask School A's technician (the one known fix) |
+| D-5 | Schools C, D and E (tail hold since late October; School E never answered) | Other people deal with the schools; Dale passes them the findings (2026-11-09). No school contacts come to us | When a school has a problem, write a short summary for the people who deal with the schools (what the data shows, what the school's IT should change, the one-pager) and give it to Dale to pass on |
+| D-6 | School B: why its browsers keep no site data between sessions (ephemeral or guest profiles?) | Unanswered; goes through the same people as D-5 | Include it in School B's summary if it comes up again; the data (new device ids every launch) is the evidence |
+| D-7 | Which districts changed their filters for the tail hold, and what they changed (vendor, setting) | **Closed, unknown:** asked, no reply (2026-11-09) | None. The one-pager stays generic (no vendor setting to quote); B.3 and B.7 must work without that knowledge |
 
 ---
 
@@ -113,7 +113,7 @@ Check: their build passes the hand-off's build checks on the dev site before it 
 1. FC-1 and FC-2 after the next class day at any school (the gate is the riskiest change: a false positive stops a class).
 2. B.5 (small, stops lost crash reports).
 3. The game team package (G-1 to G-5), together with the save fix hand-off.
-4. D-5, D-6, D-7 (messages; Dale). D-2 and D-3 are done.
+4. Per-school summaries for the people who deal with the schools, as problems come up (D-5, D-6). D-2 and D-3 are done; D-7 is closed (unknown).
 5. B.6, S-1 to S-3.
 6. FC-3 to FC-5 in the weekly review; then decide B.7.
 7. I-1 to I-3 as devices and time allow.

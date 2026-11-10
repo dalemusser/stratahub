@@ -234,10 +234,10 @@ The device-state analysis for Issue 1 (above) shows what School B's devices do s
 
 What I would not do: anything that disguises the files from the filter. The scan is the school's policy; the fix is to let it finish (item 1) or to give it objects it can finish quickly (item 2), and to tell IT what to exempt (item 3).
 
-### Open questions for Dale
+### Open questions for Dale (answered 2026-11-09)
 
-- Which districts made the filter change, and do we know what they changed (vendor, setting)? School A's technician is the one person who has done it.
-- School E has never been contacted; School D and School C have the problem now. Who is the contact at each?
+- Which districts made the filter change, and do we know what they changed (vendor, setting)? **Unknown:** asked, no reply. The fix on our side must not depend on knowing it.
+- School E has never been contacted; School D and School C have the problem now. Who is the contact at each? **Not ours to have:** other people deal with the schools; Dale passes them the findings. We provide per-school summaries.
 
 ### Where the evidence is
 
