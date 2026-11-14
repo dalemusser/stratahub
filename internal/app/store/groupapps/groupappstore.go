@@ -9,6 +9,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
+	"go.mongodb.org/mongo-driver/mongo/options"
 )
 
 // Store manages group_app_settings documents.
@@ -116,53 +117,33 @@ func EnabledAppIDsForUser(ctx context.Context, db *mongo.Database, userID primit
 
 // GetMHSCollectionForUser returns the pinned MHS collection ID for a user's MHS-enabled group.
 // Returns nil if no group is pinned or the user has no MHS-enabled group.
-// Uses an aggregation: group_memberships → group_app_settings where app_id=missionhydrosci and mhs_collection_id is set.
-func GetMHSCollectionForUser(ctx context.Context, db *mongo.Database, userID primitive.ObjectID) *primitive.ObjectID {
-	coll := db.Collection("group_memberships")
-	pipeline := mongo.Pipeline{
-		// Find groups where user is a member
-		{{Key: "$match", Value: bson.M{
-			"user_id": userID,
-			"role":    "member",
-		}}},
-		// Lookup MHS app settings for each group
-		{{Key: "$lookup", Value: bson.M{
-			"from": "group_app_settings",
-			"let":  bson.M{"gid": "$group_id"},
-			"pipeline": mongo.Pipeline{
-				{{Key: "$match", Value: bson.M{
-					"$expr": bson.M{"$eq": []string{"$group_id", "$$gid"}},
-					"app_id":           "missionhydrosci",
-					"mhs_collection_id": bson.M{"$exists": true, "$ne": nil},
-				}}},
-			},
-			"as": "mhs_app",
-		}}},
-		// Only keep groups that have a pinned collection
-		{{Key: "$unwind", Value: "$mhs_app"}},
-		// Return just the collection ID (take first match)
-		{{Key: "$limit", Value: 1}},
-		{{Key: "$project", Value: bson.M{
-			"_id":               0,
-			"mhs_collection_id": "$mhs_app.mhs_collection_id",
-		}}},
-	}
-
-	cur, err := coll.Aggregate(ctx, pipeline)
+// Two plain queries (the member's groups, then a pinned missionhydrosci
+// setting among them) rather than a correlated $lookup, which older DocumentDB
+// versions restrict (DL-7); an error is returned for the caller to log, so a
+// failure no longer reads as "no pin".
+func GetMHSCollectionForUser(ctx context.Context, db *mongo.Database, userID primitive.ObjectID) (*primitive.ObjectID, error) {
+	groupIDs, err := db.Collection("group_memberships").Distinct(ctx, "group_id", bson.M{"user_id": userID, "role": "member"})
 	if err != nil {
-		return nil
+		return nil, err
 	}
-	defer cur.Close(ctx)
-
+	if len(groupIDs) == 0 {
+		return nil, nil
+	}
 	var result struct {
 		MHSCollectionID *primitive.ObjectID `bson:"mhs_collection_id"`
 	}
-	if cur.Next(ctx) {
-		if err := cur.Decode(&result); err == nil && result.MHSCollectionID != nil {
-			return result.MHSCollectionID
-		}
+	err = db.Collection("group_app_settings").FindOne(ctx, bson.M{
+		"group_id":          bson.M{"$in": groupIDs},
+		"app_id":            "missionhydrosci",
+		"mhs_collection_id": bson.M{"$exists": true, "$ne": nil},
+	}, options.FindOne().SetProjection(bson.M{"mhs_collection_id": 1})).Decode(&result)
+	if err == mongo.ErrNoDocuments {
+		return nil, nil
 	}
-	return nil
+	if err != nil {
+		return nil, err
+	}
+	return result.MHSCollectionID, nil
 }
 
 // SetMHSCollection sets or clears the pinned MHS collection for a group's app setting.

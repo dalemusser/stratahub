@@ -56,7 +56,11 @@ func (h *Handler) resolveCollection(r *http.Request) resolvedCollection {
 			}
 
 			// 2. Per-group pin
-			if groupCollID := groupappstore.GetMHSCollectionForUser(ctx, h.DB, userOID); groupCollID != nil {
+			groupCollID, gerr := groupappstore.GetMHSCollectionForUser(ctx, h.DB, userOID)
+			if gerr != nil {
+				h.Log.Error("failed to look up the group's pinned MHS collection", zap.String("user_id", userOID.Hex()), zap.Error(gerr))
+			}
+			if groupCollID != nil {
 				coll, err := h.CollectionStore.GetByID(ctx, *groupCollID)
 				if err == nil {
 					return resolvedCollection{Collection: coll, Found: true}
