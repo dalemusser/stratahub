@@ -118,6 +118,11 @@ type OfflineData struct {
 type ContentManifestFile struct {
 	Path string `json:"path"`
 	Size int64  `json:"size"`
+	// Pieces is how many pieces of PieceBytes the content server holds for
+	// this file at "<path>.pieces/NNN" (models.MHSPiecePath); the service
+	// worker fetches those instead of the whole file. Zero: no pieces.
+	Pieces     int   `json:"pieces,omitempty"`
+	PieceBytes int64 `json:"pieceBytes,omitempty"`
 }
 
 // ContentManifestUnit represents a unit in the content manifest.

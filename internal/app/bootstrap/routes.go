@@ -352,6 +352,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	}
 	// Client download timing + game-service reachability probes, served with
 	// the content manifest (see docs/mission-hydrosci/mhs-loading-status-and-unit2-device-test-plan.md, A0).
+	missionhydroscifeature.DownloadPieces = !appCfg.MHSDownloadPiecesOff
 	missionHydroSciHandler.Tuning = missionhydroscifeature.ManifestTuning{
 		FrozenSwitchMs:  appCfg.MHSFrozenSwitchMs,
 		FallbackStallMs: appCfg.MHSFallbackStallMs,
@@ -677,6 +678,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 		// MHS Build Management (upload builds, manage collections)
 		mhsBuildsHandler := mhsbuildsfeature.NewHandler(deps.StrataHubMongoDatabase, deps.MHSStorage, appCfg.MHSCDNBaseURL, errLog, logger)
 		wsr.Mount("/mhsbuilds", mhsbuildsfeature.Routes(mhsBuildsHandler, sessionMgr))
+		mhsBuildsHandler.StartPiecesJob() // large files in pieces for the collections in use (B.7)
 
 		// Mission HydroSci (experimental copy of MHS delivery for admin/coordinator development)
 		wsr.Mount("/missionhydrosci", missionhydroscifeature.Routes(missionHydroSciHandler, sessionMgr))

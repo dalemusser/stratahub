@@ -483,12 +483,20 @@ func ceremonyBase(version string) string {
 	return "/missionhydrosci/content/" + models.MHSCeremonyBuildID + "/v" + version + "/"
 }
 
+// DownloadPieces lists large files' pieces in the manifest, so the service
+// worker downloads them in pieces (plan item B.7). Set from the config's
+// kill switch "mhs_download_pieces_off" at start.
+var DownloadPieces = true
+
 // buildToManifestUnit converts one build record (plus the title and build
 // identifier the collection carries for it) into a manifest unit.
 func buildToManifestUnit(unitID, title, version, buildIdentifier string, build models.MHSBuild) ContentManifestUnit {
 	files := make([]ContentManifestFile, len(build.Files))
 	for j, f := range build.Files {
 		files[j] = ContentManifestFile{Path: f.Path, Size: f.Size}
+		if DownloadPieces && f.Pieces > 0 && f.Pieces == models.MHSPieceCount(f.Size) {
+			files[j].Pieces, files[j].PieceBytes = f.Pieces, models.MHSPieceBytes
+		}
 	}
 	if buildIdentifier == "" {
 		buildIdentifier = build.BuildIdentifier

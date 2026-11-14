@@ -147,6 +147,10 @@ type AppConfig struct {
 	// MHS active gap threshold: gaps longer than this are excluded from active duration.
 	// Must match mhsgrader's active_gap_threshold for consistent results.
 	MHSActiveGapThreshold time.Duration
+	// MHSDownloadPiecesOff stops listing large files' pieces in the MHS
+	// manifest (plan item B.7), so devices download whole files again. A
+	// kill switch: pieces are on unless "mhs_download_pieces_off" is true.
+	MHSDownloadPiecesOff bool
 
 	// MHS Activity (features/mhsactivity): the cross-school activity overview.
 	MHSActivityEnabled      bool

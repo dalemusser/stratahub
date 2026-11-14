@@ -2,6 +2,7 @@
 package models
 
 import (
+	"fmt"
 	"time"
 
 	"go.mongodb.org/mongo-driver/bson/primitive"
@@ -53,4 +54,28 @@ func (b MHSBuild) IsCeremony() bool { return b.Kind == MHSBuildKindCeremony }
 type MHSBuildFile struct {
 	Path string `bson:"path" json:"path"` // S3 key relative to prefix, e.g. "unit1/v2.2.3/Build/unit1.data.unityweb"
 	Size int64  `bson:"size" json:"size"` // File size in bytes
+	// Pieces is how many piece objects of MHSPieceBytes (the last one
+	// shorter) the content server holds for this file beside it, at
+	// MHSPiecePath(Path, i); zero when the file has none. Large files are
+	// stored in pieces so a web filter that holds the last megabytes of a
+	// large object never holds a download (docs/mission-hydrosci/
+	// mhs-issues-102826.md Issue 2, plan item B.7). The whole file stays.
+	Pieces int `bson:"pieces,omitempty" json:"pieces,omitempty"`
+}
+
+// MHSPieceBytes is the size of one piece of a large build file, and
+// MHSPieceMinFileBytes the smallest file that is stored in pieces.
+const (
+	MHSPieceBytes        = 8 * 1024 * 1024
+	MHSPieceMinFileBytes = 32 * 1024 * 1024
+)
+
+// MHSPiecePath is the storage path of piece i of the file at path.
+func MHSPiecePath(path string, i int) string {
+	return fmt.Sprintf("%s.pieces/%03d", path, i)
+}
+
+// MHSPieceCount is how many pieces a file of size bytes has.
+func MHSPieceCount(size int64) int {
+	return int((size + MHSPieceBytes - 1) / MHSPieceBytes)
 }

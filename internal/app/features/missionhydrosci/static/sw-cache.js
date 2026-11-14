@@ -40,7 +40,7 @@ function cacheKeyFromPath(filePath) {
 }
 
 // NOTE: unit cache-status checking and largest-file size verification live on
-// the page side (mhs-delivery.js: _checkUnitCache / _verifyLargestFile). The SW
+// the page side (mhs-delivery.js: _checkUnitCache / _fileDamage). The SW
 // copies were only reachable via a 'checkStatus' message action that no page
 // sends anymore, so they were removed to avoid two hand-maintained copies
 // drifting apart.

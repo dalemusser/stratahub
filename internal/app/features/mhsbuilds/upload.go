@@ -217,6 +217,7 @@ func (h *Handler) uploadUnitFromZip(ctx context.Context, zr *zip.Reader, basePat
 	var files []models.MHSBuildFile
 	var totalSize int64
 	var dataFile, frameworkFile, codeFile string
+	large := map[string][]byte{} // files stored in pieces as well (pieces.go)
 
 	for _, f := range zr.File {
 		if f.FileInfo().IsDir() {
@@ -253,6 +254,9 @@ func (h *Handler) uploadUnitFromZip(ctx context.Context, zr *zip.Reader, basePat
 		}
 
 		size := int64(len(data))
+		if size >= models.MHSPieceMinFileBytes {
+			large[s3Key] = data
+		}
 		files = append(files, models.MHSBuildFile{Path: s3Key, Size: size})
 		totalSize += size
 
@@ -263,6 +267,9 @@ func (h *Handler) uploadUnitFromZip(ctx context.Context, zr *zip.Reader, basePat
 
 	if len(files) == 0 {
 		return models.MHSBuild{}, fmt.Errorf("no files found for %s in zip", unitID)
+	}
+	if err := splitIntoPieces(ctx, h.MHSStorage, files, large); err != nil {
+		return models.MHSBuild{}, err
 	}
 
 	build := models.MHSBuild{

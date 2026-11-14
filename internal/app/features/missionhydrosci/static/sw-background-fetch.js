@@ -118,8 +118,15 @@ async function startBackgroundFetch(unitId, version, files, cdnBaseUrl, title) {
     return true;
   }
 
-  var requests = files.map(function(file) {
-    return new Request(cdnBaseUrl + '/' + file.path, { mode: 'cors' });
+  // A pieced file is fetched as its pieces (B.7); the success handler
+  // assembles them.
+  var requests = [];
+  files.forEach(function(file) {
+    if (isPieced(file)) {
+      for (var p = 0; p < file.pieces; p++) requests.push(new Request(cdnBaseUrl + '/' + piecePath(file.path, p), { mode: 'cors' }));
+    } else {
+      requests.push(new Request(cdnBaseUrl + '/' + file.path, { mode: 'cors' }));
+    }
   });
 
   var totalSize = files.reduce(function(sum, f) { return sum + f.size; }, 0);
@@ -538,6 +545,121 @@ async function fetchAndCacheFileWithRetry(cache, cacheKey, url, expectedSize, on
   }
 }
 
+// Pieces (plan item B.7). A web filter that holds the last megabytes of
+// every large object it scans (School T, November 2026: the whole-file
+// restart of B.3 was held at the same point as the tail) lets objects of
+// about 12 MB through. Large files are also stored on the content server as
+// pieces of file.pieceBytes (8 MB) at "<path>.pieces/NNN"; the manifest
+// lists the count. Each piece is a whole small object: fetched with retries,
+// kept under '<key>?piece=N' as it arrives (a retry costs at most one
+// piece), and the file the Unity loader expects is assembled from them.
+function piecePath(path, i) { return path + '.pieces/' + ('00' + i).slice(-3); }
+function pieceKey(cacheKey, i) { return cacheKey + '?piece=' + i; }
+function pieceSize(file, i) {
+  return i < file.pieces - 1 ? file.pieceBytes : file.size - (file.pieces - 1) * file.pieceBytes;
+}
+function isPieced(file) {
+  return !!(file && file.pieces > 0 && file.pieceBytes > 0 &&
+    (file.pieces - 1) * file.pieceBytes < file.size && file.pieces * file.pieceBytes >= file.size);
+}
+
+async function storedPieceOK(cache, key, expected) {
+  try {
+    var r = await cache.match(key);
+    if (!r) return false;
+    var len = r.headers.get('content-length');
+    if (len !== null) return parseInt(len, 10) === expected;
+    return (await r.blob()).size === expected;
+  } catch (e) { return false; }
+}
+
+async function dropPieces(cache, cacheKey) {
+  try {
+    var keys = await cache.keys();
+    var prefix = new URL(cacheKey, self.location.origin).href + '?piece=';
+    for (var i = 0; i < keys.length; i++) {
+      if (keys[i].url.indexOf(prefix) === 0) await cache.delete(keys[i]);
+    }
+  } catch (e) { /* best effort */ }
+}
+
+// The stored pieces 0..count-1 as one stream, read one at a time.
+function piecesStream(cache, cacheKey, count) {
+  var i = 0;
+  return new ReadableStream({
+    pull: async function(controller) {
+      if (i >= count) { controller.close(); return; }
+      var r = await cache.match(pieceKey(cacheKey, i));
+      if (!r) throw new Error('piece ' + i + ' missing');
+      controller.enqueue(new Uint8Array(await r.arrayBuffer()));
+      i++;
+    }
+  });
+}
+
+// Writes the file from its stored pieces under its own key, then drops them.
+async function assemblePieces(cache, cacheKey, count, size, contentType) {
+  var headers = new Headers();
+  headers.set('content-type', contentType || 'application/octet-stream');
+  headers.set('content-length', String(size));
+  await cache.put(cacheKey, new Response(piecesStream(cache, cacheKey, count), { status: 200, headers: headers }));
+  await dropPieces(cache, cacheKey);
+}
+
+// One piece, whole: resolves with its bytes or rejects (wrong size included).
+async function fetchPiece(url, expected, signal, onBytes) {
+  var resp = await fetch(url, { mode: 'cors', signal: signal });
+  if (!resp.ok) throw new Error('Failed to fetch ' + url + ': ' + resp.status);
+  var buf;
+  if (resp.body && resp.body.getReader) {
+    var reader = resp.body.getReader(), chunks = [], got = 0;
+    for (;;) {
+      var res = await reader.read();
+      if (res.done) break;
+      chunks.push(res.value); got += res.value.byteLength;
+      onBytes(got);
+    }
+    buf = new Uint8Array(got);
+    var off = 0;
+    for (var c = 0; c < chunks.length; c++) { buf.set(chunks[c], off); off += chunks[c].byteLength; }
+  } else {
+    buf = new Uint8Array(await resp.arrayBuffer());
+    onBytes(buf.byteLength);
+  }
+  if (buf.byteLength !== expected) throw new Error('short piece: ' + buf.byteLength + ' of ' + expected + ' bytes (' + url + ')');
+  return buf;
+}
+
+// Downloads a pieced file into the cache. Only consecutive attempts that
+// stored nothing count toward giving up (as fetchAndCacheFileWithRetry);
+// onDrop hears of every failed attempt that is retried.
+async function fetchPiecedFile(cache, cacheKey, cdnBaseUrl, file, onBytes, signal, onDrop) {
+  await dropParts(cache, cacheKey); // a partial from the whole-file path: its space is needed
+  var done = 0, futile = 0;
+  for (var i = 0; i < file.pieces; i++) {
+    var expected = pieceSize(file, i), key = pieceKey(cacheKey, i);
+    if (await storedPieceOK(cache, key, expected)) { done += expected; onBytes(done); continue; }
+    for (var attempt = 1; ; attempt++) {
+      if (signal && signal.aborted) throw new DOMException('Fallback download canceled', 'AbortError');
+      try {
+        var base = done;
+        var buf = await fetchPiece(cdnBaseUrl + '/' + piecePath(file.path, i), expected, signal, function(got) { onBytes(base + got); });
+        await cache.put(key, new Response(buf, { headers: { 'content-type': 'application/octet-stream', 'content-length': String(expected) } }));
+        done += expected; futile = 0;
+        break;
+      } catch (err) {
+        if (signal && signal.aborted) throw err;
+        if (classifyDownloadError(err).cls === 'quota') throw err;
+        futile++;
+        if (futile >= MAX_FUTILE_ATTEMPTS) throw err;
+        if (onDrop) { try { onDrop({ attempt: attempt, savedBytes: done, futile: futile, error: err }); } catch (e) { /* ignore */ } }
+        await new Promise(function(resolve) { setTimeout(resolve, Math.min(2000 * futile, 10000)); });
+      }
+    }
+  }
+  await assemblePieces(cache, cacheKey, file.pieces, file.size, '');
+}
+
 /**
  * Fallback: download files using regular fetch when Background Fetch is unavailable.
  */
@@ -613,6 +735,24 @@ async function runFallbackFetch(fallbackKey, unitId, version, files, cdnBaseUrl,
       // Skip files already in cache (e.g., from a previous partial download)
       var existing = await cache.match(cacheKey);
       if (existing) {
+        downloaded += file.size;
+        broadcastProgress(downloaded);
+        continue;
+      }
+
+      if (isPieced(file)) {
+        await fetchPiecedFile(cache, cacheKey, cdnBaseUrl, file, function(fileReceived) {
+          var now = Date.now();
+          if (now - lastBroadcast < 1000) return;
+          lastBroadcast = now;
+          broadcastStatus(unitId, 'downloading', progressDetail(downloaded + fileReceived));
+        }, aborter.signal, function(info) {
+          drops++;
+          lastDropError = info.error;
+          var detail = progressDetail(downloaded + info.savedBytes);
+          detail.resumedFrom = downloaded + info.savedBytes;
+          broadcastStatus(unitId, 'downloading', detail);
+        });
         downloaded += file.size;
         broadcastProgress(downloaded);
         continue;
@@ -728,6 +868,7 @@ async function handleBackgroundFetchSuccess(event) {
   var records = await bgFetch.matchAll();
   var cached = 0;
   var firstErr = null;
+  var pieced = {}; // cache key of a pieced file -> {count, size}
 
   for (var i = 0; i < records.length; i++) {
     var record = records[i];
@@ -743,6 +884,19 @@ async function handleBackgroundFetchSuccess(event) {
       var idx = pathname.indexOf(marker);
       if (idx !== -1) {
         var relativePath = pathname.substring(idx + 1); // "unit1/v1.0.0/Build/unit1.loader.js"
+        var pm = /^(.*)\.pieces\/(\d+)$/.exec(relativePath);
+        if (pm) {
+          // A piece of a large file (B.7): kept as a piece, assembled below.
+          var baseKey = '/missionhydrosci/content/' + pm[1];
+          var n = parseInt(pm[2], 10);
+          var pr = pieced[baseKey] = pieced[baseKey] || { count: 0, size: 0 };
+          pr.count = Math.max(pr.count, n + 1);
+          var body = await response.arrayBuffer();
+          pr.size += body.byteLength;
+          await cache.put(pieceKey(baseKey, n), new Response(body, { headers: { 'content-type': 'application/octet-stream', 'content-length': String(body.byteLength) } }));
+          cached++;
+          continue;
+        }
         var cacheKey = '/missionhydrosci/content/' + relativePath;
         // Put the response directly — it isn't read again, so cloning here only
         // tees the body and buffers the whole (multi-hundred-MB) file in SW
@@ -758,6 +912,16 @@ async function handleBackgroundFetchSuccess(event) {
     } catch (err) {
       console.error('Failed to cache record:', record.request.url, err);
       if (!firstErr) firstErr = err; // representative error for messaging + telemetry
+    }
+  }
+
+  for (var pk in pieced) {
+    try {
+      await assemblePieces(cache, pk, pieced[pk].count, pieced[pk].size, '');
+    } catch (err) {
+      console.error('Failed to assemble pieces:', pk, err);
+      cached--; // the file is not in the cache
+      if (!firstErr) firstErr = err;
     }
   }
 

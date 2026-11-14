@@ -254,6 +254,7 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 
 		// MHS Activity
 		MHSActivityEnabled:      appValues.Bool("mhs_activity_enabled"),
+		MHSDownloadPiecesOff:    appValues.Bool("mhs_download_pieces_off"),
 		MHSActivityCloseAfter:   appValues.Duration("mhs_activity_close_after", 6*time.Hour),
 		MHSActivityLiveCacheTTL: appValues.Duration("mhs_activity_live_cache_ttl", time.Minute),
 		MHSActivityLiveMaxDays:  appValues.Int("mhs_activity_live_max_days"),
