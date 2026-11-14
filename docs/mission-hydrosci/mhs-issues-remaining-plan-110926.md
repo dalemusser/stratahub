@@ -51,7 +51,9 @@ Recheck cadence: after each school's next class day for FC-1 to FC-3, then weekl
 - **Found (2026-11-09, journal 11-02 onward):** all 127 "failed to count events" lines came from one place, the dashboard's staff debug view (`mhsdashboard/debug.go`), on one day: it counted each student's events one by one inside one request, and once the request's time ran out every remaining student failed. The heartbeat's logging-health check logged no failure in that period. So Issue 6's conclusion that `logs_state` is partly noise was wrong; the empty and "quiet" states are real.
 - **As built.** The debug view reads the counts in aggregates of 25 students on the `{game, user_id, _id}` index, within a 20-second budget that ends before the request's deadline; students it did not reach show "?" instead of 0, and a failure logs one line for the group. An all-time count is heavy for busy students (200 students with 654,677 events took about 27 s on DocumentDB), which is why it is chunked and budgeted rather than one query. Not verified in a browser (the debug view needs an administrator's session); the field check is the journal.
 
-### B.7 Smaller objects on the content server (Issue 2, solution 2) — L, after FC-4
+### B.7 Smaller objects on the content server (Issue 2, solution 2) — L — **done, deployed 2026-11-14 (2899271)**
+
+- **As built (2026-11-14).** FC-4 failed at School T (the filter held the whole-file restart at the same point as the tail), so B.7 went ahead. Every build file of 32 MB or more is also stored as 8 MB pieces at `<path>.pieces/NNN` beside the whole file: uploads store them at once, and a job gives the builds of every collection in use their pieces a minute after start and hourly. The manifest lists `pieces` and `pieceBytes`; the service worker (1.0.18) fetches the pieces in order, keeps each as it arrives (a retry costs at most 8 MB) and assembles the file, on the direct path and in Background Fetch. Kill switch `mhs_download_pieces_off`. Verified on dev (see `mhs-resolution-plan-111426.md` item 3).
 
 - **What.** At build upload, store each large unit file as a series of objects of 8 MB or less listed in the manifest; the service worker fetches them in order, keeps them as the parts it already uses and assembles the single cached file the Unity loader expects. No tail to hold; a retry costs at most 8 MB.
 - **Waits on.** B.3 a week in the field (FC-4). If B.3 alone clears the holds, B.7 drops to P3.
@@ -60,7 +62,7 @@ Recheck cadence: after each school's next class day for FC-1 to FC-3, then weekl
 ### Small follow-ups (S each)
 
 - **S-1** ~~The play gate's heading still says "Loading Unit N…"~~ **Done 2026-11-09 (48d5ca0):** while gated it says "<unit> cannot start yet".
-- **S-2** The service worker's `sw-cache.js` comment still names `_verifyLargestFile` (now `_fileDamage`); fix with the next service worker change (a comment-only edit would reinstall the worker on every device).
+- **S-2** ~~The service worker's `sw-cache.js` comment names `_verifyLargestFile`~~ **Done 2026-11-14** with B.7's service worker change.
 - **S-3** ~~Units page warning~~ **Done 2026-11-09 (48d5ca0):** the play page remembers a gated launch on the device (cleared when the services answer) and the units page shows an amber line naming the hosts before the next Launch. Verified on dev with the simulated block.
 - **S-4** ~~Re-scope ACT-4 and DL-4~~ **Done 2026-11-09:** both notes are in [`mhs-remaining-work-plan.md`](mhs-remaining-work-plan.md) (ACT-4 down to P3; DL-4 stays P2 and is the next small code item there).
 

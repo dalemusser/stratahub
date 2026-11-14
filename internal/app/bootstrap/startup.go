@@ -277,12 +277,19 @@ func ensureMHSDevSentinel(ctx context.Context, deps DBDeps, workspaceID primitiv
 		return err
 	}
 
-	// Already present? Leave it alone.
+	// Already present? Only make sure it cannot sign in (RDY-4: the row is
+	// for joins from dev log and save data; its login id is published in
+	// the code, and an active trust account with it could be signed into by
+	// anyone wherever trust sign-in is reachable).
 	var existing models.User
 	err = coll.FindOne(ctx, bson.M{"_id": sentinelID}).Decode(&existing)
 	if err == nil {
-		logger.Debug("mhs dev sentinel user already present",
-			zap.String("user_id", MHSDevSentinelUserIDHex))
+		if existing.Status != "disabled" {
+			if _, uerr := coll.UpdateOne(ctx, bson.M{"_id": sentinelID}, bson.M{"$set": bson.M{"status": "disabled", "updated_at": time.Now().UTC()}}); uerr != nil {
+				return uerr
+			}
+			logger.Info("mhs dev sentinel user disabled (it exists only for joins)", zap.String("user_id", MHSDevSentinelUserIDHex))
+		}
 		return nil
 	}
 	if err != mongo.ErrNoDocuments {
@@ -301,7 +308,7 @@ func ensureMHSDevSentinel(ctx context.Context, deps DBDeps, workspaceID primitiv
 		LoginIDCI:   ptrString(text.Fold(loginID)),
 		AuthMethod:  "trust",
 		Role:        "member",
-		Status:      "active",
+		Status:      "disabled", // never signed into: the row exists for joins (RDY-4)
 		CreatedAt:   now,
 		UpdatedAt:   now,
 	}

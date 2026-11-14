@@ -72,7 +72,7 @@ the code has shifted since (line numbers especially).
 | RDY-1 | **iPad smoke pass has never been done** (fallback-only platform) | P1 | L | OPEN |
 | RDY-2 | MHS-005: request `navigator.storage.persist()` + report `persisted()` | P1 | S | **DONE 2026-09-07** (A0, deployed) |
 | RDY-3 | MHS-006: per-unit space preflight before downloading | P1 | M | **DONE 2026-09-07** (A0: missing bytes vs free quota, re-checked every minute; deployed) |
-| RDY-4 | Dev-sentinel user seeded into default/prod workspace unconditionally | P1 | S | OPEN |
+| RDY-4 | Dev-sentinel user seeded into default/prod workspace unconditionally | P1 | S | **DONE 2026-11-14** (created disabled; an existing row is disabled at start) |
 | RDY-5 | `progress.go` `totalUnits = 5` fallback breaks a future 6-unit collection | P2 | S | OPEN |
 | RDY-6 | MHS-004: guest-profile verification run, then close/re-scope | P3 | M | OPEN |
 | ARCH-1 | Units/manage pipelines ~150 duplicated lines — refactor or freeze | P2 | L | OPEN |
