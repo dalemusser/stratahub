@@ -98,7 +98,25 @@ async function reattachAllProgress() {
  * themselves) so the SW is the creating context and can broadcast live
  * progress to every page; see attachProgressBroadcast.
  */
-async function startBackgroundFetch(unitId, version, files, cdnBaseUrl, title) {
+// Background Fetch creations in flight, keyed by fetch id (DL-1). Two
+// 'download' messages for one unit that arrive together (session restore
+// reopening two pages, a poller's self-heal while a cold worker is still
+// creating) both missed get() and the loser's duplicate-id error was taken
+// for "Background Fetch unavailable", starting a second full download.
+// The second request now waits for the first one's creation instead.
+var bgFetchCreations = new Map();
+
+function startBackgroundFetch(unitId, version, files, cdnBaseUrl, title) {
+  var fetchId = 'missionhydrosci-' + unitId + '-v' + version;
+  var inFlight = bgFetchCreations.get(fetchId);
+  if (inFlight) return inFlight;
+  var p = startBackgroundFetchOnce(unitId, version, files, cdnBaseUrl, title);
+  bgFetchCreations.set(fetchId, p);
+  p.then(function() { bgFetchCreations.delete(fetchId); }, function() { bgFetchCreations.delete(fetchId); });
+  return p;
+}
+
+async function startBackgroundFetchOnce(unitId, version, files, cdnBaseUrl, title) {
   var fetchId = 'missionhydrosci-' + unitId + '-v' + version;
 
   // SW-side dedupe across the two download paths. The SW is the only context
@@ -161,6 +179,15 @@ async function startBackgroundFetch(unitId, version, files, cdnBaseUrl, title) {
 
     return true;
   } catch (err) {
+    // Another context created the same fetch meanwhile: adopt it rather
+    // than start a second download (DL-1).
+    try {
+      var again = await self.registration.backgroundFetch.get(fetchId);
+      if (again && again.result === '') {
+        attachProgressBroadcast(again, unitId, version);
+        return true;
+      }
+    } catch (e2) { /* fall through to the fallback */ }
     // The browser refused to start the Background Fetch (seen on managed
     // Chromebooks: the API is present, fetch() rejects). The pages asked for
     // a background download and would otherwise go on believing they got

@@ -177,7 +177,7 @@ func (h *Handler) checkMemberAuth(r *http.Request, role, authToken, keyword stri
 		h.Log.Warn("throttled MHS member-auth attempt",
 			zap.String("member_user_id", userOID.Hex()),
 			zap.Duration("retry_after", wait))
-		return http.StatusTooManyRequests, "Too many attempts. Please wait a moment and try again."
+		return http.StatusTooManyRequests, waitMessage(wait)
 	}
 
 	grantedBy := ""

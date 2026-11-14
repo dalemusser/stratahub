@@ -105,10 +105,10 @@
 
     <!-- Download progress bar (hidden by default) -->
     <div id="progress-wrap" class="mb-4 hidden">
-      <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
+      <div id="progress-track" role="progressbar" aria-label="Download progress" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2.5">
         <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full transition-all" style="width: 0%"></div>
       </div>
-      <div id="progress-text" aria-live="polite" class="text-xs text-gray-500 dark:text-gray-400 mt-1 text-center">0%</div>
+      <div id="progress-text" class="text-xs text-gray-500 dark:text-gray-400 mt-1 text-center">0%</div>
     </div>
 
     <!-- Action buttons -->
@@ -159,7 +159,7 @@
     <!-- Active game version — always visible for every role. Support's first
          question is "what version is displayed?", so this must be on screen. -->
     {{ if .ActiveCollectionName }}
-    <div class="mt-4 text-center text-xs text-gray-400 dark:text-gray-500">
+    <div class="mt-4 text-center text-xs text-gray-500 dark:text-gray-400">
       Version:
       {{ if ne .Role "member" }}<a href="/missionhydrosci/manage#card-version" class="underline decoration-dotted hover:text-gray-600 dark:hover:text-gray-300">{{ .ActiveCollectionName }}</a>{{ else }}<span>{{ .ActiveCollectionName }}</span>{{ end }}
       {{ if .CollectionOverride }}<span class="ml-1 px-1.5 py-0.5 rounded bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">override</span>{{ end }}
@@ -176,7 +176,7 @@
       {{ range .Units }}
       <div id="unit-card-{{ .ID }}" data-unit-status="{{ .Status }}" class="bg-gray-50 dark:bg-gray-700/50 rounded p-3">
         <span class="text-sm font-medium text-gray-900 dark:text-gray-100">{{ .Title }}</span>
-        <span class="text-xs text-gray-400 dark:text-gray-500 ml-1">v{{ .Version }}</span>
+        <span class="text-xs text-gray-500 dark:text-gray-400 ml-1">v{{ .Version }}</span>
         <span class="text-xs text-gray-500 dark:text-gray-400 ml-2">{{ .SizeLabel }}</span>
         <span id="status-{{ .ID }}" aria-live="polite" class="text-xs text-gray-500 dark:text-gray-400 ml-2">{{ if eq .Status "completed" }}Completed{{ else }}Checking...{{ end }}</span>
       </div>
@@ -186,7 +186,7 @@
            streams when watched). Members open it once the game has ended; staff any time. -->
       <div id="ceremony-card" class="bg-gray-50 dark:bg-gray-700/50 rounded p-3">
         <span class="text-sm font-medium text-gray-900 dark:text-gray-100">🏆 End-of-game ceremony</span>
-        <span class="text-xs text-gray-400 dark:text-gray-500 ml-1">v{{ .Ceremony.Version }}</span>
+        <span class="text-xs text-gray-500 dark:text-gray-400 ml-1">v{{ .Ceremony.Version }}</span>
         <span class="text-xs text-gray-500 dark:text-gray-400 ml-2">{{ .Ceremony.SizeLabel }}</span>
         {{ if .Ceremony.CanOpen }}
         <a href="{{ .Ceremony.URL }}" class="text-xs ml-2 font-medium text-blue-600 dark:text-blue-400 hover:underline">{{ .Ceremony.Label }}</a>
@@ -251,6 +251,22 @@
 
   // Throttle for storage/button refresh during downloads (see onStatus tail)
   var lastStorageRefresh = 0;
+
+  // Screen readers (UX-1): the live status lines announce transitions and
+  // every 25 % of a download, not each percent (up to once a second); the
+  // bar is a progressbar whose value a reader can ask for.
+  function quietWhileDownloading(el, status, detail) {
+    if (!el) return;
+    if (status !== 'downloading') { el.setAttribute('aria-live', 'polite'); el.removeAttribute('data-said'); return; }
+    var step = Math.floor(((detail && detail.percent) || 0) / 25);
+    var said = el.getAttribute('data-said');
+    el.setAttribute('aria-live', said === String(step) ? 'off' : 'polite');
+    el.setAttribute('data-said', String(step));
+  }
+  function setProgressValue(pct) {
+    var t = document.getElementById('progress-track');
+    if (t) t.setAttribute('aria-valuenow', String(Math.round(pct)));
+  }
 
   // Track manually downloaded units so autoCleanup preserves them
   var MANUAL_DL_KEY = 'mhs-manual-downloads';
@@ -560,6 +576,7 @@
     var card = document.getElementById('unit-card-' + unitId);
     var unitStatus = card ? card.getAttribute('data-unit-status') : '';
     var statusEl = document.getElementById('status-' + unitId);
+    quietWhileDownloading(statusEl, status, detail);
 
     // Completed units keep their static "Completed" label
     if (unitStatus === 'completed') {
@@ -577,7 +594,7 @@
           break;
         case 'not_cached':
           statusEl.textContent = 'Not downloaded';
-          statusEl.className = 'text-xs text-gray-400 dark:text-gray-500 ml-2';
+          statusEl.className = 'text-xs text-gray-500 dark:text-gray-400 ml-2';
           break;
         case 'partial':
           statusEl.textContent = 'Partial';
@@ -664,7 +681,7 @@
               ? 'text-sm text-amber-600 dark:text-amber-400 mt-1'
               : 'text-sm text-blue-600 dark:text-blue-400 mt-1';
             if (mainProgressWrap) mainProgressWrap.classList.remove('hidden');
-            if (mainProgressBar) mainProgressBar.style.width = pct2 + '%';
+            if (mainProgressBar) { mainProgressBar.style.width = pct2 + '%'; setProgressValue(pct2); }
             if (mainProgressText) mainProgressText.textContent = mhsProgressLabel(detail);
             if (mainDownloadBtn) mainDownloadBtn.classList.add('hidden');
             if (mainPlayBtn) mainPlayBtn.classList.add('hidden');
@@ -685,7 +702,7 @@
             if (mainProgressWrap) {
               if (detail.downloadTotal) {
                 mainProgressWrap.classList.remove('hidden');
-                if (mainProgressBar) mainProgressBar.style.width = (detail.percent || 0) + '%';
+                if (mainProgressBar) { mainProgressBar.style.width = (detail.percent || 0) + '%'; setProgressValue(detail.percent || 0); }
                 if (mainProgressText) mainProgressText.textContent = mhsProgressLabel(detail);
               } else {
                 mainProgressWrap.classList.add('hidden');
@@ -708,6 +725,7 @@
     // Update next-unit status line
     if (unitId === nextUnit && nextUnit) {
       var nextStatusEl = document.getElementById('next-unit-status');
+      quietWhileDownloading(nextStatusEl, status, detail);
       if (nextStatusEl) {
         nextStatusEl.classList.remove('hidden');
         switch (status) {
@@ -727,7 +745,7 @@
             } else {
               nextStatusEl.textContent = (unitTitles[nextUnit] || 'Next unit') + ' queued';
             }
-            nextStatusEl.className = 'text-center text-xs text-gray-400 dark:text-gray-500 mt-3';
+            nextStatusEl.className = 'text-center text-xs text-gray-500 dark:text-gray-400 mt-3';
             break;
           case 'stalled':
             nextStatusEl.textContent = (unitTitles[nextUnit] || 'Next unit') + ' download stalled \u2014 restarting';

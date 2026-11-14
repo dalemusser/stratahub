@@ -59,14 +59,14 @@ P1 first, then P2, then P3; inside a priority, small items first. Each row's det
 | 12 | DL-2 play overlay cleanup wipes manual pre-downloads | P2 | **Done 2026-11-14** |
 | 13 | UX-4 `handleUnitComplete` has no `resp.ok` check | P3 (data loss, so early) | **Done 2026-11-14** |
 | 14 | RDY-5 `totalUnits = 5` fallback | P2 | **Done 2026-11-14** |
-| 15 | DL-7 `groupappstore` correlated `$lookup` on DocumentDB | P2 | |
-| 16 | DL-1 service worker download-creation race | P2 | |
+| 15 | DL-7 `groupappstore` correlated `$lookup` on DocumentDB | P2 | **Fix ready, held for Dale (branch `dl7-group-pins`).** Production DocumentDB refuses the old pipeline ("$lookup argument 'let' is not supported yet") and the error was swallowed: no group pin has ever applied. The 6 pinned groups are test and team groups with no activity in 14 days, pinned to old test builds; merging makes those pins apply. Options: merge as is, or clear the stale pins first |
+| 16 | DL-1 service worker download-creation race | P2 | **Done 2026-11-14** (service worker 1.0.19) |
 | 17 | DL-3 post-login early-download driver | P2 | |
-| 18 | UX-1 `aria-live` announces every percent | P2 | |
+| 18 | UX-1 `aria-live` announces every percent | P2 | **Done 2026-11-14** |
 | 19 | DOC-1, DOC-2 stale feature and issues READMEs | P2 | |
 | 20 | OPS-1 alert on download errors (the Daily Digest may already be the answer: decide) | P2 | |
 | 21 | SEC-3, SEC-4, SEC-5 | P3 | **Done 2026-11-14** |
-| 22 | UX-2, UX-3, UX-6, UX-7, UX-8 | P3 | UX-6, UX-7, UX-8 done 2026-11-14 |
+| 22 | UX-2, UX-3, UX-6, UX-7, UX-8 | P3 | **Done 2026-11-14** |
 | 23 | DL-5, DL-6, DL-8, ARCH-3 | P3 | DL-5, DL-6, ARCH-3 done 2026-11-14 |
 | 24 | ACT-2, ACT-3, ACT-4 | P3 | |
 | 25 | S-2 service worker comment (with the next service worker change, never alone) | P3 | **Done 2026-11-14** with B.7 |

@@ -47,13 +47,13 @@ the code has shifted since (line numbers especially).
 | SEC-3 | `ValidateAndConsumeToken` doesn't verify workspace binding | P3 | S | **DONE 2026-11-14** (staff tokens are consumed only in the workspace that minted them) |
 | SEC-4 | `HandleDeviceStatus` input unbounded (contrast bounded `HandleDownloadError`) | P3 | S | **DONE 2026-11-14** (body capped at 32 KB since 2026-09-07; ids, labels and both maps clipped) |
 | SEC-5 | Unlock-window gated actions not logged with attribution | P3 | S | **DONE 2026-11-14** (a gated action under an unlock logs who authorized it) |
-| DL-1 | SW download-creation race → BG fetch + fallback both run for one unit | P2 | M | OPEN |
+| DL-1 | SW download-creation race → BG fetch + fallback both run for one unit | P2 | M | **DONE 2026-11-14** (concurrent Background Fetch creations share one promise; a duplicate-id refusal adopts the existing fetch (service worker 1.0.19; simulated: 3 simultaneous requests → 1 download, the old code started 2 extra)) |
 | DL-2 | Play overlay `autoCleanup([nextUnit])` wipes manual pre-downloads | P2 | S | **DONE 2026-11-14** (the completion overlay keeps mhs-manual-downloads too) |
 | DL-3 | Post-login early-download hook is a 4th, unmanaged download driver | P2 | M | OPEN |
 | DL-4 | Play heartbeat stopped on `pagehide`, no `pageshow`/`persisted` re-arm | P2 | S | **DONE 2026-11-14** (a page restored from the back/forward cache reloads (Unity was quit at pagehide)) |
 | DL-5 | `authThrottle` idle-reset uses `nextAllowed` (future) not last-attempt | P3 | S | **DONE 2026-11-14** (the idle reset counts from the last attempt) |
 | DL-6 | Two throttle-key derivations that are supposed to be one budget | P3 | S | **DONE 2026-11-14** (checkMemberAuth uses authThrottleKey) |
-| DL-7 | `groupappstore` correlated `$lookup` — DocumentDB risk, error swallowed | P2 | M | OPEN |
+| DL-7 | `groupappstore` correlated `$lookup` — DocumentDB risk, error swallowed | P2 | M | FIX READY on branch `dl7-group-pins`, held: production DocumentDB refuses the old pipeline, so no group pin has ever applied (6 test/team groups, stale test builds pinned); merging makes them apply — Dale decides |
 | DL-8 | Double collection resolution per units/manage render | P3 | S | OPEN |
 | DL-9 | Content CDN rejects CORS preflights (OPTIONS 403; ETag not exposed) | P1 | S | **DONE 2026-10-07** (console: OPTIONS allowed on both behaviours, ExposeHeaders extended, `/*` invalidated; probes 9/9, Unity revalidation 304, Range+If-Range 206) |
 | DL-10 | Verify the drop-tolerant direct download at the school whose network cuts transfers; read `bgfetch-refused` prevalence | P1 | S | readable in-app since 2026-10-13: MHS Activity (`/mhsactivity`) shows per school the held / failed downloads and the students whose browser refused the background download; the school's filter was turned off by its district 2026-10-12 |
@@ -61,9 +61,9 @@ the code has shifted since (line numbers especially).
 | ACT-2 | Device Tests viewer: let coordinators follow MHS Activity's record links (add `coordinator` to its roles; `viewscope` already restricts rows) | P3 | S | OPEN |
 | ACT-3 | MHS Activity: an organization-level rollup for windows longer than 31 days (today's cap; student-day documents are summed per request) | P3 | M | OPEN |
 | ACT-4 | A `download-held` outcome posted by the units page after some minutes in the tail, so a hold is a record of its own instead of being read from a later record | P3 | S | OPEN — re-scoped 2026-11-09: since B.3 (`mhs-issues-remaining-plan-110926.md`) the step log records each tail wait once and every whole-file restart, and MHS Activity shows "held at the tail since"; a record of its own only helps if a hold is never followed by any record from that tab |
-| UX-1 | `aria-live` announces every download percent (~1/s) — SR spam | P2 | M | OPEN |
-| UX-2 | Contrast fix (MHS-A4) nullified at runtime by JS class strings | P3 | S | OPEN |
-| UX-3 | 429 backoff is a dead-end alert; no `Retry-After` / client handling | P3 | M | OPEN |
+| UX-1 | `aria-live` announces every download percent (~1/s) — SR spam | P2 | M | **DONE 2026-11-14** (status lines announce transitions and every 25 %; the bar is a role=progressbar with aria-valuenow) |
+| UX-2 | Contrast fix (MHS-A4) nullified at runtime by JS class strings | P3 | S | **DONE 2026-11-14** (JS state text uses gray-500 / dark gray-400 on the units and manage pages) |
+| UX-3 | 429 backoff is a dead-end alert; no `Retry-After` / client handling | P3 | M | **DONE 2026-11-14** (429 answers carry Retry-After and the exact wait; the manage page says how long to wait) |
 | UX-4 | `handleUnitComplete` has no `resp.ok` check (latent progress-drop) | P3 | S | **DONE 2026-11-14** (a refused completion is queued and sent again) |
 | UX-5 | `crypto.randomUUID()` no fallback — kills device telemetry on old Chrome | P3 | S | **DONE 2026-09-07** (A0, deployed) |
 | UX-6 | `quota === 0` → `NaN%` (guard only checks `!estimate`) | P3 | S | **DONE 2026-11-14** (a quota of 0 skips the storage math) |

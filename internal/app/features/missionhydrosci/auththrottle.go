@@ -2,6 +2,7 @@
 package missionhydrosci
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -114,4 +115,18 @@ func backoffDelay(fails int) time.Duration {
 		d = throttleMaxDelay
 	}
 	return d
+}
+
+// waitMessage says how long to wait (UX-3), and retryAfterSeconds is the
+// same wait for the Retry-After header.
+func waitMessage(wait time.Duration) string {
+	return fmt.Sprintf("Too many attempts. Please wait %d seconds and try again.", retryAfterSeconds(wait))
+}
+
+func retryAfterSeconds(wait time.Duration) int {
+	secs := int((wait + time.Second - 1) / time.Second)
+	if secs < 1 {
+		secs = 1
+	}
+	return secs
 }

@@ -3,6 +3,7 @@ package missionhydrosci
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
 	"time"
 
 	"github.com/dalemusser/stratahub/internal/app/store/emailverify"
@@ -55,7 +56,8 @@ func (h *Handler) HandleStaffAuthStart(w http.ResponseWriter, r *http.Request) {
 	now := time.Now()
 	if hasKey {
 		if wait := h.authThrottle.retryAfter(throttleKey, now); wait > 0 {
-			jsonError(w, "Too many attempts. Please wait a moment and try again.", http.StatusTooManyRequests)
+			w.Header().Set("Retry-After", strconv.Itoa(retryAfterSeconds(wait)))
+			jsonError(w, waitMessage(wait), http.StatusTooManyRequests)
 			return
 		}
 	}
@@ -118,7 +120,8 @@ func (h *Handler) HandleStaffAuthVerify(w http.ResponseWriter, r *http.Request) 
 	now := time.Now()
 	if hasKey {
 		if wait := h.authThrottle.retryAfter(throttleKey, now); wait > 0 {
-			jsonError(w, "Too many attempts. Please wait a moment and try again.", http.StatusTooManyRequests)
+			w.Header().Set("Retry-After", strconv.Itoa(retryAfterSeconds(wait)))
+			jsonError(w, waitMessage(wait), http.StatusTooManyRequests)
 			return
 		}
 	}
