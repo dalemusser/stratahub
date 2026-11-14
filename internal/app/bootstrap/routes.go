@@ -175,6 +175,11 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	wsStore := workspacestore.New(deps.StrataHubMongoDatabase)
 	r.Use(workspace.Middleware(appCfg.PrimaryDomain, wsStore, appCfg.MultiWorkspace, logger))
 
+	// MHS build zip uploads take longer than the server's read_timeout; give
+	// those two posts longer deadlines before anything (the CSRF check) reads
+	// the body.
+	r.Use(mhsbuildsfeature.LongUploadDeadlines(logger))
+
 	// Member Status API: built before the middleware chain because its CORS
 	// policy (the workspace's allowed browser origins, set on Settings) must
 	// answer the API's preflights BEFORE the global CORS middleware, which

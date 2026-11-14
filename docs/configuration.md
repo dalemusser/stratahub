@@ -44,7 +44,7 @@ StrataHub configuration is divided into two sections:
 | `http_port` | int | `8080` | HTTP server port |
 | `https_port` | int | `8443` | HTTPS server port |
 | `use_https` | bool | `false` | Enable HTTPS |
-| `read_timeout` | duration | `"30s"` | Max time to read request |
+| `read_timeout` | duration | `"15s"` | Max time to read a whole request, body included (MHS build uploads get 30 minutes; see `features/mhsbuilds/deadlines.go`) |
 | `read_header_timeout` | duration | `"10s"` | Max time to read request headers |
 | `write_timeout` | duration | `"30s"` | Max time to write response |
 | `idle_timeout` | duration | `"120s"` | Max time for keep-alive connections |
