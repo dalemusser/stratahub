@@ -198,7 +198,9 @@ func TestPlayPageProbesGameServices(t *testing.T) {
 		`including <code>OPTIONS</code> and <code>POST</code>`,
 		`services_blocked:`,
 		`showLoggingNotice('blocked')`,
-		`MHSDeliveryManager.probeServices(svcProbes, svcAuth)`,
+		`MHSDeliveryManager.probeServices(svcProbes, svcAuth, patient ? { limitMs: SVC_CONFIRM_LIMIT_MS } : null)`,
+		`assessServices(confirming).then(`, // the gate confirms with the patient probe
+		`return svcOnline() ? assessServices(true)`, // so does a block found while the game runs
 		`fetch('/missionhydrosci/api/services-health'`,
 		`Promise.all([logQueueReady, servicesGate])`,
 		`memberReport('services-blocked');`,

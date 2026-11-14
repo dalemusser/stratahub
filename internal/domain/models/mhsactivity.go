@@ -24,7 +24,10 @@ import (
 //	   starting there)
 //	7 (2026-11-10): a masked "Script error." runtime error is a browser
 //	   notice, not a crash (mhssteplog.IsCrashNotice), also for older records
-const MHSActivityVersion = 7
+//	8 (2026-11-14): Flags.ServicesBlocked counts a block found while the game
+//	   ran only when none of the game's events reached the log service that
+//	   day (the probe misses on slow networks); a gated launch always counts
+const MHSActivityVersion = 8
 
 // MHSChromeClosedDiscards is how many discards in a day make a problem. One
 // is ordinary (Chrome's memory saver unloads a tab left in the background

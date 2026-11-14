@@ -1616,9 +1616,14 @@
       // reaches the service (/api/services-health). A device without internet
       // and an outage on our side do not stop the game (it keeps its activity
       // and sends it later). A block is confirmed once after a short wait,
-      // then the loading screen says why, names the hosts for IT, and checks
-      // again every 30 s, starting the game by itself when they answer. Once
-      // the game runs, a block found later only shows the logging bar.
+      // with a probe that waits SVC_CONFIRM_LIMIT_MS for its answer (on a
+      // slow school network an answer can take longer than the first
+      // probe's 8 s while the game's own requests get through, seen
+      // 2026-11-11..13, mhs-resolution-plan-111426.md), then the loading
+      // screen says why, names the hosts for IT, and checks again every
+      // 30 s, starting the game by itself when they answer. Once the game
+      // runs, a block found later is confirmed the same way and then only
+      // shows the logging bar.
       var svcHealth = { blocked: '', hosts: '', okLogged: false, oddLogged: false, downLogged: false };
       var svcProbes = {{ .ServiceProbes }} || [];
       var svcAuth = (function() {
@@ -1634,10 +1639,12 @@
       // One look at the services: the probes plus the server's view.
       // Resolves {results, school (blocked by the school), down (not
       // answering, no evidence it is the school), odd}.
-      function assessServices() {
+      var SVC_CONFIRM_LIMIT_MS = 45000;
+      function assessServices(patient) {
         var health = fetch('/missionhydrosci/api/services-health', { cache: 'no-store', credentials: 'same-origin' })
           .then(function(r) { return r.ok ? r.json() : null; }).catch(function() { return null; });
-        return Promise.all([MHSDeliveryManager.probeServices(svcProbes, svcAuth), health]).then(function(v) {
+        var probing = MHSDeliveryManager.probeServices(svcProbes, svcAuth, patient ? { limitMs: SVC_CONFIRM_LIMIT_MS } : null);
+        return Promise.all([probing, health]).then(function(v) {
           var results = v[0] || [], up = (v[1] && v[1].services) || {};
           var school = [], down = [];
           results.forEach(function(r) {
@@ -1688,6 +1695,9 @@
         if (!svcProbes.length || typeof MHSDeliveryManager === 'undefined' || !MHSDeliveryManager.probeServices) { release(); return; }
         var GATE_RECHECK_S = 30, CONFIRM_MS = 3000;
         var gated = false, nextAt = 0, tick = null, checking = false;
+        // The launch watchdog waits with the gate, also while a patient
+        // confirmation (up to SVC_CONFIRM_LIMIT_MS) is still out.
+        var feed = setInterval(function() { if (typeof launchProgress === 'function') launchProgress(); }, 5000);
         var retryBtn = document.getElementById('loading-gate-retry');
         var titleEl = document.getElementById('loading-title');
         var titleText = titleEl ? titleEl.textContent : '';
@@ -1727,6 +1737,7 @@
         }
         function open() {
           if (tick) { clearInterval(tick); tick = null; }
+          if (feed) { clearInterval(feed); feed = null; }
           if (gated) {
             gated = false;
             loadingText.textContent = 'Starting…';
@@ -1743,7 +1754,7 @@
         function check(confirming) {
           checking = true;
           if (gated) gateHint();
-          assessServices().then(function(a) {
+          assessServices(confirming).then(function(a) {
             checking = false;
             noteServices(a);
             if (a.school.length && svcOnline()) {
@@ -1769,9 +1780,19 @@
       // is not stopped; its own store keeps the activity meanwhile).
       servicesGate.then(function() {
         if (!svcProbes.length || typeof MHSDeliveryManager === 'undefined' || !MHSDeliveryManager.probeServices) return;
+        var confirmingBlock = false;
         setInterval(function() {
-          if (!svcOnline()) return;
-          assessServices().then(function(a) {
+          if (!svcOnline() || confirmingBlock) return;
+          assessServices(false).then(function(first) {
+            noteServices(first);
+            if (!first.school.length || svcHealth.blocked) return first;
+            // A miss while the game runs is confirmed once, 30 s later, with
+            // the patient probe before the page reports a block.
+            confirmingBlock = true;
+            return new Promise(function(r) { setTimeout(r, 30000); })
+              .then(function() { return svcOnline() ? assessServices(true) : { results: [], school: [], down: [], odd: [] }; })
+              .then(function(a) { confirmingBlock = false; return a; }, function() { confirmingBlock = false; return first; });
+          }).then(function(a) {
             noteServices(a);
             if (a.school.length) {
               if (markBlocked(a.school)) {

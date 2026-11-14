@@ -279,6 +279,33 @@ func TestMergeServicesBlocked(t *testing.T) {
 	}
 }
 
+// A block found while the game ran, on a day whose game events reached the
+// log service, is the probe missing on a slow network, not a block; a gated
+// launch counts even then.
+func TestMergeServicesBlockedContradictedByEvents(t *testing.T) {
+	b, student, _ := testBuilder(t)
+	b.logAvailable = true
+	r := rec(student, "dev-a", "unit2", "launch-ok", ct(9, 15, 0))
+	r.ServicesBlocked = "log,save"
+	b.addRecord(r, &models.MHSMemberSummary{V: models.MHSMemberSummaryVersion})
+	a := b.accs[student.ID]
+	a.doc.Log.Available, a.doc.Log.Events = true, 500
+	if d := b.finish(time.Now())[0]; d.Flags.ServicesBlocked {
+		t.Errorf("a contradicted in-play mark flagged the day: %+v", d.Flags)
+	}
+
+	b2, student2, _ := testBuilder(t)
+	b2.logAvailable = true
+	g := rec(student2, "dev-a", "unit2", "services-blocked", ct(9, 15, 0))
+	g.ServicesBlocked = "log,save"
+	b2.addRecord(g, &models.MHSMemberSummary{V: models.MHSMemberSummaryVersion, Outcome: "services-blocked"})
+	a2 := b2.accs[student2.ID]
+	a2.doc.Log.Available, a2.doc.Log.Events = true, 500
+	if d := b2.finish(time.Now())[0]; !d.Flags.ServicesBlocked {
+		t.Errorf("a gated launch must flag the day: %+v", d.Flags)
+	}
+}
+
 // Discards, other game windows and page freezes land on the day; a line two
 // records of one tab both carry counts once; two discards make the day a
 // problem, one does not.

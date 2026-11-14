@@ -52,6 +52,8 @@ type dayAcc struct {
 	renders      map[string][]time.Time // device → renderings
 	types        map[string]bool        // real crash types
 	launchPlayed bool                   // a launch record says logs were seen or the game heartbeat
+	gated        bool                   // the play gate kept a launch from starting (outcome services-blocked)
+	markedBlock  bool                   // a running game's page found the services blocked (no gate)
 }
 
 type unitAcc struct {
@@ -193,7 +195,11 @@ func (b *builder) addRecord(rec models.MHSDeviceTest, sum *models.MHSMemberSumma
 		a.doc.Flags.LoggingProblem = true
 	}
 	if inDay && rec.ServicesBlocked != "" {
-		a.doc.Flags.ServicesBlocked = true
+		if outcomeOf(rec) == "services-blocked" {
+			a.gated = true
+		} else {
+			a.markedBlock = true
+		}
 		a.doc.Opened = true // the play page was opened (the gate may have kept the game from starting)
 	}
 	if sum == nil {
@@ -548,6 +554,12 @@ func (b *builder) finish(now time.Time) []models.MHSActivityDay {
 		if d.Opened || d.Records > 0 {
 			d.Flags.StrayEvents = false // something happened today; the events are its own
 		}
+		// The gate stopping a launch always counts. A block found while the
+		// game ran counts only when none of the game's activity reached the
+		// log service that day: on a slow school network the page's probe
+		// can miss while the game's own requests get through (2026-11-14,
+		// mhs-resolution-plan-111426.md), and those days are not blocked.
+		d.Flags.ServicesBlocked = a.gated || (a.markedBlock && !(d.Log.Available && d.Log.Events > 0))
 		if d.Flags.ServicesBlocked {
 			problem = true // the play gate kept the game from starting (or nothing was recorded)
 		}

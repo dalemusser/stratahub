@@ -775,10 +775,14 @@
   //             filter's own reply, or nothing within the time limit)
   //   'odd'     a readable answer that is not the service's (an older service
   //             without the route, a server error): not evidence of a block
-  function probePost(url, auth) {
+  // `limitMs` is how long to wait for the answer (default
+  // PREFLIGHT_TIMEOUT_MS); a result that ran out of time carries
+  // timedOut: true, which on a slow school network is not proof of a block.
+  function probePost(url, auth, limitMs) {
     var started = Date.now();
+    var limit = limitMs || PREFLIGHT_TIMEOUT_MS;
     var controller = (typeof AbortController !== 'undefined') ? new AbortController() : null;
-    var timer = controller ? setTimeout(function() { controller.abort(); }, PREFLIGHT_TIMEOUT_MS) : null;
+    var timer = controller ? setTimeout(function() { controller.abort(); }, limit) : null;
     var opts = {
       method: 'POST', mode: 'cors', cache: 'no-store', credentials: 'omit',
       headers: { 'Content-Type': 'application/json', 'Authorization': auth || 'Bearer probe' },
@@ -797,8 +801,8 @@
     }).catch(function(err) {
       if (timer) clearTimeout(timer);
       var aborted = err && err.name === 'AbortError';
-      return { state: 'blocked', ms: Date.now() - started, status: 0,
-        error: aborted ? ('no answer within ' + Math.round(PREFLIGHT_TIMEOUT_MS / 1000) + ' s')
+      return { state: 'blocked', ms: Date.now() - started, status: 0, timedOut: !!aborted,
+        error: aborted ? ('no answer within ' + Math.round(limit / 1000) + ' s')
                        : 'the request was stopped before an answer (' + String((err && err.message) || err) + ')' };
     });
   }
@@ -811,19 +815,21 @@
    * sends the POST probe and, alongside, the plain GET to /health, so a
    * blocked result can say whether the host itself answers. Services without
    * a `post` URL are left out. Resolves to
-   * [{name, host, state, ms, error, hostAnswers}]; never rejects.
+   * [{name, host, state, ms, error, hostAnswers, timedOut}]; never rejects.
+   * `opts.limitMs` sets how long each POST probe waits for its answer.
    */
-  MHSDeliveryManager.probeServices = function(probes, auth) {
+  MHSDeliveryManager.probeServices = function(probes, auth, opts) {
     auth = auth || {};
+    var limitMs = (opts && opts.limitMs) || 0;
     var checks = [];
     (probes || []).forEach(function(probe) {
       if (!probe || !probe.post) return;
       checks.push(Promise.all([
-        probePost(probe.post, auth[probe.name]),
+        probePost(probe.post, auth[probe.name], limitMs),
         probe.url ? probeURL(probe.url, 'no-cors') : Promise.resolve({ ok: false })
       ]).then(function(r) {
         return { name: probe.name, host: hostOf(probe.post), state: r[0].state, ms: r[0].ms,
-          status: r[0].status, error: r[0].error, hostAnswers: !!r[1].ok };
+          status: r[0].status, error: r[0].error, hostAnswers: !!r[1].ok, timedOut: !!r[0].timedOut };
       }));
     });
     return Promise.all(checks);
