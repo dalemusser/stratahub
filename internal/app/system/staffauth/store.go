@@ -170,10 +170,13 @@ func (s *Store) MarkVerified(ctx context.Context, challengeID string) (string, e
 
 // ValidateAndConsumeToken checks that a token exists, is verified, and unused.
 // On success, marks it as used (single-use) and returns the challenge.
-func (s *Store) ValidateAndConsumeToken(ctx context.Context, token string) (*Challenge, error) {
+//
+// The token must have been minted in workspaceID (SEC-3): a token from another
+// workspace is not found and stays unused.
+func (s *Store) ValidateAndConsumeToken(ctx context.Context, token string, workspaceID primitive.ObjectID) (*Challenge, error) {
 	var ch Challenge
 	err := s.c.FindOneAndUpdate(ctx,
-		bson.M{"token": token, "verified": true, "used": false, "expires_at": bson.M{"$gt": time.Now()}},
+		bson.M{"token": token, "workspace_id": workspaceID, "verified": true, "used": false, "expires_at": bson.M{"$gt": time.Now()}},
 		bson.M{"$set": bson.M{"used": true}},
 	).Decode(&ch)
 	if err != nil {

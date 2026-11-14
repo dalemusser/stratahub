@@ -19,13 +19,12 @@ func (h *Handler) ServePlay(w http.ResponseWriter, r *http.Request) {
 
 	manifest, _ := h.resolveManifest(r)
 	var unit *ContentManifestUnit
-	var nextUnitID, nextUnitVersion string
+	var nextUnitID string
 	for i := range manifest.Units {
 		if manifest.Units[i].ID == unitID {
 			unit = &manifest.Units[i]
 			if i+1 < len(manifest.Units) {
 				nextUnitID = manifest.Units[i+1].ID
-				nextUnitVersion = manifest.Units[i+1].Version
 			}
 			break
 		}
@@ -76,13 +75,12 @@ func (h *Handler) ServePlay(w http.ResponseWriter, r *http.Request) {
 	}
 
 	h.renderPlay(w, r, playRender{
-		Unit:            *unit,
-		NextUnitID:      nextUnitID,
-		NextUnitVersion: nextUnitVersion,
-		UserName:        userName,
-		UserIDHex:       userIDHex,
-		BackURL:         "/missionhydrosci/units",
-		CeremonyURL:     ceremonyURLFor(manifest),
+		Unit:        *unit,
+		NextUnitID:  nextUnitID,
+		UserName:    userName,
+		UserIDHex:   userIDHex,
+		BackURL:     "/missionhydrosci/units",
+		CeremonyURL: ceremonyURLFor(manifest),
 	})
 }
 
@@ -100,14 +98,13 @@ func ceremonyURLFor(m ContentManifest) string {
 // to run, the identity to hand the game, and (for the device test) the
 // run's ids and endpoints.
 type playRender struct {
-	Unit            ContentManifestUnit
-	NextUnitID      string
-	NextUnitVersion string
-	UserName        string
-	UserIDHex       string
-	BackURL         string
-	CeremonyURL     string          // where MHSBridge.EndGame lands ("" = BackURL)
-	DeviceTest      *deviceTestPlay // nil for the normal launcher
+	Unit        ContentManifestUnit
+	NextUnitID  string
+	UserName    string
+	UserIDHex   string
+	BackURL     string
+	CeremonyURL string          // where MHSBridge.EndGame lands ("" = BackURL)
+	DeviceTest  *deviceTestPlay // nil for the normal launcher
 }
 
 // deviceTestPlay carries the device-test run into the play template.
@@ -133,7 +130,6 @@ func (h *Handler) renderPlay(w http.ResponseWriter, r *http.Request, p playRende
 		UserName:        p.UserName,
 		UserIDHex:       p.UserIDHex,
 		NextUnitID:      p.NextUnitID,
-		NextUnitVersion: p.NextUnitVersion,
 		CeremonyURL:     p.CeremonyURL,
 		DataFile:        p.Unit.DataFile,
 		FrameworkFile:   p.Unit.FrameworkFile,

@@ -155,6 +155,12 @@ func (h *Handler) checkMemberAuth(r *http.Request, role, authToken, keyword stri
 			if err := h.UnlockStore.Refresh(r.Context(), key, settings.GetMHSStaffUnlockDuration()); err != nil {
 				h.Log.Warn("failed to refresh staff unlock", zap.Error(err))
 			}
+			// The gated action is attributed to whoever granted the unlock
+			// (SEC-5).
+			h.Log.Info("MHS gated action under a staff unlock",
+				zap.String("member_user_id", userOID.Hex()),
+				zap.String("authorized_by", unlock.GrantedBy),
+				zap.String("action", r.Method+" "+r.URL.Path))
 			return 0, ""
 		}
 	}
@@ -162,7 +168,10 @@ func (h *Handler) checkMemberAuth(r *http.Request, role, authToken, keyword stri
 	// Back off a member who is repeatedly failing credential checks (idle
 	// scripting of the gate). Keyed per member+workspace so it survives a new
 	// session token. Non-attempts (empty credential) are not counted below.
-	throttleKey := userOID.Hex() + ":" + wsOID.Hex()
+	throttleKey, hasKey := h.authThrottleKey(r) // one key derivation for both credential surfaces (DL-6)
+	if !hasKey {
+		throttleKey = userOID.Hex() + ":" + wsOID.Hex()
+	}
 	now := time.Now()
 	if wait := h.authThrottle.retryAfter(throttleKey, now); wait > 0 {
 		h.Log.Warn("throttled MHS member-auth attempt",
@@ -178,7 +187,7 @@ func (h *Handler) checkMemberAuth(r *http.Request, role, authToken, keyword stri
 		if authToken == "" {
 			return http.StatusForbidden, "authorization token required"
 		}
-		ch, err := h.StaffAuthVerifier.Store.ValidateAndConsumeToken(r.Context(), authToken)
+		ch, err := h.StaffAuthVerifier.Store.ValidateAndConsumeToken(r.Context(), authToken, workspace.IDFromRequest(r))
 		if err != nil {
 			authFailed = true
 			break

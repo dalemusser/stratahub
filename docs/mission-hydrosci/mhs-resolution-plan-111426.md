@@ -55,19 +55,19 @@ P1 first, then P2, then P3; inside a priority, small items first. Each row's det
 | # | Item | Pri | Status |
 |---|---|---|---|
 | 10 | RDY-4 dev-sentinel user seeded into the default workspace | P1 | **Done 2026-11-14:** the row stays (joins from dev log and save data need it) but is created disabled, and an existing one is disabled at start, so it can never be signed into |
-| 11 | DL-4 play heartbeat not re-armed on `pageshow` | P2 | |
-| 12 | DL-2 play overlay cleanup wipes manual pre-downloads | P2 | |
-| 13 | UX-4 `handleUnitComplete` has no `resp.ok` check | P3 (data loss, so early) | |
-| 14 | RDY-5 `totalUnits = 5` fallback | P2 | |
+| 11 | DL-4 play heartbeat not re-armed on `pageshow` | P2 | **Done 2026-11-14** |
+| 12 | DL-2 play overlay cleanup wipes manual pre-downloads | P2 | **Done 2026-11-14** |
+| 13 | UX-4 `handleUnitComplete` has no `resp.ok` check | P3 (data loss, so early) | **Done 2026-11-14** |
+| 14 | RDY-5 `totalUnits = 5` fallback | P2 | **Done 2026-11-14** |
 | 15 | DL-7 `groupappstore` correlated `$lookup` on DocumentDB | P2 | |
 | 16 | DL-1 service worker download-creation race | P2 | |
 | 17 | DL-3 post-login early-download driver | P2 | |
 | 18 | UX-1 `aria-live` announces every percent | P2 | |
 | 19 | DOC-1, DOC-2 stale feature and issues READMEs | P2 | |
 | 20 | OPS-1 alert on download errors (the Daily Digest may already be the answer: decide) | P2 | |
-| 21 | SEC-3, SEC-4, SEC-5 | P3 | |
-| 22 | UX-2, UX-3, UX-6, UX-7, UX-8 | P3 | |
-| 23 | DL-5, DL-6, DL-8, ARCH-3 | P3 | |
+| 21 | SEC-3, SEC-4, SEC-5 | P3 | **Done 2026-11-14** |
+| 22 | UX-2, UX-3, UX-6, UX-7, UX-8 | P3 | UX-6, UX-7, UX-8 done 2026-11-14 |
+| 23 | DL-5, DL-6, DL-8, ARCH-3 | P3 | DL-5, DL-6, ARCH-3 done 2026-11-14 |
 | 24 | ACT-2, ACT-3, ACT-4 | P3 | |
 | 25 | S-2 service worker comment (with the next service worker change, never alone) | P3 | **Done 2026-11-14** with B.7 |
 | 26 | ARCH-1, ARCH-2, TEST-1 (large: refactor or freeze; a JS test harness) | P2/P3 | |

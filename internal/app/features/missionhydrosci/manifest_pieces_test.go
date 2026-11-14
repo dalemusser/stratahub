@@ -28,3 +28,23 @@ func TestManifestListsPieces(t *testing.T) {
 		t.Errorf("kill switch: %+v", f)
 	}
 }
+
+// Device reports are clipped (SEC-4).
+func TestClipDeviceFields(t *testing.T) {
+	m := map[string]string{}
+	for i := 0; i < 100; i++ {
+		m[string(rune('a'+i%26))+string(rune('a'+i/26))] = "vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv"
+	}
+	c := clipMap(m, 40, 64, 10)
+	if len(c) != 40 {
+		t.Errorf("entries %d", len(c))
+	}
+	for _, v := range c {
+		if len(v) != 10 {
+			t.Errorf("value %q", v)
+		}
+	}
+	if got := clipString("ééé", 3); got != "é" {
+		t.Errorf("clip in a rune: %q", got)
+	}
+}

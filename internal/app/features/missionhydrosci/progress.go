@@ -236,10 +236,16 @@ func (h *Handler) HandleCompleteUnit(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Get total units from the active manifest for this user
+	// Without it the request fails rather than guessing a unit count (a
+	// guess of 5 would mark a student complete after unit 5 of a longer
+	// collection; RDY-5). The play page queues a refused completion and
+	// sends it again later.
 	manifest, _ := h.resolveManifest(r)
 	totalUnits := len(manifest.Units)
 	if totalUnits == 0 {
-		totalUnits = 5 // fallback
+		h.Log.Warn("unit completion refused: no units resolved for the user", zap.String("unit", req.Unit), zap.String("user_id", user.ID))
+		http.Error(w, "units unavailable, try again", http.StatusServiceUnavailable)
+		return
 	}
 
 	progress, err := h.ProgressStore.CompleteUnit(r.Context(), wsID, userID, req.Unit, totalUnits)

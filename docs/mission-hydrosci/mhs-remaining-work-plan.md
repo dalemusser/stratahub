@@ -44,15 +44,15 @@ the code has shifted since (line numbers especially).
 |----|------|-----|--------|--------|
 | SEC-1 | `checkMemberAuth` fails **open** on an unknown member-auth mode (no `default:`) | P1 | S | **DONE 2026-07-28** |
 | SEC-2 | `/api/auth/start` is unthrottled (mail-bomb / enumeration / code-invalidation) | P1 | S | **DONE 2026-07-28** |
-| SEC-3 | `ValidateAndConsumeToken` doesn't verify workspace binding | P3 | S | OPEN |
-| SEC-4 | `HandleDeviceStatus` input unbounded (contrast bounded `HandleDownloadError`) | P3 | S | PARTIAL 2026-09-07 (body capped at 32 KB); field/map caps OPEN |
-| SEC-5 | Unlock-window gated actions not logged with attribution | P3 | S | OPEN |
+| SEC-3 | `ValidateAndConsumeToken` doesn't verify workspace binding | P3 | S | **DONE 2026-11-14** (staff tokens are consumed only in the workspace that minted them) |
+| SEC-4 | `HandleDeviceStatus` input unbounded (contrast bounded `HandleDownloadError`) | P3 | S | **DONE 2026-11-14** (body capped at 32 KB since 2026-09-07; ids, labels and both maps clipped) |
+| SEC-5 | Unlock-window gated actions not logged with attribution | P3 | S | **DONE 2026-11-14** (a gated action under an unlock logs who authorized it) |
 | DL-1 | SW download-creation race → BG fetch + fallback both run for one unit | P2 | M | OPEN |
-| DL-2 | Play overlay `autoCleanup([nextUnit])` wipes manual pre-downloads | P2 | S | OPEN |
+| DL-2 | Play overlay `autoCleanup([nextUnit])` wipes manual pre-downloads | P2 | S | **DONE 2026-11-14** (the completion overlay keeps mhs-manual-downloads too) |
 | DL-3 | Post-login early-download hook is a 4th, unmanaged download driver | P2 | M | OPEN |
-| DL-4 | Play heartbeat stopped on `pagehide`, no `pageshow`/`persisted` re-arm | P2 | S | OPEN — more relevant since B.4 (2026-11-09): a game window restored from the back/forward cache after a discard-like pause stops beating and reads as "page stopped responding" |
-| DL-5 | `authThrottle` idle-reset uses `nextAllowed` (future) not last-attempt | P3 | S | OPEN |
-| DL-6 | Two throttle-key derivations that are supposed to be one budget | P3 | S | OPEN |
+| DL-4 | Play heartbeat stopped on `pagehide`, no `pageshow`/`persisted` re-arm | P2 | S | **DONE 2026-11-14** (a page restored from the back/forward cache reloads (Unity was quit at pagehide)) |
+| DL-5 | `authThrottle` idle-reset uses `nextAllowed` (future) not last-attempt | P3 | S | **DONE 2026-11-14** (the idle reset counts from the last attempt) |
+| DL-6 | Two throttle-key derivations that are supposed to be one budget | P3 | S | **DONE 2026-11-14** (checkMemberAuth uses authThrottleKey) |
 | DL-7 | `groupappstore` correlated `$lookup` — DocumentDB risk, error swallowed | P2 | M | OPEN |
 | DL-8 | Double collection resolution per units/manage render | P3 | S | OPEN |
 | DL-9 | Content CDN rejects CORS preflights (OPTIONS 403; ETag not exposed) | P1 | S | **DONE 2026-10-07** (console: OPTIONS allowed on both behaviours, ExposeHeaders extended, `/*` invalidated; probes 9/9, Unity revalidation 304, Range+If-Range 206) |
@@ -64,20 +64,20 @@ the code has shifted since (line numbers especially).
 | UX-1 | `aria-live` announces every download percent (~1/s) — SR spam | P2 | M | OPEN |
 | UX-2 | Contrast fix (MHS-A4) nullified at runtime by JS class strings | P3 | S | OPEN |
 | UX-3 | 429 backoff is a dead-end alert; no `Retry-After` / client handling | P3 | M | OPEN |
-| UX-4 | `handleUnitComplete` has no `resp.ok` check (latent progress-drop) | P3 | S | OPEN |
+| UX-4 | `handleUnitComplete` has no `resp.ok` check (latent progress-drop) | P3 | S | **DONE 2026-11-14** (a refused completion is queued and sent again) |
 | UX-5 | `crypto.randomUUID()` no fallback — kills device telemetry on old Chrome | P3 | S | **DONE 2026-09-07** (A0, deployed) |
-| UX-6 | `quota === 0` → `NaN%` (guard only checks `!estimate`) | P3 | S | OPEN |
-| UX-7 | Initial device report counts events, not units — can send incomplete | P3 | S | OPEN |
-| UX-8 | Collection picker interpolates `c.id` unescaped into onclick (hardening) | P3 | S | OPEN |
+| UX-6 | `quota === 0` → `NaN%` (guard only checks `!estimate`) | P3 | S | **DONE 2026-11-14** (a quota of 0 skips the storage math) |
+| UX-7 | Initial device report counts events, not units — can send incomplete | P3 | S | **DONE 2026-11-14** (the first report counts units) |
+| UX-8 | Collection picker interpolates `c.id` unescaped into onclick (hardening) | P3 | S | **DONE 2026-11-14** (only a 24-hex id goes into the onclick) |
 | RDY-1 | **iPad smoke pass has never been done** (fallback-only platform) | P1 | L | OPEN |
 | RDY-2 | MHS-005: request `navigator.storage.persist()` + report `persisted()` | P1 | S | **DONE 2026-09-07** (A0, deployed) |
 | RDY-3 | MHS-006: per-unit space preflight before downloading | P1 | M | **DONE 2026-09-07** (A0: missing bytes vs free quota, re-checked every minute; deployed) |
 | RDY-4 | Dev-sentinel user seeded into default/prod workspace unconditionally | P1 | S | **DONE 2026-11-14** (created disabled; an existing row is disabled at start) |
-| RDY-5 | `progress.go` `totalUnits = 5` fallback breaks a future 6-unit collection | P2 | S | OPEN |
+| RDY-5 | `progress.go` `totalUnits = 5` fallback breaks a future 6-unit collection | P2 | S | **DONE 2026-11-14** (no units resolved: 503, the play page queues the completion) |
 | RDY-6 | MHS-004: guest-profile verification run, then close/re-scope | P3 | M | OPEN |
 | ARCH-1 | Units/manage pipelines ~150 duplicated lines — refactor or freeze | P2 | L | OPEN |
 | ARCH-2 | Factory for `MHSDeliveryManager` construction (3–4 sites, wrong defaults) | P3 | M | OPEN |
-| ARCH-3 | Dead code: `PlayData.CDNBaseURL`, `nextUnitVersion`, others | P3 | S | OPEN |
+| ARCH-3 | Dead code: `PlayData.CDNBaseURL`, `nextUnitVersion`, others | P3 | S | **DONE 2026-11-14** (nextUnitVersion and its plumbing removed (PlayData.CDNBaseURL is read again: the content-server retry)) |
 | DOC-1 | Feature `README.md` stale (SW 1.0.7, "no Go tests", missing files/routes) | P2 | M | OPEN |
 | DOC-2 | `issues/README.md` stale (1.0.7, open-issue list, smoke-test checklist) | P2 | M | OPEN |
 | DOC-3 | Formally close / re-scope `issues/MHS-008` (only telemetry half shipped) | P3 | S | superseded → loading-status plan A1/A2 |

@@ -459,7 +459,6 @@
       var unitId = '{{ .UnitID }}';
       var csrfToken = '{{ .CSRFToken }}';
       var nextUnitId = '{{ .NextUnitID }}';
-      var nextUnitVersion = '{{ .NextUnitVersion }}';
       var completionHandled = false;
       var endGameHandled = false; // the game's EndGame, recorded once per page
 
@@ -556,7 +555,7 @@
           },
           body: JSON.stringify({ unit: unitId })
         })
-        .then(function(resp) { return resp.json(); })
+        .then(function(resp) { if (!resp.ok) throw new Error('HTTP ' + resp.status); return resp.json(); })
         .then(function(data) {
           completeAndTransition(data.next_unit, data.is_final);
         })
@@ -567,6 +566,18 @@
           var isFinal = !nextUnitId;
           completeAndTransition(nextUnitId, isFinal);
         });
+      }
+
+      // What the cleanup after a completed unit keeps: the next unit and the
+      // units downloaded by hand on the units or manage page (DL-2; those
+      // pages keep 'mhs-manual-downloads' too).
+      function keepAfterCompletion(nextUnit) {
+        var keep = [nextUnit];
+        try {
+          var manual = JSON.parse(localStorage.getItem('mhs-manual-downloads') || '[]');
+          if (Array.isArray(manual)) manual.forEach(function(id) { if (typeof id === 'string' && keep.indexOf(id) === -1) keep.push(id); });
+        } catch (e) { /* none */ }
+        return keep;
       }
 
       function completeAndTransition(nextUnit, isFinal) {
@@ -628,7 +639,7 @@
             if (status === 'cached') {
               // Auto-cleanup completed unit then navigate (navigate even if the
               // cleanup rejects — never strand).
-              mgr.autoCleanup([nextUnit]).then(function() {
+              mgr.autoCleanup(keepAfterCompletion(nextUnit)).then(function() {
                 navigateToNext(nextUnit);
               }, function() {
                 navigateToNext(nextUnit);
@@ -713,7 +724,7 @@
                 return;
               }
               if (msg) msg.textContent = 'Ready!';
-              mgr.autoCleanup([nextUnit]).then(function() {
+              mgr.autoCleanup(keepAfterCompletion(nextUnit)).then(function() {
                 navigateToNext(nextUnit);
               }, function() {
                 navigateToNext(nextUnit);
@@ -2373,6 +2384,11 @@
 
     // Full cleanup when the page is being navigated away or bfcached
     window.addEventListener('pagehide', cleanupUnity);
+
+    // A page restored from the back/forward cache has no game (Unity was
+    // quit at pagehide) and its heartbeats and play-session mark were
+    // stopped: start it over (DL-4).
+    window.addEventListener('pageshow', function(e) { if (e.persisted) location.reload(); });
 
     // Clean up when the back button is clicked (before navigation starts).
     // The back button is only visible in PWA standalone mode (via CSS media query).

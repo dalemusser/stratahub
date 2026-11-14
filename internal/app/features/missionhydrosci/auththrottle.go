@@ -25,6 +25,7 @@ type authThrottle struct {
 type throttleEntry struct {
 	fails       int
 	nextAllowed time.Time
+	lastAttempt time.Time // the idle reset counts from here (DL-5), not from nextAllowed
 }
 
 const (
@@ -59,7 +60,7 @@ func (t *authThrottle) retryAfter(key string, now time.Time) time.Duration {
 		return 0
 	}
 	// Drop a streak (and its memory) once the member has been idle a while.
-	if now.Sub(e.nextAllowed) > throttleIdleReset {
+	if now.Sub(e.lastAttempt) > throttleIdleReset {
 		delete(t.state, key)
 		return 0
 	}
@@ -82,6 +83,7 @@ func (t *authThrottle) fail(key string, now time.Time) {
 		t.state[key] = e
 	}
 	e.fails++
+	e.lastAttempt = now
 	e.nextAllowed = now.Add(backoffDelay(e.fails))
 }
 

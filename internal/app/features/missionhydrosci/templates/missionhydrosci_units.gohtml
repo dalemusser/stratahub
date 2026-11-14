@@ -498,7 +498,9 @@
 
   function collectAndReport(unitId, status) {
     initialReport[unitId] = status;
-    reportedCount++;
+    // Units, not events: one unit's rapid 'downloading' events must not
+    // send the report before the other units have answered (UX-7).
+    reportedCount = Object.keys(initialReport).length;
     if (!initialReportSent && reportedCount >= unitIds.length) {
       initialReportSent = true;
       reportDeviceStatus(initialReport);
@@ -923,7 +925,7 @@
   // Storage info display
   function updateStorageInfo() {
     manager.getStorageEstimate().then(function(estimate) {
-      if (!estimate) return;
+      if (!estimate || !estimate.quota) return; // UX-6: a quota of 0 would read as NaN%
 
       var storageInfo = document.getElementById('storage-info');
       var storageText = document.getElementById('storage-text');

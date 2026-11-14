@@ -721,7 +721,7 @@
   // Hide download buttons for units that would exceed available storage.
   function updateDownloadButtonVisibility() {
     manager.getStorageEstimate().then(function(estimate) {
-      if (!estimate || !manager.manifest || !manager.manifest.units) return;
+      if (!estimate || !estimate.quota || !manager.manifest || !manager.manifest.units) return;
 
       var available = estimate.quota - estimate.usage;
       var keepList = buildKeepList();
@@ -748,7 +748,7 @@
 
   function updateStorageInfo() {
     manager.getStorageEstimate().then(function(estimate) {
-      if (!estimate) return;
+      if (!estimate || !estimate.quota) return; // UX-6: a quota of 0 would read as NaN%
       var storageInfo = document.getElementById('storage-info');
       var storageText = document.getElementById('storage-text');
       var storageBar = document.getElementById('storage-bar');
@@ -1112,6 +1112,7 @@
         html += '</button>';
         for (var i = 0; i < collections.length; i++) {
           var c = collections[i];
+          if (!/^[0-9a-f]{24}$/.test(String(c.id))) continue; // UX-8: only an id goes into the onclick
           var isCurrent = hasOverride && (c.id === activeCollectionID);
           html += '<button onclick="mhsSelectCollection(\'' + c.id + '\')" class="w-full text-left px-3 py-2 text-sm rounded ' + (isCurrent ? 'bg-indigo-50 dark:bg-indigo-900/30 border border-indigo-300 dark:border-indigo-700' : 'hover:bg-gray-100 dark:hover:bg-gray-700') + ' text-gray-700 dark:text-gray-300">';
           html += '<span class="font-medium">' + escapeHtml(c.name) + '</span>';

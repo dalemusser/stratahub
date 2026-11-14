@@ -34,7 +34,6 @@ func memberPlayData() PlayData {
 		UserName:        "Pat O'Neil",
 		UserIDHex:       "69b4449ec6006ac370dad9df",
 		NextUnitID:      "unit2",
-		NextUnitVersion: "2.8.9",
 		DataFile:        "unit1.data.unityweb",
 		FrameworkFile:   "unit1.framework.js.unityweb",
 		CodeFile:        "unit1.wasm.unityweb",

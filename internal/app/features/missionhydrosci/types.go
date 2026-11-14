@@ -37,18 +37,17 @@ type UnitsData struct {
 // PlayData is the view model for the game launcher page.
 type PlayData struct {
 	viewdata.BaseVM
-	UnitID          string
-	UnitTitle       string
-	UnitVersion     string
-	CDNBaseURL      string
-	UserName        string // Injected into page for Unity identity bridge
-	UserIDHex       string // Hex of users._id; injected into Unity identity bridge
-	NextUnitID      string // Next unit after this one, empty if last
-	NextUnitVersion string // Version of the next unit
-	CeremonyURL     string // where the game's EndGame lands when the collection has a ceremony ("" = units page)
-	DataFile        string // Build file name for data (e.g., "unit1.data" or "unit2.data.unityweb")
-	FrameworkFile   string // Build file name for framework
-	CodeFile        string // Build file name for wasm
+	UnitID        string
+	UnitTitle     string
+	UnitVersion   string
+	CDNBaseURL    string
+	UserName      string // Injected into page for Unity identity bridge
+	UserIDHex     string // Hex of users._id; injected into Unity identity bridge
+	NextUnitID    string // Next unit after this one, empty if last
+	CeremonyURL   string // where the game's EndGame lands when the collection has a ceremony ("" = units page)
+	DataFile      string // Build file name for data (e.g., "unit1.data" or "unit2.data.unityweb")
+	FrameworkFile string // Build file name for framework
+	CodeFile      string // Build file name for wasm
 
 	// Game service config (injected into __mhsBridgeConfig for new builds)
 	// Each URL is a full endpoint (e.g., "https://log.adroit.games/api/log/submit")

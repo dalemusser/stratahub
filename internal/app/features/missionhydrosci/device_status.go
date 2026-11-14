@@ -5,6 +5,8 @@ import (
 	"encoding/json"
 	"io"
 	"net/http"
+	"sort"
+	"unicode/utf8"
 
 	"github.com/dalemusser/stratahub/internal/app/system/auth"
 	"github.com/dalemusser/stratahub/internal/app/system/workspace"
@@ -50,6 +52,12 @@ func (h *Handler) HandleDeviceStatus(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "device_id is required", http.StatusBadRequest)
 		return
 	}
+	// Bounded like HandleDownloadError (SEC-4): ids and labels clipped, the
+	// maps limited in entries and in key and value length.
+	req.DeviceID = clipString(req.DeviceID, 64)
+	req.DeviceType = clipString(req.DeviceType, 32)
+	req.DeviceDetails = clipMap(req.DeviceDetails, 40, 64, 512)
+	req.UnitStatus = clipMap(req.UnitStatus, 20, 64, 32)
 
 	wsID := workspace.IDFromRequest(r)
 	userID, err := primitive.ObjectIDFromHex(user.ID)
@@ -147,4 +155,36 @@ func (h *Handler) HandleDownloadError(w http.ResponseWriter, r *http.Request) {
 	)
 
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// clipString cuts s to at most n bytes without splitting a UTF-8 sequence.
+func clipString(s string, n int) string {
+	if len(s) <= n {
+		return s
+	}
+	for n > 0 && !utf8.RuneStart(s[n]) {
+		n--
+	}
+	return s[:n]
+}
+
+// clipMap keeps at most maxEntries entries (in key order) with keys and
+// values clipped to maxKey and maxVal bytes.
+func clipMap(m map[string]string, maxEntries, maxKey, maxVal int) map[string]string {
+	if m == nil {
+		return nil
+	}
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	out := make(map[string]string, len(m))
+	for _, k := range keys {
+		if len(out) >= maxEntries {
+			break
+		}
+		out[clipString(k, maxKey)] = clipString(m[k], maxVal)
+	}
+	return out
 }
