@@ -569,9 +569,36 @@
   /**
    * What is wrong with one cached file, or null when it is intact (or
    * cannot be judged). A wrong size returns {size: true, got, text}; a loader
-   * without createUnityInstance {loader: true, text}.
+   * without createUnityInstance {loader: true, text}; a damaged framework
+   * file {size: true, got, text} (it counts as a size
+   * repair, so the guard in _checkUnitCache stops a removal loop if a real
+   * framework ever lacked the name).
    */
   MHSDeliveryManager.prototype._fileDamage = async function(cache, key, match, file) {
+    // The framework's body can be empty or wrong under a stored
+    // content-length that matches the manifest, which the header fast path
+    // below would accept (Nov 2026: "unityFramework is not defined" on every
+    // launch on seven devices at one school). Read it: it is small. Its
+    // stored bytes must match the manifest and not be zero-filled; a plain
+    // (uncompressed) framework must also define unityFramework.
+    if (/\.framework\.js(\.unityweb)?$/.test(file.path)) {
+      try {
+        var fwBytes = new Uint8Array(await match.clone().arrayBuffer());
+        var why = '';
+        if (file.size && fwBytes.length !== file.size) why = fwBytes.length + ' of ' + file.size + ' bytes';
+        if (!why) {
+          var zero = true;
+          for (var z = 0; z < Math.min(fwBytes.length, 512); z++) { if (fwBytes[z] !== 0) { zero = false; break; } }
+          if (zero) why = 'the framework is empty or zero-filled (' + fwBytes.length + ' bytes stored)';
+        }
+        if (!why && /\.js$/.test(file.path) && new TextDecoder().decode(fwBytes).indexOf('unityFramework') === -1) {
+          why = 'the framework does not define unityFramework (' + fwBytes.length + ' bytes stored)';
+        }
+        if (why) return { size: true, got: fwBytes.length, text: why };
+      } catch (e) {
+        return null; // unreadable here: leave it to the launch check
+      }
+    }
     if (/\.loader\.js$/.test(file.path)) {
       try {
         var text = await match.clone().text();

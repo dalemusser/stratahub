@@ -1281,7 +1281,36 @@
         }
       }
 
+      // A framework file that loads but does not define unityFramework (an
+      // empty or wrong body stored under its key, seen Nov 2026 on seven
+      // devices at one school: every launch failed with "unityFramework is
+      // not defined" until the site data was cleared). Remove it from the
+      // downloaded files and reload once: the service worker then takes it
+      // from the content server, and the units page's check downloads it
+      // again. A second time in this tab is reported as the crash it is.
+      function repairDamagedFramework(message) {
+        if (!/unityFramework is not defined/.test(String(message || ''))) return false;
+        var guard = 'mhs-fw-repair-' + unitId + '-v' + unitVersion;
+        try { if (sessionStorage.getItem(guard)) return false; sessionStorage.setItem(guard, '1'); } catch (e) { return false; }
+        var fwKey = (typeof cachedLoaderKey === 'string' ? cachedLoaderKey : '').replace(/[^\/]+$/, '{{ .FrameworkFile }}');
+        stepLog.record('launch', 'warn', 'The game framework file in the downloaded files is damaged (it does not define unityFramework). ' +
+          'Removing it and reloading once; it is then loaded from the content server and downloaded again from the units page',
+          { reason: 'framework-damaged', unit: unitId });
+        if (loadingHint) loadingHint.textContent = 'Repairing a damaged game file…';
+        var removed = Promise.resolve(false);
+        try {
+          if ('caches' in window && fwKey) removed = caches.open('missionhydrosci-unit-' + unitId + '-v' + unitVersion).then(function(c) { return c.delete(fwKey); });
+        } catch (e) { /* best effort */ }
+        removed.catch(function() { return false; }).then(function(ok) {
+          stepLog.record('launch', 'info', ok ? 'Damaged framework file removed from the downloaded files' : 'The damaged framework file was not in the downloaded files');
+          memberReport('launch-repair');
+          setTimeout(function() { location.reload(); }, 500);
+        });
+        return true;
+      }
+
       window.onerror = function(message, source, lineno, colno, error) {
+        if (repairDamagedFramework(message)) return;
         reportCrash('runtime_error', message, error && error.stack ? error.stack : (source + ':' + lineno + ':' + colno), crashPhase);
       };
 

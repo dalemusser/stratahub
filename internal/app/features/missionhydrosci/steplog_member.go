@@ -35,6 +35,7 @@ const (
 	memberStepLogCeremonyOK       = "ceremony-ok"      // the end-of-game ceremony reached its end screen (unit "end")
 	memberStepLogCeremonyFailed   = "ceremony-failed"  // the ceremony could not start or play (WebGL, a bundle file, the player)
 	memberStepLogServicesBlocked  = "services-blocked" // the play gate kept the game from starting: the school blocks the log or save service
+	memberStepLogLaunchRepair     = "launch-repair"    // the play page removed a damaged downloaded file (the framework) and reloaded once
 )
 
 // memberStepLogRequest is the page's body: the outcome, the unit, the log's
@@ -60,7 +61,7 @@ func (h *Handler) HandleMemberStepLog(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	switch req.Outcome {
-	case memberStepLogDownloadFailed, memberStepLogDownloadComplete, memberStepLogDownloadSwitched, memberStepLogLaunchFailed, memberStepLogLaunchStalled, memberStepLogLaunchOK, memberStepLogCrash, memberStepLogReport, memberStepLogCeremonyOK, memberStepLogCeremonyFailed, memberStepLogServicesBlocked:
+	case memberStepLogDownloadFailed, memberStepLogDownloadComplete, memberStepLogDownloadSwitched, memberStepLogLaunchFailed, memberStepLogLaunchStalled, memberStepLogLaunchOK, memberStepLogCrash, memberStepLogReport, memberStepLogCeremonyOK, memberStepLogCeremonyFailed, memberStepLogServicesBlocked, memberStepLogLaunchRepair:
 	default:
 		writeDeviceTestJSON(w, http.StatusBadRequest, map[string]any{"ok": false, "error": "bad_outcome"})
 		return

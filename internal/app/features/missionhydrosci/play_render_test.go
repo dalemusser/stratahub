@@ -199,10 +199,12 @@ func TestPlayPageProbesGameServices(t *testing.T) {
 		`services_blocked:`,
 		`showLoggingNotice('blocked')`,
 		`MHSDeliveryManager.probeServices(svcProbes, svcAuth, patient ? { limitMs: SVC_CONFIRM_LIMIT_MS } : null)`,
-		`assessServices(confirming).then(`, // the gate confirms with the patient probe
+		`assessServices(confirming).then(`,          // the gate confirms with the patient probe
 		`return svcOnline() ? assessServices(true)`, // so does a block found while the game runs
 		`fetch('/missionhydrosci/api/services-health'`,
 		`Promise.all([logQueueReady, servicesGate])`,
+		`if (repairDamagedFramework(message)) return;`, // a damaged framework file is removed and the page reloads once
+		`replace(/[^\/]+$/, 'unit1.framework.js.unityweb')`,
 		`memberReport('services-blocked');`,
 		`id="loading-gate-retry"`,
 		`if (r.hostAnswers || up[r.name] === 'ok') school.push(r); else down.push(r);`,
