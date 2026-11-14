@@ -77,7 +77,7 @@ P1 first, then P2, then P3; inside a priority, small items first. Each row's det
 | # | Item | Status |
 |---|---|---|
 | 27 | H-1 database-backed tests for B.4 step 2 and the play gate | **Done 2026-11-14:** the local mongod (32 days up, 100 % CPU from deferred drops) restarted with `launchctl kickstart -k gui/<uid>/homebrew.mxcl.mongodb-community` (Homebrew refuses its untrusted tap); the handler tests pass |
-| 28 | H-2 dev test data from 2026-11-09 and the save/resume tests: keep, labelled as test data | |
+| 28 | H-2 dev test data from 2026-11-09 and the save/resume tests: keep, labelled as test data | Kept. Added 2026-11-14 (test member on dev, not field data): launches at 23:15, 23:33, 23:40 and 23:55 UTC and the Unit 1/2/3 downloads of the B.7 check; one probe log entry and one probe save under game `probe-enforce-111426`, user `0123456789abcdef01234567` |
 | 29 | mhsgrader's uncommitted rebuilt binary; three untracked zip bundles in mhs-updates | |
 
 ### Waiting on others (checks ready, nothing to do until then)
@@ -85,7 +85,7 @@ P1 first, then P2, then P3; inside a priority, small items first. Each row's det
 | Item | Waits on | Check when it arrives |
 |---|---|---|
 | D-1 Schools J and L filter | the districts | `filtercheck.js` after each class day (part of FC-1) |
-| Restricted-key enforcement in the log and save services | the game team's build with the new keys | the journal shows no requests on the old key, then `api_key_restricted_enforce = true` in both services |
+| ~~Restricted-key enforcement in the log and save services~~ | — | **Done 2026-11-14:** in 14 days of journals the old key was used outside the developer id once (2026-11-03, an admin account playing from the Editor, now allowed too); enforcement on in both services; old key with any other id refused (403), current keys accepted (201) |
 | B.7 smaller content objects | FC-4 | decided in item 3 |
 | Member Status API task 7 | Abt | already receiving events; tick the task in its plan |
 | Repeat students across semesters | Dale's decision | the enrollment-id design is written |

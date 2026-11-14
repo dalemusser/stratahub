@@ -117,7 +117,7 @@ Check: their build passes the hand-off's build checks on the dev site before it 
 
 - **H-1** Run the database-backed tests for B.4 step 2 and the play gate (`mhsactivity` handler and CSV tests, `missionhydrosci` handler tests) once the local database answers normally again (it took ~30 s per index on 2026-11-09).
 - **H-2** Dev test data from 2026-11-09 on the test member (gated launches, simulated discards, "Chrome closed the game 2 times" on the dev Activity day, one test crash record and crash event from the B.5 check): leave or delete, but do not read it as field data.
-- **H-3** Related work elsewhere that touches the same code paths: the restricted-key enforcement flip in the log and save services (waits on the game team's build with the new keys), and the save fix hand-off (G-package coordination).
+- **H-3** Related work elsewhere that touches the same code paths: the restricted-key enforcement in the log and save services (**on since 2026-11-14**, see `mhs-resolution-plan-111426.md`), and the save fix hand-off (G-package coordination).
 
 ---
 
