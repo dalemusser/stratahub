@@ -68,7 +68,7 @@ P1 first, then P2, then P3; inside a priority, small items first. Each row's det
 | 21 | SEC-3, SEC-4, SEC-5 | P3 | **Done 2026-11-14** |
 | 22 | UX-2, UX-3, UX-6, UX-7, UX-8 | P3 | **Done 2026-11-14** |
 | 23 | DL-5, DL-6, DL-8, ARCH-3 | P3 | DL-5, DL-6, ARCH-3 done 2026-11-14 |
-| 24 | ACT-2, ACT-3, ACT-4 | P3 | |
+| 24 | ACT-2, ACT-3, ACT-4 | P3 | ACT-2 done 2026-11-14 |
 | 25 | S-2 service worker comment (with the next service worker change, never alone) | P3 | **Done 2026-11-14** with B.7 |
 | 26 | ARCH-1, ARCH-2, TEST-1 (large: refactor or freeze; a JS test harness) | P2/P3 | |
 
@@ -76,7 +76,7 @@ P1 first, then P2, then P3; inside a priority, small items first. Each row's det
 
 | # | Item | Status |
 |---|---|---|
-| 27 | H-1 database-backed tests for B.4 step 2 and the play gate | |
+| 27 | H-1 database-backed tests for B.4 step 2 and the play gate | **Done 2026-11-14:** the local mongod (32 days up, 100 % CPU from deferred drops) restarted with `launchctl kickstart -k gui/<uid>/homebrew.mxcl.mongodb-community` (Homebrew refuses its untrusted tap); the handler tests pass |
 | 28 | H-2 dev test data from 2026-11-09 and the save/resume tests: keep, labelled as test data | |
 | 29 | mhsgrader's uncommitted rebuilt binary; three untracked zip bundles in mhs-updates | |
 

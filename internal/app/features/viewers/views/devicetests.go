@@ -57,7 +57,7 @@ func (v *DeviceTests) Title() string { return "Device Tests" }
 func (v *DeviceTests) Description() string {
 	return "Runs of the Mission HydroSci device test: who ran it, on what device and network, how the download and launch went, where it stopped, and the run's game telemetry."
 }
-func (v *DeviceTests) Roles() []string          { return []string{"admin", "analyst"} }
+func (v *DeviceTests) Roles() []string          { return []string{"admin", "analyst", "coordinator"} } // coordinators: their organizations only (scope), for MHS Activity's record links (ACT-2)
 func (v *DeviceTests) LiveIntervalSeconds() int { return deviceTestsLiveSeconds }
 
 // Filter keys (prefixed: the package shares one namespace across viewers).

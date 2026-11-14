@@ -301,7 +301,7 @@ func (h *Handler) load(w http.ResponseWriter, r *http.Request, pathOrg primitive
 		h.fail(w, r, "lookups", err)
 		return nil, false
 	}
-	canOpenRecords := authz.IsAdmin(r) || authz.IsAnalyst(r) // the Device Tests viewer's roles
+	canOpenRecords := authz.IsAdmin(r) || authz.IsAnalyst(r) || authz.IsCoordinator(r) // the Device Tests viewer's roles (coordinators: their organizations, ACT-2)
 	rep := BuildReport(docs, lk, Options{SelectedOrg: selectedOrg, SelectedGroup: scope.SelectedGroup, ShowStaff: showStaff, MultiDay: multiDay, Now: now, CanOpenDeviceTests: canOpenRecords})
 
 	missing := map[string]bool{}

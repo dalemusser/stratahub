@@ -188,7 +188,7 @@ func (h *Handler) ServeStudentDay(w http.ResponseWriter, r *http.Request) {
 		LogNote:    logNote,
 		LastRecord: lastRecord,
 	}
-	if authz.IsAdmin(r) || authz.IsAnalyst(r) {
+	if authz.IsAdmin(r) || authz.IsAnalyst(r) || authz.IsCoordinator(r) { // the Device Tests viewer's roles (ACT-2)
 		vm.RecordsHref = DeviceTestsHref(userID)
 	}
 	templates.Render(w, r, "mhsactivity_timeline", vm)
