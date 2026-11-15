@@ -78,8 +78,8 @@ the code has shifted since (line numbers especially).
 | ARCH-1 | Units/manage pipelines ~150 duplicated lines — refactor or freeze | P2 | L | OPEN — recommendation 2026-11-14: freeze the two pipelines during the school year (every change to one is made to both, as now) and do the status→UI-table refactor (MHS-020) in the summer break; Dale decides |
 | ARCH-2 | Factory for `MHSDeliveryManager` construction (3–4 sites, wrong defaults) | P3 | M | **DONE 2026-11-14** (the defaults in mhs-delivery.js are the real values, so a construction that leaves an option out is still right; the play overlay passes its options at construction instead of patching private fields; DL-3 removed the fourth path) |
 | ARCH-3 | Dead code: `PlayData.CDNBaseURL`, `nextUnitVersion`, others | P3 | S | **DONE 2026-11-14** (nextUnitVersion and its plumbing removed (PlayData.CDNBaseURL is read again: the content-server retry)) |
-| DOC-1 | Feature `README.md` stale (SW 1.0.7, "no Go tests", missing files/routes) | P2 | M | OPEN |
-| DOC-2 | `issues/README.md` stale (1.0.7, open-issue list, smoke-test checklist) | P2 | M | OPEN |
+| DOC-1 | Feature `README.md` stale (SW 1.0.7, "no Go tests", missing files/routes) | P2 | M | **DONE 2026-11-14** (rewritten to the current state) |
+| DOC-2 | `issues/README.md` stale (1.0.7, open-issue list, smoke-test checklist) | P2 | M | **DONE 2026-11-14** (rewritten to the current state) |
 | DOC-3 | Formally close / re-scope `issues/MHS-008` (only telemetry half shipped) | P3 | S | superseded → loading-status plan A1/A2 |
 | OPS-1 | No monitoring/alert on `"mhs download error"` log; no teacher runbook | P2 | M | **CLOSED 2026-11-14**: the alert is the MHS Daily Digest (Dale's decision 2026-11-09: a digest now, emails later); the runbook is mhs-logging-support-checklist.md plus the school IT one-pager |
 | TEST-1 | Zero automated tests for the newest behaviors; no JS test harness | P2 | L | **PARTLY DONE**: a JS harness exists (node --test tests/js/*.test.mjs, 60 tests on 2026-11-14 incl. the service worker pieces, Background Fetch assembly, DL-1 and the framework check); a test for each new behaviour is the rule from here |

@@ -63,7 +63,7 @@ P1 first, then P2, then P3; inside a priority, small items first. Each row's det
 | 16 | DL-1 service worker download-creation race | P2 | **Done 2026-11-14** (service worker 1.0.19) |
 | 17 | DL-3 post-login early-download driver | P2 | **Done 2026-11-14** (sign-in registers the service worker only) |
 | 18 | UX-1 `aria-live` announces every percent | P2 | **Done 2026-11-14** |
-| 19 | DOC-1, DOC-2 stale feature and issues READMEs | P2 | |
+| 19 | DOC-1, DOC-2 stale feature and issues READMEs | P2 | **Done 2026-11-14** |
 | 20 | OPS-1 alert on download errors (the Daily Digest may already be the answer: decide) | P2 | **Closed 2026-11-14:** the Daily Digest is the alert (Dale's decision 2026-11-09, emails later); the runbook is the support checklist and the school IT one-pager |
 | 21 | SEC-3, SEC-4, SEC-5 | P3 | **Done 2026-11-14** |
 | 22 | UX-2, UX-3, UX-6, UX-7, UX-8 | P3 | **Done 2026-11-14** |

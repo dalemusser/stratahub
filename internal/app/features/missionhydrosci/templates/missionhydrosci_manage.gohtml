@@ -906,7 +906,7 @@
     // capability hint (this device's Background Fetch pauses), not user data.
     // Purging it on Reset re-broke the exact devices the fallback exists for —
     // they'd revert to the pausable Background Fetch on the next download. It
-    // self-expires after 24h; testers who need the Background Fetch path back
+    // self-expires after 1 h (PREFER_FALLBACK_MS); testers who need the Background Fetch path back
     // sooner can clear the key manually.
     manager.purgeAllMHSData([MANUAL_DL_KEY, 'mhs-progress-queue', 'missionhydrosci-progress-changed', MHSDeliveryManager.ACTIVE_PLAY_KEY]).then(function() {
       manualDownloads = [];

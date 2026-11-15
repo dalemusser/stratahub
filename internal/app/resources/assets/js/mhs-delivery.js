@@ -733,7 +733,7 @@
   MHSDeliveryManager.PREFER_FALLBACK_KEY = PREFER_FALLBACK_KEY; // exported so Reset can purge it
 
   /**
-   * Remembers (for 24h) that Background Fetch doesn't work on this device —
+   * Remembers (for PREFER_FALLBACK_MS, 1 h) that Background Fetch doesn't work on this device —
    * Chrome pauses background fetches indefinitely under device conditions
    * like a metered connection or battery saver (seen on some Chromebooks).
    * While set, downloads go straight to the SW sequential fallback, which
