@@ -38,7 +38,7 @@ function load() {
   const steps = [];
   const sandbox = {
     window: { caches: api, location: { href: 'https://hub.example.org/missionhydrosci/units' } },
-    caches: api, Response, Headers, Blob, URL, console, setTimeout, clearTimeout, Promise, JSON,
+    caches: api, Response, Headers, Blob, URL, TextDecoder, Uint8Array, console, setTimeout, clearTimeout, Promise, JSON,
     localStorage: { getItem: k => (k in mem ? mem[k] : null), setItem: (k, v) => { mem[k] = String(v); }, removeItem: k => { delete mem[k]; } },
   };
   sandbox.window.localStorage = sandbox.localStorage;
@@ -136,4 +136,56 @@ test('nothing cached is not_cached; some missing is partial', async () => {
   const m = await fill(stores);
   m.delete(key(unit.files[1]));
   assert.equal(await mgr._checkUnitCache(unit), 'partial');
+});
+
+// The framework file (Nov 2026: "unityFramework is not defined" on every
+// launch while the stored content-length matched the manifest). Its body is
+// read: the stored bytes must match, must not be zero-filled, and a plain
+// framework must define unityFramework.
+const fwUnit = (p, n) => ({
+  id: 'unit2', version: '3.0.6', title: 'Unit 2',
+  files: [{ path: 'unit2/v3.0.6/Build/' + p, size: n }],
+});
+async function fillFw(stores, u, r) {
+  const m = new Map();
+  stores.set('missionhydrosci-unit-unit2-v3.0.6', m);
+  m.set(key(u.files[0]), r);
+  return m;
+}
+
+test('a compressed framework with a matching header but an empty body is removed', async () => {
+  const { mgr, stores, steps } = load();
+  const u = fwUnit('unit2.framework.js.unityweb', 3000);
+  const m = await fillFw(stores, u, resp(new Uint8Array(0), 3000));
+  assert.equal(await mgr._checkUnitCache(u), 'not_cached');
+  assert.equal(m.size, 0);
+  assert.ok(steps.some(s => /Removed 1 damaged file.*framework/.test(s.msg)), JSON.stringify(steps));
+});
+
+test('a zero-filled framework of the right size is removed', async () => {
+  const { mgr, stores, steps } = load();
+  const u = fwUnit('unit2.framework.js.unityweb', 3000);
+  await fillFw(stores, u, resp(new Uint8Array(3000), 3000));
+  assert.equal(await mgr._checkUnitCache(u), 'not_cached');
+  assert.ok(steps.some(s => /zero-filled/.test(s.msg)), JSON.stringify(steps));
+});
+
+test('an intact compressed framework is kept', async () => {
+  const { mgr, stores } = load();
+  const u = fwUnit('unit2.framework.js.unityweb', 3000);
+  const b = new Uint8Array(3000).map((_, i) => (i * 7 + 1) & 255);
+  await fillFw(stores, u, resp(b, 3000));
+  assert.equal(await mgr._checkUnitCache(u), 'cached');
+});
+
+test('a plain framework must define unityFramework', async () => {
+  const { mgr, stores } = load();
+  const good = 'var unityFramework = (() => { return function(Module) {}; })();';
+  const u = fwUnit('unit2.framework.js', good.length);
+  await fillFw(stores, u, resp(good, good.length));
+  assert.equal(await mgr._checkUnitCache(u), 'cached');
+  const bad = 'x'.repeat(good.length);
+  const { mgr: mgr2, stores: stores2 } = load();
+  await fillFw(stores2, u, resp(bad, bad.length));
+  assert.equal(await mgr2._checkUnitCache(u), 'not_cached');
 });

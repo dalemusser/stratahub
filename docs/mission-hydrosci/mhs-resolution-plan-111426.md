@@ -35,7 +35,7 @@ The play gate is the riskiest change in production (a false positive stops a cla
 | 2 | FC-3 | B.2 damaged-file removals: removals followed by completed downloads, no loops | **Done 2026-11-14; a gap found and fixed (35418b8, deployed).** Loader repairs worked (removal, then the launch from the content server). At School D, 7 devices then crashed on every launch with "unityFramework is not defined" (50 records, 11-10 and 11-11): the framework file had a correct stored content-length over a broken body, which the cache check accepted without reading it. Now the check reads the framework (bytes, zero-fill, the name in a plain framework) and the play page removes a damaged framework and reloads once (outcome `launch-repair`). Field check: School D's next class days |
 | 3 | FC-4 | B.3 held tail: whole-file restarts complete; decides B.7 | **Done 2026-11-14: fails at School T, so B.7 is needed.** Student-units restarted whole / completed afterwards since 11-09: T 36 / 5, O 6 / 3, S 5 / 4, U 1 / 1. At T the filter holds the whole-file fetch at the same point as the tail-only one (128 of 130 MB, every time), and after the second restart the download failed with "Quota exceeded" (I-1 on a fresh profile). B.3 helps where a stale partial was the cause (S, U); it cannot help where the filter holds every large object. **B.7 built and deployed the same day (2899271, service worker 1.0.18):** files of 32 MB or more are also stored as 8 MB pieces (25 builds of the 5 collections in use, done by the job at start); the service worker downloads and assembles them on both download paths. Verified on dev: Unit 3's data file fetched as its 18 pieces, Unit 2 (213 MB) assembled to the exact size, Unit 1 launched from an assembled file. Kill switch: `mhs_download_pieces_off = true`. Field check: School T's next class days (held restarts should stop; any piece that fails shows as a dropped connection) |
 | 4 | FC-5 | B.4 one window: second game windows before and after 2026-11-09; discard notices | **Passes 2026-11-14.** Launches that saw another game window: 129 of 2437 (5.3 %) on 11-02..06, 70 of 4312 (1.6 %) on 11-09..13. Discards per day are unchanged (they depend on the device), and the discard notice and Activity counts are recorded |
-| 5 | I-2 | The Daily Digest read against real data (does it mark the days the checks above find?) | |
+| 5 | I-2 | The Daily Digest read against real data (does it mark the days the checks above find?) | **Data side done 2026-11-14:** the Digest reads the stored days; after the Activity v8 recompute, the student-days flagged "filter blocking" on 11-11/12/13 dropped from 43/61/75 to 8/4/4 (the launches the gate actually stopped), so School S's false marks go away as the recompute finishes. A look in a browser needs a staff sign-in |
 
 Any check that fails becomes the next item, ahead of everything below.
 
@@ -64,11 +64,11 @@ P1 first, then P2, then P3; inside a priority, small items first. Each row's det
 | 17 | DL-3 post-login early-download driver | P2 | **Done 2026-11-14** (sign-in registers the service worker only) |
 | 18 | UX-1 `aria-live` announces every percent | P2 | **Done 2026-11-14** |
 | 19 | DOC-1, DOC-2 stale feature and issues READMEs | P2 | |
-| 20 | OPS-1 alert on download errors (the Daily Digest may already be the answer: decide) | P2 | |
+| 20 | OPS-1 alert on download errors (the Daily Digest may already be the answer: decide) | P2 | **Closed 2026-11-14:** the Daily Digest is the alert (Dale's decision 2026-11-09, emails later); the runbook is the support checklist and the school IT one-pager |
 | 21 | SEC-3, SEC-4, SEC-5 | P3 | **Done 2026-11-14** |
 | 22 | UX-2, UX-3, UX-6, UX-7, UX-8 | P3 | **Done 2026-11-14** |
 | 23 | DL-5, DL-6, DL-8, ARCH-3 | P3 | **Done 2026-11-14** |
-| 24 | ACT-2, ACT-3, ACT-4 | P3 | ACT-2 done 2026-11-14 |
+| 24 | ACT-2, ACT-3, ACT-4 | P3 | ACT-2 done, ACT-4 closed (superseded by B.7) 2026-11-14; ACT-3 (a rollup for windows over 31 days) waits until someone needs it |
 | 25 | S-2 service worker comment (with the next service worker change, never alone) | P3 | **Done 2026-11-14** with B.7 |
 | 26 | ARCH-1, ARCH-2, TEST-1 (large: refactor or freeze; a JS test harness) | P2/P3 | |
 

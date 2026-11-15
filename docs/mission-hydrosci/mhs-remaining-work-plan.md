@@ -60,7 +60,7 @@ the code has shifted since (line numbers especially).
 | ACT-1 | MHS Activity: student-day timeline (one student's merged, de-duplicated step log for one day across devices) | P2 | M | OPEN (plan phase 4, `docs/mhs-activity/plan.md`) |
 | ACT-2 | Device Tests viewer: let coordinators follow MHS Activity's record links (add `coordinator` to its roles; `viewscope` already restricts rows) | P3 | S | **DONE 2026-11-14** (coordinators open the Device Tests viewer for their organizations; MHS Activity and the student-day timeline show them the record links) |
 | ACT-3 | MHS Activity: an organization-level rollup for windows longer than 31 days (today's cap; student-day documents are summed per request) | P3 | M | OPEN |
-| ACT-4 | A `download-held` outcome posted by the units page after some minutes in the tail, so a hold is a record of its own instead of being read from a later record | P3 | S | OPEN — re-scoped 2026-11-09: since B.3 (`mhs-issues-remaining-plan-110926.md`) the step log records each tail wait once and every whole-file restart, and MHS Activity shows "held at the tail since"; a record of its own only helps if a hold is never followed by any record from that tab |
+| ACT-4 | A `download-held` outcome posted by the units page after some minutes in the tail, so a hold is a record of its own instead of being read from a later record | P3 | S | **CLOSED 2026-11-14**: superseded by B.7 — pieced files have no tail for a filter to hold; the step log keeps recording any hold of a whole file |
 | UX-1 | `aria-live` announces every download percent (~1/s) — SR spam | P2 | M | **DONE 2026-11-14** (status lines announce transitions and every 25 %; the bar is a role=progressbar with aria-valuenow) |
 | UX-2 | Contrast fix (MHS-A4) nullified at runtime by JS class strings | P3 | S | **DONE 2026-11-14** (JS state text uses gray-500 / dark gray-400 on the units and manage pages) |
 | UX-3 | 429 backoff is a dead-end alert; no `Retry-After` / client handling | P3 | M | **DONE 2026-11-14** (429 answers carry Retry-After and the exact wait; the manage page says how long to wait) |
@@ -81,8 +81,8 @@ the code has shifted since (line numbers especially).
 | DOC-1 | Feature `README.md` stale (SW 1.0.7, "no Go tests", missing files/routes) | P2 | M | OPEN |
 | DOC-2 | `issues/README.md` stale (1.0.7, open-issue list, smoke-test checklist) | P2 | M | OPEN |
 | DOC-3 | Formally close / re-scope `issues/MHS-008` (only telemetry half shipped) | P3 | S | superseded → loading-status plan A1/A2 |
-| OPS-1 | No monitoring/alert on `"mhs download error"` log; no teacher runbook | P2 | M | data source: MHS Activity (`/mhsactivity`, 2026-10-13) shows failed and held downloads, blocked students and fresh-profile churn per school and day; an alert and the runbook OPEN |
-| TEST-1 | Zero automated tests for the newest behaviors; no JS test harness | P2 | L | OPEN |
+| OPS-1 | No monitoring/alert on `"mhs download error"` log; no teacher runbook | P2 | M | **CLOSED 2026-11-14**: the alert is the MHS Daily Digest (Dale's decision 2026-11-09: a digest now, emails later); the runbook is mhs-logging-support-checklist.md plus the school IT one-pager |
+| TEST-1 | Zero automated tests for the newest behaviors; no JS test harness | P2 | L | **PARTLY DONE**: a JS harness exists (node --test tests/js/*.test.mjs, 60 tests on 2026-11-14 incl. the service worker pieces, Background Fetch assembly, DL-1 and the framework check); a test for each new behaviour is the rule from here |
 
 ---
 
