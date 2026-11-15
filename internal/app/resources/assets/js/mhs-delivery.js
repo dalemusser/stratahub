@@ -5,12 +5,12 @@
 
   var DEFAULT_SW_URL = '/sw.js';
   var DEFAULT_SW_SCOPE = '/';
-  var DEFAULT_MANIFEST_URL = '/mhs/api/manifest';
-  var DEFAULT_CONTENT_PREFIX = '/mhs/content/';
-  var DEFAULT_CHANNEL_NAME = 'mhs-delivery';
-  var DEFAULT_UNIT_CACHE_PREFIX = 'mhs-unit-';
-  var DEFAULT_FETCH_ID_PREFIX = 'mhs-';
-  var DEFAULT_APP_SHELL_CACHE_PREFIX = 'mhs-app-shell-';
+  var DEFAULT_MANIFEST_URL = '/missionhydrosci/api/manifest';
+  var DEFAULT_CONTENT_PREFIX = '/missionhydrosci/content/';
+  var DEFAULT_CHANNEL_NAME = 'missionhydrosci-delivery';
+  var DEFAULT_UNIT_CACHE_PREFIX = 'missionhydrosci-unit-';
+  var DEFAULT_FETCH_ID_PREFIX = 'missionhydrosci-';
+  var DEFAULT_APP_SHELL_CACHE_PREFIX = 'missionhydrosci-app-shell-';
 
   // Live play-session heartbeat (written by the play page, read by
   // pruneStaleCaches). Entries older than the TTL are dead sessions. Hidden
@@ -26,10 +26,10 @@
    * MHSDeliveryManager manages content downloads and cache status.
    * @param {Object} [opts] - Optional configuration overrides.
    * @param {string} [opts.swUrl] - Service worker URL (default: '/sw.js')
-   * @param {string} [opts.manifestUrl] - Content manifest API URL (default: '/mhs/api/manifest')
-   * @param {string} [opts.contentPrefix] - Content path prefix (default: '/mhs/content/')
-   * @param {string} [opts.channelName] - BroadcastChannel name (default: 'mhs-delivery')
-   * @param {string} [opts.unitCachePrefix] - Cache name prefix (default: 'mhs-unit-')
+   * @param {string} [opts.manifestUrl] - Content manifest API URL (default: '/missionhydrosci/api/manifest')
+   * @param {string} [opts.contentPrefix] - Content path prefix (default: '/missionhydrosci/content/')
+   * @param {string} [opts.channelName] - BroadcastChannel name (default: 'missionhydrosci-delivery')
+   * @param {string} [opts.unitCachePrefix] - Cache name prefix (default: 'missionhydrosci-unit-')
    */
   function MHSDeliveryManager(opts) {
     opts = opts || {};

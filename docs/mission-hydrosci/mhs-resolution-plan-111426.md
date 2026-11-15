@@ -70,7 +70,7 @@ P1 first, then P2, then P3; inside a priority, small items first. Each row's det
 | 23 | DL-5, DL-6, DL-8, ARCH-3 | P3 | **Done 2026-11-14** |
 | 24 | ACT-2, ACT-3, ACT-4 | P3 | ACT-2 done, ACT-4 closed (superseded by B.7) 2026-11-14; ACT-3 (a rollup for windows over 31 days) waits until someone needs it |
 | 25 | S-2 service worker comment (with the next service worker change, never alone) | P3 | **Done 2026-11-14** with B.7 |
-| 26 | ARCH-1, ARCH-2, TEST-1 (large: refactor or freeze; a JS test harness) | P2/P3 | |
+| 26 | ARCH-1, ARCH-2, TEST-1 (large: refactor or freeze; a JS test harness) | P2/P3 | ARCH-2 done 2026-11-14; TEST-1: the harness exists (60 JS tests); ARCH-1 recommendation: freeze during the school year, refactor in the summer (Dale decides) |
 
 ### Phase 4: housekeeping
 

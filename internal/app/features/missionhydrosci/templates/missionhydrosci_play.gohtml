@@ -603,6 +603,7 @@
 
         // Check if next unit is already cached
         var mgr = new MHSDeliveryManager({
+          swUrl: '/sw.js', swScope: '/', channelName: 'missionhydrosci-delivery', // Background Fetch needs the full worker setup
           manifestUrl: '/missionhydrosci/api/manifest',
           contentPrefix: '/missionhydrosci/content/',
           unitCachePrefix: 'missionhydrosci-unit-',
@@ -752,10 +753,6 @@
           }
         });
 
-        // Need full SW init for Background Fetch
-        mgr._swUrl = '/sw.js';
-        mgr._swScope = '/';
-        mgr._channelName = 'missionhydrosci-delivery';
         mgr.init().then(function() {
           mgr.downloadUnit(nextUnit);
         }).catch(function() {

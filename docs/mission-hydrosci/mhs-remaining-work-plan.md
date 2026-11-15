@@ -75,8 +75,8 @@ the code has shifted since (line numbers especially).
 | RDY-4 | Dev-sentinel user seeded into default/prod workspace unconditionally | P1 | S | **DONE 2026-11-14** (created disabled; an existing row is disabled at start) |
 | RDY-5 | `progress.go` `totalUnits = 5` fallback breaks a future 6-unit collection | P2 | S | **DONE 2026-11-14** (no units resolved: 503, the play page queues the completion) |
 | RDY-6 | MHS-004: guest-profile verification run, then close/re-scope | P3 | M | OPEN |
-| ARCH-1 | Units/manage pipelines ~150 duplicated lines — refactor or freeze | P2 | L | OPEN |
-| ARCH-2 | Factory for `MHSDeliveryManager` construction (3–4 sites, wrong defaults) | P3 | M | OPEN |
+| ARCH-1 | Units/manage pipelines ~150 duplicated lines — refactor or freeze | P2 | L | OPEN — recommendation 2026-11-14: freeze the two pipelines during the school year (every change to one is made to both, as now) and do the status→UI-table refactor (MHS-020) in the summer break; Dale decides |
+| ARCH-2 | Factory for `MHSDeliveryManager` construction (3–4 sites, wrong defaults) | P3 | M | **DONE 2026-11-14** (the defaults in mhs-delivery.js are the real values, so a construction that leaves an option out is still right; the play overlay passes its options at construction instead of patching private fields; DL-3 removed the fourth path) |
 | ARCH-3 | Dead code: `PlayData.CDNBaseURL`, `nextUnitVersion`, others | P3 | S | **DONE 2026-11-14** (nextUnitVersion and its plumbing removed (PlayData.CDNBaseURL is read again: the content-server retry)) |
 | DOC-1 | Feature `README.md` stale (SW 1.0.7, "no Go tests", missing files/routes) | P2 | M | OPEN |
 | DOC-2 | `issues/README.md` stale (1.0.7, open-issue list, smoke-test checklist) | P2 | M | OPEN |
