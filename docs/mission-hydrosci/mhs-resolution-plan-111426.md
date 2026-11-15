@@ -43,8 +43,8 @@ Any check that fails becomes the next item, ahead of everything below.
 
 | # | Item | What | Status |
 |---|---|---|---|
-| 6 | Save fixes | One cover note for the two ready packages, `gamesave-fix-102426` (v1.3) and `save-resume-fix-111126` (G-2, G-6), with the order to apply them and the dev-site check for their build; includes the G-6 questions (Unit 2 skip list, append-only replay lists) | |
-| 7 | G-5 | When their build arrives: the hand-off checks of each package on the dev site (garden box, logger, save fix, save/resume) before it is activated | waits on the team |
+| 6 | Save fixes | Hand-off to the game team | **Ready for Dale to send (2026-11-14).** The save fix v1.3 needs no hand-off: it is already in the team's 2026-10-29 code and in the 2026-11-02 release (G-5). What remains is `mhs-updates/save-resume-fix-111126` (G-2 and G-6; pushed, verified, dev-site test build `20261111-saveresume-SaveResumeFixTest`): send the link to its `03-for-the-game-dev.md`, with the two questions in G-6 (what the Unit 2 skip-list change 8 → 9 was for; keep the replay and skip lists append-only once saves exist) |
+| 7 | G-5 | The 2026-11-02 release | **Garden box confirmed in the field (2026-11-14):** Unit 4 v3.0.2 has 436 launch records and no "memory access out of bounds" crash since 11-03, against 7 in 400 (v2.8.1), 6 in 478 (v2.8.4) and 7 in 237 (v2.8.9) before. The save fix and logger 1.3 are in the same code (snapshot 12527); nothing more to check on the release |
 | 8 | G-3 | Memory: measure a local Unit 2 and Unit 1 build with Unity's memory tools (dialogue audio, occlusion data, texture formats on ARM), then a package, the same change in the local project and a dev-site test build | |
 | 9 | G-4 | Skip the main menu after a discard reload: required only if Dale decides so | Dale's decision |
 
