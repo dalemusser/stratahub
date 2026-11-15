@@ -49,12 +49,12 @@ the code has shifted since (line numbers especially).
 | SEC-5 | Unlock-window gated actions not logged with attribution | P3 | S | **DONE 2026-11-14** (a gated action under an unlock logs who authorized it) |
 | DL-1 | SW download-creation race → BG fetch + fallback both run for one unit | P2 | M | **DONE 2026-11-14** (concurrent Background Fetch creations share one promise; a duplicate-id refusal adopts the existing fetch (service worker 1.0.19; simulated: 3 simultaneous requests → 1 download, the old code started 2 extra)) |
 | DL-2 | Play overlay `autoCleanup([nextUnit])` wipes manual pre-downloads | P2 | S | **DONE 2026-11-14** (the completion overlay keeps mhs-manual-downloads too) |
-| DL-3 | Post-login early-download hook is a 4th, unmanaged download driver | P2 | M | OPEN |
+| DL-3 | Post-login early-download hook is a 4th, unmanaged download driver | P2 | M | **DONE 2026-11-14** (the sign-in action only registers the service worker; the unmanaged download is gone (staff get the managed one on the units page)) |
 | DL-4 | Play heartbeat stopped on `pagehide`, no `pageshow`/`persisted` re-arm | P2 | S | **DONE 2026-11-14** (a page restored from the back/forward cache reloads (Unity was quit at pagehide)) |
 | DL-5 | `authThrottle` idle-reset uses `nextAllowed` (future) not last-attempt | P3 | S | **DONE 2026-11-14** (the idle reset counts from the last attempt) |
 | DL-6 | Two throttle-key derivations that are supposed to be one budget | P3 | S | **DONE 2026-11-14** (checkMemberAuth uses authThrottleKey) |
 | DL-7 | `groupappstore` correlated `$lookup` — DocumentDB risk, error swallowed | P2 | M | FIX READY on branch `dl7-group-pins`, held: production DocumentDB refuses the old pipeline, so no group pin has ever applied (6 test/team groups, stale test builds pinned); merging makes them apply — Dale decides |
-| DL-8 | Double collection resolution per units/manage render | P3 | S | OPEN |
+| DL-8 | Double collection resolution per units/manage render | P3 | S | **DONE 2026-11-14** (the units and manage pages resolve the collection once (resolveManifestAndInfo)) |
 | DL-9 | Content CDN rejects CORS preflights (OPTIONS 403; ETag not exposed) | P1 | S | **DONE 2026-10-07** (console: OPTIONS allowed on both behaviours, ExposeHeaders extended, `/*` invalidated; probes 9/9, Unity revalidation 304, Range+If-Range 206) |
 | DL-10 | Verify the drop-tolerant direct download at the school whose network cuts transfers; read `bgfetch-refused` prevalence | P1 | S | readable in-app since 2026-10-13: MHS Activity (`/mhsactivity`) shows per school the held / failed downloads and the students whose browser refused the background download; the school's filter was turned off by its district 2026-10-12 |
 | ACT-1 | MHS Activity: student-day timeline (one student's merged, de-duplicated step log for one day across devices) | P2 | M | OPEN (plan phase 4, `docs/mhs-activity/plan.md`) |

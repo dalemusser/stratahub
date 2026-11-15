@@ -14,7 +14,7 @@ import (
 
 // ServeUnits renders the single-launch unit page with progress tracking.
 func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
-	manifest, _ := h.resolveManifest(r)
+	manifest, _, collInfo := h.resolveManifestAndInfo(r)
 
 	// Load user progress
 	var currentUnit string
@@ -87,8 +87,7 @@ func (h *Handler) ServeUnits(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Resolve effective collection info for the read-only version line.
-	collInfo := h.resolveEffectiveCollectionInfo(r)
+	// collInfo (resolved with the manifest above) feeds the read-only version line.
 
 	// The ceremony row: members open it once the game has ended (the
 	// end-of-game mark, not unit completion), staff any time.

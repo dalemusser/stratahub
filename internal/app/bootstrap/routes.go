@@ -393,69 +393,25 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 	// Login Actions Registry: features register post-login actions here.
 	loginActionsRegistry := loginactions.New(logger)
 
-	// Mission HydroSci early download: register SW and begin downloading on login.
+	// Mission HydroSci: register the service worker at sign-in, so the game
+	// pages are served from it from the start. It no longer starts a
+	// download (DL-3): that was a fourth download path with no stall
+	// watchdog, fallback, dedupe or telemetry, and it began a 130-200 MB
+	// download on every staff sign-in, on whatever network. Members land on
+	// the units page, which manages downloads; staff who open it get the
+	// same managed download there.
 	loginActionsRegistry.RegisterClient(loginactions.ClientAction{
 		Name:        "missionhydrosci-early-download",
-		Description: "Register service worker and begin downloading game units",
+		Description: "Register the Mission HydroSci service worker",
 		ShouldRun: func(lc *loginactions.LoginContext) bool {
-			// Members with missionhydrosci enabled land on the units page,
-			// which handles downloads itself — skip the login action.
-			if lc.Role == "member" {
-				for _, app := range lc.EnabledApps {
-					if app == "missionhydrosci" {
-						return false
-					}
-				}
-				return false
-			}
-			// Non-members (admin, coordinator, leader) always run
-			return true
+			// Members land on the units page, which registers it itself.
+			return lc.Role != "member"
 		},
 		Script: func(lc *loginactions.LoginContext) string {
 			return `
 				if ('serviceWorker' in navigator) {
 					navigator.serviceWorker.register('/sw.js', { scope: '/' })
-						.then(function(reg) {
-							// Wait for the SW to become active (may not be controlling yet after fresh install)
-							var sw = reg.active || reg.installing || reg.waiting;
-							if (!sw) return;
-							function whenActive(sw) {
-								return new Promise(function(resolve) {
-									if (sw.state === 'activated') { resolve(sw); return; }
-									sw.addEventListener('statechange', function() {
-										if (sw.state === 'activated') resolve(sw);
-									});
-								});
-							}
-							return whenActive(sw).then(function(activeSW) {
-								return fetch('/missionhydrosci/api/progress')
-									.then(function(resp) { return resp.json(); })
-									.then(function(progress) {
-										if (progress.current_unit && progress.current_unit !== 'complete') {
-											return fetch('/missionhydrosci/api/manifest')
-												.then(function(mr) { return mr.json(); })
-												.then(function(manifest) {
-													var units = manifest.units || [];
-													var unit = null;
-													for (var i = 0; i < units.length; i++) {
-														if (units[i].id === progress.current_unit) { unit = units[i]; break; }
-													}
-													if (unit && unit.files) {
-														activeSW.postMessage({
-															action: 'download',
-															unitId: progress.current_unit,
-															version: unit.version,
-															files: unit.files,
-															cdnBaseUrl: manifest.cdnBaseUrl,
-															title: 'Downloading ' + unit.title
-														});
-													}
-												});
-										}
-									});
-							});
-						})
-						.catch(function(e) { console.warn('MHS early download:', e); });
+						.catch(function(e) { console.warn('MHS service worker:', e); });
 				}
 			`
 		},

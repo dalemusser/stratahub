@@ -91,7 +91,20 @@ func (h *Handler) resolveCollection(r *http.Request) resolvedCollection {
 
 // resolveManifest resolves the active content manifest for the current request.
 func (h *Handler) resolveManifest(r *http.Request) (ContentManifest, bool) {
+	return h.manifestFor(r, h.resolveCollection(r))
+}
+
+// resolveManifestAndInfo resolves the collection once and returns both the
+// manifest and the UI's collection info (DL-8: the units and manage pages
+// resolved it twice, running the group-pin lookup and the progress upsert
+// twice per page load).
+func (h *Handler) resolveManifestAndInfo(r *http.Request) (ContentManifest, bool, collectionInfo) {
 	rc := h.resolveCollection(r)
+	m, ok := h.manifestFor(r, rc)
+	return m, ok, infoFor(rc)
+}
+
+func (h *Handler) manifestFor(r *http.Request, rc resolvedCollection) (ContentManifest, bool) {
 	if !rc.Found {
 		return ContentManifest{CDNBaseURL: h.CDNBaseURL}, false
 	}
@@ -106,9 +119,8 @@ type collectionInfo struct {
 	IsOverride  bool
 }
 
-// resolveEffectiveCollectionInfo returns metadata about the effective collection for the UI.
-func (h *Handler) resolveEffectiveCollectionInfo(r *http.Request) collectionInfo {
-	rc := h.resolveCollection(r)
+// infoFor returns metadata about the effective collection for the UI.
+func infoFor(rc resolvedCollection) collectionInfo {
 	if !rc.Found {
 		return collectionInfo{}
 	}

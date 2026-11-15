@@ -87,7 +87,7 @@ func (h *Handler) ServeManage(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Page content
-	manifest, _ := h.resolveManifest(r)
+	manifest, _, collInfo := h.resolveManifestAndInfo(r)
 
 	var currentUnit string
 	var completedUnits []string
@@ -158,8 +158,6 @@ func (h *Handler) ServeManage(w http.ResponseWriter, r *http.Request) {
 			nextUnitID = manifest.Units[i+1].ID
 		}
 	}
-
-	collInfo := h.resolveEffectiveCollectionInfo(r)
 
 	data.Units = units
 	if n := len(manifest.Units); n > 0 {
