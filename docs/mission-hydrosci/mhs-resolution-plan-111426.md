@@ -38,6 +38,19 @@ The play gate is the riskiest change in production (a false positive stops a cla
 | 5 | I-2 | The Daily Digest read against real data (does it mark the days the checks above find?) | **Data side done 2026-11-14:** the Digest reads the stored days; after the Activity v8 recompute, the student-days flagged "filter blocking" on 11-11/12/13 dropped from 43/61/75 to 8/4/4 (the launches the gate actually stopped), so School S's false marks go away as the recompute finishes. A look in a browser needs a staff sign-in |
 | 5a | Saves on slow networks | Played days without saves (found while adding the save check to Activity v10) | **Fixed 2026-11-19 (configuration).** Of the played days whose saves can still be checked, about 3 % have none: mostly short Unit 1 sessions (18 of 119 Unit 1 days, 1 to 2 % in Units 2 to 5; a session that ends before Unit 1's first save point), and School S. At School S the log and save services cut requests off at their 15 s read timeout: since 11-12, 59 state saves and 181 log submissions from School S's address arrived with an empty body and were refused as "Invalid JSON payload" (400), which the game treats as final and drops. `read_timeout` raised from 15s to 120s in the stratasave and stratalog configurations (`read_header_timeout` stays 10s), both restarted about 22:05 UTC, checked with a request whose body came 20 s late. Field check: the save service's refused saves (`ledger_entries`, 400 on /api/state/save) from School S after 11-19. Open: whether Unit 1's first save point comes too late for a class period (a game question) |
 
+**Recheck 2026-11-19** (class days 11-16..19 against 11-09..13; queries outside the repository):
+
+- **Gate (items 1, School S):** no launch stopped by the gate at School S since the fix (25 before, all on days whose events arrived); 15 in-play marks, of which the Activity day flags 3. 182 to 200 School S students play each class day.
+- **School J:** the filter no longer blocks: 16 to 20 students launched on each of 11-16, 11-18 and 11-19, none stopped, game events seen. School L: no launches.
+- **Framework repair (item 2, School D):** no "unityFramework is not defined" anywhere since the fix, but School D has not played since (one download attempt on 11-18), so the repair itself is not yet seen in the field.
+- **Pieces (item 3, School T):** the held downloads are gone (no whole-file restarts; Unit 3's 156 MB in 31 s), and every School T student who opened the game played (about 55 a day, 88 to 110 launches). What remains is a storage limit: School T's Chromebooks start a fresh profile every day, and a profile holds about one unit, so downloading the next units fails with "Quota exceeded" (631 download-failed records, one device retrying 336 times). The 9 students whose first unit failed on one device played that day on another. Follow-up: item 3a.
+- **Activity v10 (item 5):** recomputing oldest day first; 1,660 organization-days done, 2,099 (10-02..11-15) left, at the job's pace. Flagged student-days 11-16..18: 4.
+- **Save timeout (item 5a):** no refused saves since the change (after school hours so far); recheck after 11-20.
+
+| # | Item | What | Status |
+|---|---|---|---|
+| 3a | Next-unit downloads on wiped profiles | On a profile that holds about one unit (School T), the page keeps downloading the next units and each fails with "Quota exceeded": noise in the records and the Devices tab, and wasted bandwidth. Options: after a quota failure on a unit the student is not playing, stop downloading further units on that device (no retry loop, not reported as a failure); and assemble pieces without holding the pieces and the whole file at once (now the peak is twice the file) | To do |
+
 Any check that fails becomes the next item, ahead of everything below.
 
 ### Phase 2: hand-offs for the game team (prepared here, sent by Dale)
@@ -85,7 +98,7 @@ P1 first, then P2, then P3; inside a priority, small items first. Each row's det
 
 | Item | Waits on | Check when it arrives |
 |---|---|---|
-| D-1 Schools J and L filter | the districts | `filtercheck.js` after each class day (part of FC-1) |
+| D-1 Schools J and L filter (J passes since 11-16) | the districts (L only) | `filtercheck.js` after each class day (part of FC-1) |
 | ~~Restricted-key enforcement in the log and save services~~ | — | **Done 2026-11-14:** in 14 days of journals the old key was used outside the developer id once (2026-11-03, an admin account playing from the Editor, now allowed too); enforcement on in both services; old key with any other id refused (403), current keys accepted (201) |
 | B.7 smaller content objects | FC-4 | decided in item 3 |
 | Member Status API task 7 | Abt | already receiving events; tick the task in its plan |
