@@ -27,7 +27,10 @@ import (
 //	8 (2026-11-14): Flags.ServicesBlocked counts a block found while the game
 //	   ran only when none of the game's events reached the log service that
 //	   day (the probe misses on slow networks); a gated launch always counts
-const MHSActivityVersion = 8
+//	9 (2026-11-19): a block found while the game ran that names only the
+//	   save service counts even when log events arrived (they say nothing
+//	   about the save service)
+const MHSActivityVersion = 9
 
 // MHSChromeClosedDiscards is how many discards in a day make a problem. One
 // is ordinary (Chrome's memory saver unloads a tab left in the background

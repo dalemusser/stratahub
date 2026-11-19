@@ -306,6 +306,26 @@ func TestMergeServicesBlockedContradictedByEvents(t *testing.T) {
 	}
 }
 
+// A block found while the game ran that names only the save service is not
+// contradicted by log events: the log service answered that probe.
+func TestMergeSaveOnlyBlockKeptDespiteEvents(t *testing.T) {
+	b, student, _ := testBuilder(t)
+	b.logAvailable = true
+	r := rec(student, "dev-a", "unit2", "launch-ok", ct(9, 15, 0))
+	r.ServicesBlocked = "save"
+	b.addRecord(r, &models.MHSMemberSummary{V: models.MHSMemberSummaryVersion})
+	a := b.accs[student.ID]
+	a.doc.Log.Available, a.doc.Log.Events = true, 500
+	if d := b.finish(time.Now())[0]; !d.Flags.ServicesBlocked {
+		t.Errorf("a save-only block must flag the day: %+v", d.Flags)
+	}
+	for in, want := range map[string]bool{"save": true, "log,save": false, "log": false, "": false, " save ": true} {
+		if got := blocksSaveOnly(in); got != want {
+			t.Errorf("blocksSaveOnly(%q) = %v", in, got)
+		}
+	}
+}
+
 // Discards, other game windows and page freezes land on the day; a line two
 // records of one tab both carry counts once; two discards make the day a
 // problem, one does not.

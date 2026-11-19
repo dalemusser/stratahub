@@ -54,6 +54,7 @@ type dayAcc struct {
 	launchPlayed bool                   // a launch record says logs were seen or the game heartbeat
 	gated        bool                   // the play gate kept a launch from starting (outcome services-blocked)
 	markedBlock  bool                   // a running game's page found the services blocked (no gate)
+	markedSave   bool                   // such a mark named the save service and not the log service
 }
 
 type unitAcc struct {
@@ -199,6 +200,9 @@ func (b *builder) addRecord(rec models.MHSDeviceTest, sum *models.MHSMemberSumma
 			a.gated = true
 		} else {
 			a.markedBlock = true
+			if blocksSaveOnly(rec.ServicesBlocked) {
+				a.markedSave = true
+			}
 		}
 		a.doc.Opened = true // the play page was opened (the gate may have kept the game from starting)
 	}
@@ -559,7 +563,10 @@ func (b *builder) finish(now time.Time) []models.MHSActivityDay {
 		// log service that day: on a slow school network the page's probe
 		// can miss while the game's own requests get through (2026-11-14,
 		// mhs-resolution-plan-111426.md), and those days are not blocked.
-		d.Flags.ServicesBlocked = a.gated || (a.markedBlock && !(d.Log.Available && d.Log.Events > 0))
+		// A mark that names only the save service always counts: the log
+		// service answered that probe, so arriving log events say nothing
+		// about the save service (a filter that stops saves alone).
+		d.Flags.ServicesBlocked = a.gated || a.markedSave || (a.markedBlock && !(d.Log.Available && d.Log.Events > 0))
 		if d.Flags.ServicesBlocked {
 			problem = true // the play gate kept the game from starting (or nothing was recorded)
 		}
@@ -625,4 +632,19 @@ func BrowserOf(ua string) string {
 		return "Safari " + m[1]
 	}
 	return ""
+}
+
+// blocksSaveOnly reports whether a page's list of blocked services ("log",
+// "save" or "log,save") names the save service and not the log service.
+func blocksSaveOnly(services string) bool {
+	save, log := false, false
+	for _, s := range strings.Split(services, ",") {
+		switch strings.TrimSpace(s) {
+		case "save":
+			save = true
+		case "log":
+			log = true
+		}
+	}
+	return save && !log
 }
