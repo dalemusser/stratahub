@@ -91,7 +91,7 @@ P1 first, then P2, then P3; inside a priority, small items first. Each row's det
 | # | Item | Status |
 |---|---|---|
 | 27 | H-1 database-backed tests for B.4 step 2 and the play gate | **Done 2026-11-14:** the local mongod (32 days up, 100 % CPU from deferred drops) restarted with `launchctl kickstart -k gui/<uid>/homebrew.mxcl.mongodb-community` (Homebrew refuses its untrusted tap); the handler tests pass |
-| 28 | H-2 dev test data from 2026-11-09 and the save/resume tests: keep, labelled as test data | Kept. Added 2026-11-14 (test member on dev, not field data): launches at 23:15, 23:33, 23:40 and 23:55 UTC and the Unit 1/2/3 downloads of the B.7 check; one probe log entry and one probe save under game `probe-enforce-111426`, user `0123456789abcdef01234567` |
+| 28 | H-2 dev test data from 2026-11-09 and the save/resume tests: keep, labelled as test data | Kept. Added 2026-11-14 (test member on dev, not field data): launches at 23:15, 23:33, 23:40 and 23:55 UTC and the Unit 1/2/3 downloads of the B.7 check; one probe log entry and one probe save under game `probe-enforce-111426`, user `0123456789abcdef01234567`; 2026-11-19 23:05–23:08 UTC: the 3a check (test member, Units 1 and 2 downloaded under a 600 MB storage limit, one download-failed record caused by the test) |
 | 29 | mhsgrader's uncommitted rebuilt binary; three untracked zip bundles in mhs-updates | Binary committed 2026-11-14 (the build of 293a5fb, the deployed code). The zips (`end-of-game-ceremony-092426`, `gamelogger-cache-overflow-091626`, `gamelogger-fix-093026`) are hand-off copies of folders already in the repository; left in place for Dale to keep or delete |
 
 ### Waiting on others (checks ready, nothing to do until then)
