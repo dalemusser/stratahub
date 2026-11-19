@@ -306,22 +306,47 @@ func TestMergeServicesBlockedContradictedByEvents(t *testing.T) {
 	}
 }
 
-// A block found while the game ran that names only the save service is not
-// contradicted by log events: the log service answered that probe.
-func TestMergeSaveOnlyBlockKeptDespiteEvents(t *testing.T) {
-	b, student, _ := testBuilder(t)
-	b.logAvailable = true
-	r := rec(student, "dev-a", "unit2", "launch-ok", ct(9, 15, 0))
-	r.ServicesBlocked = "save"
-	b.addRecord(r, &models.MHSMemberSummary{V: models.MHSMemberSummaryVersion})
-	a := b.accs[student.ID]
-	a.doc.Log.Available, a.doc.Log.Events = true, 500
-	if d := b.finish(time.Now())[0]; !d.Flags.ServicesBlocked {
-		t.Errorf("a save-only block must flag the day: %+v", d.Flags)
+// A block found while the game ran is checked per service: log marks against
+// the day's log events, save marks against the day's saves; when the save
+// service cannot say, a log,save mark goes by the log events and a save-only
+// mark counts.
+func TestMergeServicesBlockedCheckedPerService(t *testing.T) {
+	cases := []struct {
+		name     string
+		services string
+		events   int
+		saves    saveState
+		want     bool
+	}{
+		{"save-only, saves arrived", "save", 500, saveArrived, false},
+		{"save-only, no saves", "save", 500, saveNone, true},
+		{"save-only, unknown", "save", 500, saveUnknown, true},
+		{"both, events and saves", "log,save", 500, saveArrived, false},
+		{"both, events but no saves", "log,save", 500, saveNone, true},
+		{"both, events, saves unknown", "log,save", 500, saveUnknown, false},
+		{"both, saves but no events", "log,save", 0, saveArrived, true},
+		{"log-only, events, no saves", "log", 500, saveNone, false},
+		{"log-only, no events", "log", 0, saveArrived, true},
 	}
-	for in, want := range map[string]bool{"save": true, "log,save": false, "log": false, "": false, " save ": true} {
-		if got := blocksSaveOnly(in); got != want {
-			t.Errorf("blocksSaveOnly(%q) = %v", in, got)
+	for _, c := range cases {
+		b, student, _ := testBuilder(t)
+		b.logAvailable = true
+		r := rec(student, "dev-a", "unit2", "launch-ok", ct(9, 15, 0))
+		r.ServicesBlocked = c.services
+		b.addRecord(r, &models.MHSMemberSummary{V: models.MHSMemberSummaryVersion})
+		if got := b.saveMarked(); (len(got) == 1) != (c.services != "log") {
+			t.Errorf("%s: students whose saves are read %v", c.name, got)
+		}
+		b.addSaves(map[string]saveState{student.ID.Hex(): c.saves})
+		a := b.accs[student.ID]
+		a.doc.Log.Available, a.doc.Log.Events = true, c.events
+		if d := b.finish(time.Now())[0]; d.Flags.ServicesBlocked != c.want {
+			t.Errorf("%s: flagged %v, want %v", c.name, d.Flags.ServicesBlocked, c.want)
+		}
+	}
+	for in, want := range map[string][2]bool{"save": {false, true}, "log,save": {true, true}, "log": {true, false}, "": {false, false}, " save ": {false, true}} {
+		if l, s := blockedServices(in); l != want[0] || s != want[1] {
+			t.Errorf("blockedServices(%q) = %v %v", in, l, s)
 		}
 	}
 }

@@ -53,8 +53,10 @@ type dayAcc struct {
 	types        map[string]bool        // real crash types
 	launchPlayed bool                   // a launch record says logs were seen or the game heartbeat
 	gated        bool                   // the play gate kept a launch from starting (outcome services-blocked)
-	markedBlock  bool                   // a running game's page found the services blocked (no gate)
-	markedSave   bool                   // such a mark named the save service and not the log service
+	markLog      bool                   // a running game's page found the log service blocked (no gate)
+	markSave     bool                   // a running game's page found the save service blocked
+	markSaveOnly bool                   // such a mark named the save service and not the log service
+	saves        saveState              // whether the day's saves reached the save service (read only for markSave)
 }
 
 type unitAcc struct {
@@ -199,10 +201,10 @@ func (b *builder) addRecord(rec models.MHSDeviceTest, sum *models.MHSMemberSumma
 		if outcomeOf(rec) == "services-blocked" {
 			a.gated = true
 		} else {
-			a.markedBlock = true
-			if blocksSaveOnly(rec.ServicesBlocked) {
-				a.markedSave = true
-			}
+			log, save := blockedServices(rec.ServicesBlocked)
+			a.markLog = a.markLog || log
+			a.markSave = a.markSave || save
+			a.markSaveOnly = a.markSaveOnly || (save && !log)
 		}
 		a.doc.Opened = true // the play page was opened (the gate may have kept the game from starting)
 	}
@@ -563,10 +565,21 @@ func (b *builder) finish(now time.Time) []models.MHSActivityDay {
 		// log service that day: on a slow school network the page's probe
 		// can miss while the game's own requests get through (2026-11-14,
 		// mhs-resolution-plan-111426.md), and those days are not blocked.
-		// A mark that names only the save service always counts: the log
-		// service answered that probe, so arriving log events say nothing
-		// about the save service (a filter that stops saves alone).
-		d.Flags.ServicesBlocked = a.gated || a.markedSave || (a.markedBlock && !(d.Log.Available && d.Log.Events > 0))
+		// A mark that names the save service is checked against the day's
+		// saves in the same way. When the save service cannot say (its old
+		// saves are dropped), a mark that also named the log service goes by
+		// the log events, and a mark naming only the save service counts.
+		logOK := d.Log.Available && d.Log.Events > 0
+		var saveOK bool
+		switch a.saves {
+		case saveArrived:
+			saveOK = true
+		case saveNone:
+			saveOK = false
+		default:
+			saveOK = !a.markSaveOnly && logOK
+		}
+		d.Flags.ServicesBlocked = a.gated || (a.markLog && !logOK) || (a.markSave && !saveOK)
 		if d.Flags.ServicesBlocked {
 			problem = true // the play gate kept the game from starting (or nothing was recorded)
 		}
@@ -634,10 +647,9 @@ func BrowserOf(ua string) string {
 	return ""
 }
 
-// blocksSaveOnly reports whether a page's list of blocked services ("log",
-// "save" or "log,save") names the save service and not the log service.
-func blocksSaveOnly(services string) bool {
-	save, log := false, false
+// blockedServices reads a page's list of blocked services ("log", "save" or
+// "log,save").
+func blockedServices(services string) (log, save bool) {
 	for _, s := range strings.Split(services, ",") {
 		switch strings.TrimSpace(s) {
 		case "save":
@@ -646,5 +658,29 @@ func blocksSaveOnly(services string) bool {
 			log = true
 		}
 	}
-	return save && !log
+	return log, save
+}
+
+// saveMarked returns the students (hex ids) whose running game's page found
+// the save service blocked that day: the ones whose saves are read.
+func (b *builder) saveMarked() []string {
+	var ids []string
+	for id, a := range b.accs {
+		if a.markSave {
+			ids = append(ids, id.Hex())
+		}
+	}
+	sort.Strings(ids)
+	return ids
+}
+
+// addSaves records what the save service says about each student's day.
+func (b *builder) addSaves(states map[string]saveState) {
+	for hexID, st := range states {
+		if id, err := primitive.ObjectIDFromHex(hexID); err == nil {
+			if a := b.accs[id]; a != nil {
+				a.saves = st
+			}
+		}
+	}
 }

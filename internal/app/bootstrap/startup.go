@@ -149,7 +149,7 @@ func Startup(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig, 
 	// MHS Activity: store each school's closed days (docs/mhs-activity/plan.md)
 	if appCfg.MHSActivityEnabled {
 		deps.TaskRunner.Register(mhsactivity.RollupJob(
-			mhsactivity.Deps{DB: deps.StrataHubMongoDatabase, LogDB: deps.StratalogDatabase, GradesDB: deps.MHSGraderDatabase, Log: logger, CloseAfter: appCfg.MHSActivityCloseAfter},
+			mhsactivity.Deps{DB: deps.StrataHubMongoDatabase, LogDB: deps.StratalogDatabase, SaveDB: deps.StratasaveDatabase, GradesDB: deps.MHSGraderDatabase, Log: logger, CloseAfter: appCfg.MHSActivityCloseAfter},
 			mhsactivitydays.New(deps.StrataHubMongoDatabase),
 			workspacestore.New(deps.StrataHubMongoDatabase),
 			mhsactivity.JobConfig{Interval: appCfg.MHSActivityRollupEvery, CatchUpDays: appCfg.MHSActivityCatchUpDays},

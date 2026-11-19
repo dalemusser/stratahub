@@ -39,6 +39,9 @@ type AppConfig struct {
 	// Stratalog database (for reading game log data - same cluster, different database)
 	StratalogDatabase string // Database name for Stratalog log data (default: stratalog)
 
+	// Stratasave database (for reading whether game saves arrived - same cluster, different database)
+	StratasaveDatabase string // Database name for Stratasave game saves (default: stratasave)
+
 	// Session management configuration
 	SessionKey    string        // Secret key for signing session cookies (must be strong in production)
 	SessionName   string        // Cookie name for sessions (default: stratahub-session)

@@ -51,7 +51,7 @@ func NewHandler(db, logDB, gradesDB *mongo.Database, errLog *uierrors.ErrorLogge
 	if cfg.MaxDays < cfg.MaxLiveDays {
 		cfg.MaxDays = cfg.MaxLiveDays
 	}
-	deps := activity.Deps{DB: db, LogDB: logDB, GradesDB: gradesDB, Log: logger, CloseAfter: cfg.CloseAfter}
+	deps := activity.Deps{DB: db, LogDB: logDB, SaveDB: cfg.SaveDB, GradesDB: gradesDB, Log: logger, CloseAfter: cfg.CloseAfter}
 	store := mhsactivitydays.New(db)
 	h := &Handler{
 		DB:       db,

@@ -22,6 +22,7 @@ var appConfigKeys = []config.AppKey{
 	{Name: "mongo_min_pool_size", Default: 10, Desc: "MongoDB min connection pool size (default: 10)"},
 	{Name: "mhsgrader_database", Default: "mhsgrader", Desc: "MHSGrader database for progress grades (same cluster)"},
 	{Name: "stratalog_database", Default: "stratalog", Desc: "Stratalog database for game log data (same cluster)"},
+	{Name: "stratasave_database", Default: "stratasave", Desc: "Stratasave database for game saves, read by the MHS Activity rollup (same cluster)"},
 	{Name: "session_key", Default: "dev-only-change-me-please-0123456789ABCDEF", Desc: "Session signing key (must be strong in production)"},
 	{Name: "session_name", Default: "stratahub-session", Desc: "Session cookie name"},
 	{Name: "session_domain", Default: "", Desc: "Session cookie domain (blank means current host)"},
@@ -149,16 +150,17 @@ func LoadConfig(logger *zap.Logger) (*config.CoreConfig, AppConfig, error) {
 	}
 
 	appCfg := AppConfig{
-		MongoURI:          appValues.String("mongo_uri"),
-		MongoDatabase:     appValues.String("mongo_database"),
-		MongoMaxPoolSize:  uint64(appValues.Int("mongo_max_pool_size")),
-		MongoMinPoolSize:  uint64(appValues.Int("mongo_min_pool_size")),
-		MHSGraderDatabase: appValues.String("mhsgrader_database"),
-		StratalogDatabase: appValues.String("stratalog_database"),
-		SessionKey:        appValues.String("session_key"),
-		SessionName:       appValues.String("session_name"),
-		SessionDomain:     appValues.String("session_domain"),
-		SessionMaxAge:     appValues.Duration("session_max_age", 24*time.Hour),
+		MongoURI:           appValues.String("mongo_uri"),
+		MongoDatabase:      appValues.String("mongo_database"),
+		MongoMaxPoolSize:   uint64(appValues.Int("mongo_max_pool_size")),
+		MongoMinPoolSize:   uint64(appValues.Int("mongo_min_pool_size")),
+		MHSGraderDatabase:  appValues.String("mhsgrader_database"),
+		StratalogDatabase:  appValues.String("stratalog_database"),
+		StratasaveDatabase: appValues.String("stratasave_database"),
+		SessionKey:         appValues.String("session_key"),
+		SessionName:        appValues.String("session_name"),
+		SessionDomain:      appValues.String("session_domain"),
+		SessionMaxAge:      appValues.Duration("session_max_age", 24*time.Hour),
 
 		// Idle logout
 		IdleLogoutEnabled: appValues.Bool("idle_logout_enabled"),

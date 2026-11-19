@@ -610,6 +610,7 @@ func BuildHandler(coreCfg *config.CoreConfig, appCfg AppConfig, deps DBDeps, log
 			MaxLiveDays:   appCfg.MHSActivityLiveMaxDays,
 			MaxDays:       appCfg.MHSActivityMaxDays,
 			BackfillStart: appCfg.MHSActivityBackfillFrom,
+			SaveDB:        deps.StratasaveDatabase,
 		})
 		wsr.Mount("/mhsactivity", mhsactivityfeature.Routes(mhsActivityHandler, sessionMgr))
 

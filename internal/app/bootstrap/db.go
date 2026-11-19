@@ -4,6 +4,7 @@ package bootstrap
 import (
 	"context"
 	"fmt"
+	"go.mongodb.org/mongo-driver/mongo"
 
 	"github.com/dalemusser/stratahub/internal/app/store/globalsettings"
 	"github.com/dalemusser/stratahub/internal/app/system/indexes"
@@ -56,10 +57,17 @@ func ConnectDB(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig
 	// Also get reference to the Stratalog database (same cluster, different database)
 	stratalogDB := client.Database(appCfg.StratalogDatabase)
 
+	// And the Stratasave database (same cluster, different database)
+	var stratasaveDB *mongo.Database
+	if appCfg.StratasaveDatabase != "" {
+		stratasaveDB = client.Database(appCfg.StratasaveDatabase)
+	}
+
 	logger.Info("connected to MongoDB",
 		zap.String("database", appCfg.MongoDatabase),
 		zap.String("mhsgrader_database", appCfg.MHSGraderDatabase),
 		zap.String("stratalog_database", appCfg.StratalogDatabase),
+		zap.String("stratasave_database", appCfg.StratasaveDatabase),
 		zap.Uint64("max_pool_size", poolCfg.MaxPoolSize),
 		zap.Uint64("min_pool_size", poolCfg.MinPoolSize),
 	)
@@ -146,6 +154,7 @@ func ConnectDB(ctx context.Context, coreCfg *config.CoreConfig, appCfg AppConfig
 		StrataHubMongoDatabase: db,
 		MHSGraderDatabase:      mhsGraderDB,
 		StratalogDatabase:      stratalogDB,
+		StratasaveDatabase:     stratasaveDB,
 		FileStorage:            store,
 		MHSStorage:             mhsStorage,
 		GlobalSettingsStore:    gsStore,

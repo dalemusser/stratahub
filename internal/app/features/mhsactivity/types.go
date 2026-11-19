@@ -9,16 +9,18 @@ import (
 
 	"github.com/dalemusser/stratahub/internal/app/system/viewdata"
 	"github.com/dalemusser/stratahub/internal/domain/models"
+	"go.mongodb.org/mongo-driver/mongo"
 )
 
 // Config is the feature's configuration (bootstrap appconfig).
 type Config struct {
 	Enabled       bool
-	CloseAfter    time.Duration // how long after its end a day stays open (live)
-	CacheTTL      time.Duration // how long a live day's computation is reused
-	MaxLiveDays   int           // how many days one request may compute live
-	MaxDays       int           // the longest window (stored days fill the rest)
-	BackfillStart string        // the first day the backfill offers by default
+	CloseAfter    time.Duration   // how long after its end a day stays open (live)
+	CacheTTL      time.Duration   // how long a live day's computation is reused
+	MaxLiveDays   int             // how many days one request may compute live
+	MaxDays       int             // the longest window (stored days fill the rest)
+	BackfillStart string          // the first day the backfill offers by default
+	SaveDB        *mongo.Database // the save service (stratasave), for days whose page found it blocked; nil = not read
 }
 
 // adminVM is the admin page's view model.

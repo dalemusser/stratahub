@@ -30,7 +30,12 @@ import (
 //	9 (2026-11-19): a block found while the game ran that names only the
 //	   save service counts even when log events arrived (they say nothing
 //	   about the save service)
-const MHSActivityVersion = 9
+//	10 (2026-11-19): a block found while the game ran is checked per service:
+//	   a mark naming the save service against the day's saves in the save
+//	   service (mhsactivity/saves.go); when those cannot be known (the save
+//	   service keeps a few saves per student), a log,save mark goes by the log
+//	   events and a save-only mark counts
+const MHSActivityVersion = 10
 
 // MHSChromeClosedDiscards is how many discards in a day make a problem. One
 // is ordinary (Chrome's memory saver unloads a tab left in the background

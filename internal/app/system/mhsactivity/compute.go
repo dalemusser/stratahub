@@ -42,6 +42,7 @@ const (
 type Deps struct {
 	DB         *mongo.Database // stratahub
 	LogDB      *mongo.Database // stratalog
+	SaveDB     *mongo.Database // stratasave; read only for days whose page found the save service blocked
 	GradesDB   *mongo.Database // mhsgrader
 	Log        *zap.Logger
 	CloseAfter time.Duration // how long after its end a day stays open; raised to MinCloseAfter when lower
@@ -201,6 +202,16 @@ func ComputeDay(ctx context.Context, deps Deps, wsID primitive.ObjectID, day str
 			if id, err := primitive.ObjectIDFromHex(hexID); err == nil {
 				b.addLog(id, ua)
 			}
+		}
+	}
+
+	// The save service: did the saves of students whose running game's page
+	// found it blocked arrive that day? Unknown when it cannot be read.
+	if ids := b.saveMarked(); len(ids) > 0 && deps.SaveDB != nil {
+		if states, err := readSaves(ctx, deps.SaveDB, ids, start, end); err != nil {
+			log.Warn("mhs activity: save service unavailable", zap.Error(err))
+		} else {
+			b.addSaves(states)
 		}
 	}
 

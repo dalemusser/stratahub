@@ -35,6 +35,9 @@ type DBDeps struct {
 	// Stratalog database for reading game log data (same cluster, different database)
 	StratalogDatabase *mongo.Database
 
+	// Stratasave database for reading whether game saves arrived (same cluster, different database)
+	StratasaveDatabase *mongo.Database
+
 	// FileStorage for material file uploads
 	FileStorage storage.Store
 
