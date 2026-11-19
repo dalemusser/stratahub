@@ -2,7 +2,7 @@
 // This file is concatenated with sw-cache.js and sw-background-fetch.js
 // by the Go handler before being served at /sw.js.
 
-const SW_VERSION = '1.0.19';
+const SW_VERSION = '1.0.20';
 
 // ---- Install ----
 // Pre-caches the app shell one URL at a time and never lets a failure abort

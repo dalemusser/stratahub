@@ -26,7 +26,10 @@ const ORIGIN = 'https://mhs.example';
 const CDN = 'https://cdn.example/mhs';
 
 class FakeCache {
-  constructor() { this.store = new Map(); }
+  // cap: total bytes the cache may hold; a put that would exceed it fails
+  // with QuotaExceededError when it is committed (after its body is read).
+  constructor(cap = Infinity) { this.store = new Map(); this.cap = cap; }
+  used() { let n = 0; for (const e of this.store.values()) n += e.body.byteLength; return n; }
   static url(key) { return typeof key === 'string' ? new URL(key, ORIGIN).href : key.url; }
   async match(key) {
     const e = this.store.get(FakeCache.url(key));
@@ -34,6 +37,7 @@ class FakeCache {
   }
   async put(key, response) {
     const buf = new Uint8Array(await response.arrayBuffer());
+    if (this.used() + buf.byteLength > this.cap) throw new DOMException('Quota exceeded.', 'QuotaExceededError');
     this.store.set(FakeCache.url(key), { body: buf, headers: Object.fromEntries(response.headers) });
   }
   async delete(key) { return this.store.delete(FakeCache.url(key)); }
@@ -209,4 +213,36 @@ test('DL-1: simultaneous download requests create one Background Fetch and no fa
   assert.deepEqual(results, [true, true, true]);
   assert.equal(created, 1);
   assert.equal(fallbacks, 0, 'no second download starts');
+});
+
+test('assembly that runs out of space is made again consuming the pieces, so the file needs only its own size', async () => {
+  const server = pieced(3123, 1000);
+  const { sandbox } = load(server.fetch);
+  const cache = new FakeCache(5000); // room for the pieces (3123) but not the pieces and the file together
+  await sandbox.fetchPiecedFile(cache, KEY, CDN, { path: PATH, size: 3123, pieces: 4, pieceBytes: 1000 }, () => {}, null, () => {});
+  assert.deepEqual(await bytesAt(cache, KEY), server.file);
+  assert.deepEqual(await leftovers(cache), []);
+  assert.equal(cache.used(), 3123);
+});
+
+test('assembly with room keeps every piece until the file is stored', async () => {
+  const server = pieced(3123, 1000);
+  const { sandbox } = load(server.fetch);
+  const cache = new FakeCache();
+  const deletes = [];
+  const del = cache.delete.bind(cache);
+  cache.delete = async (k) => { deletes.push({ key: FakeCache.url(k), fileStored: cache.store.has(FakeCache.url(KEY)) }); return del(k); };
+  await sandbox.fetchPiecedFile(cache, KEY, CDN, { path: PATH, size: 3123, pieces: 4, pieceBytes: 1000 }, () => {}, null, () => {});
+  const pieceDeletes = deletes.filter((d) => /\?piece=/.test(d.key));
+  assert.equal(pieceDeletes.length, 4);
+  assert.ok(pieceDeletes.every((d) => d.fileStored), 'pieces are dropped only after the file is stored');
+});
+
+test('a piece download that runs out of space fails at once (the page decides what follows)', async () => {
+  const server = pieced(3123, 1000);
+  const { sandbox } = load(server.fetch);
+  const cache = new FakeCache(1500);
+  await assert.rejects(sandbox.fetchPiecedFile(cache, KEY, CDN, { path: PATH, size: 3123, pieces: 4, pieceBytes: 1000 }, () => {}, null, () => {}),
+    (err) => err.name === 'QuotaExceededError');
+  assert.equal(server.requests.length, 2, 'no retries of a piece that cannot be stored');
 });

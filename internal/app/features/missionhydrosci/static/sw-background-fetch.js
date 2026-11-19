@@ -611,25 +611,43 @@ async function dropPieces(cache, cacheKey) {
 }
 
 // The stored pieces 0..count-1 as one stream, read one at a time.
-function piecesStream(cache, cacheKey, count) {
+// consume: delete each piece once it is read (see assemblePieces).
+function piecesStream(cache, cacheKey, count, consume) {
   var i = 0;
   return new ReadableStream({
     pull: async function(controller) {
       if (i >= count) { controller.close(); return; }
-      var r = await cache.match(pieceKey(cacheKey, i));
+      var key = pieceKey(cacheKey, i);
+      var r = await cache.match(key);
       if (!r) throw new Error('piece ' + i + ' missing');
       controller.enqueue(new Uint8Array(await r.arrayBuffer()));
+      if (consume) await cache.delete(key);
       i++;
     }
   });
 }
 
 // Writes the file from its stored pieces under its own key, then drops them.
+// The pieces stay until the file is stored, so a failed write loses
+// nothing; but for that moment the file takes twice its size. When that
+// runs out of space (a device whose profile holds about one unit, plan item
+// 3a), the write is made again deleting each piece as it is read: the file
+// then needs only its own size, and a failure there costs the pieces read
+// (downloaded again on the next attempt).
 async function assemblePieces(cache, cacheKey, count, size, contentType) {
-  var headers = new Headers();
-  headers.set('content-type', contentType || 'application/octet-stream');
-  headers.set('content-length', String(size));
-  await cache.put(cacheKey, new Response(piecesStream(cache, cacheKey, count), { status: 200, headers: headers }));
+  function put(consume) {
+    var headers = new Headers();
+    headers.set('content-type', contentType || 'application/octet-stream');
+    headers.set('content-length', String(size));
+    return cache.put(cacheKey, new Response(piecesStream(cache, cacheKey, count, consume), { status: 200, headers: headers }));
+  }
+  try {
+    await put(false);
+  } catch (err) {
+    if (classifyDownloadError(err).cls !== 'quota') throw err;
+    try { await cache.delete(cacheKey); } catch (e) { /* nothing stored */ }
+    await put(true);
+  }
   await dropPieces(cache, cacheKey);
 }
 

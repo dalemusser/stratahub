@@ -74,6 +74,7 @@
     this._wanted = {}; // unitId -> true while a requested download is outstanding (until 'cached' or removed)
     this._retryAttempts = {}; // unitId -> consecutive automatic retries without new bytes (drives the backoff)
     this._pendingRetries = {}; // unitId -> { kind, dueAt, attempt, base, timer, tick } while a retry is scheduled
+    this._ahead = {}; // unitId -> true while its download is ahead of need (the next unit; see downloadUnit)
     this._steplog = null; // MHSStepLog (see setStepLog); null = no per-load logging
     this._logSamples = {}; // unitId -> { at, bytes, bucket } throttling progress samples in the step log
     this.preflightResult = null; // last content-server/services reachability probe (see preflight)
@@ -1104,7 +1105,7 @@
       }
       delete self._pendingRetries[unitId];
       announce(0);
-      var run = (pending.kind === 'stalled') ? self.retryDownload(unitId) : self.downloadUnit(unitId);
+      var run = (pending.kind === 'stalled') ? self.retryDownload(unitId) : self.downloadUnit(unitId, { keep: true });
       Promise.resolve(run).catch(function(err) {
         console.warn('Automatic retry failed to start:', err);
       });
@@ -1142,7 +1143,7 @@
   MHSDeliveryManager.prototype.retryNow = function(unitId) {
     var p = this._pendingRetries[unitId];
     this._clearPendingRetry(unitId);
-    var run = (p && p.kind === 'stalled') ? this.retryDownload(unitId) : this.downloadUnit(unitId);
+    var run = (p && p.kind === 'stalled') ? this.retryDownload(unitId) : this.downloadUnit(unitId, { keep: true });
     return Promise.resolve(run).catch(function(err) { console.warn('Retry failed to start:', err); });
   };
 
@@ -1967,7 +1968,7 @@
         delete this._activeDownloads[unitId]; // couldn't start — let downloadUnit try cleanly
       }
 
-      return await this.downloadUnit(unitId);
+      return await this.downloadUnit(unitId, { keep: true });
     } finally {
       delete this._retryInFlight[unitId];
     }
@@ -2172,7 +2173,26 @@
    * instead of aborting. Falls back to SW sequential fetch if BG Fetch
    * API is unavailable or fails to start.
    */
-  MHSDeliveryManager.prototype.downloadUnit = async function(unitId) {
+  MHSDeliveryManager.prototype.downloadUnit = async function(unitId, opts) {
+    // Ahead of need (opts.ahead: the next unit, fetched while the current
+    // one is played). Some devices hold only one unit (School T's
+    // Chromebooks start a fresh profile in memory every day, and their
+    // reported quota is not the real limit), so an ahead download that runs
+    // out of space is put off until the unit is needed instead of failing
+    // and retrying all day (plan item 3a, mhs-resolution-plan-111426.md; see
+    // _deferAhead). opts.keep (the manager's own retries) keeps the mark; a
+    // plain call is a download that is needed now and clears it.
+    opts = opts || {};
+    if (opts.ahead) {
+      if (this._aheadDeferred(unitId)) {
+        this._fireStatus(unitId, 'deferred', { reason: 'quota' });
+        return;
+      }
+      if (!this._activeDownloads[unitId]) this._ahead[unitId] = true;
+    } else if (!opts.keep) {
+      delete this._ahead[unitId];
+      this._aheadDeferred(unitId, 'clear');
+    }
     // Prevent duplicate downloads — if already active, skip
     if (this._activeDownloads[unitId]) {
       return;
@@ -2330,8 +2350,9 @@
   /**
    * Deletes a unit's cache and aborts any active download for it.
    */
-  MHSDeliveryManager.prototype.deleteUnit = async function(unitId) {
+  MHSDeliveryManager.prototype.deleteUnit = async function(unitId, opts) {
     this._forgetDownload(unitId); // the user removed it — stop retrying
+    if (!(opts && opts.keepDeferred)) delete this._ahead[unitId];
     this._step('storage', 'info', 'Removed the downloaded files for ' + unitId);
     if (!this.manifest) return;
 
@@ -2607,7 +2628,63 @@
   };
 
   // Internal: fire all status callbacks
+  // Ahead downloads put off for want of space, per unit version, kept for
+  // AHEAD_DEFER_MS in localStorage so each page load does not download most
+  // of the unit again only to run out of space at the same point.
+  var AHEAD_DEFER_KEY = 'mhs-ahead-deferred';
+  var AHEAD_DEFER_MS = 12 * 60 * 60 * 1000;
+
+  // _aheadDeferred(unitId) reports whether the unit's ahead download is put
+  // off; with 'set' it puts it off, with 'clear' it lifts that.
+  MHSDeliveryManager.prototype._aheadDeferred = function(unitId, op) {
+    var unit = this._findUnit(unitId);
+    var key = unitId + '|' + (unit ? unit.version : '');
+    var map = {};
+    try { map = JSON.parse(localStorage.getItem(AHEAD_DEFER_KEY) || '{}') || {}; } catch (e) { map = {}; }
+    var now = Date.now(), changed = false;
+    for (var k in map) {
+      if (!(now - map[k] < AHEAD_DEFER_MS)) { delete map[k]; changed = true; }
+    }
+    var held = !!map[key] || !!(this._aheadHeld && this._aheadHeld[unitId]);
+    if (op === 'set') { map[key] = now; changed = true; this._aheadHeld = this._aheadHeld || {}; this._aheadHeld[unitId] = true; held = true; }
+    if (op === 'clear') {
+      if (map[key]) { delete map[key]; changed = true; }
+      if (this._aheadHeld) delete this._aheadHeld[unitId];
+      held = false;
+    }
+    if (changed) { try { localStorage.setItem(AHEAD_DEFER_KEY, JSON.stringify(map)); } catch (e) { /* storage off: this page still remembers */ } }
+    return held;
+  };
+
+  // An ahead download ran out of space: stop it (no retry, no failure
+  // report), remove what it stored (the unit being played may need the
+  // room), and report 'deferred'. The unit downloads when it is needed: the
+  // pages ask for it without opts.ahead once it is the current unit.
+  MHSDeliveryManager.prototype._deferAhead = function(unitId, detail) {
+    this._aheadDeferred(unitId, 'set');
+    delete this._ahead[unitId];
+    this._forgetDownload(unitId);
+    delete this._activeDownloads[unitId];
+    if (this._downloadMonitors[unitId]) {
+      clearInterval(this._downloadMonitors[unitId]);
+      delete this._downloadMonitors[unitId];
+    }
+    delete this._stallState[unitId];
+    var unit = this._findUnit(unitId);
+    this._step('storage', 'info', 'Not enough room on this device to download ' + (unit ? unit.title : unitId) +
+      ' ahead of time; it will download when it is needed' + (detail.rawError ? ' (' + detail.rawError + ')' : ''),
+      { unit: unitId, version: unit ? unit.version : '', error_class: 'quota', deferred: 'ahead' });
+    var self = this;
+    Promise.resolve(this.deleteUnit(unitId, { keepDeferred: true })).catch(function() {}).then(function() {
+      self._fireStatus(unitId, 'deferred', { reason: 'quota' });
+    });
+  };
+
   MHSDeliveryManager.prototype._fireStatus = function(unitId, status, detail) {
+    if (status === 'error' && this._ahead[unitId] && detail && detail.errorClass === 'quota') {
+      this._deferAhead(unitId, detail);
+      return;
+    }
     var wasActive = !!this._activeDownloads[unitId];
     // Feed the stall watchdog from 'downloading' broadcasts. For fallback
     // loops any broadcast is a liveness signal (they fire at least once a

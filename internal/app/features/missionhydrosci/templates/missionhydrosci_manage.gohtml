@@ -639,6 +639,14 @@
           if (downloadBtn) { downloadBtn.classList.remove('hidden'); downloadBtn.disabled = false; downloadBtn.textContent = 'Retry'; }
           if (clearBtn) clearBtn.classList.add('hidden');
           break;
+        case 'deferred':
+          // The next unit's early download ran out of room on this device; it
+          // downloads when it becomes the current unit (Download asks now).
+          statusEl.textContent = 'Not downloaded — downloads when it is the current unit (not enough room on this device for both)';
+          statusEl.className = 'text-xs text-gray-500 dark:text-gray-400 ml-2';
+          if (downloadBtn) { downloadBtn.classList.remove('hidden'); downloadBtn.disabled = false; downloadBtn.textContent = 'Download'; }
+          if (clearBtn) clearBtn.classList.add('hidden');
+          break;
       }
     }
 
@@ -697,8 +705,10 @@
         } else if (currentStatus === 'cached' && nextUnit) {
           // Current cached — auto-download the next unit if storage allows
           var nextStatus = cacheStatus[nextUnit];
+          // Ahead of need: put off (status 'deferred') rather than failed
+          // and retried when the device has no room for both units.
           if ((nextStatus === 'not_cached' || nextStatus === 'partial') && !lowStorage) {
-            manager.downloadUnit(nextUnit);
+            manager.downloadUnit(nextUnit, { ahead: true });
           }
         }
 
