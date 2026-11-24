@@ -47,6 +47,7 @@ func (h *Handler) ServeCollections(w http.ResponseWriter, r *http.Request) {
 			ID:            c.ID.Hex(),
 			Name:          c.Name,
 			Description:   c.Description,
+			TestOnly:      c.TestOnly,
 			UnitsSummary:  collectionSummary(c),
 			CreatedAt:     c.CreatedAt,
 			CreatedByName: c.CreatedByName,
@@ -131,6 +132,7 @@ func (h *Handler) ServeCollectionDetail(w http.ResponseWriter, r *http.Request) 
 		ID:            coll.ID.Hex(),
 		Name:          coll.Name,
 		Description:   coll.Description,
+		TestOnly:      coll.TestOnly,
 		Units:         unitVMs,
 		Ceremony:      ceremonyVM,
 		CreatedAt:     coll.CreatedAt,
@@ -290,6 +292,7 @@ func (h *Handler) ServeEdit(w http.ResponseWriter, r *http.Request) {
 		ID:          coll.ID.Hex(),
 		Name:        coll.Name,
 		Description: coll.Description,
+		TestOnly:    coll.TestOnly,
 		Units:       units,
 		Ceremony:    ceremonyRow(ceremonies, ceremonyVersion),
 		IsActive:    isActive,
@@ -358,6 +361,7 @@ func (h *Handler) HandleEdit(w http.ResponseWriter, r *http.Request) {
 
 	coll.Name = newName
 	coll.Description = newDesc
+	coll.TestOnly = r.FormValue("test_only") == "on"
 
 	if err := h.CollectionStore.Update(ctx, oid, coll); err != nil {
 		h.ErrLog.LogServerError(w, r, "Failed to update collection", err, "Failed to save changes", "/mhsbuilds/collections/"+idStr+"/edit")
@@ -406,6 +410,7 @@ func (h *Handler) renderEditError(w http.ResponseWriter, r *http.Request, id pri
 		ID:          id.Hex(),
 		Name:        r.FormValue("collection_name"),
 		Description: r.FormValue("collection_description"),
+		TestOnly:    r.FormValue("test_only") == "on",
 		Units:       units,
 		Ceremony:    ceremonyRow(ceremonies, strings.TrimSpace(r.FormValue("version_"+models.MHSCeremonyBuildID))),
 		Error:       msg,

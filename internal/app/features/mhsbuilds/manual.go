@@ -49,10 +49,10 @@ func (h *Handler) ServeManual(w http.ResponseWriter, r *http.Request) {
 	}
 	sort.Strings(sortedUnitIDs)
 
-	// Pre-fill versions (and the ceremony) from latest collection
+	// Pre-fill versions (and the ceremony) from the newest non-test collection
 	latestMap := make(map[string]models.MHSCollectionUnit)
 	ceremonyVersion := ""
-	if latest, err := h.CollectionStore.Latest(ctx); err == nil {
+	if latest, err := h.CollectionStore.LatestBase(ctx); err == nil {
 		for _, u := range latest.Units {
 			latestMap[u.UnitID] = u
 		}
@@ -226,6 +226,7 @@ func (h *Handler) HandleManual(w http.ResponseWriter, r *http.Request) {
 		Description:   collectionDesc,
 		Units:         units,
 		Ceremony:      ceremony,
+		TestOnly:      r.FormValue("test_only") == "on",
 		CreatedByID:   createdByID,
 		CreatedByName: createdByName,
 	}
@@ -260,9 +261,9 @@ func (h *Handler) renderManualError(w http.ResponseWriter, r *http.Request, msg 
 	}
 	sort.Strings(sortedUnitIDs)
 
-	// Pre-fill from latest collection
+	// Pre-fill from the newest non-test collection
 	latestMap := make(map[string]models.MHSCollectionUnit)
-	if latest, err := h.CollectionStore.Latest(ctx); err == nil {
+	if latest, err := h.CollectionStore.LatestBase(ctx); err == nil {
 		for _, u := range latest.Units {
 			latestMap[u.UnitID] = u
 		}

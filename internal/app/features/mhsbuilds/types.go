@@ -69,6 +69,7 @@ type CollectionVM struct {
 	ID            string
 	Name          string
 	Description   string
+	TestOnly      bool
 	UnitsSummary  string // "unit1:v2.2.2, unit2:v2.2.2, ..."
 	CreatedAt     time.Time
 	CreatedByName string
@@ -118,6 +119,7 @@ type EditCollectionData struct {
 	ID          string
 	Name        string
 	Description string
+	TestOnly    bool
 	Units       []EditCollectionUnitRow
 	Ceremony    CeremonyRow
 	IsActive    bool
@@ -211,6 +213,7 @@ type CollectionDetailData struct {
 	ID            string
 	Name          string
 	Description   string
+	TestOnly      bool
 	Units         []CollectionUnitVM
 	Ceremony      *CollectionCeremonyVM // nil when the collection has no ceremony
 	CreatedAt     time.Time

@@ -137,6 +137,7 @@ func (h *Handler) HandleUploadConfirm(w http.ResponseWriter, r *http.Request) {
 	buildIdentifier := r.FormValue("build_identifier")
 	collectionName := r.FormValue("collection_name")
 	collectionDesc := r.FormValue("collection_description")
+	testOnly := r.FormValue("test_only") == "on"
 
 	// Clean up temp file when done
 	defer func() {
@@ -201,8 +202,8 @@ func (h *Handler) HandleUploadConfirm(w http.ResponseWriter, r *http.Request) {
 		newBuilds = append(newBuilds, build)
 	}
 
-	// Create the collection: inherit from latest, override uploaded units
-	coll, err := h.createCollectionWithUploads(ctx, collectionName, collectionDesc, newBuilds, createdByID, createdByName)
+	// Create the collection: inherit from the newest non-test collection, override uploaded units
+	coll, err := h.createCollectionWithUploads(ctx, collectionName, collectionDesc, testOnly, newBuilds, createdByID, createdByName)
 	if err != nil {
 		h.ErrLog.LogServerError(w, r, "Failed to create collection", err, "Failed to create collection", "/mhsbuilds/upload")
 		return
@@ -305,20 +306,21 @@ func (h *Handler) uploadUnitFromZip(ctx context.Context, zr *zip.Reader, basePat
 	return build, nil
 }
 
-// createCollectionWithUploads creates a new collection inheriting from the latest existing collection
-// and overriding units that were just uploaded.
-func (h *Handler) createCollectionWithUploads(ctx context.Context, name, description string, newBuilds []models.MHSBuild, createdByID primitive.ObjectID, createdByName string) (models.MHSCollection, error) {
+// createCollectionWithUploads creates a new collection inheriting from the newest collection that
+// is not a test collection, and overriding units that were just uploaded.
+func (h *Handler) createCollectionWithUploads(ctx context.Context, name, description string, testOnly bool, newBuilds []models.MHSBuild, createdByID primitive.ObjectID, createdByName string) (models.MHSCollection, error) {
 	// Build a map of new builds by unit ID
 	newBuildMap := make(map[string]models.MHSBuild, len(newBuilds))
 	for _, b := range newBuilds {
 		newBuildMap[b.UnitID] = b
 	}
 
-	// Start from the latest collection to inherit unchanged units (and its
-	// ceremony reference — an upload never changes the ceremony)
+	// Start from the newest non-test collection to inherit unchanged units (and
+	// its ceremony reference — an upload never changes the ceremony). A test
+	// collection is skipped, so a test build never passes into another upload.
 	var units []models.MHSCollectionUnit
 	var ceremony *models.MHSCollectionCeremony
-	latest, err := h.CollectionStore.Latest(ctx)
+	latest, err := h.CollectionStore.LatestBase(ctx)
 	if err == nil {
 		if latest.HasCeremony() {
 			c := *latest.Ceremony
@@ -354,6 +356,7 @@ func (h *Handler) createCollectionWithUploads(ctx context.Context, name, descrip
 		Description:   description,
 		Units:         units,
 		Ceremony:      ceremony,
+		TestOnly:      testOnly,
 		CreatedByID:   createdByID,
 		CreatedByName: createdByName,
 	}

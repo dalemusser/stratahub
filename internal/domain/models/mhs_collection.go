@@ -18,10 +18,16 @@ type MHSCollection struct {
 	// Ceremony is the end-of-game ceremony version served after the last
 	// unit; nil means the collection has no ceremony (the game returns to the
 	// units page as before). Pinned per collection like the units.
-	Ceremony      *MHSCollectionCeremony `bson:"ceremony,omitempty" json:"ceremony,omitempty"`
-	CreatedAt     time.Time              `bson:"created_at" json:"created_at"`
-	CreatedByID   primitive.ObjectID     `bson:"created_by_id" json:"created_by_id"`
-	CreatedByName string                 `bson:"created_by_name" json:"created_by_name"`
+	Ceremony *MHSCollectionCeremony `bson:"ceremony,omitempty" json:"ceremony,omitempty"`
+	// TestOnly marks a collection made to try out a test build. An upload
+	// fills the units it leaves out from the newest collection that is not a
+	// test collection, so a test build never passes into someone else's
+	// upload. Students only get a test collection if it is activated or
+	// assigned to them.
+	TestOnly      bool               `bson:"test_only,omitempty" json:"test_only,omitempty"`
+	CreatedAt     time.Time          `bson:"created_at" json:"created_at"`
+	CreatedByID   primitive.ObjectID `bson:"created_by_id" json:"created_by_id"`
+	CreatedByName string             `bson:"created_by_name" json:"created_by_name"`
 }
 
 // MHSCollectionCeremony is a reference to a specific ceremony version

@@ -75,14 +75,27 @@ func (s *Store) Latest(ctx context.Context) (models.MHSCollection, error) {
 	return c, err
 }
 
-// Update updates a collection's name, description, units, and ceremony
-// reference (a nil Ceremony removes it).
+// LatestBase returns the most recently created collection that is not a test
+// collection: the one an upload or a new manual collection starts from.
+func (s *Store) LatestBase(ctx context.Context) (models.MHSCollection, error) {
+	var c models.MHSCollection
+	opts := options.FindOne().SetSort(bson.D{{Key: "created_at", Value: -1}})
+	err := s.c.FindOne(ctx, bson.M{"test_only": bson.M{"$ne": true}}, opts).Decode(&c)
+	if err == mongo.ErrNoDocuments {
+		return c, ErrNotFound
+	}
+	return c, err
+}
+
+// Update updates a collection's name, description, units, ceremony
+// reference (a nil Ceremony removes it) and test flag.
 func (s *Store) Update(ctx context.Context, id primitive.ObjectID, coll models.MHSCollection) error {
 	update := bson.M{
 		"$set": bson.M{
 			"name":        coll.Name,
 			"description": coll.Description,
 			"units":       coll.Units,
+			"test_only":   coll.TestOnly,
 		},
 	}
 	if coll.HasCeremony() {

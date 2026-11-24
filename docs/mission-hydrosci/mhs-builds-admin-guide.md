@@ -71,9 +71,14 @@ The system checks in this order (first match wins):
 4. Optionally enter a build identifier (defaults to the zip filename)
 5. Click **Analyze Build** — the system detects which units are in the zip
 6. Review detected units, adjust version numbers if needed
-7. Click **Confirm & Upload to CDN** — files are uploaded to S3 and a new collection is created
+7. Tick **Test collection** if the build is only there to be tried out (see below)
+8. Click **Confirm & Upload to CDN** — files are uploaded to S3 and a new collection is created
 
-The new collection inherits unchanged units from the most recent existing collection and overrides the ones that were just uploaded.
+The new collection inherits unchanged units from the most recent collection that is not a test collection, and overrides the ones that were just uploaded.
+
+### Test collections
+
+A collection made to try out a test build (a fix that is not part of the team's builds yet) is marked **Test collection**, on the upload review page, the manual-create form or the edit form. Later uploads never take units from a test collection (and the manual-create form is never pre-filled from one), so a test build can't pass into someone else's upload by being the newest collection. A test collection works like any other otherwise: it can be assigned to a user, pinned to a group or activated. The collections list and the collection page show a **Test** label.
 
 ### Create Manually (from existing S3 files)
 
@@ -185,7 +190,7 @@ When deploying updates or testing on the server, use **Maintenance Mode** to blo
 ## Typical Workflow: Fixing One Unit
 
 1. Developers provide a zip with just the fixed unit (e.g., only unit5)
-2. Upload the zip — the new collection inherits unit1-4 from the previous collection and uses the new unit5
+2. Upload the zip — the new collection inherits unit1-4 from the newest collection that is not a test collection, and uses the new unit5
 3. Test the new collection
 4. Activate it — groups that are pinned stay on their version; unpinned groups get the fix
 
@@ -220,7 +225,7 @@ Every collection has an **End-of-game ceremony** select on the manual-create
 and edit forms: **None** (the game's own ending returns students to the units
 page, as before) or one of the registered versions. The collection detail
 page shows the chosen version and its size. A collection created by
-uploading a build inherits the previous collection's ceremony.
+uploading a build inherits the ceremony of the collection it takes its other units from.
 
 Activating a collection with a ceremony makes it live for the workspace at
 once, for students who have already finished as well as those who finish
